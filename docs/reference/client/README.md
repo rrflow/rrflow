@@ -15,3 +15,4 @@ automation authority. Wire shapes remain owned by the
 | Client | Durable warp | Checkout record | State |
 |---|---|---|---|
 | Connectome operator/developer workbench | [`rrflow://rrflow-instance/data/reference/client/connectome`](rrflow://rrflow-instance/data/reference/client/connectome) | [`connectome.md`](connectome.md) | active target contract; separate implementation is partial and non-conforming |
+| Connectome real-engine handoff | [`rrflow://rrflow-instance/data/reference/client/connectome-implementation-guide`](rrflow://rrflow-instance/data/reference/client/connectome-implementation-guide) | [`connectome-implementation-guide.md`](connectome-implementation-guide.md) | supporting source-audited guide; implementation order and real-persistence oracle only |

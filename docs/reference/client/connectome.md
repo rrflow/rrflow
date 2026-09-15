@@ -17,6 +17,11 @@ language clients. Roadmap [H-06](../../roadmap/rrflow-1.0.md#gate-h--prove-conte
 owns implementation and acceptance. This record cannot add an engine operation
 or declare Connectome qualified.
 
+The [real-engine implementation guide](connectome-implementation-guide.md)
+maps the audited separate checkout to concrete replacement packages and a
+write/kill/restart/readback acceptance journey. It is supporting guidance, not
+another contract or H-06 qualification record.
+
 ## Product and authority boundary
 
 Connectome is RRFlow's optional operator and developer workbench. It is built,
@@ -290,7 +295,7 @@ H-06.
 |---|---|---|
 | Separate React/Tauri repository and production build | Connectome remains independently built and released. | The production bundle still carries SurrealDB client/UI/CBOR/Wasm aliases, QL Wasm packages, inherited surfaces, and multi-megabyte chunks. They are removed when the corresponding RRFlow surface exists; no compatibility or migration mode survives. |
 | `src-tauri/src/rrd/client.rs` and `transport.rs` | Native loopback validation, redirect denial, response limits, one authenticated session, and explicit close have four passing focused tests. | The client handwrites a partial RRD contract, exposes generic JSON, supports only capabilities/session/diagnostics/context, has no network TLS or WebSocket path, and is not generated from or conformed against the shared public contract/SDK corpus. |
-| `src/rrflow/runtime.ts` | Bounded URL construction and response-shape checks are useful client defenses. | It duplicates protocol truth and consumes the now-rejected scalar deployment list (`memory`, `embedded`, `local_daemon`, `edge`, `remote`, `distributed`). Replace it from generated RRFlow OpenAPI digest `0ef644d8b65019d3fdbb3cf6bf5dd0961473d41d66b0080529801d0008cd9040`; retain no fallback decoder. |
+| `src/rrflow/runtime.ts` | Bounded URL construction and response-shape checks are useful client defenses. | It duplicates protocol truth and consumes the now-rejected scalar deployment list (`memory`, `embedded`, `local_daemon`, `edge`, `remote`, `distributed`). Replace it with generated types bound to the packaged and advertised RRFlow OpenAPI identity; retain no fallback decoder. |
 | `src/rrflow/attunement.ts` and runtime-connection UI | The eleven phase names and honest progress presentation can be projected from RRD. | The client duplicates attunement phases, estimates, trigger/routine/hook/skill definitions, status, and static automation rows. All lifecycle state must come from public engine job records and capabilities. |
 | `src/rrflow/diagnostics.ts` | A detailed trace/run inspector remains a required view. | It defines a retired diagnostics protocol, provider-flight state and runners, and private `/api/*` routes. This is a parallel diagnostics/reasoning lifecycle and is removed directly. |
 | `src/rrflow/control-plane.ts` | Multi-instance navigation remains a valid client use case. | It invents a client-owned `rrflow-control` protocol and managed-instance state without an accepted engine/fleet contract. It cannot be treated as current RRFlow capability. |
@@ -302,13 +307,20 @@ tests pass. The build reports unresolved/browser-externalized SurrealDB QL/Wasm
 paths and oversized chunks. Four focused native `rrd` tests pass. These results
 prove a compilable, renderable, partially connected rough draft only.
 
+RRFlow's own installed-lifecycle oracle now commits and queries a claim, kills
+the serving process abruptly, starts the same installed project again, performs
+fresh readiness and session handshakes, and returns the same claim through the
+public Rust client before final offline verification. That proves a concrete
+persistence target on the engine side; it does not prove the separate
+Connectome artifact consumes it.
+
 ## Direct-convergence sequence
 
 Implementation remains one reviewed package at a time in the separate
 Connectome repository:
 
-1. Generate or consume one qualified public RRD client surface at the exact
-   OpenAPI digest above; implement the structured identity/deployment/
+1. Generate or consume one qualified public RRD client surface bound to one
+   exact packaged OpenAPI digest; implement the structured identity/deployment/
    configuration bootstrap and delete handwritten/old-vocabulary branches in
    the same package.
 2. Implement the native credential, endpoint, HTTP/WebSocket, session,

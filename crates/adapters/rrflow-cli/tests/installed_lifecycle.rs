@@ -15,7 +15,7 @@ use rrd_engine::RrdEngine;
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Child, ChildStdout, Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 fn binary() -> &'static str {
@@ -85,6 +85,74 @@ fn terminate_abruptly(child: &mut Child) {
             panic!("rrflow serve did not exit after abrupt termination");
         }
         std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn start_installed_service(
+    project: &str,
+    executable: &str,
+    captured: &mut Vec<u8>,
+) -> (Child, BufReader<ChildStdout>, String, String) {
+    let mut child = Command::new(binary())
+        .args([
+            "--json",
+            "serve",
+            "--project",
+            project,
+            "--bind",
+            "127.0.0.1:0",
+            "--test-distribution-executable",
+            executable,
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start installed rrflow service");
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    let mut announcement = String::new();
+    stdout.read_line(&mut announcement).unwrap();
+    if announcement.is_empty() {
+        let mut error = String::new();
+        child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_string(&mut error)
+            .unwrap();
+        panic!("serve exited before readiness: {error}");
+    }
+    captured.extend_from_slice(announcement.as_bytes());
+    let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
+    assert_eq!(announcement["status"], "listening");
+    let address = announcement["url"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("http://")
+        .unwrap()
+        .to_owned();
+    let instance_id = announcement["instance_id"].as_str().unwrap().to_owned();
+    (child, stdout, address, instance_id)
+}
+
+fn terminate_and_capture(
+    mut child: Child,
+    mut stdout: BufReader<ChildStdout>,
+    captured: &mut Vec<u8>,
+) {
+    terminate_abruptly(&mut child);
+    stdout.read_to_end(captured).unwrap();
+    child.stderr.take().unwrap().read_to_end(captured).unwrap();
+}
+
+fn installed_query_budget() -> QueryBudget {
+    QueryBudget {
+        max_storage_keys: 75_000,
+        max_rows: 768,
+        max_output_bytes: 393_216,
+        max_batch_rows: 192,
+        max_memory_bytes: 33_554_432,
+        max_spill_bytes: 67_108_864,
+        max_elapsed_ms: 20_000,
     }
 }
 
@@ -360,42 +428,8 @@ max_elapsed_ms = 20000
         true
     );
 
-    let mut child = Command::new(binary())
-        .args([
-            "--json",
-            "serve",
-            "--project",
-            project_arg,
-            "--bind",
-            "127.0.0.1:0",
-            "--test-distribution-executable",
-            executable_arg,
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("start installed rrflow service");
-    let mut stdout = BufReader::new(child.stdout.take().unwrap());
-    let mut announcement = String::new();
-    stdout.read_line(&mut announcement).unwrap();
-    if announcement.is_empty() {
-        let mut error = String::new();
-        child
-            .stderr
-            .take()
-            .unwrap()
-            .read_to_string(&mut error)
-            .unwrap();
-        panic!("serve exited before readiness: {error}");
-    }
-    lifecycle_output.extend_from_slice(announcement.as_bytes());
-    let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
-    assert_eq!(announcement["status"], "listening");
-    let address = announcement["url"]
-        .as_str()
-        .unwrap()
-        .strip_prefix("http://")
-        .unwrap();
+    let (child, stdout, address, installed_instance_id) =
+        start_installed_service(project_arg, executable_arg, &mut lifecycle_output);
 
     let ready = invoke(&[
         "--json",
@@ -403,7 +437,7 @@ max_elapsed_ms = 20000
         "--project",
         project_arg,
         "--address",
-        address,
+        &address,
     ]);
     capture_output(&ready, &mut lifecycle_output);
     assert_success(&ready, "live UI discovery");
@@ -437,11 +471,14 @@ max_elapsed_ms = 20000
     let credential = RrdEngine::read_installed_api_key(&project).unwrap();
     let client = RrdClient::connect_local(
         address.parse().unwrap(),
-        locator.identity.instance_id,
+        locator.identity.instance_id.clone(),
         ClientConfig::default(),
     )
     .unwrap();
-    tokio::runtime::Builder::new_current_thread()
+    let query_text = format!(
+        "FROM claim:status AT VALID {installed_at} KNOWN HEAD WHERE subject = \"installed-walking-product\" PROJECT subject, object EXPLAIN CONTRACT"
+    );
+    let (committed_claim_sequence, first_query) = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -511,9 +548,6 @@ max_elapsed_ms = 20000
                 .unwrap();
             assert_eq!(receipt.mutation_count, 1);
 
-            let query_text = format!(
-                "FROM claim:status AT VALID {installed_at} KNOWN HEAD WHERE subject = \"installed-walking-product\" PROJECT subject, object EXPLAIN CONTRACT"
-            );
             let denied = client
                 .execute_query(
                     &session,
@@ -544,17 +578,9 @@ max_elapsed_ms = 20000
                     &session,
                     ExecuteQuery {
                         scope: format!("instance:{}", client.instance_id()),
-                        query: query_text,
+                        query: query_text.clone(),
                         parameters: BTreeMap::new(),
-                        budget: QueryBudget {
-                            max_storage_keys: 75_000,
-                            max_rows: 768,
-                            max_output_bytes: 393_216,
-                            max_batch_rows: 192,
-                            max_memory_bytes: 33_554_432,
-                            max_spill_bytes: 67_108_864,
-                            max_elapsed_ms: 20_000,
-                        },
+                        budget: installed_query_budget(),
                     },
                     RequestOptions::read(
                         "installed-test-query-request",
@@ -564,6 +590,7 @@ max_elapsed_ms = 20000
                 )
                 .await
                 .unwrap();
+            assert!(query.known_at_cursor >= receipt.last_claim_sequence);
             assert_eq!(query.rows.len(), 1);
             assert_eq!(
                 query.rows[0].identity,
@@ -586,6 +613,7 @@ max_elapsed_ms = 20000
                 )
                 .await
                 .unwrap();
+            (receipt.last_claim_sequence, query)
         });
 
     let live_verify = invoke(&[
@@ -603,14 +631,119 @@ max_elapsed_ms = 20000
         "offline verifier must not race the live writer"
     );
 
-    terminate_abruptly(&mut child);
-    stdout.read_to_end(&mut lifecycle_output).unwrap();
-    child
-        .stderr
-        .take()
+    terminate_and_capture(child, stdout, &mut lifecycle_output);
+
+    let (restarted_child, restarted_stdout, restarted_address, restarted_instance_id) =
+        start_installed_service(project_arg, executable_arg, &mut lifecycle_output);
+    assert_eq!(restarted_instance_id, installed_instance_id);
+
+    let restarted_ready = invoke(&[
+        "--json",
+        "ready",
+        "--project",
+        project_arg,
+        "--address",
+        &restarted_address,
+    ]);
+    capture_output(&restarted_ready, &mut lifecycle_output);
+    assert_success(&restarted_ready, "post-kill live UI discovery");
+    let restarted_ready: serde_json::Value =
+        serde_json::from_slice(&restarted_ready.stdout).unwrap();
+    assert_eq!(restarted_ready["status"], "ready");
+    assert_eq!(
+        restarted_ready["capabilities"]["instance"]["id"],
+        installed_instance_id
+    );
+    assert_eq!(restarted_ready["authentication"]["session_closed"], true);
+
+    let restarted_locator = RrdEngine::read_project_locator(&project).unwrap();
+    assert_eq!(
+        restarted_locator.identity.instance_id,
+        locator.identity.instance_id
+    );
+    let restarted_client = RrdClient::connect_local(
+        restarted_address.parse().unwrap(),
+        restarted_locator.identity.instance_id,
+        ClientConfig::default(),
+    )
+    .unwrap();
+    let restarted_query = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
         .unwrap()
-        .read_to_end(&mut lifecycle_output)
-        .unwrap();
+        .block_on(async {
+            let session = restarted_client
+                .create_session(
+                    credential.principal_id.clone(),
+                    credential.credential(),
+                    CreateSession {
+                        limits: SessionLimits {
+                            idle_timeout_ms: 60_000,
+                            absolute_timeout_ms: 300_000,
+                            max_open_transactions: 1,
+                        },
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-restart-session-request",
+                        "installed-test-restart-session-operation",
+                        "installed-test-restart-session-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            let query = restarted_client
+                .execute_query(
+                    &session,
+                    ExecuteQuery {
+                        scope: format!("instance:{}", restarted_client.instance_id()),
+                        query: query_text,
+                        parameters: BTreeMap::new(),
+                        budget: installed_query_budget(),
+                    },
+                    RequestOptions::read(
+                        "installed-test-restart-query-request",
+                        "installed-test-restart-query-operation",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            restarted_client
+                .close_session(
+                    &session,
+                    CloseSession {},
+                    RequestOptions::mutation(
+                        "installed-test-restart-close-request",
+                        "installed-test-restart-close-operation",
+                        "installed-test-restart-close-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            query
+        });
+    assert!(restarted_query.known_at_cursor >= committed_claim_sequence);
+    assert_eq!(restarted_query.canonical_query, first_query.canonical_query);
+    assert_eq!(restarted_query.scope, first_query.scope);
+    assert_eq!(restarted_query.schema_revision, first_query.schema_revision);
+    assert_eq!(
+        restarted_query.read_manifest_sha256,
+        first_query.read_manifest_sha256
+    );
+    assert_eq!(restarted_query.rows, first_query.rows);
+    assert_eq!(restarted_query.rows.len(), 1);
+    assert_eq!(
+        restarted_query.rows[0].identity,
+        "claim:installed-walking-product:status"
+    );
+    assert_eq!(
+        restarted_query.rows[0].values.get("object"),
+        Some(&QueryValue::String("ui-queryable".into()))
+    );
+
+    terminate_and_capture(restarted_child, restarted_stdout, &mut lifecycle_output);
     let reopened = invoke(&[
         "--json",
         "verify",

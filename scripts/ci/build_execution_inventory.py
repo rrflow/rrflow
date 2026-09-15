@@ -1615,6 +1615,13 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
         "J-03",
         "J-05",
     ),
+    "docs/reference/client/connectome-implementation-guide.md": (
+        "D-01",
+        "H-04",
+        "H-06",
+        "J-03",
+        "J-05",
+    ),
     "docs/reference/context/README.md": ("KB-05", "KB-08"),
     "docs/reference/context/context-maintenance.md": ("KB-05",),
     "docs/reference/context/retrieval.md": ("KB-05",),
