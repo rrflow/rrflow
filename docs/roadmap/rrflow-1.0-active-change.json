@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "package_id": "D01-H06-connectome-real-persistence-handoff-v1",
+  "package_id": "J02-reproducible-development-container-v1",
   "status": "active",
-  "package_kind": "installed-ui-persistence-proof-and-connectome-implementation-guide",
+  "package_kind": "repository-development-environment-and-ci-parity-policy",
   "baseline": {
-    "revision": "3fa90fadf6e00d21345523350df1c960f0e10501",
-    "tree": "451a105ec3085273831bdb7cf0db9a37ef84893e",
+    "revision": "676fe533366349dc7f3c2340129e1a3a332c7f30",
+    "tree": "f05365297d9463f91bc297dbda7f02cecf81593d",
     "branch": "agent/connectome-temporal-runtime-visualizer",
     "development_remote": "development",
     "development_url": "https://github.com/rrflow/rrflow-development.git",
@@ -13,22 +13,20 @@
     "cargo_lock_sha256": "316533e7512dbb9029e494386503ca8430b0c69853b3b78ef02319dcbab93a27"
   },
   "authority": {
-    "alpha_prerequisite": "Make the D-01-installed RRFlow process a concrete Connectome development target by proving one committed rrflowDB value survives abrupt process loss, service restart, fresh discovery, fresh authentication, and a public SDK query, then give the separate Connectome repository an exact source-audited implementation handoff that cannot mistake mocks, renamed SurrealDB code, hard-coded rows, or an unauthenticated health probe for a working RRFlow product.",
-    "roadmap_gates": ["D-01", "H-04", "H-06", "J-03", "J-05"],
-    "poam_items": ["POAM-006", "POAM-011"],
-    "architecture_owner": "docs/reference/client/connectome.md"
+    "alpha_prerequisite": "Give every developer and AI host one reproducible Linux workspace whose toolchains, native build dependencies, and optional pgvector service equal the candidate-CI pins, so the checked-in presubmit, focused engine tests, and SDK conformance run locally with the same tool identity that J-02 release evidence must record, without making the container a second CI, lifecycle, or RRFlow runtime authority.",
+    "roadmap_gates": ["J-02"],
+    "poam_items": ["POAM-027"],
+    "architecture_owner": "docs/operations/ci.md"
   },
-  "current_behavior": "At clean RRFlow baseline 3fa90fad, the primary rrflow binary plans/applies an installation, serves one installed RrdEngine, authenticates readiness, commits a claim through the public Rust client, and queries it in the first process. The test then kills that process and proves only offline structural verification; it never restarts serve, creates a fresh session, or queries the value again. The separate Connectome checkout at 38f68ce7 contains a useful but handwritten native RRD session prototype that is not invoked by any screen. Its active runtime screen declares RRD connected and every stage verified after only three unauthenticated GETs; its browser smoke test intercepts those GETs and returns fixed 0.1.0/local_daemon/rrd-lsm data. The checkout also retains SurrealDB packages renamed as RRFlow, an incompatible legacy rrflow start command, a hard-coded cloud endpoint and namespace/database, static attunement/automation truth, and client-invented diagnostics/control protocols. RRFlow has no concise guide that tells that repository exactly what to retain, remove, generate, wire, and prove against real persistence.",
-  "target_behavior": "The primary installed-lifecycle test starts the same installed rrflow binary again after an abrupt kill, verifies the announced instance, repeats authenticated readiness, creates a new public-client session, executes the same bounded rrflowQL query, and proves the same committed claim identity/value at or beyond the acknowledged sequence before final offline verification. One supporting Connectome implementation guide binds its audit to the exact separate-checkout revision; identifies real, dead, mocked, hard-coded, parallel-authority, and legacy paths; specifies the target renderer-to-native-to-public-RRD-to-RrdEngine-to-rrflowKV boundary; gives exact RRFlow install/serve/ready commands and generated-contract inputs; defines the first file/symbol edit packages and stop conditions; and requires a real artifact test that commits, renders engine-issued coordinates, kills RRFlow, restarts, reconnects, and renders the same value. The guide clearly marks secure installed credential handoff, packaged generated SDK consumption, complete WebSocket dispatch, signed bundles, and full H-06 conformance as open rather than inventing an insecure workaround.",
+  "current_behavior": "At clean baseline 676fe533 no Containerfile, Dockerfile, devcontainer, or compose file exists anywhere in repository history. Candidate CI pins Rust 1.98.0, Python 3.11.16, uv 0.11.21, Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12 (SHA-512), .NET SDK 10.0.111, and a digest-pinned pgvector service, but those pins exist only in GitHub Actions setup steps. A Windows checkout therefore diverges: core.filemode reports executable-bit loss on 13 scripts, python3 resolves to the Microsoft Store stub, and 14 of 20 scripts/ci/test_change_plan.py cases fail because fixtures written in text mode gain CRLF bytes that no longer match their LF digests. Nothing checks that a local environment matches CI.",
+  "target_behavior": "One .devcontainer directory supplies a digest-pinned Ubuntu 24.04 amd64 Containerfile with a lean rust target (Rust 1.98.0 with clippy/rustfmt, native C/C++ build dependencies, uv 0.11.21 and Python 3.11.16 as python3) and a full target that adds the exact CI SDK toolchains; every download is verified against an embedded SHA-256 or SHA-512. devcontainer.json builds the rust target for VS Code with rootless-Podman user mapping and no lifecycle command; compose.yaml drives the same image from the Podman CLI with named source and cache volumes and an opt-in pgvector profile using the CI image digest and credentials. A seed script clones committed history from a read-only mount of an existing checkout into the source volume and restores its remotes, so work happens on a native Linux filesystem. scripts/ci/check_workflow.py fails when any container toolchain pin, checksum, base or service image digest, or the pgvector test identity diverges from rust-toolchain.toml and ci-reusable.yml. docs/operations/ci.md documents the workspace as local reproduction, never as CI evidence or a hook.",
   "unchanged_behavior": [
-    "README, objective, roadmap, and POA&M retain identity, outcome, dependency/status, and deficiency authority; no gate or deficiency closes.",
-    "Fjall remains only a pinned correctness/performance opponent. SurrealDB, Qdrant, Tauri, Connectome, and other external projects never become RRFlow persistence, lifecycle, query, or semantic authority.",
-    "The rrflow command tree remains version, install, serve, ready, and verify; this package adds no hidden operator command, credential broker, browser-authentication profile, or second lifecycle.",
-    "The executable operation catalogue, OpenAPI document, internal client bindings, and generated SDK projections remain the only permitted public-surface source; the guide adds no handwritten catalogue.",
-    "The Connectome sibling checkout is inspected read-only and is not edited, committed, pushed, imported, or made a build/runtime dependency of RRFlow in this package.",
-    "The test-only distribution override and engine-internal installed credential reader remain test fixtures and are not presented as production Connectome APIs.",
-    "A UI render, build, fake server, intercepted request, liveness/readiness response, open port, or static label remains non-qualifying evidence.",
-    "Version 1.0.0, protocol version 1, Cargo.lock, dependencies, official promotion target, and pre-release status do not change."
+    "README, objective, roadmap, and POA&M retain identity, outcome, status, and deficiency authority; no gate, checkbox, or deficiency changes status.",
+    "Candidate CI jobs, triggers, runners, action pins, ci-gate reduction, and the ARC deployment remain unchanged; the container is local reproduction and cannot satisfy or replace pipeline / ci-gate.",
+    "No Git, editor, provider, or RRFlow runtime hook is added: devcontainer.json declares no postCreate, postStart, or other lifecycle command, and AGENTS.md hook policy is untouched.",
+    "No Rust source, Cargo manifest, Cargo.lock, SDK source, generated product surface, dependency, protocol, version 1.0.0, or remote/promotion configuration changes.",
+    "The RRFlow default distribution, installation path, and offline runtime contract are unaffected; container toolchain downloads are development build inputs like the CI setup actions, never RRFlow install-time or runtime fetches.",
+    "The Windows checkout remains supported for editing; the Windows-only CRLF fixture defect in scripts/ci/test_change_plan.py is characterized, not fixed, by this package."
   ],
   "planning_commit": {
     "must_precede_implementation": true,
@@ -36,108 +34,125 @@
     "allowed_paths": ["docs/roadmap/rrflow-1.0-active-change.json"]
   },
   "reviewed_files": [
-    {"path":"docs/roadmap/rrflow-1.0-active-change.json","baseline_sha256":"db729903be0a0dbb94bcd1be9277a1a74273fc44e777d6386120d2ec68f3d697","baseline_lines":237,"reviewed_lines":"1-237","symbols":["complete preceding D01 clock package effect envelope"]},
-    {"path":"AGENTS.md","baseline_sha256":"6ed5e45f260a42f8a0a008b3023d50cb165df788bee94485390c5af5938c6ef1","baseline_lines":161,"reviewed_lines":"1-161","symbols":["complete repository engineering and evidence rules"]},
-    {"path":"README.md","baseline_sha256":"85a6c35efdb4b5a3b229007cfd0e530a5e44676c806c5e986758b9dd00f096ad","baseline_lines":282,"reviewed_lines":"1-282","symbols":["complete product identity, maturity, operation map, and warp points"]},
-    {"path":"docs/objectives/rrflow-1.0-alpha.md","baseline_sha256":"1b0f0d10d6c1e5ae9f22a157f21baa44d539550ac98a3e88b96278bf6c75df01","baseline_lines":65,"reviewed_lines":"1-65","symbols":["complete measurable alpha outcomes"]},
-    {"path":"docs/roadmap/rrflow-1.0.md","baseline_sha256":"ee5445a41ba7d5d07393150ce6ee5ab259284d43d4603b96efe35c7990e4db42","baseline_lines":165,"reviewed_lines":"1-165","symbols":["complete roadmap dependency and status owner"]},
-    {"path":"docs/roadmap/rrflow-1.0/gate-d.md","baseline_sha256":"fa170ae354c24c88563d594b8d2949fa1fb199e40fd8710acc54625ae2930f31","baseline_lines":31,"reviewed_lines":"1-31","symbols":["D-01 installed walking-product requirement and evidence"]},
-    {"path":"docs/roadmap/rrflow-1.0/gate-h.md","baseline_sha256":"51efe3532a3e6cfda3917fb48f190ce154533ddb16737d85190d79160cda82b4","baseline_lines":74,"reviewed_lines":"1-74","symbols":["H-04 public surfaces and H-06 Connectome requirements"]},
-    {"path":"docs/poam/rrflow-1.0-alpha.md","baseline_sha256":"e68ae3e9221cfa77f56ffac54a30450e30d3798fa975d374b465e08e58c8012f","baseline_lines":43,"reviewed_lines":"1-43","symbols":["complete deficiency ledger"]},
-    {"path":"docs/poam/rrflow-1.0-alpha/poam-006.md","baseline_sha256":"b3cbafd6c34751c063cdb1451a0a53db12a7508d2cfb667de054aacfee37981c","baseline_lines":57,"reviewed_lines":"1-57","symbols":["installed product and attunement lifecycle deficiency"]},
-    {"path":"docs/poam/rrflow-1.0-alpha/poam-011.md","baseline_sha256":"9a53d502381b5ff9addc50000a868406ea70003283a86cde4fdef82322a16afd","baseline_lines":94,"reviewed_lines":"1-94","symbols":["public surfaces, SDKs, and Connectome deficiency"]},
-    {"path":"docs/roadmap/rrflow-1.0-execution-map.md","baseline_sha256":"982d8af7b77a21c9c1768d6356a03c978e556cb7b43d78d3fca931404b459877","baseline_lines":124,"reviewed_lines":"1-124","symbols":["complete implementation-navigation portal"]},
-    {"path":"docs/roadmap/rrflow-1.0-execution/change-authoring.md","baseline_sha256":"6ea5ed28b4621e824c53e503dae84ef46de549fed0f02d6be6298d9e7979bb42","baseline_lines":145,"reviewed_lines":"1-145","symbols":["complete effect-boundary and journal procedure"]},
-    {"path":"docs/reference/deployment/installed-lifecycle.md","baseline_sha256":"25332df05a2f9dbc1e23c58627d2e0126d692440ad7f2acb67a2d9b6a7d34857","baseline_lines":472,"reviewed_lines":"1-472","symbols":["complete install, serve, readiness, recovery, and artifact contract"]},
-    {"path":"docs/reference/protocol/public-contract.md","baseline_sha256":"90e159325a5a83ef30626026886693f58a131361835f0e30d75cd8ec634c3c7a","baseline_lines":276,"reviewed_lines":"1-276","symbols":["complete executable operation and discovery contract"]},
-    {"path":"docs/reference/client/connectome.md","baseline_sha256":"2e2b2ecfdfa8880ee0a8a4a1d5964e87664a32f5f22f1468310349ea96980e0f","baseline_lines":387,"reviewed_lines":"1-387","symbols":["complete Connectome authority, connection, interaction, and acceptance contract"]},
-    {"path":"docs/reference/client/README.md","baseline_sha256":"e6843117b42feead71190c6c85d06b6902d5ec7d1a029441661893fcc9c5cd3e","baseline_lines":17,"reviewed_lines":"1-17","symbols":["complete client reference index"]},
-    {"path":"docs/reference/sdk/rust.md","baseline_sha256":"811946e914e8027feef0779538e97787ea969908127ab8d23f9b5aac8eb735b1","baseline_lines":373,"reviewed_lines":"1-373","symbols":["complete native client boundary and known gaps"]},
-    {"path":"docs/reference/sdk/typescript.md","baseline_sha256":"0bbb631a3eff41b35ff3c031e0f8b85d3327b8475acdf0d5fddef199780e341a","baseline_lines":398,"reviewed_lines":"1-398","symbols":["complete generated UI type surface and browser/package gaps"]},
-    {"path":"crates/adapters/rrflow-cli/tests/installed_lifecycle.rs","baseline_sha256":"453fae5c35baebe17cbce00ca50d4333d55b32d0d833b54936dc5f375d471767","baseline_lines":633,"reviewed_lines":"1-633","symbols":["primary installed command guards","installed_engine_plans_applies_serves_discovers_authenticates_and_reopens"]},
-    {"path":"scripts/ci/build_execution_inventory.py","baseline_sha256":"ec296e503f1247a8d19b9013109c2683d9fb0df94dcb3f6463da7d04caa2f3cb","baseline_lines":1969,"reviewed_lines":"1-1969","symbols":["complete gate/path assignment and deterministic inventory generator"]},
-    {"path":"scripts/knowledge/render_navigation.py","baseline_sha256":"d19b692237b0ceee868de99fcc240ab5e601d49f66c1689d16bc5d8d35f17855","baseline_lines":351,"reviewed_lines":"1-351","symbols":["complete coordinated-record index and graph generator"]},
-    {"path":"docs/evidence/change-journals/gate-h/README.md","baseline_sha256":"1334862e68633b105f8a2e3dd8e8003d377b9efb28f1028b73264e1348e5f343","baseline_lines":15,"reviewed_lines":"1-15","symbols":["complete generated Gate H journal index"]}
+    {"path":"docs/roadmap/rrflow-1.0-active-change.json","baseline_sha256":"28ad4fe89fef63aa59a3df1abcf2699552d3cfb1640d7bfd00664fe1e9af794e","baseline_lines":143,"reviewed_lines":"1-143","symbols":["complete preceding D01-H06 Connectome persistence package envelope"]},
+    {"path":"AGENTS.md","baseline_sha256":"6ed5e45f260a42f8a0a008b3023d50cb165df788bee94485390c5af5938c6ef1","baseline_lines":161,"reviewed_lines":"1-161","symbols":["repository containment, hook prohibition, change-authoring and journal rules"]},
+    {"path":"README.md","baseline_sha256":"85a6c35efdb4b5a3b229007cfd0e530a5e44676c806c5e986758b9dd00f096ad","baseline_lines":282,"reviewed_lines":"1-282","symbols":["product identity, owner warps, repository verification row"]},
+    {"path":"docs/roadmap/rrflow-1.0-execution/change-authoring.md","baseline_sha256":"6ea5ed28b4621e824c53e503dae84ef46de549fed0f02d6be6298d9e7979bb42","baseline_lines":145,"reviewed_lines":"1-145","symbols":["change sequence, journal template, global stop conditions"]},
+    {"path":"docs/roadmap/rrflow-1.0/gate-j.md","baseline_sha256":"73b5da9e503765ff600fefed752fea7f7b7d9c839160d053bb32da50bbce3b92","baseline_lines":32,"reviewed_lines":"1-32","symbols":["J-02 tool-version and command evidence requirement"]},
+    {"path":"docs/poam/rrflow-1.0-alpha/poam-027.md","baseline_sha256":"ba81c5dbb89cb66ac49961e44b6382b098a895d56f58b1235dd550f80d98e311","baseline_lines":63,"reviewed_lines":"1-63","symbols":["local presubmit bypassability and no-hook remediation boundary"]},
+    {"path":"docs/operations/ci.md","baseline_sha256":"2d484763faafa27f09189b22304e6e129e77e38ec9ff8abefbb54a58a913fab5","baseline_lines":308,"reviewed_lines":"1-308","symbols":["presubmit boundary","repository workflow policy","runner trust boundary"]},
+    {"path":".github/workflows/ci.yml","baseline_sha256":"489b9e60da94adb6b6cf65348674013634181985b4820fd61fc5363813d9b54b","baseline_lines":31,"reviewed_lines":"1-31","symbols":["candidate caller and runner routing"]},
+    {"path":".github/workflows/ci-reusable.yml","baseline_sha256":"0dcbefdc0747a3798b0f8446be19c43fe14febf59988f7816576871ae62ed1c3","baseline_lines":354,"reviewed_lines":"1-354","symbols":["toolchain pins","sdk-conformance setup","pgvector-feature service image and test URL"]},
+    {"path":"deploy/ci/github-actions/arc/rrflow-heavy.values.yaml","baseline_sha256":"218045e514813e242c959c71f5320c8bfeec7c1bee4d8cfb1ea8b7d852d94b44","baseline_lines":126,"reviewed_lines":"1-126","symbols":["digest-pinned runner and Docker sidecar images"]},
+    {"path":"rust-toolchain.toml","baseline_sha256":"495c69d1db93f25f53e3d0d2d40d812313366cc368de317871c2ace6c6ffafa4","baseline_lines":4,"reviewed_lines":"1-4","symbols":["Rust channel and components"]},
+    {"path":".gitignore","baseline_sha256":"83a9925567d3d4f02fa121e1ca2e55f787cf3d70fa86c6324769e17d2885ab3f","baseline_lines":26,"reviewed_lines":"1-26","symbols":["ignored target, tool, and estate paths"]},
+    {"path":"scripts/ci/check_workflow.py","baseline_sha256":"08a21dfc094c3bf30b896d09a29280007468e9bca8db946128190498a20a084d","baseline_lines":474,"reviewed_lines":"1-474","symbols":["verify_action_pins","verify_arc_policy","verify_sdk_conformance","main"]},
+    {"path":"scripts/ci/check_change_plan.py","baseline_sha256":"7cb42018ebd26ee8fc15aac8e51ddf16d76cfa43f179bc8713779f92e911a604","baseline_lines":828,"reviewed_lines":"1-828","symbols":["validate_schema","validate_planning_commit","validate_reviewed_files","validate_changed_paths"]},
+    {"path":"scripts/ci/build_execution_inventory.py","baseline_sha256":"0ded8734dba6e8e8f29cb51512c367bbb9177b64583de5b92b34a4263d090824","baseline_lines":1976,"reviewed_lines":"1-1976","symbols":["planned_gates","action","git_files","validate"]},
+    {"path":"scripts/knowledge/render_navigation.py","baseline_sha256":"d19b692237b0ceee868de99fcc240ab5e601d49f66c1689d16bc5d8d35f17855","baseline_lines":351,"reviewed_lines":"1-351","symbols":["record_metadata","generated_index_body","write_indexes"]}
   ],
   "implementation_changes": [
     {
-      "path": "crates/adapters/rrflow-cli/tests/installed_lifecycle.rs",
-      "baseline_state": "present",
-      "symbols": ["installed_engine_plans_applies_serves_discovers_authenticates_and_reopens", "bounded installed service helpers"],
-      "action": "Extend the single installed journey with a second service process, fresh ready/session handshake, same-query readback, exact instance/value/sequence assertions, cleanup, and final offline verification.",
-      "failure_semantics": "Fail if acknowledged state lived only in process memory, installed identity changes, discovery/authentication cannot repeat, the public query loses or changes the claim, the read cursor predates the commit, a killed child remains alive, or final verification cannot reopen the estate."
+      "path": ".devcontainer/Containerfile",
+      "baseline_state": "absent",
+      "symbols": ["rust target", "full target", "toolchain ARG pins and checksums"],
+      "action": "Create a digest-pinned ubuntu:24.04 amd64 multi-stage image: rust target with native build dependencies, rustup 1.29.1, Rust 1.98.0 plus clippy/rustfmt, uv 0.11.21, and Python 3.11.16 as python3; full target adding Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12, and .NET SDK 10.0.111 with ICU. Every artifact is verified with sha256sum/sha512sum --check --strict against an embedded ARG. Run as non-root uid 1000 with caches under /cache.",
+      "failure_semantics": "The build fails on any checksum mismatch, missing tool, or version drift; an unpinned base image, :latest tag, or unverified download is a policy failure."
     },
     {
-      "path": "scripts/ci/build_execution_inventory.py",
+      "path": ".devcontainer/devcontainer.json",
+      "baseline_state": "absent",
+      "symbols": ["build target rust", "runArgs", "mounts", "containerEnv"],
+      "action": "Build the rust target from the Containerfile for VS Code Dev Containers with rootless-Podman keep-id user mapping, host networking for loopback parity with CI, and the shared cache volume; declare no lifecycle command.",
+      "failure_semantics": "Fail review if it declares postCreate/postStart/updateContent/initialize commands, a second toolchain source, or credentials."
+    },
+    {
+      "path": ".devcontainer/compose.yaml",
+      "baseline_state": "absent",
+      "symbols": ["workspace service", "pgvector service profile", "rrflow-src and rrflow-cache volumes"],
+      "action": "Drive the same image from the Podman CLI with a named Linux source volume, a read-only seed mount of the invoking checkout, a shared cache volume, and an opt-in pgvector profile whose digest, database, user, password, and 127.0.0.1:5432 endpoint equal candidate CI.",
+      "failure_semantics": "Policy fails if the pgvector image or test identity diverges from ci-reusable.yml or any image lacks a SHA-256 digest."
+    },
+    {
+      "path": ".devcontainer/seed-workspace.sh",
+      "baseline_state": "absent",
+      "symbols": ["seed clone", "remote restoration"],
+      "action": "Clone committed history from the read-only seed mount into an empty source volume, check out the seed branch, and restore the seed repository's remote URLs without copying credentials or uncommitted files.",
+      "failure_semantics": "Refuse a non-empty destination, a missing seed repository, or an unresolved branch; never overwrite existing work."
+    },
+    {
+      "path": "scripts/ci/check_workflow.py",
       "baseline_state": "present",
-      "symbols": ["PLANNED_PATHS"],
-      "action": "Assign the new Connectome implementation guide to D-01/H-04/H-06/J-03/J-05 so generated inventory preserves its product boundary.",
-      "failure_semantics": "Fail inventory generation on an unknown gate, duplicate path, missing current path, or nondeterministic output."
+      "symbols": ["verify_development_container", "main"],
+      "action": "Add a development-container policy check that parses Containerfile ARG pins and compose images and requires equality with rust-toolchain.toml and the ci-reusable.yml toolchain, Maven checksum, and pgvector service identity, digest-pinned images, strict checksum verification, and no devcontainer lifecycle command.",
+      "failure_semantics": "Exit non-zero naming the divergent pin, image, checksum, or lifecycle field; existing CI policy checks remain unchanged."
     }
   ],
   "evidence_changes": [
-    {"path":"docs/reference/client/connectome.md","action":"Link the source-audited real-engine implementation guide and record the newly bounded installed restart readback without overstating H-06."},
-    {"path":"docs/reference/client/README.md","action":"Add a supporting implementation-guide warp while retaining Connectome as the sole client contract owner."},
-    {"path":"docs/reference/client/connectome-implementation-guide.md","action":"Create the exact separate-repository audit, target topology, file/symbol edit map, real RRFlow development workflow, anti-mock review checklist, persistence demo, rollout order, and open-blocker guide."},
-    {"path":"docs/evidence/change-journals/gate-h/h-06-connectome-real-persistence-handoff.md","action":"Create the linked immutable package record with RRFlow and Connectome baselines, full reads, changes, tests, failures, non-runs, and unchanged roadmap status."},
-    {"path":"docs/evidence/change-journals/gate-h/README.md","action":"Regenerate the Gate H journal index.","generated":true,"generator":"scripts/knowledge/render_navigation.py"},
+    {"path":"docs/operations/ci.md","action":"Add the local development-container section: rust/full targets, Podman and VS Code entry, source/cache volumes, seed flow, opt-in pgvector, CI-parity policy, and the explicit statement that it is local reproduction rather than CI evidence, hook, or lifecycle authority."},
+    {"path":"docs/evidence/change-journals/repository/development-container-workspace-journal.md","action":"Create the linked immutable package record with baseline, reads, changes, build and test results, surfaced failures, checks not run, and unchanged roadmap status."},
+    {"path":"docs/evidence/change-journals/repository/README.md","action":"Regenerate the repository journal index.","generated":true,"generator":"scripts/knowledge/render_navigation.py"},
     {"path":"docs/roadmap/rrflow-1.0-file-plan.jsonl","action":"Regenerate the Git-backed whole-repository execution inventory.","generated":true,"generator":"scripts/ci/build_execution_inventory.py"}
   ],
   "research": {
     "decision": "required",
-    "reason": "Desktop renderer/native isolation, ordered IPC, browser secret handling, generated API consumption, and the exact separate-checkout source audit cannot be inferred from UI convention or mock success.",
+    "reason": "Toolchain artifact identities and checksums, rootless Podman user mapping, and Dev Containers behavior are external facts that must be taken from primary sources rather than inferred.",
     "sources": [
-      {"title":"Connectome authenticated native RRD client baseline","url":"https://github.com/EonsofStupid/rrflow-connectome/commit/38f68ce7adda9d03501f3591165f0e14996899ec","retained_behavior":"Retain loopback validation, redirect denial, response bounds, native credential/session ownership intent, correlation checks, and explicit close.","rejected_assumption":"A handwritten partial client, fake TCP server, or registered but unused Tauri commands prove that the product UI authenticates or persists through RRFlow."},
-      {"title":"Tauri v2 calling Rust from the frontend","url":"https://v2.tauri.app/develop/calling-rust/","retained_behavior":"Use a narrow native command boundary for request/response and channels for ordered streaming; use raw bytes only where measured payloads justify them.","rejected_assumption":"Generic events, arbitrary commands, or JSON Value forwarding are an ordered high-throughput protocol, schema validator, or authorization boundary."},
-      {"title":"OWASP HTML5 Security Cheat Sheet","url":"https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html","retained_behavior":"Keep long-lived credentials out of browser storage and treat client-side data as untrusted input.","rejected_assumption":"A desktop webview makes connection profiles, localStorage, routes, logs, or serializable renderer state safe for operator credentials."},
-      {"title":"OpenAPI Specification 3.1.0","url":"https://spec.openapis.org/oas/v3.1.0.html","retained_behavior":"Bind generated client inputs to the advertised OpenAPI document and identity instead of copying endpoint prose.","rejected_assumption":"Generated types alone prove runtime validation, authentication, transport safety, operation coverage, or persistence."
-      }
+      {"title":"Go downloads JSON","url":"https://go.dev/dl/?mode=json&include=all","retained_behavior":"go1.24.13.linux-amd64.tar.gz SHA-256 1fc94b57134d51669c72173ad5d49fd62afb0f1db9bf3f798fd98ee423f8d730.","rejected_assumption":"A floating Go version or distribution package is equivalent to the CI pin."},
+      {"title":"Node.js v24.20.0 SHASUMS256","url":"https://nodejs.org/dist/v24.20.0/SHASUMS256.txt","retained_behavior":"node-v24.20.0-linux-x64.tar.xz SHA-256 2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2.","rejected_assumption":"Distribution Node packages match CI's setup-node version."},
+      {"title":"pnpm 11.22.0 registry metadata","url":"https://registry.npmjs.org/pnpm/11.22.0","retained_behavior":"Tarball integrity sha512-H/hwxMYTPf2I+yr8Rt0T1H8JyXlLQ4xv20fKmMrzvBY4HuC+k6CRuOOCTPAfiJ9G19niCRD7C+GrD7W6qA3WIQ== verified before a local global install.","rejected_assumption":"corepack or an unpinned npm install yields the CI pnpm."},
+      {"title":"uv 0.11.21 release checksum","url":"https://github.com/astral-sh/uv/releases/download/0.11.21/uv-x86_64-unknown-linux-gnu.tar.gz.sha256","retained_behavior":"SHA-256 8c88519b0ef0af9801fcdee419bbb12116bd9e6b18e162ae093c932d8b264050; uv installs the exact CPython 3.11.16 build.","rejected_assumption":"Ubuntu's python3 (3.12) is the CI SDK interpreter."},
+      {"title":"Temurin 21.0.12.1+1 release checksum","url":"https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz.sha256.txt","retained_behavior":"SHA-256 ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94.","rejected_assumption":"Any OpenJDK 21 package is the CI Temurin build."},
+      {"title":".NET 10 release metadata","url":"https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json","retained_behavior":"dotnet-sdk-10.0.111-linux-x64.tar.gz SHA-512 aae221be96a3b510d5b6fffefc69d8ad2fa595a1430299419316bb71c65f260a457ca9af24d044e1709b28a9118798caafec535ccfe58f7767c5acb735c00392.","rejected_assumption":"An unpinned dotnet-install script invocation is a reproducible input."},
+      {"title":"rustup 1.29.1 archived installer checksum","url":"https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-unknown-linux-gnu/rustup-init.sha256","retained_behavior":"SHA-256 dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71 for a versioned installer URL; the toolchain channel follows rust-toolchain.toml.","rejected_assumption":"Piping the floating sh.rustup.rs script is reproducible."},
+      {"title":"Podman rootless user-namespace keep-id","url":"https://docs.podman.io/en/latest/markdown/podman-run.1.html","retained_behavior":"--userns=keep-id maps the invoking user to the same uid inside the container so volume and mount ownership stay consistent for a non-root uid-1000 image user.","rejected_assumption":"Running the development container as root is required for rootless Podman."},
+      {"title":"Dev Containers JSON reference","url":"https://containers.dev/implementors/json_reference/","retained_behavior":"build.dockerfile/target, runArgs, mounts, containerEnv, and remoteUser configure the workspace declaratively; lifecycle commands are optional and omitted.","rejected_assumption":"A development container needs editor lifecycle commands, which would resemble a provider-owned hook."}
     ]
   },
   "trace_resource_debug": {
-    "runtime_trace": {"decision":"preserve","reason":"No runtime source changes; existing request, operation, transaction, query, readiness, and process coordinates remain the causal surface, and the guide requires Connectome to retain them."},
-    "resource_evidence": {"decision":"preserve","reason":"Add only one bounded second service/query cycle with existing ceilings; no dependency, daemon, store, background matrix, or unbounded workload is introduced."},
-    "debugging_evidence": {"decision":"add","reason":"The focused test becomes a deterministic oracle for process-memory-only state, wrong installed identity, failed reconnect/authentication, stale read position, changed value, secret leakage, and final reopen failure; the guide adds source-search falsification checks for the separate UI."
-    }
+    "runtime_trace": {"decision":"not_applicable","reason":"No RRFlow runtime operation, request, or persisted engine state changes."},
+    "resource_evidence": {"decision":"add","reason":"Record built image sizes, Podman machine CPU/memory, and the wall time of the focused in-container build and test commands as environment provenance; no engine performance claim is made."},
+    "debugging_evidence": {"decision":"add","reason":"The in-container run of scripts/ci/test_change_plan.py separates the Windows CRLF fixture failure from validator logic, and the parity check reports the exact divergent pin."}
   },
   "first_failure_oracle": [
-    "Baseline installed_lifecycle.rs performs no second serve, fresh session, or post-restart semantic query; its only post-kill operation is offline verify.",
-    "Baseline Connectome RuntimeConnectionPage calls only public handshake(), marks RRD connected and all stages verified, and never instantiates RrdAuthenticatedClient; the API key and session prototype is dead screen code.",
-    "Baseline Connectome browser smoke intercepts /v1 requests and supplies fixed 0.1.0/local_daemon/rrd-lsm capability data, so it cannot observe RRFlow persistence.",
-    "After change, the RRFlow test fails unless a second real process returns claim:installed-walking-product:status with object ui-queryable at or beyond the committed sequence.",
-    "Documentation/inventory checks fail if the guide creates a second authority, breaks warp links, lacks record metadata/gate assignment, or presents mock/build/health evidence as a working product."
+    "Baseline has no container definition; on this Windows host python3 is the Microsoft Store stub and scripts/ci/test_change_plan.py fails 14 of 20 cases with digest drift caused by CRLF fixture bytes.",
+    "After change, the same test module must pass 20 of 20 inside the rust image, showing the failures are host line-ending artifacts rather than validator defects.",
+    "After change, python3 scripts/ci/check_workflow.py must fail when any single container pin, checksum, or pgvector identity is mutated in a scratch copy, and pass on the committed files.",
+    "After change, both image targets must build with every checksum verified, and each pinned tool must report the CI version inside the image."
   ],
   "edit_sequence": [
     "Commit this file alone as the direct child of the declared clean baseline and require planning-only change-plan acceptance.",
-    "Extract only bounded test helpers needed to start and collect one installed rrflow service without changing product code.",
-    "Extend the installed journey with kill, second serve, identity comparison, ready, fresh session, same-query readback, second kill, and final read-only verify.",
-    "Run the focused lifecycle oracle before documenting its result; correct implementation/test assumptions instead of weakening assertions.",
-    "Author one supporting Connectome implementation guide under the existing owner using the exact 38f68ce7 source audit, including an anti-hard-code checklist and secure-handoff blocker.",
-    "Link the guide, assign its inventory gates, create the journal, and regenerate navigation and inventory.",
-    "Run focused/package/documentation/navigation/generated-surface/inventory/version/format/diff checks; reread every changed file and the complete diff."
+    "Author the Containerfile, devcontainer.json, compose.yaml, and executable seed-workspace.sh.",
+    "Add verify_development_container to scripts/ci/check_workflow.py and prove it rejects scratch-copy pin mutations.",
+    "Build the rust and full targets; record tool versions and image sizes.",
+    "Run the repository checks, change-plan unit tests, formatting, and the installed-lifecycle test inside the rust image; run SDK conformance inside the full image; run the pgvector feature test against the compose profile.",
+    "Prove the seed script clones committed history into an empty scratch volume and refuses a non-empty one.",
+    "Document the workspace in docs/operations/ci.md, create the journal, regenerate navigation and inventory, and run final documentation, inventory, version, and diff checks."
   ],
   "acceptance_commands": [
     "python3 scripts/ci/check_change_plan.py",
-    "cargo test -p rrflow-cli --test installed_lifecycle installed_engine_plans_applies_serves_discovers_authenticates_and_reopens --locked",
-    "cargo test -p rrflow-cli --test installed_lifecycle --locked",
-    "cargo test -p rrd-client --test real_server --locked",
-    "cargo fmt --all -- --check",
+    "python3 scripts/ci/check_workflow.py",
+    "podman build --target rust --tag localhost/rrflow-dev:rust .devcontainer",
+    "podman build --target full --tag localhost/rrflow-dev:full .devcontainer",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:rust python3 -m unittest scripts.ci.test_change_plan scripts.knowledge.test_navigation scripts.knowledge.test_export",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:rust cargo fmt --all -- --check",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:rust cargo test -p rrflow-cli --test installed_lifecycle --locked",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:full python3 scripts/ci/run_sdk_conformance.py",
+    "podman compose -f .devcontainer/compose.yaml --profile pgvector up -d pgvector",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow -e RRFLOW_PGVECTOR_TEST_URL=postgresql://rrflow_test:rrflow_test_password@127.0.0.1:5432/rrd_operator_knowledge_test?sslmode=disable -e RRFLOW_PGVECTOR_TEST_DISPOSABLE=1 localhost/rrflow-dev:rust cargo test -p rrd-operator-knowledge --all-targets --all-features --locked",
     "python3 scripts/ci/check_documentation.py",
     "python3 scripts/knowledge/render_navigation.py --check",
-    "python3 -m unittest scripts.knowledge.test_navigation",
     "python3 scripts/ci/build_execution_inventory.py --check",
-    "python3 scripts/ci/check_generated_surfaces.py --check",
     "python3 scripts/check_version.py",
     "git diff --check"
   ],
   "stop_conditions": [
-    "Any implementation/evidence edit precedes the planning commit, the baseline is dirty/stale, or validation fails.",
-    "The second process uses a new estate/root/instance, direct storage read, mock server, embedded engine, or bypasses the public client/session/query path.",
-    "The proof treats offline verification, an open port, HTTP success, generated code, or a UI render as semantic readback.",
-    "The guide exposes an operator credential to renderer state, documents the engine-only credential reader as a product SDK, hardcodes a generated digest as eternal, or authorizes direct rrflowKV access.",
-    "The guide preserves renamed SurrealDB behavior as RRFlow authority, invents a control/diagnostics/attunement contract, or creates another operation catalogue, lifecycle/status ledger, storage/query model, or product status owner.",
-    "Scope expands into sibling-checkout edits, a credential broker, new CLI/API operation, browser authentication, WebSocket completion, SDK packaging, native-index/DataFusion work, service installation, signing, release, or official promotion.",
-    "Any record claims D-01, H-04, H-06, POAM-006, POAM-011, Gate J, alpha, performance superiority, or release completion from this bounded proof."
+    "Any implementation or evidence edit precedes the planning commit, the baseline is dirty or stale, or validation fails.",
+    "A toolchain cannot be pinned to the exact CI version with a primary-source checksum; do not substitute a floating or distribution version.",
+    "The workspace would require a devcontainer lifecycle command, Git/editor/provider hook, baked credential, or change to AGENTS.md hook policy.",
+    "Verification would require editing Rust sources, Cargo manifests, Cargo.lock, SDK sources, generated surfaces, CI workflows, or the ARC deployment.",
+    "Any record presents a local container run as candidate-CI, J-02, POAM-027, alpha, or release evidence, or claims the Windows CRLF fixture defect is fixed.",
+    "Scope expands into the hook-catalogue restoration, arm64 images, Windows containers, GPU inference, or publishing an image to a registry."
   ],
-  "roadmap_status_change": "None. This closes one missing installed rrflowKV persistence observation and gives the separate UI repository a falsifiable implementation path. Secure installed credential handoff, generated SDK packaging, Connectome code convergence, real-artifact UI conformance, D-01 platform/distribution closure, H-04, H-06, POAM-006, POAM-011, and Gate J remain open."
+  "roadmap_status_change": "None. This adds a reproducible local workspace and a CI-parity policy check. J-02, POAM-027, and every other gate and deficiency remain open; candidate CI stays the only check authority."
 }
