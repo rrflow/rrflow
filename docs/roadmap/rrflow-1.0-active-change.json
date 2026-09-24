@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "package_id": "J02-reproducible-development-container-v1",
+  "package_id": "J02-reproducible-development-container-v2",
   "status": "active",
   "package_kind": "repository-development-environment-and-ci-parity-policy",
   "baseline": {
-    "revision": "676fe533366349dc7f3c2340129e1a3a332c7f30",
-    "tree": "f05365297d9463f91bc297dbda7f02cecf81593d",
+    "revision": "6ff29c0a317507ae6f90fa7ae858b12823c63c4d",
+    "tree": "208cf19dd7437e5e3c614df0c2ce7c686acb3ad8",
     "branch": "agent/connectome-temporal-runtime-visualizer",
     "development_remote": "development",
     "development_url": "https://github.com/rrflow/rrflow-development.git",
@@ -14,118 +14,392 @@
   },
   "authority": {
     "alpha_prerequisite": "Give every developer and AI host one reproducible Linux workspace whose toolchains, native build dependencies, and optional pgvector service equal the candidate-CI pins, so the checked-in presubmit, focused engine tests, and SDK conformance run locally with the same tool identity that J-02 release evidence must record, without making the container a second CI, lifecycle, or RRFlow runtime authority.",
-    "roadmap_gates": ["J-02"],
-    "poam_items": ["POAM-027"],
+    "roadmap_gates": [
+      "J-02"
+    ],
+    "poam_items": [
+      "POAM-027"
+    ],
     "architecture_owner": "docs/operations/ci.md"
   },
-  "current_behavior": "At clean baseline 676fe533 no Containerfile, Dockerfile, devcontainer, or compose file exists anywhere in repository history. Candidate CI pins Rust 1.98.0, Python 3.11.16, uv 0.11.21, Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12 (SHA-512), .NET SDK 10.0.111, and a digest-pinned pgvector service, but those pins exist only in GitHub Actions setup steps. A Windows checkout therefore diverges: core.filemode reports executable-bit loss on 13 scripts, python3 resolves to the Microsoft Store stub, and 14 of 20 scripts/ci/test_change_plan.py cases fail because fixtures written in text mode gain CRLF bytes that no longer match their LF digests. Nothing checks that a local environment matches CI.",
-  "target_behavior": "One .devcontainer directory supplies a digest-pinned Ubuntu 24.04 amd64 Containerfile with a lean rust target (Rust 1.98.0 with clippy/rustfmt, native C/C++ build dependencies, uv 0.11.21 and Python 3.11.16 as python3) and a full target that adds the exact CI SDK toolchains; every download is verified against an embedded SHA-256 or SHA-512. devcontainer.json builds the rust target for VS Code with rootless-Podman user mapping and no lifecycle command; compose.yaml drives the same image from the Podman CLI with named source and cache volumes and an opt-in pgvector profile using the CI image digest and credentials. A seed script clones committed history from a read-only mount of an existing checkout into the source volume and restores its remotes, so work happens on a native Linux filesystem. scripts/ci/check_workflow.py fails when any container toolchain pin, checksum, base or service image digest, or the pgvector test identity diverges from rust-toolchain.toml and ci-reusable.yml. docs/operations/ci.md documents the workspace as local reproduction, never as CI evidence or a hook.",
+  "current_behavior": "At clean baseline 676fe533 no Containerfile, Dockerfile, devcontainer, or compose file exists anywhere in repository history. Candidate CI pins Rust 1.98.0, Python 3.11.16, uv 0.11.21, Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12 (SHA-512), .NET SDK 10.0.111, and a digest-pinned pgvector service, but those pins exist only in GitHub Actions setup steps. A Windows checkout therefore diverges: core.filemode reports executable-bit loss on 13 scripts, python3 resolves to the Microsoft Store stub, and 14 of 20 scripts/ci/test_change_plan.py cases fail because fixtures written in text mode gain CRLF bytes that no longer match their LF digests. Nothing checks that a local environment matches CI. The CI MAVEN_SHA512 pin introduced by 198012b2 has 131 hexadecimal characters; Apache publishes a 128-character SHA-512, so the sdk-conformance step's `sha512sum --check --strict` exits 1 with 'no properly formatted checksum lines found' and ci-gate cannot pass, while check_workflow.py hard-codes the same malformed value. Superseded plan v1 (6ff29c0a) forbade the CI edit needed to correct it.",
+  "target_behavior": "One .devcontainer directory supplies a digest-pinned Ubuntu 24.04 amd64 Containerfile whose RUN steps are POSIX sh (Podman's OCI format ignores SHELL). Its rust target installs snapshot-pinned apt packages, rustup 1.29.1, Rust 1.98.0 with clippy/rustfmt, uv 0.11.21, and the exact actions/python-versions CPython 3.11.16 artifact that setup-python installs on ubuntu-24.04 runners, at the same tool-cache prefix and without its unpinned pip upgrade; its full target adds Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12, and .NET SDK 10.0.111. Every download is verified against an embedded SHA-256 or SHA-512. devcontainer.json builds the rust target for VS Code with rootless-Podman user mapping and no lifecycle command; compose.yaml drives the same image from the Podman CLI with named source and cache volumes and an opt-in pgvector profile matching CI. A seed script clones committed history from a read-only checkout mount into the source volume and restores remotes. The CI and policy MAVEN_SHA512 pin is corrected to Apache's published 128-character value. scripts/ci/check_workflow.py fails when any container pin, checksum, image digest, or pgvector identity diverges from rust-toolchain.toml and ci-reusable.yml. The TypeScript SDK's existing locked runtime dependency ArkType 2.2.3 installs from the frozen lockfile inside the full image. docs/operations/ci.md documents the workspace as local reproduction, never CI evidence or a hook.",
   "unchanged_behavior": [
     "README, objective, roadmap, and POA&M retain identity, outcome, status, and deficiency authority; no gate, checkbox, or deficiency changes status.",
-    "Candidate CI jobs, triggers, runners, action pins, ci-gate reduction, and the ARC deployment remain unchanged; the container is local reproduction and cannot satisfy or replace pipeline / ci-gate.",
+    "Candidate CI jobs, triggers, runners, action pins, ci-gate reduction, and the ARC deployment remain unchanged except the single MAVEN_SHA512 value corrected to Apache's published checksum; the container is local reproduction and cannot satisfy or replace pipeline / ci-gate.",
     "No Git, editor, provider, or RRFlow runtime hook is added: devcontainer.json declares no postCreate, postStart, or other lifecycle command, and AGENTS.md hook policy is untouched.",
-    "No Rust source, Cargo manifest, Cargo.lock, SDK source, generated product surface, dependency, protocol, version 1.0.0, or remote/promotion configuration changes.",
+    "No Rust source, Cargo manifest, Cargo.lock, SDK source, SDK package manifest or lockfile, generated product surface, dependency, protocol, version 1.0.0, or remote/promotion configuration changes; ArkType 2.2.3 is already the locked TypeScript SDK dependency and is only installed, not added or upgraded.",
     "The RRFlow default distribution, installation path, and offline runtime contract are unaffected; container toolchain downloads are development build inputs like the CI setup actions, never RRFlow install-time or runtime fetches.",
     "The Windows checkout remains supported for editing; the Windows-only CRLF fixture defect in scripts/ci/test_change_plan.py is characterized, not fixed, by this package."
   ],
   "planning_commit": {
     "must_precede_implementation": true,
     "must_have_exactly_one_parent": true,
-    "allowed_paths": ["docs/roadmap/rrflow-1.0-active-change.json"]
+    "allowed_paths": [
+      "docs/roadmap/rrflow-1.0-active-change.json"
+    ]
   },
   "reviewed_files": [
-    {"path":"docs/roadmap/rrflow-1.0-active-change.json","baseline_sha256":"28ad4fe89fef63aa59a3df1abcf2699552d3cfb1640d7bfd00664fe1e9af794e","baseline_lines":143,"reviewed_lines":"1-143","symbols":["complete preceding D01-H06 Connectome persistence package envelope"]},
-    {"path":"AGENTS.md","baseline_sha256":"6ed5e45f260a42f8a0a008b3023d50cb165df788bee94485390c5af5938c6ef1","baseline_lines":161,"reviewed_lines":"1-161","symbols":["repository containment, hook prohibition, change-authoring and journal rules"]},
-    {"path":"README.md","baseline_sha256":"85a6c35efdb4b5a3b229007cfd0e530a5e44676c806c5e986758b9dd00f096ad","baseline_lines":282,"reviewed_lines":"1-282","symbols":["product identity, owner warps, repository verification row"]},
-    {"path":"docs/roadmap/rrflow-1.0-execution/change-authoring.md","baseline_sha256":"6ea5ed28b4621e824c53e503dae84ef46de549fed0f02d6be6298d9e7979bb42","baseline_lines":145,"reviewed_lines":"1-145","symbols":["change sequence, journal template, global stop conditions"]},
-    {"path":"docs/roadmap/rrflow-1.0/gate-j.md","baseline_sha256":"73b5da9e503765ff600fefed752fea7f7b7d9c839160d053bb32da50bbce3b92","baseline_lines":32,"reviewed_lines":"1-32","symbols":["J-02 tool-version and command evidence requirement"]},
-    {"path":"docs/poam/rrflow-1.0-alpha/poam-027.md","baseline_sha256":"ba81c5dbb89cb66ac49961e44b6382b098a895d56f58b1235dd550f80d98e311","baseline_lines":63,"reviewed_lines":"1-63","symbols":["local presubmit bypassability and no-hook remediation boundary"]},
-    {"path":"docs/operations/ci.md","baseline_sha256":"2d484763faafa27f09189b22304e6e129e77e38ec9ff8abefbb54a58a913fab5","baseline_lines":308,"reviewed_lines":"1-308","symbols":["presubmit boundary","repository workflow policy","runner trust boundary"]},
-    {"path":".github/workflows/ci.yml","baseline_sha256":"489b9e60da94adb6b6cf65348674013634181985b4820fd61fc5363813d9b54b","baseline_lines":31,"reviewed_lines":"1-31","symbols":["candidate caller and runner routing"]},
-    {"path":".github/workflows/ci-reusable.yml","baseline_sha256":"0dcbefdc0747a3798b0f8446be19c43fe14febf59988f7816576871ae62ed1c3","baseline_lines":354,"reviewed_lines":"1-354","symbols":["toolchain pins","sdk-conformance setup","pgvector-feature service image and test URL"]},
-    {"path":"deploy/ci/github-actions/arc/rrflow-heavy.values.yaml","baseline_sha256":"218045e514813e242c959c71f5320c8bfeec7c1bee4d8cfb1ea8b7d852d94b44","baseline_lines":126,"reviewed_lines":"1-126","symbols":["digest-pinned runner and Docker sidecar images"]},
-    {"path":"rust-toolchain.toml","baseline_sha256":"495c69d1db93f25f53e3d0d2d40d812313366cc368de317871c2ace6c6ffafa4","baseline_lines":4,"reviewed_lines":"1-4","symbols":["Rust channel and components"]},
-    {"path":".gitignore","baseline_sha256":"83a9925567d3d4f02fa121e1ca2e55f787cf3d70fa86c6324769e17d2885ab3f","baseline_lines":26,"reviewed_lines":"1-26","symbols":["ignored target, tool, and estate paths"]},
-    {"path":"scripts/ci/check_workflow.py","baseline_sha256":"08a21dfc094c3bf30b896d09a29280007468e9bca8db946128190498a20a084d","baseline_lines":474,"reviewed_lines":"1-474","symbols":["verify_action_pins","verify_arc_policy","verify_sdk_conformance","main"]},
-    {"path":"scripts/ci/check_change_plan.py","baseline_sha256":"7cb42018ebd26ee8fc15aac8e51ddf16d76cfa43f179bc8713779f92e911a604","baseline_lines":828,"reviewed_lines":"1-828","symbols":["validate_schema","validate_planning_commit","validate_reviewed_files","validate_changed_paths"]},
-    {"path":"scripts/ci/build_execution_inventory.py","baseline_sha256":"0ded8734dba6e8e8f29cb51512c367bbb9177b64583de5b92b34a4263d090824","baseline_lines":1976,"reviewed_lines":"1-1976","symbols":["planned_gates","action","git_files","validate"]},
-    {"path":"scripts/knowledge/render_navigation.py","baseline_sha256":"d19b692237b0ceee868de99fcc240ab5e601d49f66c1689d16bc5d8d35f17855","baseline_lines":351,"reviewed_lines":"1-351","symbols":["record_metadata","generated_index_body","write_indexes"]}
+    {
+      "path": "docs/roadmap/rrflow-1.0-active-change.json",
+      "baseline_sha256": "399342e7465e8e75c6906e999747e47ec5369f461d62102ad75ecd6c0ba75a71",
+      "baseline_lines": 158,
+      "reviewed_lines": "1-158",
+      "symbols": [
+        "complete superseded J02 development-container plan v1"
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "baseline_sha256": "6ed5e45f260a42f8a0a008b3023d50cb165df788bee94485390c5af5938c6ef1",
+      "baseline_lines": 161,
+      "reviewed_lines": "1-161",
+      "symbols": [
+        "repository containment, hook prohibition, change-authoring and journal rules"
+      ]
+    },
+    {
+      "path": "README.md",
+      "baseline_sha256": "85a6c35efdb4b5a3b229007cfd0e530a5e44676c806c5e986758b9dd00f096ad",
+      "baseline_lines": 282,
+      "reviewed_lines": "1-282",
+      "symbols": [
+        "product identity, owner warps, repository verification row"
+      ]
+    },
+    {
+      "path": "docs/roadmap/rrflow-1.0-execution/change-authoring.md",
+      "baseline_sha256": "6ea5ed28b4621e824c53e503dae84ef46de549fed0f02d6be6298d9e7979bb42",
+      "baseline_lines": 145,
+      "reviewed_lines": "1-145",
+      "symbols": [
+        "change sequence, journal template, global stop conditions"
+      ]
+    },
+    {
+      "path": "docs/roadmap/rrflow-1.0/gate-j.md",
+      "baseline_sha256": "73b5da9e503765ff600fefed752fea7f7b7d9c839160d053bb32da50bbce3b92",
+      "baseline_lines": 32,
+      "reviewed_lines": "1-32",
+      "symbols": [
+        "J-02 tool-version and command evidence requirement"
+      ]
+    },
+    {
+      "path": "docs/poam/rrflow-1.0-alpha/poam-027.md",
+      "baseline_sha256": "ba81c5dbb89cb66ac49961e44b6382b098a895d56f58b1235dd550f80d98e311",
+      "baseline_lines": 63,
+      "reviewed_lines": "1-63",
+      "symbols": [
+        "local presubmit bypassability and no-hook remediation boundary"
+      ]
+    },
+    {
+      "path": "docs/operations/ci.md",
+      "baseline_sha256": "2d484763faafa27f09189b22304e6e129e77e38ec9ff8abefbb54a58a913fab5",
+      "baseline_lines": 308,
+      "reviewed_lines": "1-308",
+      "symbols": [
+        "presubmit boundary",
+        "repository workflow policy",
+        "runner trust boundary"
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "baseline_sha256": "489b9e60da94adb6b6cf65348674013634181985b4820fd61fc5363813d9b54b",
+      "baseline_lines": 31,
+      "reviewed_lines": "1-31",
+      "symbols": [
+        "candidate caller and runner routing"
+      ]
+    },
+    {
+      "path": ".github/workflows/ci-reusable.yml",
+      "baseline_sha256": "0dcbefdc0747a3798b0f8446be19c43fe14febf59988f7816576871ae62ed1c3",
+      "baseline_lines": 354,
+      "reviewed_lines": "1-354",
+      "symbols": [
+        "toolchain pins",
+        "sdk-conformance setup",
+        "pgvector-feature service image and test URL"
+      ]
+    },
+    {
+      "path": "deploy/ci/github-actions/arc/rrflow-heavy.values.yaml",
+      "baseline_sha256": "218045e514813e242c959c71f5320c8bfeec7c1bee4d8cfb1ea8b7d852d94b44",
+      "baseline_lines": 126,
+      "reviewed_lines": "1-126",
+      "symbols": [
+        "digest-pinned runner and Docker sidecar images"
+      ]
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "baseline_sha256": "495c69d1db93f25f53e3d0d2d40d812313366cc368de317871c2ace6c6ffafa4",
+      "baseline_lines": 4,
+      "reviewed_lines": "1-4",
+      "symbols": [
+        "Rust channel and components"
+      ]
+    },
+    {
+      "path": ".gitignore",
+      "baseline_sha256": "83a9925567d3d4f02fa121e1ca2e55f787cf3d70fa86c6324769e17d2885ab3f",
+      "baseline_lines": 26,
+      "reviewed_lines": "1-26",
+      "symbols": [
+        "ignored target, tool, and estate paths"
+      ]
+    },
+    {
+      "path": "scripts/ci/check_workflow.py",
+      "baseline_sha256": "08a21dfc094c3bf30b896d09a29280007468e9bca8db946128190498a20a084d",
+      "baseline_lines": 474,
+      "reviewed_lines": "1-474",
+      "symbols": [
+        "verify_action_pins",
+        "verify_arc_policy",
+        "verify_sdk_conformance",
+        "main"
+      ]
+    },
+    {
+      "path": "scripts/ci/check_change_plan.py",
+      "baseline_sha256": "7cb42018ebd26ee8fc15aac8e51ddf16d76cfa43f179bc8713779f92e911a604",
+      "baseline_lines": 828,
+      "reviewed_lines": "1-828",
+      "symbols": [
+        "validate_schema",
+        "validate_planning_commit",
+        "validate_reviewed_files",
+        "validate_changed_paths"
+      ]
+    },
+    {
+      "path": "scripts/ci/build_execution_inventory.py",
+      "baseline_sha256": "0ded8734dba6e8e8f29cb51512c367bbb9177b64583de5b92b34a4263d090824",
+      "baseline_lines": 1976,
+      "reviewed_lines": "1-1976",
+      "symbols": [
+        "planned_gates",
+        "action",
+        "git_files",
+        "validate"
+      ]
+    },
+    {
+      "path": "scripts/knowledge/render_navigation.py",
+      "baseline_sha256": "d19b692237b0ceee868de99fcc240ab5e601d49f66c1689d16bc5d8d35f17855",
+      "baseline_lines": 351,
+      "reviewed_lines": "1-351",
+      "symbols": [
+        "record_metadata",
+        "generated_index_body",
+        "write_indexes"
+      ]
+    }
   ],
   "implementation_changes": [
     {
       "path": ".devcontainer/Containerfile",
       "baseline_state": "absent",
-      "symbols": ["rust target", "full target", "toolchain ARG pins and checksums"],
-      "action": "Create a digest-pinned ubuntu:24.04 amd64 multi-stage image: rust target with native build dependencies, rustup 1.29.1, Rust 1.98.0 plus clippy/rustfmt, uv 0.11.21, and Python 3.11.16 as python3; full target adding Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12, and .NET SDK 10.0.111 with ICU. Every artifact is verified with sha256sum/sha512sum --check --strict against an embedded ARG. Run as non-root uid 1000 with caches under /cache.",
+      "symbols": [
+        "rust target",
+        "full target",
+        "toolchain ARG pins and checksums"
+      ],
+      "action": "Create a POSIX-sh, digest-pinned ubuntu:24.04 amd64 multi-stage image: rust target with native build dependencies, rustup 1.29.1, Rust 1.98.0 plus clippy/rustfmt, uv 0.11.21, and the actions/python-versions CPython 3.11.16 runner artifact as python3 with its runtime libraries; full target adding Node 24.20.0, pnpm 11.22.0, Go 1.24.13, Temurin 21.0.12.1+1, Maven 3.9.12, and .NET SDK 10.0.111 with ICU. Every artifact is verified with sha256sum/sha512sum --check --strict against an embedded ARG. Run as non-root uid 1000 with caches under /cache.",
       "failure_semantics": "The build fails on any checksum mismatch, missing tool, or version drift; an unpinned base image, :latest tag, or unverified download is a policy failure."
     },
     {
       "path": ".devcontainer/devcontainer.json",
       "baseline_state": "absent",
-      "symbols": ["build target rust", "runArgs", "mounts", "containerEnv"],
+      "symbols": [
+        "build target rust",
+        "runArgs",
+        "mounts",
+        "containerEnv"
+      ],
       "action": "Build the rust target from the Containerfile for VS Code Dev Containers with rootless-Podman keep-id user mapping, host networking for loopback parity with CI, and the shared cache volume; declare no lifecycle command.",
       "failure_semantics": "Fail review if it declares postCreate/postStart/updateContent/initialize commands, a second toolchain source, or credentials."
     },
     {
       "path": ".devcontainer/compose.yaml",
       "baseline_state": "absent",
-      "symbols": ["workspace service", "pgvector service profile", "rrflow-src and rrflow-cache volumes"],
+      "symbols": [
+        "workspace service",
+        "pgvector service profile",
+        "rrflow-src and rrflow-cache volumes"
+      ],
       "action": "Drive the same image from the Podman CLI with a named Linux source volume, a read-only seed mount of the invoking checkout, a shared cache volume, and an opt-in pgvector profile whose digest, database, user, password, and 127.0.0.1:5432 endpoint equal candidate CI.",
       "failure_semantics": "Policy fails if the pgvector image or test identity diverges from ci-reusable.yml or any image lacks a SHA-256 digest."
     },
     {
       "path": ".devcontainer/seed-workspace.sh",
       "baseline_state": "absent",
-      "symbols": ["seed clone", "remote restoration"],
+      "symbols": [
+        "seed clone",
+        "remote restoration"
+      ],
       "action": "Clone committed history from the read-only seed mount into an empty source volume, check out the seed branch, and restore the seed repository's remote URLs without copying credentials or uncommitted files.",
       "failure_semantics": "Refuse a non-empty destination, a missing seed repository, or an unresolved branch; never overwrite existing work."
     },
     {
+      "path": ".github/workflows/ci-reusable.yml",
+      "baseline_state": "present",
+      "symbols": [
+        "sdk-conformance MAVEN_SHA512"
+      ],
+      "action": "Replace only the malformed 131-character MAVEN_SHA512 value with Apache's published 128-character SHA-512 for apache-maven-3.9.12-bin.tar.gz.",
+      "failure_semantics": "The Maven step fails closed if the archive differs from the published checksum; any other workflow change is out of scope."
+    },
+    {
       "path": "scripts/ci/check_workflow.py",
       "baseline_state": "present",
-      "symbols": ["verify_development_container", "main"],
-      "action": "Add a development-container policy check that parses Containerfile ARG pins and compose images and requires equality with rust-toolchain.toml and the ci-reusable.yml toolchain, Maven checksum, and pgvector service identity, digest-pinned images, strict checksum verification, and no devcontainer lifecycle command.",
+      "symbols": [
+        "verify_development_container",
+        "verify_sdk_conformance",
+        "main"
+      ],
+      "action": "Add a development-container policy check that parses Containerfile ARG pins and compose images and requires equality with rust-toolchain.toml and the ci-reusable.yml toolchain, Maven checksum, and pgvector service identity, digest-pinned images, strict checksum verification, and no devcontainer lifecycle command. Correct the verify_sdk_conformance MAVEN_SHA512 fragment to the same 128-character value.",
       "failure_semantics": "Exit non-zero naming the divergent pin, image, checksum, or lifecycle field; existing CI policy checks remain unchanged."
     }
   ],
   "evidence_changes": [
-    {"path":"docs/operations/ci.md","action":"Add the local development-container section: rust/full targets, Podman and VS Code entry, source/cache volumes, seed flow, opt-in pgvector, CI-parity policy, and the explicit statement that it is local reproduction rather than CI evidence, hook, or lifecycle authority."},
-    {"path":"docs/evidence/change-journals/repository/development-container-workspace-journal.md","action":"Create the linked immutable package record with baseline, reads, changes, build and test results, surfaced failures, checks not run, and unchanged roadmap status."},
-    {"path":"docs/evidence/change-journals/repository/README.md","action":"Regenerate the repository journal index.","generated":true,"generator":"scripts/knowledge/render_navigation.py"},
-    {"path":"docs/roadmap/rrflow-1.0-file-plan.jsonl","action":"Regenerate the Git-backed whole-repository execution inventory.","generated":true,"generator":"scripts/ci/build_execution_inventory.py"}
+    {
+      "path": "docs/operations/ci.md",
+      "action": "Add the local development-container section: rust/full targets, Podman and VS Code entry, source/cache volumes, seed flow, opt-in pgvector, CI-parity policy, and the explicit statement that it is local reproduction rather than CI evidence, hook, or lifecycle authority."
+    },
+    {
+      "path": "docs/evidence/change-journals/repository/development-container-workspace-journal.md",
+      "action": "Create the linked immutable package record with baseline, reads, changes, build and test results, surfaced failures, checks not run, and unchanged roadmap status."
+    },
+    {
+      "path": "docs/evidence/change-journals/repository/README.md",
+      "action": "Regenerate the repository journal index.",
+      "generated": true,
+      "generator": "scripts/knowledge/render_navigation.py"
+    },
+    {
+      "path": "docs/roadmap/rrflow-1.0-file-plan.jsonl",
+      "action": "Regenerate the Git-backed whole-repository execution inventory.",
+      "generated": true,
+      "generator": "scripts/ci/build_execution_inventory.py"
+    }
   ],
   "research": {
     "decision": "required",
     "reason": "Toolchain artifact identities and checksums, rootless Podman user mapping, and Dev Containers behavior are external facts that must be taken from primary sources rather than inferred.",
     "sources": [
-      {"title":"Go downloads JSON","url":"https://go.dev/dl/?mode=json&include=all","retained_behavior":"go1.24.13.linux-amd64.tar.gz SHA-256 1fc94b57134d51669c72173ad5d49fd62afb0f1db9bf3f798fd98ee423f8d730.","rejected_assumption":"A floating Go version or distribution package is equivalent to the CI pin."},
-      {"title":"Node.js v24.20.0 SHASUMS256","url":"https://nodejs.org/dist/v24.20.0/SHASUMS256.txt","retained_behavior":"node-v24.20.0-linux-x64.tar.xz SHA-256 2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2.","rejected_assumption":"Distribution Node packages match CI's setup-node version."},
-      {"title":"pnpm 11.22.0 registry metadata","url":"https://registry.npmjs.org/pnpm/11.22.0","retained_behavior":"Tarball integrity sha512-H/hwxMYTPf2I+yr8Rt0T1H8JyXlLQ4xv20fKmMrzvBY4HuC+k6CRuOOCTPAfiJ9G19niCRD7C+GrD7W6qA3WIQ== verified before a local global install.","rejected_assumption":"corepack or an unpinned npm install yields the CI pnpm."},
-      {"title":"uv 0.11.21 release checksum","url":"https://github.com/astral-sh/uv/releases/download/0.11.21/uv-x86_64-unknown-linux-gnu.tar.gz.sha256","retained_behavior":"SHA-256 8c88519b0ef0af9801fcdee419bbb12116bd9e6b18e162ae093c932d8b264050; uv installs the exact CPython 3.11.16 build.","rejected_assumption":"Ubuntu's python3 (3.12) is the CI SDK interpreter."},
-      {"title":"Temurin 21.0.12.1+1 release checksum","url":"https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz.sha256.txt","retained_behavior":"SHA-256 ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94.","rejected_assumption":"Any OpenJDK 21 package is the CI Temurin build."},
-      {"title":".NET 10 release metadata","url":"https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json","retained_behavior":"dotnet-sdk-10.0.111-linux-x64.tar.gz SHA-512 aae221be96a3b510d5b6fffefc69d8ad2fa595a1430299419316bb71c65f260a457ca9af24d044e1709b28a9118798caafec535ccfe58f7767c5acb735c00392.","rejected_assumption":"An unpinned dotnet-install script invocation is a reproducible input."},
-      {"title":"rustup 1.29.1 archived installer checksum","url":"https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-unknown-linux-gnu/rustup-init.sha256","retained_behavior":"SHA-256 dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71 for a versioned installer URL; the toolchain channel follows rust-toolchain.toml.","rejected_assumption":"Piping the floating sh.rustup.rs script is reproducible."},
-      {"title":"Podman rootless user-namespace keep-id","url":"https://docs.podman.io/en/latest/markdown/podman-run.1.html","retained_behavior":"--userns=keep-id maps the invoking user to the same uid inside the container so volume and mount ownership stay consistent for a non-root uid-1000 image user.","rejected_assumption":"Running the development container as root is required for rootless Podman."},
-      {"title":"Dev Containers JSON reference","url":"https://containers.dev/implementors/json_reference/","retained_behavior":"build.dockerfile/target, runArgs, mounts, containerEnv, and remoteUser configure the workspace declaratively; lifecycle commands are optional and omitted.","rejected_assumption":"A development container needs editor lifecycle commands, which would resemble a provider-owned hook."}
+      {
+        "title": "Go downloads JSON",
+        "url": "https://go.dev/dl/?mode=json&include=all",
+        "retained_behavior": "go1.24.13.linux-amd64.tar.gz SHA-256 1fc94b57134d51669c72173ad5d49fd62afb0f1db9bf3f798fd98ee423f8d730.",
+        "rejected_assumption": "A floating Go version or distribution package is equivalent to the CI pin."
+      },
+      {
+        "title": "Node.js v24.20.0 SHASUMS256",
+        "url": "https://nodejs.org/dist/v24.20.0/SHASUMS256.txt",
+        "retained_behavior": "node-v24.20.0-linux-x64.tar.xz SHA-256 2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2.",
+        "rejected_assumption": "Distribution Node packages match CI's setup-node version."
+      },
+      {
+        "title": "pnpm 11.22.0 registry metadata",
+        "url": "https://registry.npmjs.org/pnpm/11.22.0",
+        "retained_behavior": "Tarball integrity sha512-H/hwxMYTPf2I+yr8Rt0T1H8JyXlLQ4xv20fKmMrzvBY4HuC+k6CRuOOCTPAfiJ9G19niCRD7C+GrD7W6qA3WIQ== verified before a local global install.",
+        "rejected_assumption": "corepack or an unpinned npm install yields the CI pnpm."
+      },
+      {
+        "title": "uv 0.11.21 release checksum",
+        "url": "https://github.com/astral-sh/uv/releases/download/0.11.21/uv-x86_64-unknown-linux-gnu.tar.gz.sha256",
+        "retained_behavior": "SHA-256 8c88519b0ef0af9801fcdee419bbb12116bd9e6b18e162ae093c932d8b264050 for the CI uv binary; uv resolves the image python3 and never downloads interpreters (UV_PYTHON_DOWNLOADS=never).",
+        "rejected_assumption": "uv 0.11.21 can install CPython 3.11.16; its managed list ends at 3.11.15, and Ubuntu's python3 (3.12) is not the CI interpreter."
+      },
+      {
+        "title": "actions/python-versions 3.11.16 release",
+        "url": "https://api.github.com/repos/actions/python-versions/releases/tags/3.11.16-31661435402",
+        "retained_behavior": "python-3.11.16-linux-24.04-x64.tar.gz, GitHub asset digest sha256:07b61e35f30861939ff95314297921de8f57cd48f85bb18d777651b3ea45f2ee, is the setup-python build for ubuntu-24.04; its setup.sh layout at /opt/hostedtoolcache/Python/3.11.16/x64 resolves libpython by rpath and needs gdbm, readline, sqlite3, tcl, and tk runtime libraries.",
+        "rejected_assumption": "Running its setup.sh is reproducible; that script performs an unpinned network pip upgrade."
+      },
+      {
+        "title": "Temurin 21.0.12.1+1 release checksum",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz.sha256.txt",
+        "retained_behavior": "SHA-256 ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94.",
+        "rejected_assumption": "Any OpenJDK 21 package is the CI Temurin build."
+      },
+      {
+        "title": ".NET 10 release metadata",
+        "url": "https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json",
+        "retained_behavior": "dotnet-sdk-10.0.111-linux-x64.tar.gz SHA-512 aae221be96a3b510d5b6fffefc69d8ad2fa595a1430299419316bb71c65f260a457ca9af24d044e1709b28a9118798caafec535ccfe58f7767c5acb735c00392.",
+        "rejected_assumption": "An unpinned dotnet-install script invocation is a reproducible input."
+      },
+      {
+        "title": "Apache Maven 3.9.12 binary SHA-512",
+        "url": "https://archive.apache.org/dist/maven/maven-3/3.9.12/binaries/apache-maven-3.9.12-bin.tar.gz.sha512",
+        "retained_behavior": "The published SHA-512 is 128 characters ending d694f70; sha512sum --check --strict accepts it for the downloaded archive.",
+        "rejected_assumption": "The 131-character CI value is a valid pin; sha512sum rejects it as an improperly formatted checksum line."
+      },
+      {
+        "title": "rustup 1.29.1 archived installer checksum",
+        "url": "https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-unknown-linux-gnu/rustup-init.sha256",
+        "retained_behavior": "SHA-256 dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71 for a versioned installer URL; the toolchain channel follows rust-toolchain.toml.",
+        "rejected_assumption": "Piping the floating sh.rustup.rs script is reproducible."
+      },
+      {
+        "title": "Podman rootless user-namespace keep-id",
+        "url": "https://docs.podman.io/en/latest/markdown/podman-run.1.html",
+        "retained_behavior": "--userns=keep-id maps the invoking user to the same uid inside the container so volume and mount ownership stay consistent for a non-root uid-1000 image user.",
+        "rejected_assumption": "Running the development container as root is required for rootless Podman."
+      },
+      {
+        "title": "Dev Containers JSON reference",
+        "url": "https://containers.dev/implementors/json_reference/",
+        "retained_behavior": "build.dockerfile/target, runArgs, mounts, containerEnv, and remoteUser configure the workspace declaratively; lifecycle commands are optional and omitted.",
+        "rejected_assumption": "A development container needs editor lifecycle commands, which would resemble a provider-owned hook."
+      },
+      {
+        "title": "Podman build SHELL handling for OCI images",
+        "url": "https://docs.podman.io/en/latest/markdown/podman-build.1.html",
+        "retained_behavior": "The default OCI image format does not carry SHELL (the build warns 'SHELL is not supported for OCI image format'), so RUN steps must be POSIX sh.",
+        "rejected_assumption": "A SHELL instruction reliably selects bash under Podman's default --format oci."
+      },
+      {
+        "title": "ArkType 2.2.3 registry metadata",
+        "url": "https://registry.npmjs.org/arktype/2.2.3",
+        "retained_behavior": "The TypeScript SDK already declares arktype 2.2.3 and pins its integrity in pnpm-lock.yaml; a frozen-lockfile install reproduces it without resolution.",
+        "rejected_assumption": "Installing ArkType requires adding or upgrading a dependency."
+      }
     ]
   },
   "trace_resource_debug": {
-    "runtime_trace": {"decision":"not_applicable","reason":"No RRFlow runtime operation, request, or persisted engine state changes."},
-    "resource_evidence": {"decision":"add","reason":"Record built image sizes, Podman machine CPU/memory, and the wall time of the focused in-container build and test commands as environment provenance; no engine performance claim is made."},
-    "debugging_evidence": {"decision":"add","reason":"The in-container run of scripts/ci/test_change_plan.py separates the Windows CRLF fixture failure from validator logic, and the parity check reports the exact divergent pin."}
+    "runtime_trace": {
+      "decision": "not_applicable",
+      "reason": "No RRFlow runtime operation, request, or persisted engine state changes."
+    },
+    "resource_evidence": {
+      "decision": "add",
+      "reason": "Record built image sizes, Podman machine CPU/memory, and the wall time of the focused in-container build and test commands as environment provenance; no engine performance claim is made."
+    },
+    "debugging_evidence": {
+      "decision": "add",
+      "reason": "The in-container run of scripts/ci/test_change_plan.py separates the Windows CRLF fixture failure from validator logic, and the parity check reports the exact divergent pin."
+    }
   },
   "first_failure_oracle": [
     "Baseline has no container definition; on this Windows host python3 is the Microsoft Store stub and scripts/ci/test_change_plan.py fails 14 of 20 cases with digest drift caused by CRLF fixture bytes.",
+    "Baseline CI Maven snippet, executed verbatim in the rust image, exits 1 with 'no properly formatted checksum lines found' for the 131-character MAVEN_SHA512; after correction the same snippet verifies the archive.",
     "After change, the same test module must pass 20 of 20 inside the rust image, showing the failures are host line-ending artifacts rather than validator defects.",
     "After change, python3 scripts/ci/check_workflow.py must fail when any single container pin, checksum, or pgvector identity is mutated in a scratch copy, and pass on the committed files.",
-    "After change, both image targets must build with every checksum verified, and each pinned tool must report the CI version inside the image."
+    "After change, both image targets must build with every checksum verified, and each pinned tool must report the CI version inside the image.",
+    "After change, pnpm install --frozen-lockfile in the full image installs ArkType 2.2.3 exactly as locked, and the TypeScript SDK typecheck and tests that exercise its ArkType envelope pass."
   ],
   "edit_sequence": [
     "Commit this file alone as the direct child of the declared clean baseline and require planning-only change-plan acceptance.",
-    "Author the Containerfile, devcontainer.json, compose.yaml, and executable seed-workspace.sh.",
+    "Restore the stashed container implementation (Containerfile, devcontainer.json, compose.yaml, executable seed-workspace.sh, check_workflow.py parity check) and correct the CI and policy MAVEN_SHA512 value.",
     "Add verify_development_container to scripts/ci/check_workflow.py and prove it rejects scratch-copy pin mutations.",
     "Build the rust and full targets; record tool versions and image sizes.",
-    "Run the repository checks, change-plan unit tests, formatting, and the installed-lifecycle test inside the rust image; run SDK conformance inside the full image; run the pgvector feature test against the compose profile.",
+    "Run the repository checks, change-plan unit tests, formatting, and the installed-lifecycle test inside the rust image; install the TypeScript SDK's locked dependencies including ArkType and run its typecheck and tests, then SDK conformance, inside the full image; run the pgvector feature test against the compose profile.",
     "Prove the seed script clones committed history into an empty scratch volume and refuses a non-empty one.",
     "Document the workspace in docs/operations/ci.md, create the journal, regenerate navigation and inventory, and run final documentation, inventory, version, and diff checks."
   ],
@@ -138,6 +412,9 @@
     "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:rust cargo fmt --all -- --check",
     "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:rust cargo test -p rrflow-cli --test installed_lifecycle --locked",
     "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:full python3 scripts/ci/run_sdk_conformance.py",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:full pnpm --dir sdks/typescript install --frozen-lockfile",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:full pnpm --dir sdks/typescript run typecheck",
+    "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow localhost/rrflow-dev:full pnpm --dir sdks/typescript run test",
     "podman compose -f .devcontainer/compose.yaml --profile pgvector up -d pgvector",
     "podman run --rm --userns=keep-id --network=host -v rrflow-cache:/cache -v \"$(pwd -W):/workspaces/rrflow\" -w /workspaces/rrflow -e RRFLOW_PGVECTOR_TEST_URL=postgresql://rrflow_test:rrflow_test_password@127.0.0.1:5432/rrd_operator_knowledge_test?sslmode=disable -e RRFLOW_PGVECTOR_TEST_DISPOSABLE=1 localhost/rrflow-dev:rust cargo test -p rrd-operator-knowledge --all-targets --all-features --locked",
     "python3 scripts/ci/check_documentation.py",
@@ -150,9 +427,9 @@
     "Any implementation or evidence edit precedes the planning commit, the baseline is dirty or stale, or validation fails.",
     "A toolchain cannot be pinned to the exact CI version with a primary-source checksum; do not substitute a floating or distribution version.",
     "The workspace would require a devcontainer lifecycle command, Git/editor/provider hook, baked credential, or change to AGENTS.md hook policy.",
-    "Verification would require editing Rust sources, Cargo manifests, Cargo.lock, SDK sources, generated surfaces, CI workflows, or the ARC deployment.",
+    "Verification would require editing Rust sources, Cargo manifests, Cargo.lock, SDK sources, SDK package manifests or lockfiles, generated surfaces, the ARC deployment, or any CI workflow line other than the MAVEN_SHA512 value.",
     "Any record presents a local container run as candidate-CI, J-02, POAM-027, alpha, or release evidence, or claims the Windows CRLF fixture defect is fixed.",
     "Scope expands into the hook-catalogue restoration, arm64 images, Windows containers, GPU inference, or publishing an image to a registry."
   ],
-  "roadmap_status_change": "None. This adds a reproducible local workspace and a CI-parity policy check. J-02, POAM-027, and every other gate and deficiency remain open; candidate CI stays the only check authority."
+  "roadmap_status_change": "None. This adds a reproducible local workspace and CI-parity policy check and corrects one malformed CI checksum pin. J-02, POAM-027, and every other gate and deficiency remain open; candidate CI stays the only check authority, and no CI run has yet proven the corrected pin."
 }
