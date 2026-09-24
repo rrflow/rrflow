@@ -1,0 +1,163 @@
+# RRFlow development workspace (local reproduction of candidate CI only).
+#
+# Targets:
+#   rust  Rust engine work, repository policy scripts, and Python tooling.
+#   full  rust plus every SDK toolchain used by scripts/ci/run_sdk_conformance.py.
+#
+# Every pin below must equal rust-toolchain.toml or
+# .github/workflows/ci-reusable.yml; scripts/ci/check_workflow.py enforces it.
+# Usage and limits: docs/operations/ci.md#local-development-container.
+
+FROM docker.io/library/ubuntu:24.04@sha256:496754492fb28b4d3049432f2ca787449331e23fb14f0dd3fffea86bf5a93eb4 AS rust
+
+ARG UBUNTU_SNAPSHOT=20260922T000000Z
+ARG RUSTUP_VERSION=1.29.1
+ARG RUSTUP_SHA256=dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71
+ARG RUST_VERSION=1.98.0
+ARG UV_VERSION=0.11.21
+ARG UV_SHA256=8c88519b0ef0af9801fcdee419bbb12116bd9e6b18e162ae093c932d8b264050
+# The actions/python-versions build that setup-python installs on CI's
+# ubuntu-24.04 runners; the digest is GitHub's published asset SHA-256.
+ARG PYTHON_VERSION=3.11.16
+ARG PYTHON_RELEASE=3.11.16-31661435402
+ARG PYTHON_SHA256=07b61e35f30861939ff95314297921de8f57cd48f85bb18d777651b3ea45f2ee
+
+# Podman's default OCI image format ignores SHELL, so every RUN is POSIX sh.
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    CARGO_TARGET_DIR=/cache/target \
+    UV_CACHE_DIR=/cache/uv \
+    UV_PYTHON=${PYTHON_VERSION} \
+    UV_PYTHON_DOWNLOADS=never \
+    PATH=/usr/local/cargo/bin:${PATH}
+
+# ca-certificates comes from the signed archive so the HTTPS snapshot can be
+# reached; every other package resolves from one fixed snapshot date.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && apt-get update --snapshot "${UBUNTU_SNAPSHOT}" \
+ && apt-get install -y --no-install-recommends --snapshot "${UBUNTU_SNAPSHOT}" \
+      build-essential clang cmake curl git jq less libssl-dev lld \
+      openssh-client pkg-config procps unzip xz-utils \
+      libgdbm-compat4t64 libgdbm6t64 libreadline8t64 libsqlite3-0 libtcl8.6 libtk8.6 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Replace the image's default uid-1000 account with the workspace user so
+# rootless Podman --userns=keep-id maps the host user onto it.
+RUN userdel --remove ubuntu \
+ && useradd --uid 1000 --user-group --create-home --shell /bin/bash dev \
+ && install -d -o dev -g dev /workspaces /cache /cache/cargo-registry /cache/cargo-git \
+ && git config --system safe.directory '*'
+
+RUN curl -fsSLo /tmp/rustup-init \
+      "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init" \
+ && echo "${RUSTUP_SHA256}  /tmp/rustup-init" | sha256sum --check --strict \
+ && chmod 0755 /tmp/rustup-init \
+ && /tmp/rustup-init -y --no-modify-path --profile minimal \
+      --default-toolchain "${RUST_VERSION}" --component clippy,rustfmt \
+ && rm /tmp/rustup-init \
+ && ln -s /cache/cargo-registry "${CARGO_HOME}/registry" \
+ && ln -s /cache/cargo-git "${CARGO_HOME}/git" \
+ && chown -R dev:dev "${RUSTUP_HOME}" "${CARGO_HOME}"
+
+RUN curl -fsSLo /tmp/uv.tar.gz \
+      "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz" \
+ && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum --check --strict \
+ && tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1 \
+      uv-x86_64-unknown-linux-gnu/uv uv-x86_64-unknown-linux-gnu/uvx \
+ && rm /tmp/uv.tar.gz
+
+# Mirror the artifact's setup.sh layout at the runner tool-cache prefix it was
+# built for, without its unpinned network pip upgrade.
+RUN curl -fsSLo /tmp/python.tar.gz \
+      "https://github.com/actions/python-versions/releases/download/${PYTHON_RELEASE}/python-${PYTHON_VERSION}-linux-24.04-x64.tar.gz" \
+ && echo "${PYTHON_SHA256}  /tmp/python.tar.gz" | sha256sum --check --strict \
+ && prefix="/opt/hostedtoolcache/Python/${PYTHON_VERSION}/x64" \
+ && install -d "${prefix}" \
+ && tar -xzf /tmp/python.tar.gz -C "${prefix}" \
+ && rm "${prefix}/setup.sh" /tmp/python.tar.gz \
+ && ln -s "${prefix}/bin/python${PYTHON_VERSION%.*}" /usr/local/bin/python3 \
+ && ln -s python3 /usr/local/bin/python \
+ && ! find "${prefix}" -name '*.so*' -type f -exec ldd {} + 2>/dev/null | grep 'not found' \
+ && python3 -c "import platform, ssl, sqlite3, readline; assert platform.python_version() == '${PYTHON_VERSION}'"
+
+USER dev
+WORKDIR /workspaces/rrflow
+CMD ["bash", "-l"]
+
+FROM rust AS full
+
+ARG NODE_VERSION=24.20.0
+ARG NODE_SHA256=2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2
+ARG PNPM_VERSION=11.22.0
+ARG PNPM_INTEGRITY=sha512-H/hwxMYTPf2I+yr8Rt0T1H8JyXlLQ4xv20fKmMrzvBY4HuC+k6CRuOOCTPAfiJ9G19niCRD7C+GrD7W6qA3WIQ==
+ARG GO_VERSION=1.24.13
+ARG GO_SHA256=1fc94b57134d51669c72173ad5d49fd62afb0f1db9bf3f798fd98ee423f8d730
+ARG JAVA_VERSION=21.0.12.1+1
+ARG JAVA_SHA256=ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94
+ARG MAVEN_VERSION=3.9.12
+ARG MAVEN_SHA512=0a1be79f02466533fc1a80abbef8796e4f737c46c6574ede5658b110899942a94db634477dfd3745501c80aef9aac0d4f841d38574373f7e2d24cce89d694f70
+ARG DOTNET_VERSION=10.0.111
+ARG DOTNET_SHA512=aae221be96a3b510d5b6fffefc69d8ad2fa595a1430299419316bb71c65f260a457ca9af24d044e1709b28a9118798caafec535ccfe58f7767c5acb735c00392
+
+USER root
+
+ENV JAVA_HOME=/opt/jdk \
+    DOTNET_ROOT=/opt/dotnet \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    DOTNET_NOLOGO=1 \
+    NUGET_PACKAGES=/cache/nuget \
+    GOTOOLCHAIN=local \
+    GOPATH=/cache/go \
+    GOCACHE=/cache/go-build \
+    MAVEN_OPTS=-Dmaven.repo.local=/cache/m2 \
+    pnpm_config_store_dir=/cache/pnpm-store \
+    PATH=/opt/node/bin:/usr/local/go/bin:/opt/jdk/bin:/opt/maven/bin:/opt/dotnet:${PATH}
+
+RUN apt-get update --snapshot "${UBUNTU_SNAPSHOT}" \
+ && apt-get install -y --no-install-recommends --snapshot "${UBUNTU_SNAPSHOT}" libicu74 \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSLo /tmp/node.tar.xz \
+      "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+ && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum --check --strict \
+ && install -d /opt/node \
+ && tar -xJf /tmp/node.tar.xz -C /opt/node --strip-components=1 \
+ && rm /tmp/node.tar.xz \
+ && curl -fsSLo /tmp/pnpm.tgz "https://registry.npmjs.org/pnpm/-/pnpm-${PNPM_VERSION}.tgz" \
+ && pnpm_sha512="$(printf '%s' "${PNPM_INTEGRITY#sha512-}" | base64 -d | od -An -vtx1 | tr -d ' \n')" \
+ && echo "${pnpm_sha512}  /tmp/pnpm.tgz" | sha512sum --check --strict \
+ && npm install --global --no-audit --no-fund /tmp/pnpm.tgz \
+ && rm /tmp/pnpm.tgz
+
+RUN curl -fsSLo /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+ && echo "${GO_SHA256}  /tmp/go.tar.gz" | sha256sum --check --strict \
+ && tar -xzf /tmp/go.tar.gz -C /usr/local \
+ && rm /tmp/go.tar.gz
+
+RUN java_tag="$(printf '%s' "${JAVA_VERSION}" | sed 's/+/%2B/')" \
+ && java_file="$(printf '%s' "${JAVA_VERSION}" | sed 's/+/_/')" \
+ && curl -fsSLo /tmp/jdk.tar.gz \
+      "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-${java_tag}/OpenJDK21U-jdk_x64_linux_hotspot_${java_file}.tar.gz" \
+ && echo "${JAVA_SHA256}  /tmp/jdk.tar.gz" | sha256sum --check --strict \
+ && install -d /opt/jdk \
+ && tar -xzf /tmp/jdk.tar.gz -C /opt/jdk --strip-components=1 \
+ && rm /tmp/jdk.tar.gz
+
+RUN curl -fsSLo /tmp/maven.tar.gz \
+      "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+ && echo "${MAVEN_SHA512}  /tmp/maven.tar.gz" | sha512sum --check --strict \
+ && install -d /opt/maven \
+ && tar -xzf /tmp/maven.tar.gz -C /opt/maven --strip-components=1 \
+ && rm /tmp/maven.tar.gz
+
+RUN curl -fsSLo /tmp/dotnet.tar.gz \
+      "https://builds.dotnet.microsoft.com/dotnet/Sdk/${DOTNET_VERSION}/dotnet-sdk-${DOTNET_VERSION}-linux-x64.tar.gz" \
+ && echo "${DOTNET_SHA512}  /tmp/dotnet.tar.gz" | sha512sum --check --strict \
+ && install -d /opt/dotnet \
+ && tar -xzf /tmp/dotnet.tar.gz -C /opt/dotnet \
+ && rm /tmp/dotnet.tar.gz
+
+USER dev
