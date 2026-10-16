@@ -74,8 +74,7 @@ def test_public_negotiation_retries_transport_loss_and_validates_envelope() -> N
                         "max_elapsed_ms": 30_000,
                     },
                     "configuration_sha256": (
-                        "bf8a4557c1465ab4bf0e8640be42f65b"
-                        "28e4d65dff5f3147b2892edfe9db31be"
+                        "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be"
                     ),
                 },
                 "instance": {"kind": "instance", "id": "sdk-test"},
