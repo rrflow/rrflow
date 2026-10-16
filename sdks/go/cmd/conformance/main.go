@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"time"
 
@@ -157,9 +158,7 @@ func integer(value any) int {
 }
 func clone(value map[string]any) map[string]any {
 	result := make(map[string]any, len(value))
-	for key, item := range value {
-		result[key] = item
-	}
+	maps.Copy(result, value)
 	return result
 }
 func containsIdentity(rows []any, expected string) bool {

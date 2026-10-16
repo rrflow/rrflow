@@ -54,7 +54,7 @@ workspace pins SDK `10.0.402` with roll-forward disabled, targets only
 `net10.0`, and centralizes nullable analysis, warnings-as-errors, the latest
 analysis level under that pinned SDK, deterministic compilation, and lock-file
 generation in `Directory.Build.props`. `Directory.Packages.props` is the sole
-source for the xUnit v3 3.2.2 test version. The client has no third-party
+source for the xUnit v3 4.0.2 test version. The client has no third-party
 runtime dependency. These source/build-policy facts do not qualify a release
 toolchain or offline dependency closure.
 
@@ -381,7 +381,7 @@ deterministic-compilation, target-framework, and lock-file-generation policy
 lives in `Directory.Build.props`; the xUnit version lives once in
 `Directory.Packages.props`. Exact locked restore still requires
 `--locked-mode`. The runtime lock has no package dependencies; the test lock
-records xUnit and fifteen transitive packages. A library lock does not control
+records xUnit and sixteen transitive packages. A library lock does not control
 the graph selected by a consuming application, so neither the pin nor either
 lock substitutes for the signed release closure.
 

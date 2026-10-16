@@ -39,9 +39,9 @@ semantic intent and declared budgets and validates the engine's public result.
 
 ## Audited current package
 
-The package requires Python 3.11 or later and has two runtime dependencies:
-HTTPX 0.28.1 and Pydantic 2.13.4. `pyproject.toml` pins Hatchling 1.32.0 as
-the build backend, while the uv project lock fixes Ruff 0.16.4, mypy 2.3.1,
+The package requires Python 3.15 or later and has two runtime dependencies:
+HTTPX 0.28.1 and Pydantic 2.14.1. `pyproject.toml` pins Hatchling 1.32.4 as
+the build backend, while the uv project lock fixes Ruff 0.17.1, mypy 2.4.0,
 and pytest 9.1.1 for development. The reviewed executable layout is:
 
 ```text
@@ -310,8 +310,10 @@ The resulting client must:
 
 An offline `uv build` currently succeeds. Under Python 3.14.4 and uv 0.11.21,
 the A-07.1d output was a 9,294-byte pure-Python wheel and a 48,486-byte source
-distribution. The wheel has 14 entries; the source distribution has 18. Both
-contain `rrd_client/py.typed` and omit the removed `rrd_client/models.py`.
+distribution. The wheel has 14 entries; the source distribution has 18. Under
+Python 3.15.0 and uv 0.13.1 on 2026-10-16, the output was a 12,654-byte wheel
+with 15 entries and a 33,113-byte source distribution with 20. Each build
+contains `rrd_client/py.typed` and omits the removed `rrd_client/models.py`.
 That proves the intended file projection, not reproducibility or consumer
 typing behavior.
 
@@ -319,9 +321,9 @@ Project metadata still lacks the deliberate license, readme, authorship,
 project-link, support, and artifact-provenance surface needed for release. The
 exact runtime dependency pins make this checkout repeatable but have not been
 justified as a compatible consumer-library range. Only Python 3.14.4 was
-exercised in this review; the declared 3.11 minimum has no current interpreter
-matrix. Normalized archive timestamps aid reproducibility, but one local build
-is not a reproducible-build claim.
+exercised in that review; the declared minimum is now Python 3.15, the one
+interpreter candidate CI runs. Normalized archive timestamps aid
+reproducibility, but one local build is not a reproducible-build claim.
 
 The qualified distribution contains an sdist and pure-Python wheel produced
 from one source identity, includes `py.typed`, has a closed included-file set,
