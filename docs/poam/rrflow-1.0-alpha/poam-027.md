@@ -22,11 +22,12 @@ the service-protocol suite's backup kill-matrix test failed while the
 per-change validator passed.
 
 One gap remains: the pull request rule is written policy, not enforced. No
-repository ruleset yet requires pull requests and the stable candidate check,
-or denies branch deletion and force pushes, on `main`. On 2026-09-11 GitHub
-returned HTTP 403 for both rulesets and `main` branch-protection APIs while
-the repository was private; GitHub now lists `rrflow/rrflow-development` as
-public, where those controls are available.
+recorded repository ruleset yet requires pull requests and the stable
+candidate check, or denies branch deletion and force pushes, on `main`. On
+2026-09-11 GitHub returned HTTP 403 for both rulesets and `main`
+branch-protection APIs while the repository was private; the repository owner
+confirmed on 2026-10-16 that `rrflow/rrflow-development` is public, where those
+controls are available.
 
 ## Impact
 

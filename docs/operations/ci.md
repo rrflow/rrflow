@@ -202,7 +202,9 @@ This routing expression is defense in depth, not permission to connect a
 self-hosted pool to a public repository: a fork can propose a change to the
 workflow itself. The installer queries GitHub and fails closed unless the
 repository visibility is `PRIVATE`. Do not set the physical routing variables
-or register the scale sets while the repository is public.
+or register the scale sets while the repository is public. The repository
+owner confirmed public visibility on 2026-10-16, so candidate CI uses
+GitHub-hosted runners and the routing variables stay unset.
 
 GitHub recommends ephemeral runners for autoscaling and identifies Actions
 Runner Controller (ARC) as its reference Kubernetes implementation. The
@@ -266,8 +268,8 @@ must remain GitHub-hosted.
 
 ## Repository enforcement
 
-After the first physical proof succeeds and the hosting tier exposes the
-control, protect `main` with these invariants:
+Public visibility exposes this control on the current hosting tier. Protect
+`main` with these invariants:
 
 - pull requests and the stable `pipeline / ci-gate` check are required;
 - merge queue or an up-to-date branch is required;
@@ -276,15 +278,16 @@ control, protect `main` with these invariants:
 
 This is an external control and needs external evidence. On 2026-09-11,
 read-only GitHub API requests for both repository rulesets and `main` branch
-protection on private `rrflow/rrflow-development` returned HTTP 403 with the
-message that GitHub Pro or public visibility is required. Therefore the
-checkout does **not** currently claim that `pipeline / ci-gate`, pull requests,
-reviews, deletion denial, or force-push denial is enforced. Do not compensate
-with a local hook, make the repository public, or push to the official
-promotion repository. Enable an eligible private-repository plan or equivalent
-organization control, then record the exact repository, rule/protection
-identity, required check name, protected ref, API response, and verification
-attempt in this record and one linked package journal.
+protection on the then-private `rrflow/rrflow-development` returned HTTP 403
+with the message that GitHub Pro or public visibility is required. The
+repository owner confirmed public visibility on 2026-10-16, so rulesets are
+available; no ruleset is recorded here yet. Therefore the checkout does
+**not** currently claim that `pipeline / ci-gate`, pull requests, reviews,
+deletion denial, or force-push denial is enforced. Do not compensate with a
+local hook or push to the official promotion repository. Create the `main`
+ruleset, then record the exact repository, rule identity, required check name,
+protected ref, API response, and verification attempt in this record and one
+linked package journal.
 
 The repository CI-policy check rejects candidate trigger duplication, unsafe
 fork routing, unpinned actions, service or runner images, persisted checkout

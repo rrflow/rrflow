@@ -23,7 +23,7 @@ not use version changes as progress markers. A later version change requires
 the repository owner's explicit instruction after the alpha objective, release
 gates, optimization evidence, and release decision are complete.
 
-The private `rrflow/rrflow-development` repository is the only push target for
+The public `rrflow/rrflow-development` repository is the only push target for
 incremental pre-release source, evidence, and candidate history. The private
 `rrflow/rrflow` repository is the official promotion target, not a development
 remote. Changes reach `main` only through pull requests whose candidate CI
