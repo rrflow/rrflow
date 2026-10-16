@@ -1774,7 +1774,7 @@ def action(path: str) -> str:
     if path == "README.md":
         return "retain as the product portal; link owners and never absorb detailed roadmap or architecture bodies"
     if path == ACTIVE_CHANGE_PLAN:
-        return "replace only in a separate planning commit; never edit alongside implementation"
+        return "retired 2026-10-16 with the planning-only commit rule; keep unchanged as historical evidence linked from journals"
     if path == "Cargo.lock":
         return "regenerate only after an accepted manifest change; never hand-edit"
     if path in GENERATED_PROJECTIONS:

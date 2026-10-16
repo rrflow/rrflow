@@ -337,10 +337,6 @@ def main() -> None:
         reusable.count("python3 scripts/ci/build_execution_inventory.py --check") == 1,
         "the exhaustive execution inventory must be checked exactly once",
     )
-    require(
-        reusable.count("python3 scripts/ci/check_change_plan.py") == 1,
-        "the committed change package must be checked exactly once",
-    )
 
     expected_jobs = {
         "topology-smoke",
@@ -418,11 +414,6 @@ def main() -> None:
     require(
         "fetch-depth: 0" in verify_checkouts[0][1],
         "the verify checkout must fetch complete Git history",
-    )
-    require(
-        jobs["verify"].index("python3 scripts/ci/check_change_plan.py")
-        < jobs["verify"].index("cargo fmt --all -- --check"),
-        "the change-plan policy must run before build and test checks",
     )
     require(
         "python3 scripts/ci/check_generated_surfaces.py" in jobs["verify"],

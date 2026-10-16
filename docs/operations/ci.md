@@ -81,37 +81,26 @@ The portable development control has three layers:
 3. repository branch policy makes the pull request and stable check
    non-bypassable when the GitHub account tier supports that control.
 
-Every code-bearing or structural package first commits
-`docs/roadmap/rrflow-1.0-active-change.json` in a planning-only commit. The
-record binds one immutable parent revision and tree, complete baseline-file
-digests and line intervals, exact changed paths and symbols, research and
-adaptation decisions, failure oracles, acceptance commands,
-trace/resource/debug decisions, and stop conditions. The subsequent package
-may change only its declared implementation and evidence paths; changing the
-plan itself requires stopping and making another planning-only commit.
+Every code-bearing or structural package lands as one pull request against
+`main`. Its description carries the change brief defined by the
+[change-authoring procedure](../roadmap/rrflow-1.0-execution/change-authoring.md#required-change-checklist).
+Candidate CI runs on that pull request and must pass before merge; a direct
+push to `main` is not a landing path. The pull request description begins at
+the repository-effect boundary. It is not a workflow for exploratory reading or
+private AI reasoning and must not contain hidden chain-of-thought.
 
-This machine record begins at the repository-effect boundary. It is not a
-workflow for exploratory reading or private AI reasoning and must not contain
-hidden chain-of-thought. Repository tooling should derive baseline, digest,
-line-count, generated-link, and final-diff facts; authors supply the semantic
-intent, risk, evidence, and stop decisions.
+The planning-only commit, `docs/roadmap/rrflow-1.0-active-change.json`, and
+`scripts/ci/check_change_plan.py` were retired on 2026-10-16. Between
+2026-08-19 and 2026-09-15, 218 commits reached `main` by direct push; candidate
+CI triggers only on `pull_request`, `merge_group`, and `workflow_dispatch`, so
+none of them ran it automatically, and the per-change validator did not prevent
+the generated-surface and backup-fixture failures present at `cfa0e80`. The
+active-change file stays unchanged as historical evidence linked from earlier
+journals; nothing reads or updates it.
 
-Run `python3 scripts/ci/check_change_plan.py` as the local presubmit. It
-authenticates the planning commit and every complete-file review against Git,
-then reconciles paths touched by every post-plan commit—including paths later
-reverted—with the staged, unstaged, and non-ignored untracked worktree. It
-rejects mixed plan/code commits, stale baselines, partial reviews, undeclared
-or omitted paths, a changed lockfile, and missing research, failure,
-acceptance, observability, or stop evidence. The generated file inventory is a
-complete tree ledger, but it is not permission to edit; the earlier committed
-active package is the authorization envelope.
-
-Candidate CI checks out complete Git history and runs the same command before
-format, build, or test work. The checker proves plan-to-diff conformance, not
-algorithm correctness or alpha readiness, and it remains locally bypassable
-by a person controlling the checkout. Only the separately evidenced
-server-side protection below can make the required candidate check and review
-non-bypassable.
+Candidate CI proves the checked-in controls, not algorithm correctness or alpha
+readiness. Only the separately evidenced server-side protection below can make
+the pull request and required candidate check non-bypassable.
 
 A developer may run the
 [repository checklist](../roadmap/rrflow-1.0-execution-map.md#repository-wide-run-checklist)
@@ -124,9 +113,7 @@ The documentation policy machine-checks the owner chain, required
 change-authoring procedure/evidence fields, generated-index freshness,
 active-record classification, knowledge-package determinism, and local links.
 The execution inventory checks every current/generated/registered-planned
-path. The change-plan validator proves that the candidate checkout's complete
-post-plan path set is covered by one earlier machine-readable package. Each
-package records its result in a linked record under
+path. Each package records its result in a linked record under
 `docs/evidence/change-journals/`; the execution portal contains no journal
 bodies. These checked-in controls remain bypassable outside candidate CI;
 POAM-027 stays open for eligible server-side review/check/force-push/deletion
