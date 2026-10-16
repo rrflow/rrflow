@@ -261,11 +261,21 @@ impl TurboQuantVector {
 
 fn dot(left: &[f64], right: &[f64], kernel: QuantizedKernel) -> f64 {
     debug_assert_eq!(left.len(), right.len());
-    #[cfg(target_arch = "x86_64")]
-    if kernel == QuantizedKernel::Auto && std::arch::is_x86_feature_detected!("avx2") {
-        // SAFETY: AVX2 support was checked and both slices have equal lengths.
-        return unsafe { dot_avx2(left, right) };
+    match kernel {
+        QuantizedKernel::Scalar => dot_scalar(left, right),
+        QuantizedKernel::Auto => {
+            #[cfg(target_arch = "x86_64")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                // SAFETY: AVX2 support was checked and both slices have equal
+                // lengths.
+                return unsafe { dot_avx2(left, right) };
+            }
+            dot_scalar(left, right)
+        }
     }
+}
+
+fn dot_scalar(left: &[f64], right: &[f64]) -> f64 {
     left.iter()
         .zip(right)
         .map(|(left, right)| left * right)

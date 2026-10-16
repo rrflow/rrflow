@@ -927,13 +927,19 @@ fn score_dense_values(
     if query.len() != candidate.len() {
         return invalid("dense query and candidate dimensions differ");
     }
-    #[cfg(target_arch = "x86_64")]
-    if kernel == HnswKernel::Auto && std::arch::is_x86_feature_detected!("avx2") {
-        // SAFETY: AVX2 was detected at runtime and both slices have the same
-        // proven length; the kernel performs only unaligned in-bounds loads.
-        return Ok(unsafe { score_dense_avx2(query, candidate, metric) });
+    match kernel {
+        HnswKernel::Scalar => score_dense(query, candidate, metric),
+        HnswKernel::Auto => {
+            #[cfg(target_arch = "x86_64")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                // SAFETY: AVX2 was detected at runtime and both slices have the
+                // same proven length; the kernel performs only unaligned
+                // in-bounds loads.
+                return Ok(unsafe { score_dense_avx2(query, candidate, metric) });
+            }
+            score_dense(query, candidate, metric)
+        }
     }
-    score_dense(query, candidate, metric)
 }
 
 #[cfg(target_arch = "x86_64")]

@@ -141,19 +141,29 @@ pub(super) fn create_estate_directories(project: &Path) -> Result<()> {
             Err(error) => return Err(ServiceError::Storage(error.to_string())),
         }
         let parent = path.parent().ok_or(ServiceError::ProjectBindingMismatch)?;
-        let mut builder = std::fs::DirBuilder::new();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt as _;
-            builder.mode(0o700);
-        }
-        builder
+        owner_only_directory_builder()
             .create(&path)
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
         rrd_store::sync_directory_metadata(parent)
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
     }
     Ok(())
+}
+
+/// Estate directories are owner-only (0700) on Unix; other platforms use the
+/// platform's default directory permissions.
+fn owner_only_directory_builder() -> std::fs::DirBuilder {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt as _;
+        let mut builder = std::fs::DirBuilder::new();
+        builder.mode(0o700);
+        builder
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::DirBuilder::new()
+    }
 }
 
 pub(super) fn validate_recovery_estate(project: &Path, layout: &EstateLayout) -> Result<()> {
