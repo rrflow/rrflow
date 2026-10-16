@@ -57,7 +57,10 @@ pub use backup::{
 };
 pub use control::{ControlJournalEntry, ControlTransition};
 pub use ds::{DataRuntime, DataRuntimeAccess, DataRuntimeRef, DataRuntimeStep};
-pub use engine::{PhysicalStoreEvidence, RrflowMxStore, StorageEngine, StorageProfile};
+pub use engine::{
+    PhysicalStoreEvidence, RrflowMxStore, StorageEngine, StorageProfile, LOGICAL_ONLY_EVIDENCE,
+    RRFLOW_KV_COUNTER_EVIDENCE,
+};
 pub use error::{Error, Result};
 pub use footprint::{measure_storage_footprint, FootprintBytes, StorageFootprint};
 pub use gc::{PairStatus, RemovalReport, Verdict};

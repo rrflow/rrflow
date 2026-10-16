@@ -789,6 +789,17 @@ existing operation through `RrdEngine`; it cannot duplicate the snapshot
 schema, replay the runtime log independently, or open repositories/storage to
 assemble a second view.
 
+The snapshot also carries one `storage` section with `observation` authority:
+the storage port's process-local physical counters for the instance's
+profile, measured once after the logical coordinates verify and never gating an
+assembly retry. rrflowKV reports its memtable, write-ahead log, flush and
+compaction, segment-set, page-cache, and segment I/O counters; rrflowMX reports
+`logical_only`. Cumulative counters reset when the process reopens its store,
+so they are operator evidence, not state, and are not bound to the read stamp.
+The H-05 metric instruments, such as `rrflow.kv.cache.requests`, remain the
+observability projection of the same physical behavior; neither is derived
+from the other.
+
 Normal logs are structured, bounded, and correlated with trace/span/request
 coordinates. Raw prompts, source bodies, query parameters, vector values,
 credentials, headers, paths, model output, hidden reasoning, and error messages

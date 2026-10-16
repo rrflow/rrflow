@@ -6,7 +6,7 @@
 //! stored in those transactions.
 
 use crate::access::{prepare_semantic_commit, SemanticCommitPlan};
-use crate::engine::{PhysicalStoreEvidence, StorageEngine};
+use crate::engine::{PhysicalStoreEvidence, StorageEngine, RRFLOW_KV_COUNTER_EVIDENCE};
 use crate::error::{Error, Result};
 use crate::key_codec::prefix_end;
 #[cfg(test)]
@@ -748,7 +748,7 @@ impl StorageEngine for RrflowKvStore {
         let memtable = database.memtable().profile();
         Ok(PhysicalStoreEvidence {
             backend: "rrflow_kv".into(),
-            evidence_level: "rrflow_kv_counters".into(),
+            evidence_level: RRFLOW_KV_COUNTER_EVIDENCE.into(),
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),

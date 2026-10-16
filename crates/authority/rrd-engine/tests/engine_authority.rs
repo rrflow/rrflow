@@ -3,11 +3,11 @@ use rrd_contract::{
     CloseSession, CommitTransaction, CorrelationId, CreateSession, DataCatalogueIdentity,
     DataLogicalModel, DataProperties, DataPropertySchema, DataRecordSchema, DataReference,
     DataSchemaMode, DataSchemaRegistry, DataTableSchema, DataValueType, DataVectorValue,
-    EnsureQueryIndex, EnsureVectorCollection, EstateDesiredPhase, InstallationManagedPathKind,
-    InstallationTargetKind, NamedVectorDefinition, QueryBudget, QueryIndexKind, QueryValue,
-    ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot, RequestContext, ResourceId, ResourceKind,
-    ResourcePath, SecurityAction, SessionLimits, TransactionMutation, VectorMemoryTier,
-    VectorSearchMetric, VectorValueKind,
+    DiagnosticAuthority, DiagnosticStorageEvidenceLevel, EnsureQueryIndex, EnsureVectorCollection,
+    EstateDesiredPhase, InstallationManagedPathKind, InstallationTargetKind, NamedVectorDefinition,
+    QueryBudget, QueryIndexKind, QueryValue, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot,
+    RequestContext, ResourceId, ResourceKind, ResourcePath, SecurityAction, SessionLimits,
+    StorageProfileKind, TransactionMutation, VectorMemoryTier, VectorSearchMetric, VectorValueKind,
 };
 use rrd_core::{digest, Claim, Predicate, Producer, Subject};
 use rrd_engine::{
@@ -446,6 +446,34 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
         diagnostic.query_indexes.revision,
         query_index.catalogue_revision
     );
+    assert_eq!(diagnostic.storage.profile, StorageProfileKind::RrflowKv);
+    assert_eq!(
+        diagnostic.storage.evidence_level,
+        DiagnosticStorageEvidenceLevel::RrflowKvCounters
+    );
+    assert_eq!(
+        diagnostic.storage.observed_at_unix_ms,
+        diagnostic.observed_at_unix_ms
+    );
+    let rrflow_kv = diagnostic
+        .storage
+        .rrflow_kv
+        .as_ref()
+        .expect("rrflowKV publishes its physical counters");
+    assert!(
+        rrflow_kv.physical_sequence > 0,
+        "committed transactions advance the physical sequence"
+    );
+    assert!(rrflow_kv.memtable.max_versions > 0);
+    assert!(rrflow_kv.write_ahead_log.payload_max_bytes > 0);
+    assert!(rrflow_kv.page_cache.capacity_bytes > 0);
+    let storage_section = diagnostic
+        .sections
+        .iter()
+        .find(|section| section.id.as_str() == "storage")
+        .expect("the storage observation is disclosed as a section");
+    assert_eq!(storage_section.authority, DiagnosticAuthority::Observation);
+    assert_eq!(storage_section.row_count, 1);
 
     let audit = engine
         .read_audit(

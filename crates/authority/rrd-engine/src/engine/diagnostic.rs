@@ -1,4 +1,11 @@
 use super::*;
+use rrd_contract::{
+    DiagnosticMaintenanceSnapshot, DiagnosticMemtableSnapshot, DiagnosticPageCacheSnapshot,
+    DiagnosticRrflowKvSnapshot, DiagnosticSegmentIoMode, DiagnosticSegmentIoSnapshot,
+    DiagnosticSegmentSetSnapshot, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
+    DiagnosticWriteAheadLogSnapshot, MAX_MESSAGE_BYTES,
+};
+use rrd_store::PhysicalStoreEvidence;
 
 const MAX_DIAGNOSTIC_ASSEMBLY_ATTEMPTS: u8 = 3;
 
@@ -102,6 +109,9 @@ impl RrdEngine {
                 continue;
             }
 
+            // Physical counters are an observation of this process, taken once
+            // after the logical coordinates verified; they never gate a retry.
+            let storage = diagnostic_storage(self, now)?;
             let sections = diagnostic_sections(
                 after.runtime.commit_cursor,
                 &product_capabilities,
@@ -114,6 +124,7 @@ impl RrdEngine {
                 &query_indexes,
                 &vector_collections,
                 estate.as_ref(),
+                &storage,
                 &changes,
                 &audit,
             )?;
@@ -144,6 +155,7 @@ impl RrdEngine {
                 query_indexes,
                 vector_collections,
                 estate,
+                storage,
                 changes,
                 audit,
                 sections,
@@ -604,6 +616,7 @@ fn diagnostic_sections(
     query_indexes: &QueryIndexCatalogueSnapshot,
     vector_collections: &VectorCollectionCatalogueSnapshot,
     estate: Option<&rrd_contract::EstateSnapshot>,
+    storage: &DiagnosticStorageSnapshot,
     changes: &ChangefeedPage,
     audit: &AuditPage,
 ) -> Result<Vec<DiagnosticSectionSnapshot>> {
@@ -689,6 +702,14 @@ fn diagnostic_sections(
             None,
         )?,
         section(
+            "storage",
+            DiagnosticAuthority::Observation,
+            DiagnosticCoverage::Complete,
+            usize::from(storage.rrflow_kv.is_some()),
+            known_at_cursor,
+            None,
+        )?,
+        section(
             "vector-artifacts",
             DiagnosticAuthority::Authoritative,
             DiagnosticCoverage::Complete,
@@ -707,6 +728,213 @@ fn diagnostic_sections(
     ];
     sections.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(sections)
+}
+
+/// Projects the storage port's physical evidence into the public contract.
+/// A profile that reports counters must report every one of them; a missing
+/// counter or unknown level fails the read instead of rendering a guess.
+fn diagnostic_storage(
+    engine: &RrdEngine,
+    observed_at_unix_ms: u64,
+) -> Result<DiagnosticStorageSnapshot> {
+    let evidence = engine.storage.physical_store_evidence()?;
+    if evidence.backend != engine.storage.backend_name() {
+        return Err(ServiceError::Storage(format!(
+            "storage evidence names backend {} but the instance runs {}",
+            evidence.backend,
+            engine.storage.backend_name()
+        )));
+    }
+    let (evidence_level, rrflow_kv) = match evidence.evidence_level.as_str() {
+        rrd_store::LOGICAL_ONLY_EVIDENCE => (DiagnosticStorageEvidenceLevel::LogicalOnly, None),
+        rrd_store::RRFLOW_KV_COUNTER_EVIDENCE => (
+            DiagnosticStorageEvidenceLevel::RrflowKvCounters,
+            Some(rrflow_kv_snapshot(&evidence)?),
+        ),
+        level => {
+            return Err(ServiceError::Storage(format!(
+                "storage reported unknown physical evidence level {level}"
+            )))
+        }
+    };
+    Ok(DiagnosticStorageSnapshot {
+        observed_at_unix_ms,
+        profile: engine.storage_profile_kind,
+        evidence_level,
+        rrflow_kv,
+    })
+}
+
+fn counter(value: Option<u64>, name: &str) -> Result<u64> {
+    value.ok_or_else(|| ServiceError::Storage(format!("rrflowKV physical evidence omitted {name}")))
+}
+
+fn segment_io_mode(mode: Option<&str>) -> Result<DiagnosticSegmentIoMode> {
+    match mode {
+        Some("auto") => Ok(DiagnosticSegmentIoMode::Auto),
+        Some("mmap") => Ok(DiagnosticSegmentIoMode::Mmap),
+        Some("io_uring") => Ok(DiagnosticSegmentIoMode::IoUring),
+        Some("bounded") => Ok(DiagnosticSegmentIoMode::Bounded),
+        mode => Err(ServiceError::Storage(format!(
+            "rrflowKV physical evidence names unknown segment I/O mode {mode:?}"
+        ))),
+    }
+}
+
+/// A fallback reason is diagnostic text; it is bounded to one contract
+/// message so a long error cannot fail the whole snapshot.
+fn bounded_reason(reason: Option<&String>) -> Option<String> {
+    let reason = reason?.replace('\0', "");
+    if reason.is_empty() {
+        return None;
+    }
+    let mut end = reason.len().min(MAX_MESSAGE_BYTES);
+    while !reason.is_char_boundary(end) {
+        end -= 1;
+    }
+    Some(reason[..end].to_owned())
+}
+
+fn rrflow_kv_snapshot(evidence: &PhysicalStoreEvidence) -> Result<DiagnosticRrflowKvSnapshot> {
+    Ok(DiagnosticRrflowKvSnapshot {
+        physical_sequence: counter(evidence.physical_sequence, "physical_sequence")?,
+        manifest_generation: counter(evidence.manifest_generation, "manifest_generation")?,
+        durable_sequence: counter(evidence.durable_sequence, "durable_sequence")?,
+        memtable: DiagnosticMemtableSnapshot {
+            versions: counter(evidence.memtable_versions, "memtable_versions")?,
+            max_versions: counter(evidence.memtable_max_versions, "memtable_max_versions")?,
+            approximate_bytes: counter(evidence.memtable_bytes, "memtable_bytes")?,
+            keys: counter(evidence.memtable_keys, "memtable_keys")?,
+            key_payload_bytes: counter(
+                evidence.memtable_key_payload_bytes,
+                "memtable_key_payload_bytes",
+            )?,
+            value_payload_bytes: counter(
+                evidence.memtable_value_payload_bytes,
+                "memtable_value_payload_bytes",
+            )?,
+            tombstones: counter(evidence.memtable_tombstones, "memtable_tombstones")?,
+            spilled_chains: counter(evidence.memtable_spilled_chains, "memtable_spilled_chains")?,
+            spilled_version_capacity: counter(
+                evidence.memtable_spilled_version_capacity,
+                "memtable_spilled_version_capacity",
+            )?,
+            version_record_bytes: counter(
+                evidence.memtable_version_record_bytes,
+                "memtable_version_record_bytes",
+            )?,
+            owned_bytes_lower_bound: counter(
+                evidence.memtable_owned_bytes_lower_bound,
+                "memtable_owned_bytes_lower_bound",
+            )?,
+        },
+        write_ahead_log: DiagnosticWriteAheadLogSnapshot {
+            payload_bytes: counter(evidence.wal_payload_bytes, "wal_payload_bytes")?,
+            payload_max_bytes: counter(evidence.wal_payload_max_bytes, "wal_payload_max_bytes")?,
+        },
+        maintenance: DiagnosticMaintenanceSnapshot {
+            automatic_flushes: counter(evidence.automatic_flushes, "automatic_flushes")?,
+            failed_flushes: counter(
+                evidence.failed_maintenance_flushes,
+                "failed_maintenance_flushes",
+            )?,
+            write_stalls: counter(
+                evidence.maintenance_write_stalls,
+                "maintenance_write_stalls",
+            )?,
+            oversized_batches: counter(evidence.oversized_batches, "oversized_batches")?,
+            automatic_compactions: counter(
+                evidence.automatic_compactions,
+                "automatic_compactions",
+            )?,
+            failed_compactions: counter(evidence.failed_compactions, "failed_compactions")?,
+            compaction_input_bytes: counter(
+                evidence.compaction_input_bytes,
+                "compaction_input_bytes",
+            )?,
+            compaction_output_bytes: counter(
+                evidence.compaction_output_bytes,
+                "compaction_output_bytes",
+            )?,
+            peak_compaction_buffer_bytes: counter(
+                evidence.peak_compaction_buffer_bytes,
+                "peak_compaction_buffer_bytes",
+            )?,
+        },
+        segment_set: DiagnosticSegmentSetSnapshot {
+            segments: counter(evidence.segment_count, "segment_count")?,
+            segment_bytes: counter(evidence.segment_bytes, "segment_bytes")?,
+            l0_segments: counter(evidence.l0_segment_count, "l0_segment_count")?,
+            l0_compaction_trigger: counter(
+                evidence.l0_compaction_trigger,
+                "l0_compaction_trigger",
+            )?,
+            compaction_debt_segments: counter(
+                evidence.compaction_debt_segments,
+                "compaction_debt_segments",
+            )?,
+            compaction_target_segment_bytes: counter(
+                evidence.compaction_target_segment_bytes,
+                "compaction_target_segment_bytes",
+            )?,
+        },
+        page_cache: DiagnosticPageCacheSnapshot {
+            capacity_bytes: counter(evidence.cache_capacity_bytes, "cache_capacity_bytes")?,
+            resident_bytes: counter(evidence.cache_resident_bytes, "cache_resident_bytes")?,
+            entries: counter(evidence.cache_entries, "cache_entries")?,
+            hits: counter(evidence.cache_hits, "cache_hits")?,
+            misses: counter(evidence.cache_misses, "cache_misses")?,
+            evictions: counter(evidence.cache_evictions, "cache_evictions")?,
+            page_loads: counter(evidence.page_loads, "page_loads")?,
+            bytes_read: counter(evidence.page_bytes_read, "page_bytes_read")?,
+            bytes_decoded: counter(evidence.page_bytes_decoded, "page_bytes_decoded")?,
+            bytes_borrowed: counter(evidence.page_bytes_borrowed, "page_bytes_borrowed")?,
+            bytes_allocated: counter(evidence.page_bytes_allocated, "page_bytes_allocated")?,
+            bytes_copied: counter(evidence.page_bytes_copied, "page_bytes_copied")?,
+            bytes_decompressed: counter(
+                evidence.page_bytes_decompressed,
+                "page_bytes_decompressed",
+            )?,
+            filter_checks: counter(evidence.filter_checks, "filter_checks")?,
+            filter_negatives: counter(evidence.filter_negatives, "filter_negatives")?,
+        },
+        segment_io: DiagnosticSegmentIoSnapshot {
+            requested_mode: segment_io_mode(evidence.segment_io_requested_mode.as_deref())?,
+            mmap_segments: counter(
+                evidence.segment_io_mmap_segments,
+                "segment_io_mmap_segments",
+            )?,
+            io_uring_segments: counter(
+                evidence.segment_io_uring_segments,
+                "segment_io_uring_segments",
+            )?,
+            bounded_segments: counter(
+                evidence.segment_io_bounded_segments,
+                "segment_io_bounded_segments",
+            )?,
+            fallbacks: counter(evidence.segment_io_fallbacks, "segment_io_fallbacks")?,
+            last_fallback_reason: bounded_reason(evidence.segment_io_last_fallback.as_ref()),
+            read_operations: counter(
+                evidence.segment_io_read_operations,
+                "segment_io_read_operations",
+            )?,
+            mmap_reads: counter(evidence.segment_io_mmap_reads, "segment_io_mmap_reads")?,
+            io_uring_reads: counter(evidence.segment_io_uring_reads, "segment_io_uring_reads")?,
+            bounded_reads: counter(
+                evidence.segment_io_bounded_reads,
+                "segment_io_bounded_reads",
+            )?,
+            bytes_read: counter(evidence.segment_io_bytes_read, "segment_io_bytes_read")?,
+            max_request_bytes: counter(
+                evidence.segment_io_max_request_bytes,
+                "segment_io_max_request_bytes",
+            )?,
+            peak_request_bytes: counter(
+                evidence.segment_io_peak_request_bytes,
+                "segment_io_peak_request_bytes",
+            )?,
+        },
+    })
 }
 
 fn graph_difference_row_count(difference: &DiagnosticGraphDifference) -> usize {
@@ -741,4 +969,44 @@ fn section(
         known_at_cursor,
         requested_after,
     })
+}
+
+#[cfg(test)]
+mod storage_tests {
+    use super::*;
+
+    #[test]
+    fn rrflow_kv_projection_fails_closed_on_a_missing_counter() {
+        let evidence = PhysicalStoreEvidence::logical_only("rrflow_kv");
+        let error = rrflow_kv_snapshot(&evidence).unwrap_err();
+        assert!(error.to_string().contains("physical_sequence"));
+    }
+
+    #[test]
+    fn segment_io_modes_map_exactly() {
+        for (text, mode) in [
+            ("auto", DiagnosticSegmentIoMode::Auto),
+            ("mmap", DiagnosticSegmentIoMode::Mmap),
+            ("io_uring", DiagnosticSegmentIoMode::IoUring),
+            ("bounded", DiagnosticSegmentIoMode::Bounded),
+        ] {
+            assert_eq!(segment_io_mode(Some(text)).unwrap(), mode);
+        }
+        assert!(segment_io_mode(Some("uring")).is_err());
+        assert!(segment_io_mode(None).is_err());
+    }
+
+    #[test]
+    fn fallback_reasons_are_bounded_contract_messages() {
+        assert_eq!(bounded_reason(None), None);
+        assert_eq!(bounded_reason(Some(&String::new())), None);
+        assert_eq!(
+            bounded_reason(Some(&"a\0b".to_owned())),
+            Some("ab".to_owned())
+        );
+        let long = "é".repeat(MAX_MESSAGE_BYTES);
+        let bounded = bounded_reason(Some(&long)).unwrap();
+        assert!(bounded.len() <= MAX_MESSAGE_BYTES);
+        assert!(bounded.chars().all(|character| character == 'é'));
+    }
 }
