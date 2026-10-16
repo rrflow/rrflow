@@ -42,3 +42,9 @@ toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 unicode-normalization = "0.1"
+
+# Release builds (benchmarks and shipped binaries) optimize across crate
+# boundaries so shared generic code is compiled once, not once per crate.
+# Thin LTO keeps codegen parallel; symbols and panic unwinding are unchanged.
+[profile.release]
+lto = "thin"
