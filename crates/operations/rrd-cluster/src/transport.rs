@@ -661,7 +661,7 @@ impl RrdRaftNetworkClient {
         })?;
         source
             .attempt_counter
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |attempt| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |attempt| {
                 attempt.checked_add(1)
             })
             .map(|attempt| attempt + 1)
