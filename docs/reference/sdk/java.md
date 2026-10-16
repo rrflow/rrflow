@@ -48,10 +48,10 @@ on DataFusion or reconstruct engine planning in Java.
 ## Audited current artifact
 
 The current Maven coordinate is `io.rrflow:rrd-client:1.0.0`; the frozen
-product version does not imply alpha readiness. `pom.xml` compiles for Java 21
-and directly declares Jackson Databind 3.2.0 plus JUnit 6.0.1 for tests. The
-resolved runtime tree observed during this review was Jackson Databind 3.2.0,
-Jackson Core 3.2.0, and Jackson Annotations 2.22. That locally resolved tree is
+product version does not imply alpha readiness. `pom.xml` compiles for Java 25
+and directly declares Jackson Databind 3.2.3 plus JUnit 6.1.3 for tests. The
+resolved runtime tree is Jackson Databind 3.2.3, Jackson Core 3.2.3, and
+Jackson Annotations 2.22. That locally resolved tree is
 not a signed dependency lock or offline distribution.
 
 The complete reviewed source layout is:
@@ -205,11 +205,11 @@ local profile. It has no HTTPS, mutual TLS, installed mesh identity, endpoint
 rotation, or authenticated network profile. A configured base path remains
 part of route resolution but is not bound to installation identity.
 
-The default `HttpClient` builder sets only redirect denial. Java 21 otherwise
+The default `HttpClient` builder sets only redirect denial. Java 25 otherwise
 permits a default proxy selector, default SSL context, preferred HTTP/2,
 implementation-managed connection pools, and an unexposed default executor.
 The client does not set a connect timeout and `RrdClient` does not expose
-`HttpClient.close()`, even though Java 21 defines the client as
+`HttpClient.close()`, even though Java 25 defines the client as
 `AutoCloseable`. An injected arbitrary `HttpClient` is a useful test seam but
 cannot qualify transport identity or production resource policy.
 
@@ -325,7 +325,7 @@ The current Java artifact has no WebSocket implementation or test. B-04 owns
 the closed language-neutral multiplexed protocol and Rust reference
 implementation; H-04 must supply Java's qualified carriage and idiomatic API.
 
-Java 21's JDK WebSocket API provides explicit receive demand through
+Java 25's JDK WebSocket API provides explicit receive demand through
 `request(n)`, sequential listener callbacks per socket, asynchronous sends,
 and an abrupt `abort`. It also rejects a concurrent pending text/binary send.
 Those primitives are useful, but they do not by themselves implement RRFlow
@@ -498,23 +498,23 @@ The dependency order is:
 
 ## Primary constraints
 
-- [Java 21 `HttpClient`](https://docs.oracle.com/en/java/javase/21/docs/api/java.net.http/java/net/http/HttpClient.html)
+- [Java 25 `HttpClient`](https://docs.oracle.com/en/java/javase/25/docs/api/java.net.http/java/net/http/HttpClient.html)
   defines reusable synchronous/asynchronous clients, connection pooling,
   default proxy/executor behavior, and close semantics; RRFlow configures,
   owns, and measures those resources explicitly.
-- [Java 21 `HttpClient.Builder`](https://docs.oracle.com/en/java/javase/21/docs/api/java.net.http/java/net/http/HttpClient.Builder.html)
+- [Java 25 `HttpClient.Builder`](https://docs.oracle.com/en/java/javase/25/docs/api/java.net.http/java/net/http/HttpClient.Builder.html)
   exposes redirect, proxy, connect-timeout, TLS, protocol, and executor inputs;
   absence of explicit inputs is not an RRFlow transport profile.
-- [Java 21 `CompletableFuture`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CompletableFuture.html)
+- [Java 25 `CompletableFuture`](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html)
   treats cancellation as exceptional completion because it does not control
   the computation; RRFlow therefore requires correlated server cancellation
   and outcome evidence separately.
-- [Java 21 records](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html)
+- [Java 25 records](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Record.html)
   derive string representation from component values; secret-bearing values
   are not transparent records.
-- [Java 21 WebSocket](https://docs.oracle.com/en/java/javase/21/docs/api/java.net.http/java/net/http/WebSocket.html)
+- [Java 25 WebSocket](https://docs.oracle.com/en/java/javase/25/docs/api/java.net.http/java/net/http/WebSocket.html)
   defines receive demand, pending sends, close, and abort, while
-  [its listener contract](https://docs.oracle.com/en/java/javase/21/docs/api/java.net.http/java/net/http/WebSocket.Listener.html)
+  [its listener contract](https://docs.oracle.com/en/java/javase/25/docs/api/java.net.http/java/net/http/WebSocket.Listener.html)
   defines sequential callbacks; B-04 supplies the RRFlow protocol, identity,
   queue, ACK, resume, and resource semantics that H-04 must carry in Java.
 - [Maven repository and offline behavior](https://maven.apache.org/guides/introduction/introduction-to-repositories)
@@ -526,7 +526,7 @@ The dependency order is:
 - [Maven dependency convergence](https://maven.apache.org/components/enforcer/enforcer-rules/dependencyConvergence.html)
   detects divergent transitive versions; the signed manifest still owns exact
   artifact bytes and checksums.
-- [The JAR specification](https://docs.oracle.com/en/java/javase/21/docs/specs/jar/jar.html)
+- [The JAR specification](https://docs.oracle.com/en/java/javase/25/docs/specs/jar/jar.html)
   defines explicit and derived automatic-module identity; RRFlow publishes one
   stable tested module name.
 - [RFC 9110 HTTP semantics](https://www.rfc-editor.org/rfc/rfc9110.html#name-idempotent-methods)
