@@ -37,7 +37,6 @@ CHANGE_AUTHORING = (
 )
 CHANGE_JOURNALS = ROOT / "docs" / "evidence" / "change-journals"
 EXECUTION_FILE_PLAN = ROOT / "docs" / "roadmap" / "rrflow-1.0-file-plan.jsonl"
-ACTIVE_CHANGE_PLAN = ROOT / "docs" / "roadmap" / "rrflow-1.0-active-change.json"
 OBJECTIVE = ROOT / "docs" / "objectives" / "rrflow-1.0-alpha.md"
 POAM = ROOT / "docs" / "poam" / "rrflow-1.0-alpha.md"
 POAM_RECORDS = ROOT / "docs" / "poam" / "rrflow-1.0-alpha"
@@ -369,7 +368,7 @@ def poam_integrity_failures(parent: str) -> list[str]:
         if target not in poam_014:
             failures.append(f"POAM-014: missing package-local trace owner {target}")
     for required_text in (
-        "planning-only active change record",
+        "pull request description",
         "linked package journal",
         "do not append a second global prose implementation trace",
     ):
@@ -386,21 +385,19 @@ def poam_integrity_failures(parent: str) -> list[str]:
         "../../evidence/change-journals/repository/poam-027a-change-plan-enforcement-implementation-journal.md",
         "../../evidence/change-journals/repository/poam-027b-canonical-package-identity-correction-journal.md",
         "../../evidence/change-journals/repository/poam-027c-linked-execution-records-and-generated-navigation.md",
+        "../../evidence/change-journals/repository/poam-027d-pull-request-landing-and-ci-gate.md",
         "../../operations/ci.md",
     ):
         if target not in poam_027:
             failures.append(f"POAM-027: missing remediation owner {target}")
     for required_text in (
-        "scripts/ci/check_change_plan.py",
-        "Candidate CI invokes that validator",
-        "not yet derived automatically",
-        "bypassable outside candidate CI",
+        "only through pull requests whose candidate CI passes",
+        "written policy, not enforced",
+        "ruleset",
         "not a schema for exploratory or private AI reasoning",
     ):
         if required_text not in poam_027_words:
             failures.append(f"POAM-027: missing current boundary {required_text!r}")
-    if "procedure-to-diff binding is not machine-readable" in poam_027_words:
-        failures.append("POAM-027: still denies the implemented machine binding")
 
     return failures
 
@@ -593,17 +590,16 @@ def main() -> int:
     if change_routine_link not in agents:
         failures.append("AGENTS.md does not require the change-authoring routine")
     for required_fragment in (
-        "docs/roadmap/rrflow-1.0-active-change.json",
         "docs/evidence/change-journals/",
-        "python3 scripts/ci/check_change_plan.py",
         "python3 scripts/knowledge/render_navigation.py",
-        "planning-only",
-        "repository-owned presubmit and candidate-CI gate",
+        "pull request",
+        "docs/operations/ci.md",
+        "repository-owned pull-request and candidate-CI gate",
         "adaptive-reasoning-governed-effects.md",
     ):
         if required_fragment not in agents:
             failures.append(
-                f"AGENTS.md lacks committed change-plan requirement {required_fragment!r}"
+                f"AGENTS.md lacks change-landing requirement {required_fragment!r}"
             )
 
     failures.extend(knowledge_package_drift_failures(ROOT))
@@ -834,7 +830,7 @@ def main() -> int:
         "## How to execute this map",
         "### Codebase-grounded change-authoring routine",
         "#### Required change checklist",
-        "#### Machine-bound active change package",
+        "#### Pull request and CI binding",
         "## Product terms versus implementation packages",
         "## Frozen target source tree",
         "## Target dependency and authority direction",
@@ -879,8 +875,6 @@ def main() -> int:
         failures.append("the execution portal duplicates the dependency sequence")
     if not EXECUTION_FILE_PLAN.is_file():
         failures.append("the exhaustive RRFlow 1.0 file plan is absent")
-    if not ACTIVE_CHANGE_PLAN.is_file():
-        failures.append("the machine-bound active change plan is absent")
     change_authoring = CHANGE_AUTHORING.read_text(encoding="utf-8")
     for required_evidence_field in (
         "alpha outcome or prerequisite advanced:",
@@ -890,7 +884,7 @@ def main() -> int:
         "first-failure or characterization oracle and result:",
         "full-file reread and diff review:",
         "change checklist:",
-        "commit/development push evidence:",
+        "pull request, CI run, and merge evidence:",
     ):
         if required_evidence_field not in change_authoring:
             failures.append(
@@ -923,11 +917,8 @@ def main() -> int:
     if "POAM-027" not in ci_operations:
         failures.append("the CI operations owner does not disclose the presubmit gap")
     for required_fragment, label in (
-        (
-            "python3 scripts/ci/check_change_plan.py",
-            "canonical change-plan presubmit command",
-        ),
-        ("post-plan path set", "complete plan-to-diff binding"),
+        ("lands as one pull request against", "pull-request landing rule"),
+        ("must pass before merge", "candidate-CI merge requirement"),
         ("bypassable outside candidate CI", "local bypass limitation"),
         ("server-side", "separate repository-enforcement boundary"),
     ):

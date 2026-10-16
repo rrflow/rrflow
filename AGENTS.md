@@ -23,14 +23,16 @@ not use version changes as progress markers. A later version change requires
 the repository owner's explicit instruction after the alpha objective, release
 gates, optimization evidence, and release decision are complete.
 
-The private `rrflow/rrflow-development` repository is the only push target for
+The public `rrflow/rrflow-development` repository is the only push target for
 incremental pre-release source, evidence, and candidate history. The private
 `rrflow/rrflow` repository is the official promotion target, not a development
-remote. Before every push, resolve the destination URL and record its remote,
-ref, and exact revision. Do not push a source ref, tag, binary, artifact, or
-release to the official repository until every Gate J prerequisite passes and
-the repository owner explicitly authorizes that exact promotion. Never use a
-force push or history rewrite as the promotion mechanism.
+remote. Changes reach `main` only through pull requests whose candidate CI
+checks pass; a direct push to `main` is not a landing path. Before every push,
+resolve the destination URL and record its remote, ref, and exact revision. Do
+not push a source ref, tag, binary, artifact, or release to the official
+repository until every Gate J prerequisite passes and the repository owner
+explicitly authorizes that exact promotion. Never use a force push or history
+rewrite as the promotion mechanism.
 
 All first-party code that implements the RRFlow engine or a bundled RRFlow
 adapter, plus its schemas, bootstrap templates, default configuration,
@@ -75,10 +77,9 @@ The framework must generate mechanical projections from one owner. Executable
 operation and capability catalogues drive dispatch, OpenAPI, internal client
 bindings, language SDK operations/models, reference projections, and shared
 conformance. Coordinated documentation and its ordinary links drive indexes,
-warp discovery, and relationship projections. Git and the active change record
-drive file/digest inventory. Generated output is replaceable discovery or
-acceleration; it cannot become another semantic, planning, lifecycle, or status
-authority.
+warp discovery, and relationship projections. Git drives file/digest
+inventory. Generated output is replaceable discovery or acceleration; it cannot
+become another semantic, planning, lifecycle, or status authority.
 
 Upstream and experimental Rust implementations are reference inputs, not
 architecture. Before adapting code from SurrealDB, Qdrant, Lance, Fjall, or
@@ -95,16 +96,18 @@ private or chat checklist is not evidence. This is a repository engineering
 procedure, not an RRFlow runtime routine, hook, trigger, skill, or lifecycle.
 It governs repository effects and claimed evidence, not exploratory reasoning
 or private analysis.
-Before editing implementation, commit the package's machine-readable
-`docs/roadmap/rrflow-1.0-active-change.json` as a separate planning-only
-change. It must bind the exact baseline, full-file digests and line coverage,
-symbols, edit order, research, failure oracle, acceptance commands,
-trace/resource/debug decisions, and stop conditions. After the planning commit
-exists, `python3 scripts/ci/check_change_plan.py` must accept every changed
-path. Derive mechanical baseline and navigation fields with repository tooling
-where available; authors own intent, risk, evidence, and stop decisions rather
-than a duplicate prose inventory. This repository-owned presubmit and candidate-CI gate
-cannot be replaced by a Git, editor, provider, prompt, or session hook.
+Each bounded package lands as one pull request against `main`. Its description
+carries the change brief: owning outcome and roadmap item, current and target
+behavior, exact scope, failure oracle, acceptance commands, research and
+trace/resource/debug decisions, and stop conditions. The pull request merges
+only after the candidate CI pipeline in `docs/operations/ci.md` passes.
+Derive mechanical baseline and navigation facts with repository tooling; authors
+own intent, risk, evidence, and stop decisions rather than a duplicate prose
+inventory. This repository-owned pull-request and candidate-CI gate cannot be
+replaced by a Git, editor, provider, prompt, or session hook. The planning-only
+commit and `docs/roadmap/rrflow-1.0-active-change.json` record were retired on
+2026-10-16; that file stays unchanged as historical evidence linked from
+earlier journals.
 
 For project work:
 
@@ -121,11 +124,11 @@ For project work:
    rules in
    `docs/reference/agent-bootstrap.md#independent-engine-and-project-integration`
    before changing installation, attunement, scaffolding, or an adapter.
-6. Write the routine's change brief before implementation: bind one alpha
-   outcome, roadmap package, current behavior, exact files and symbols,
-   smallest test oracle, trace/debugging decision, research decision, and stop
-   conditions. Let intermediate errors expose boundary mismatches, but never
-   hide them or treat compilation as completion.
+6. Write the routine's change brief in the pull request description before
+   implementation: bind one alpha outcome, roadmap package, current behavior,
+   exact files and symbols, smallest test oracle, trace/debugging decision,
+   research decision, and stop conditions. Let intermediate errors expose
+   boundary mismatches, but never hide them or treat compilation as completion.
 7. Create one linked journal record for every bounded package under
    `docs/evidence/change-journals/` using the
    [evidence-record template](docs/roadmap/rrflow-1.0-execution-map.md#evidence-record-template),
@@ -144,12 +147,11 @@ For project work:
    the acceptance evidence named by the owning record.
 11. Before deleting, moving, merging, or rewriting implementation, follow the
    [implementation traceability procedure](docs/roadmap/rrflow-1.0-execution-map.md#implementation-requirements-traceability).
-   Put the package-specific map in the planning-only active change record and
-   its result in the linked journal: current behavior, source modules,
-   characterization tests, canonical destination, owning gate, and replacement
-   evidence. Do not grow a global prose implementation audit. Git ancestry,
-   merge status, a path rename, and a successful compile are not consolidation
-   proof.
+   Put the package-specific map in the pull request description and its result
+   in the linked journal: current behavior, source modules, characterization
+   tests, canonical destination, owning gate, and replacement evidence. Do not
+   grow a global prose implementation audit. Git ancestry, merge status, a path
+   rename, and a successful compile are not consolidation proof.
 12. RRFlow 1.0 has one current pre-release implementation. Carry reusable
    behavior and tests into their canonical boundary, then remove conflicting
    paths directly. Do not create a parallel fallback, migration, or

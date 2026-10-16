@@ -16,13 +16,13 @@ second roadmap, architecture, POA&M, or status authority.
 | What executes next and what evidence can complete it? | [Roadmap dependency spine](../rrflow-1.0/executable-dependency-spine.md) and owning [gate chapter](../rrflow-1.0.md) |
 | What verified gap is being remediated? | [Canonical POA&M](../../poam/rrflow-1.0-alpha.md) and its linked item record |
 | What boundary and semantics constrain the design? | [Architecture](../../architecture/) and [reference](../../reference/) owners |
-| Which exact final paths may change now? | [Active change package](../rrflow-1.0-active-change.json) |
+| Which exact final paths may change now? | The open pull request's description and diff ([pull request and CI binding](change-authoring.md#pull-request-and-ci-binding)) |
 | Which current and planned files map to gates? | [Generated file plan](../rrflow-1.0-file-plan.jsonl) |
 | What happened in completed packages? | [Linked change journals](../../evidence/change-journals/) and gate evidence records |
 
 The roadmap dependency spine is the only current-package pointer. This record
-does not repeat it. The active change package is the only exact path envelope
-for the in-progress repository mutation. The generated file plan is discovery
+does not repeat it. The open pull request is the only exact path envelope for
+the in-progress repository mutation. The generated file plan is discovery
 and impact inventory; it is not permission to edit or evidence of completion.
 
 ## Former monolith disposition
@@ -35,7 +35,7 @@ receipt disappear:
 |---|---|
 | Change-authoring routine, checklist, evidence template, run widening, and stop conditions | [Change-authoring procedure](change-authoring.md) and [CI operations](../../operations/ci.md) |
 | Product vocabulary, dependency direction, target source placement, and runtime flows | [System overview](../../architecture/system-overview.md), [engine data flow](../../architecture/engine-data-flow.md), [agent bootstrap](../../reference/agent-bootstrap.md), and [installed lifecycle](../../reference/deployment/installed-lifecycle.md) |
-| Current implementation inventory and structural traceability | Generated [file plan](../rrflow-1.0-file-plan.jsonl), planning-only [active change](../rrflow-1.0-active-change.json), and the package's final linked journal |
+| Current implementation inventory and structural traceability | Generated [file plan](../rrflow-1.0-file-plan.jsonl), the package's pull request, and its final linked journal |
 | Gate work packages, dependency order, and acceptance | Canonical [roadmap](../rrflow-1.0.md), [gate chapters](../rrflow-1.0/), and [dependency spine](../rrflow-1.0/executable-dependency-spine.md) |
 | Verified gaps and remediation lifecycle | Canonical [POA&M](../../poam/rrflow-1.0-alpha.md) and its child records |
 | Ninety-six completed package receipts | Generated [change-journal index](../../evidence/change-journals/); each payload retains its baseline locator and digest |
@@ -69,8 +69,8 @@ Before deleting, moving, merging, or replacing implementation, map:
 - behavior to preserve, generalize, replace, or reject; and
 - equal-or-stronger replacement and removal evidence.
 
-Put the package-specific map in the planning-only active change record and its
-outcome in the linked journal. Put a newly verified open deficiency in the
+Put the package-specific map in the pull request description and its outcome in
+the linked journal. Put a newly verified open deficiency in the
 POA&M. Do not grow this navigation record into a global implementation audit.
 
 ## Current implementation discovery

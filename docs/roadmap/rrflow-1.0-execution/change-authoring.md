@@ -35,10 +35,10 @@ thought.
    and test boundary that can expose whether the design is wrong.
 4. Decide whether external research, a runtime trace, resource measurement, or
    diagnostic capture is necessary. Record why each is used or not applicable.
-5. Before the first repository edit, commit
-   [`rrflow-1.0-active-change.json`](../rrflow-1.0-active-change.json) alone.
-   That effect envelope binds the exact baseline and allowed final paths. It is
-   not a transcript of reasoning and may not contain hidden chain-of-thought.
+5. Before the first repository edit, branch from current `main` and write the
+   change brief (checklist below) as the pull request description. That brief
+   binds the baseline and intended scope. It is not a transcript of reasoning
+   and may not contain hidden chain-of-thought.
 6. Author at the one canonical boundary. Allow intermediate compiler or test
    failures to expose wrong assumptions; do not hide them with compatibility
    layers, duplicated authorities, or false completion claims.
@@ -47,12 +47,12 @@ thought.
    passes and identify checks not run.
 8. Reread every changed file and the complete diff. Create one linked journal
    record under [`docs/evidence/change-journals/`](../../evidence/change-journals/),
-   regenerate its index, reconcile the active plan to the final path set, and
-   commit one coherent result.
+   regenerate its index, and push the branch. The pull request merges into
+   `main` only after the candidate CI pipeline passes.
 
 ## Required change checklist
 
-Before implementation, the durable change brief must make these decisions
+Before implementation, the pull request description must make these decisions
 reviewable without attempting to encode the reasoning process:
 
 - the objective outcome or prerequisite and owning roadmap/POA&M records;
@@ -66,23 +66,21 @@ reviewable without attempting to encode the reasoning process:
 
 A missing fact blocks only the mutation or claim that depends on it. It does
 not make prior exploration invalid. If implementation discovers a materially
-different scope, stop and author a new planning-only boundary from the current
-clean revision.
+different scope, stop and open a new pull request from current `main`.
 
-## Machine-bound active change package
+## Pull request and CI binding
 
-The current repository validator is:
+Every change reaches `main` through a pull request. The
+[candidate CI pipeline](../../operations/ci.md) runs on the pull request and
+must pass before merge; a direct push to `main` is not a landing path. The pull
+request, its CI run, and its merge commit are the effect record; the linked
+journal is the evidence record. Neither is a product API, a runtime lifecycle,
+or proof that an implementation is correct.
 
-```text
-python3 scripts/ci/check_change_plan.py
-```
-
-It authenticates the separate planning commit, baseline, complete reviewed
-files, declared paths, generated evidence, and final Git/worktree delta. Those
-fields protect repository effects; they are not a product API, a runtime
-lifecycle, or proof that an implementation is correct. Tooling should derive
-baseline facts and projections wherever possible so authors maintain intent
-rather than duplicate repository state.
+The planning-only commit and the machine-bound
+`rrflow-1.0-active-change.json` record were retired on 2026-10-16. That file
+stays unchanged as historical evidence linked from earlier journals; it is not
+read by CI and is not updated.
 
 ## Linked journal record
 
@@ -94,7 +92,7 @@ The record must state, in clear prose or a compact table:
 
 ```text
 gate/package and alpha outcome or prerequisite advanced:
-starting revision/tree and planning commit:
+starting revision/tree and pull request:
 change brief (current -> target behavior, owner, exact scope, unchanged behavior, stop conditions):
 files and symbols read in full:
 implementation/evidence paths created, changed, moved, or deleted:
@@ -108,7 +106,7 @@ remaining known errors and owner:
 full-file reread and diff review:
 change checklist:
 roadmap/POA&M status change, or explicit none:
-commit/development push evidence:
+pull request, CI run, and merge evidence:
 ```
 
 A journal records what happened. It cannot mark a release gate complete; only

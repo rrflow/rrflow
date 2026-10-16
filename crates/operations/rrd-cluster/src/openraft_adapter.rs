@@ -30,9 +30,10 @@ use rrd_lsm::{
     SNAPSHOT_BUNDLE_MAX_BYTES,
 };
 use rrd_store::{
-    prepare_rrflow_kv_commit, rrflow_kv_commit_context, rrflow_kv_commit_outcome,
-    rrflow_kv_snapshot_all_object_references, rrflow_kv_snapshot_artifact_view,
-    rrflow_kv_snapshot_object_references, Error as StoreError, LocalObjectStore,
+    create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,
+    rrflow_kv_commit_context, rrflow_kv_commit_outcome, rrflow_kv_snapshot_all_object_references,
+    rrflow_kv_snapshot_artifact_view, rrflow_kv_snapshot_object_references, Error as StoreError,
+    LocalObjectStore,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -514,7 +515,7 @@ impl RrdRaftStore {
         root: &Path,
         shard: ShardId,
     ) -> ClusterResult<(RrdRaftLogStore, RrdRaftStateMachine)> {
-        let mut state_database = open_adapter_database(root)?;
+        let mut state_database = open_adapter_database(root, AdapterDomain::CanonicalState)?;
         ensure_adapter_database(
             &mut state_database,
             KEY_STATE_CONFIG,
@@ -527,7 +528,7 @@ impl RrdRaftStore {
         )?;
 
         let local_root = root.join(LOCAL_DATABASE_DIRECTORY);
-        let mut local_database = open_adapter_database(&local_root)?;
+        let mut local_database = open_adapter_database(&local_root, AdapterDomain::LocalRaft)?;
         ensure_adapter_database(
             &mut local_database,
             KEY_LOCAL_CONFIG,
@@ -563,9 +564,20 @@ impl RrdRaftStore {
     }
 }
 
-fn open_adapter_database(root: &Path) -> ClusterResult<Database> {
+/// Canonical state is rrflowKV truth applied through rrd-store, so its
+/// database carries the rrflowKV application format; the local Raft log and
+/// vote database is adapter-private and has none.
+fn open_adapter_database(root: &Path, domain: AdapterDomain) -> ClusterResult<Database> {
     if root.join("CURRENT").is_file() {
-        return Database::open(root).map_err(|error| ClusterError::Unavailable(error.to_string()));
+        let database =
+            Database::open(root).map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+        if domain == AdapterDomain::CanonicalState && !is_rrflow_kv_database(&database) {
+            return Err(ClusterError::Denied(format!(
+                "canonical Raft state database {} is not in the rrflowKV application format",
+                root.display()
+            )));
+        }
+        return Ok(database);
     }
     if root.exists()
         && std::fs::read_dir(root)
@@ -578,7 +590,13 @@ fn open_adapter_database(root: &Path) -> ClusterResult<Database> {
             root.display()
         )));
     }
-    Database::create(root).map_err(|error| ClusterError::Unavailable(error.to_string()))
+    match domain {
+        AdapterDomain::CanonicalState => create_rrflow_kv_database(root)
+            .map_err(|error| ClusterError::Unavailable(error.to_string())),
+        AdapterDomain::LocalRaft => {
+            Database::create(root).map_err(|error| ClusterError::Unavailable(error.to_string()))
+        }
+    }
 }
 
 fn clean_snapshot_spool(path: &Path) -> ClusterResult<()> {

@@ -84,10 +84,11 @@ pub use rrd_lsm::{
     publish_rename as publish_durable_rename, sync_directory as sync_directory_metadata,
 };
 pub use rrflow_kv::{
-    prepare_rrflow_kv_commit, rrflow_kv_commit_context, rrflow_kv_commit_outcome,
-    rrflow_kv_database_artifact_view, rrflow_kv_snapshot_all_object_references,
-    rrflow_kv_snapshot_artifact_view, rrflow_kv_snapshot_object_references, RrflowKvInspection,
-    RrflowKvInspector, RrflowKvOpenEvidence, RrflowKvReconciliationEvidence, RrflowKvStore,
+    create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,
+    rrflow_kv_commit_context, rrflow_kv_commit_outcome, rrflow_kv_database_artifact_view,
+    rrflow_kv_snapshot_all_object_references, rrflow_kv_snapshot_artifact_view,
+    rrflow_kv_snapshot_object_references, RrflowKvInspection, RrflowKvInspector,
+    RrflowKvOpenEvidence, RrflowKvReconciliationEvidence, RrflowKvStore,
     RRFLOW_KV_OPEN_EVIDENCE_VERSION,
 };
 pub use s3::{

@@ -95,7 +95,11 @@ fn prepare(database: &Path, state_root: &Path) {
         })
         .unwrap();
     let source = state_root.join("instances/instance-a/.rrflow/rrd");
-    drop(RrflowKvStore::open(&source).unwrap());
+    std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+    drop(
+        rrd_engine::RrdEngine::create_new(&source, id("instance-a"), [0_u8; 32])
+            .expect("component backup fixture must be a complete engine root"),
+    );
 }
 
 fn command(database: &Path, state_root: &Path, at: u64) -> Command {

@@ -8,7 +8,7 @@ This chapter is part of the canonical RRFlow 1.0 roadmap. The parent
 record owns release order and completion status; this file cannot change
 either independently.
 
-Incremental pre-release source and evidence are published only to the private
+Incremental pre-release source and evidence are published only to the public
 `rrflow/rrflow-development` repository. The private `rrflow/rrflow`
 repository receives no development branch, tag, binary, artifact, or release;
 it is an explicit promotion destination only after every Gate J prerequisite

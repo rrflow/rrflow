@@ -864,6 +864,23 @@ impl crate::access::runtime_state::AccessRead for RrflowKvSnapshotRead<'_> {
     }
 }
 
+/// Creates an empty database in the rrflowKV application format for an owner
+/// that applies rrflowKV commits through the `&Database` functions below,
+/// such as the Raft application bridge's canonical state.
+pub fn create_rrflow_kv_database(root: &Path) -> Result<Database> {
+    Ok(Database::create_with_application_format(
+        root,
+        DatabaseOptions::default(),
+        keyspaces::RRFLOW_KV_FORMAT,
+    )?)
+}
+
+/// Whether `database` carries the rrflowKV application format that the
+/// `&Database` functions below require.
+pub fn is_rrflow_kv_database(database: &Database) -> bool {
+    database_codec(database).is_ok()
+}
+
 /// Reads the exact rrflowKV cursor/schema pair used by the temporary Raft
 /// application bridge before it submits the complete semantic plan.
 pub fn rrflow_kv_commit_context(

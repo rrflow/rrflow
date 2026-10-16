@@ -42,11 +42,11 @@ jobs:
             reads: 2048
             read_width: 64
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@f8be11a05b1d4f3fcebe6410cc16743212b999b0 # 1.98.0
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Run isolated rrflowKV semantic profile
         run: >-
           cargo run --release --locked -p rrd-store --example engine_benchmark --
@@ -57,7 +57,7 @@ jobs:
           --output target/rrflow-kv-${{ matrix.profile }}.json
       - name: Retain raw benchmark evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rrflow-kv-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/rrflow-kv-${{ matrix.profile }}.json
@@ -87,11 +87,11 @@ jobs:
           - workload: metadata-fanout
             payload: embedding-f32
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@f8be11a05b1d4f3fcebe6410cc16743212b999b0 # 1.98.0
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Run isolated AI-read profile
         run: >-
           cargo run --release --locked -p rrd-store --example ai_hotset_benchmark --
@@ -102,7 +102,7 @@ jobs:
           --output target/rrflow-kv-ai-${{ matrix.workload }}-${{ matrix.payload }}.json
       - name: Retain raw AI-read evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rrflow-kv-ai-${{ matrix.workload }}-${{ matrix.payload }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/rrflow-kv-ai-${{ matrix.workload }}-${{ matrix.payload }}.json

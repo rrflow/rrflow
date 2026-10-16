@@ -500,7 +500,7 @@ impl PageCacheAccess {
 
 pub(crate) fn next_projected_cache_access() -> Result<PageCacheAccess> {
     CACHE_ACCESS_SCOPE_ID
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
             current.checked_add(1)
         })
         .map(PageCacheAccess::ProjectedScope)

@@ -81,37 +81,27 @@ The portable development control has three layers:
 3. repository branch policy makes the pull request and stable check
    non-bypassable when the GitHub account tier supports that control.
 
-Every code-bearing or structural package first commits
-`docs/roadmap/rrflow-1.0-active-change.json` in a planning-only commit. The
-record binds one immutable parent revision and tree, complete baseline-file
-digests and line intervals, exact changed paths and symbols, research and
-adaptation decisions, failure oracles, acceptance commands,
-trace/resource/debug decisions, and stop conditions. The subsequent package
-may change only its declared implementation and evidence paths; changing the
-plan itself requires stopping and making another planning-only commit.
+Every code-bearing or structural package lands as one pull request against
+`main`. Its description carries the change brief defined by the
+[change-authoring procedure](../roadmap/rrflow-1.0-execution/change-authoring.md#required-change-checklist).
+Candidate CI runs on that pull request and must pass before merge; a direct
+push to `main` is not a landing path. The pull request description begins at
+the repository-effect boundary. It is not a workflow for exploratory reading or
+private AI reasoning and must not contain hidden chain-of-thought.
 
-This machine record begins at the repository-effect boundary. It is not a
-workflow for exploratory reading or private AI reasoning and must not contain
-hidden chain-of-thought. Repository tooling should derive baseline, digest,
-line-count, generated-link, and final-diff facts; authors supply the semantic
-intent, risk, evidence, and stop decisions.
+The planning-only commit, `docs/roadmap/rrflow-1.0-active-change.json`, and
+`scripts/ci/check_change_plan.py` were retired on 2026-10-16. Between
+2026-08-20 and 2026-09-15, 442 commits reached `main` without a pull request;
+candidate CI triggers only on `pull_request`, `merge_group`, and
+`workflow_dispatch`, so none of them ran it automatically, and the per-change
+validator passed at `cfa0e80` while the generated-surface, backup-fixture, and
+edge binary-ceiling checks failed there. The active-change file stays unchanged
+as historical evidence linked from earlier journals; nothing reads or updates
+it.
 
-Run `python3 scripts/ci/check_change_plan.py` as the local presubmit. It
-authenticates the planning commit and every complete-file review against Git,
-then reconciles paths touched by every post-plan commit—including paths later
-reverted—with the staged, unstaged, and non-ignored untracked worktree. It
-rejects mixed plan/code commits, stale baselines, partial reviews, undeclared
-or omitted paths, a changed lockfile, and missing research, failure,
-acceptance, observability, or stop evidence. The generated file inventory is a
-complete tree ledger, but it is not permission to edit; the earlier committed
-active package is the authorization envelope.
-
-Candidate CI checks out complete Git history and runs the same command before
-format, build, or test work. The checker proves plan-to-diff conformance, not
-algorithm correctness or alpha readiness, and it remains locally bypassable
-by a person controlling the checkout. Only the separately evidenced
-server-side protection below can make the required candidate check and review
-non-bypassable.
+Candidate CI proves the checked-in controls, not algorithm correctness or alpha
+readiness. Only the separately evidenced server-side protection below can make
+the pull request and required candidate check non-bypassable.
 
 A developer may run the
 [repository checklist](../roadmap/rrflow-1.0-execution-map.md#repository-wide-run-checklist)
@@ -124,9 +114,7 @@ The documentation policy machine-checks the owner chain, required
 change-authoring procedure/evidence fields, generated-index freshness,
 active-record classification, knowledge-package determinism, and local links.
 The execution inventory checks every current/generated/registered-planned
-path. The change-plan validator proves that the candidate checkout's complete
-post-plan path set is covered by one earlier machine-readable package. Each
-package records its result in a linked record under
+path. Each package records its result in a linked record under
 `docs/evidence/change-journals/`; the execution portal contains no journal
 bodies. These checked-in controls remain bypassable outside candidate CI;
 POAM-027 stays open for eligible server-side review/check/force-push/deletion
@@ -214,7 +202,9 @@ This routing expression is defense in depth, not permission to connect a
 self-hosted pool to a public repository: a fork can propose a change to the
 workflow itself. The installer queries GitHub and fails closed unless the
 repository visibility is `PRIVATE`. Do not set the physical routing variables
-or register the scale sets while the repository is public.
+or register the scale sets while the repository is public. The repository
+owner confirmed public visibility on 2026-10-16, so candidate CI uses
+GitHub-hosted runners and the routing variables stay unset.
 
 GitHub recommends ephemeral runners for autoscaling and identifies Actions
 Runner Controller (ARC) as its reference Kubernetes implementation. The
@@ -278,8 +268,8 @@ must remain GitHub-hosted.
 
 ## Repository enforcement
 
-After the first physical proof succeeds and the hosting tier exposes the
-control, protect `main` with these invariants:
+Public visibility exposes this control on the current hosting tier. Protect
+`main` with these invariants:
 
 - pull requests and the stable `pipeline / ci-gate` check are required;
 - merge queue or an up-to-date branch is required;
@@ -288,15 +278,16 @@ control, protect `main` with these invariants:
 
 This is an external control and needs external evidence. On 2026-09-11,
 read-only GitHub API requests for both repository rulesets and `main` branch
-protection on private `rrflow/rrflow-development` returned HTTP 403 with the
-message that GitHub Pro or public visibility is required. Therefore the
-checkout does **not** currently claim that `pipeline / ci-gate`, pull requests,
-reviews, deletion denial, or force-push denial is enforced. Do not compensate
-with a local hook, make the repository public, or push to the official
-promotion repository. Enable an eligible private-repository plan or equivalent
-organization control, then record the exact repository, rule/protection
-identity, required check name, protected ref, API response, and verification
-attempt in this record and one linked package journal.
+protection on the then-private `rrflow/rrflow-development` returned HTTP 403
+with the message that GitHub Pro or public visibility is required. The
+repository owner confirmed public visibility on 2026-10-16, so rulesets are
+available; no ruleset is recorded here yet. Therefore the checkout does
+**not** currently claim that `pipeline / ci-gate`, pull requests, reviews,
+deletion denial, or force-push denial is enforced. Do not compensate with a
+local hook or push to the official promotion repository. Create the `main`
+ruleset, then record the exact repository, rule identity, required check name,
+protected ref, API response, and verification attempt in this record and one
+linked package journal.
 
 The repository CI-policy check rejects candidate trigger duplication, unsafe
 fork routing, unpinned actions, service or runner images, persisted checkout
