@@ -91,12 +91,13 @@ private AI reasoning and must not contain hidden chain-of-thought.
 
 The planning-only commit, `docs/roadmap/rrflow-1.0-active-change.json`, and
 `scripts/ci/check_change_plan.py` were retired on 2026-10-16. Between
-2026-08-19 and 2026-09-15, 218 commits reached `main` by direct push; candidate
-CI triggers only on `pull_request`, `merge_group`, and `workflow_dispatch`, so
-none of them ran it automatically, and the per-change validator did not prevent
-the generated-surface and backup-fixture failures present at `cfa0e80`. The
-active-change file stays unchanged as historical evidence linked from earlier
-journals; nothing reads or updates it.
+2026-08-20 and 2026-09-15, 442 commits reached `main` without a pull request;
+candidate CI triggers only on `pull_request`, `merge_group`, and
+`workflow_dispatch`, so none of them ran it automatically, and the per-change
+validator passed at `cfa0e80` while the generated-surface, backup-fixture, and
+edge binary-ceiling checks failed there. The active-change file stays unchanged
+as historical evidence linked from earlier journals; nothing reads or updates
+it.
 
 Candidate CI proves the checked-in controls, not algorithm correctness or alpha
 readiness. Only the separately evidenced server-side protection below can make

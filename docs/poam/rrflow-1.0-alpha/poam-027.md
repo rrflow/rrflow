@@ -14,11 +14,12 @@ Changes reach `main` only through pull requests whose candidate CI passes
 (decision of 2026-10-16). The planning-only commit, the
 `docs/roadmap/rrflow-1.0-active-change.json` record, and the
 `scripts/ci/check_change_plan.py` validator were retired at the same time:
-between 2026-08-19 and 2026-09-15, 218 commits reached `main` by direct push,
-and because candidate CI triggers only on `pull_request`, `merge_group`, and
-`workflow_dispatch`, none of them ran it automatically. At `cfa0e80` the
-verify job's generated-surface check and the service-protocol suite's backup
-kill-matrix test both failed while the per-change validator passed.
+between 2026-08-20 and 2026-09-15, 442 commits reached `main` without a pull
+request, and because candidate CI triggers only on `pull_request`,
+`merge_group`, and `workflow_dispatch`, none of them ran it automatically. At
+`cfa0e80` the verify job's generated-surface check and edge binary ceiling and
+the service-protocol suite's backup kill-matrix test failed while the
+per-change validator passed.
 
 One gap remains: the pull request rule is written policy, not enforced. No
 repository ruleset yet requires pull requests and the stable candidate check,

@@ -30,9 +30,9 @@ remote. Changes reach `main` only through pull requests whose candidate CI
 checks pass; a direct push to `main` is not a landing path. Before every push,
 resolve the destination URL and record its remote, ref, and exact revision. Do
 not push a source ref, tag, binary, artifact, or release to the official
-repository until every Gate J prerequisite passes and
-the repository owner explicitly authorizes that exact promotion. Never use a
-force push or history rewrite as the promotion mechanism.
+repository until every Gate J prerequisite passes and the repository owner
+explicitly authorizes that exact promotion. Never use a force push or history
+rewrite as the promotion mechanism.
 
 All first-party code that implements the RRFlow engine or a bundled RRFlow
 adapter, plus its schemas, bootstrap templates, default configuration,
@@ -78,8 +78,8 @@ operation and capability catalogues drive dispatch, OpenAPI, internal client
 bindings, language SDK operations/models, reference projections, and shared
 conformance. Coordinated documentation and its ordinary links drive indexes,
 warp discovery, and relationship projections. Git drives file/digest
-inventory. Generated output is replaceable discovery or acceleration; it cannot become another semantic, planning, lifecycle, or status
-authority.
+inventory. Generated output is replaceable discovery or acceleration; it cannot
+become another semantic, planning, lifecycle, or status authority.
 
 Upstream and experimental Rust implementations are reference inputs, not
 architecture. Before adapting code from SurrealDB, Qdrant, Lance, Fjall, or
@@ -126,10 +126,9 @@ For project work:
    before changing installation, attunement, scaffolding, or an adapter.
 6. Write the routine's change brief in the pull request description before
    implementation: bind one alpha outcome, roadmap package, current behavior,
-   exact files and symbols,
-   smallest test oracle, trace/debugging decision, research decision, and stop
-   conditions. Let intermediate errors expose boundary mismatches, but never
-   hide them or treat compilation as completion.
+   exact files and symbols, smallest test oracle, trace/debugging decision,
+   research decision, and stop conditions. Let intermediate errors expose
+   boundary mismatches, but never hide them or treat compilation as completion.
 7. Create one linked journal record for every bounded package under
    `docs/evidence/change-journals/` using the
    [evidence-record template](docs/roadmap/rrflow-1.0-execution-map.md#evidence-record-template),
@@ -150,10 +149,9 @@ For project work:
    [implementation traceability procedure](docs/roadmap/rrflow-1.0-execution-map.md#implementation-requirements-traceability).
    Put the package-specific map in the pull request description and its result
    in the linked journal: current behavior, source modules, characterization
-   tests, canonical destination, owning gate, and replacement
-   evidence. Do not grow a global prose implementation audit. Git ancestry,
-   merge status, a path rename, and a successful compile are not consolidation
-   proof.
+   tests, canonical destination, owning gate, and replacement evidence. Do not
+   grow a global prose implementation audit. Git ancestry, merge status, a path
+   rename, and a successful compile are not consolidation proof.
 12. RRFlow 1.0 has one current pre-release implementation. Carry reusable
    behavior and tests into their canonical boundary, then remove conflicting
    paths directly. Do not create a parallel fallback, migration, or
