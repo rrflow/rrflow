@@ -1196,6 +1196,153 @@ fn diagnostic_read_contract_is_bounded_strict_and_separately_authorized() {
     assert!(!descriptor.mutation);
 }
 
+fn rrflow_kv_storage_counters() -> rrd_contract::DiagnosticRrflowKvSnapshot {
+    rrd_contract::DiagnosticRrflowKvSnapshot {
+        physical_sequence: 12,
+        manifest_generation: 2,
+        durable_sequence: 10,
+        memtable: rrd_contract::DiagnosticMemtableSnapshot {
+            versions: 4,
+            max_versions: 64,
+            approximate_bytes: 512,
+            keys: 4,
+            key_payload_bytes: 96,
+            value_payload_bytes: 256,
+            tombstones: 0,
+            spilled_chains: 0,
+            spilled_version_capacity: 0,
+            version_record_bytes: 128,
+            owned_bytes_lower_bound: 480,
+        },
+        write_ahead_log: rrd_contract::DiagnosticWriteAheadLogSnapshot {
+            payload_bytes: 2_048,
+            payload_max_bytes: 1 << 20,
+        },
+        maintenance: rrd_contract::DiagnosticMaintenanceSnapshot {
+            automatic_flushes: 1,
+            failed_flushes: 0,
+            write_stalls: 0,
+            oversized_batches: 0,
+            automatic_compactions: 0,
+            failed_compactions: 0,
+            compaction_input_bytes: 0,
+            compaction_output_bytes: 0,
+            peak_compaction_buffer_bytes: 0,
+        },
+        segment_set: rrd_contract::DiagnosticSegmentSetSnapshot {
+            segments: 1,
+            segment_bytes: 4_096,
+            l0_segments: 1,
+            l0_compaction_trigger: 4,
+            compaction_debt_segments: 0,
+            compaction_target_segment_bytes: 1 << 26,
+        },
+        page_cache: rrd_contract::DiagnosticPageCacheSnapshot {
+            capacity_bytes: 1 << 24,
+            resident_bytes: 4_096,
+            entries: 1,
+            hits: 9,
+            misses: 1,
+            evictions: 0,
+            page_loads: 1,
+            bytes_read: 4_096,
+            bytes_decoded: 4_096,
+            bytes_borrowed: 0,
+            bytes_allocated: 4_096,
+            bytes_copied: 0,
+            bytes_decompressed: 0,
+            filter_checks: 3,
+            filter_negatives: 2,
+        },
+        segment_io: rrd_contract::DiagnosticSegmentIoSnapshot {
+            requested_mode: rrd_contract::DiagnosticSegmentIoMode::Auto,
+            mmap_segments: 0,
+            io_uring_segments: 0,
+            bounded_segments: 1,
+            fallbacks: 0,
+            last_fallback_reason: None,
+            read_operations: 1,
+            mmap_reads: 0,
+            io_uring_reads: 0,
+            bounded_reads: 1,
+            bytes_read: 4_096,
+            max_request_bytes: 1 << 20,
+            peak_request_bytes: 4_096,
+        },
+    }
+}
+
+#[test]
+fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
+    use rrd_contract::{DiagnosticStorageEvidenceLevel as Level, StorageProfileKind as Profile};
+    let storage = |profile, evidence_level, rrflow_kv| rrd_contract::DiagnosticStorageSnapshot {
+        observed_at_unix_ms: 1_000,
+        profile,
+        evidence_level,
+        rrflow_kv,
+    };
+
+    storage(
+        Profile::RrflowKv,
+        Level::RrflowKvCounters,
+        Some(rrflow_kv_storage_counters()),
+    )
+    .validate()
+    .unwrap();
+    storage(Profile::RrflowMx, Level::LogicalOnly, None)
+        .validate()
+        .unwrap();
+    assert!(storage(Profile::RrflowKv, Level::RrflowKvCounters, None)
+        .validate()
+        .is_err());
+    assert!(storage(
+        Profile::RrflowMx,
+        Level::RrflowKvCounters,
+        Some(rrflow_kv_storage_counters())
+    )
+    .validate()
+    .is_err());
+    assert!(storage(
+        Profile::RrflowKv,
+        Level::LogicalOnly,
+        Some(rrflow_kv_storage_counters())
+    )
+    .validate()
+    .is_err());
+    let mut empty_reason = rrflow_kv_storage_counters();
+    empty_reason.segment_io.last_fallback_reason = Some(String::new());
+    assert!(storage(
+        Profile::RrflowKv,
+        Level::RrflowKvCounters,
+        Some(empty_reason)
+    )
+    .validate()
+    .is_err());
+    let mut observed_at_zero = storage(Profile::RrflowMx, Level::LogicalOnly, None);
+    observed_at_zero.observed_at_unix_ms = 0;
+    assert!(observed_at_zero.validate().is_err());
+
+    let encoded = serde_json::to_value(storage(
+        Profile::RrflowKv,
+        Level::RrflowKvCounters,
+        Some(rrflow_kv_storage_counters()),
+    ))
+    .unwrap();
+    assert_eq!(encoded["profile"], "rrflow_kv");
+    assert_eq!(encoded["evidence_level"], "rrflow_kv_counters");
+    assert_eq!(encoded["rrflow_kv"]["segment_io"]["requested_mode"], "auto");
+    assert!(encoded["rrflow_kv"]["segment_io"]
+        .get("last_fallback_reason")
+        .is_none());
+    let mut unknown = encoded;
+    unknown["rrflow_kv"]["page_cache"]["physical_path"] = "/tmp/escape".into();
+    assert!(serde_json::from_value::<rrd_contract::DiagnosticStorageSnapshot>(unknown).is_err());
+    assert_eq!(
+        serde_json::to_value(rrd_contract::DiagnosticAuthority::Observation).unwrap(),
+        "observation"
+    );
+}
+
 #[test]
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();

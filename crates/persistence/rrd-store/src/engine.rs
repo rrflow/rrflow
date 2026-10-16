@@ -19,6 +19,13 @@ use std::collections::BTreeMap;
 use std::ops::Bound::{Excluded, Included};
 use std::sync::Mutex;
 
+/// `PhysicalStoreEvidence::evidence_level` of a backend without stable
+/// physical counters.
+pub const LOGICAL_ONLY_EVIDENCE: &str = "logical_only";
+/// `PhysicalStoreEvidence::evidence_level` of rrflowKV's memtable, WAL,
+/// maintenance, segment, page-cache, and segment I/O counters.
+pub const RRFLOW_KV_COUNTER_EVIDENCE: &str = "rrflow_kv_counters";
+
 /// A read-only physical counter snapshot used to attribute bounded storage
 /// work to one logical operation. Counters are cumulative; callers difference
 /// two snapshots taken immediately around the work. Backends without stable
@@ -92,7 +99,7 @@ impl PhysicalStoreEvidence {
     pub fn logical_only(backend: impl Into<String>) -> Self {
         Self {
             backend: backend.into(),
-            evidence_level: "logical_only".into(),
+            evidence_level: LOGICAL_ONLY_EVIDENCE.into(),
             physical_sequence: None,
             manifest_generation: None,
             durable_sequence: None,

@@ -1,8 +1,8 @@
 use crate::{
     invalid, AuditPage, CanonicalId, ChangefeedPage, DataObjectReceipt, DataProperties,
     DataSchemaRegistry, EstateSnapshot, ProductCapabilityCatalogue, QueryIndexCatalogueSnapshot,
-    Readiness, ResourceId, VectorCollectionCatalogueSnapshot, MAX_CHANGEFEED_PAGE,
-    MAX_MESSAGE_BYTES,
+    Readiness, ResourceId, StorageProfileKind, VectorCollectionCatalogueSnapshot,
+    MAX_CHANGEFEED_PAGE, MAX_MESSAGE_BYTES,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -83,8 +83,14 @@ pub struct DiagnosticReadStamp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticAuthority {
+    /// Canonical state read under the verified read stamp.
     Authoritative,
+    /// Derived from authoritative state under the verified read stamp.
     Projection,
+    /// A process-local measurement taken at `observed_at_unix_ms`. It is not
+    /// state, is not bound to the read stamp, and resets when the process
+    /// reopens its store.
+    Observation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -284,6 +290,187 @@ pub struct DiagnosticVectorArtifactCatalogueSnapshot {
     pub artifacts: Vec<DiagnosticVectorArtifactSnapshot>,
 }
 
+/// How much physical evidence the instance's storage profile reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticStorageEvidenceLevel {
+    /// The profile has no stable physical counters (volatile rrflowMX).
+    LogicalOnly,
+    /// rrflowKV memtable, WAL, maintenance, segment, page-cache, and segment
+    /// I/O counters.
+    RrflowKvCounters,
+}
+
+/// The rrflowKV mutable write buffer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticMemtableSnapshot {
+    pub versions: u64,
+    /// Version count that triggers an automatic flush.
+    pub max_versions: u64,
+    pub approximate_bytes: u64,
+    pub keys: u64,
+    pub key_payload_bytes: u64,
+    pub value_payload_bytes: u64,
+    pub tombstones: u64,
+    pub spilled_chains: u64,
+    pub spilled_version_capacity: u64,
+    pub version_record_bytes: u64,
+    pub owned_bytes_lower_bound: u64,
+}
+
+/// The rrflowKV write-ahead log tail not yet flushed into segments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticWriteAheadLogSnapshot {
+    pub payload_bytes: u64,
+    /// Payload size that triggers an automatic flush.
+    pub payload_max_bytes: u64,
+}
+
+/// Cumulative flush and compaction work since the process opened the store.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticMaintenanceSnapshot {
+    pub automatic_flushes: u64,
+    pub failed_flushes: u64,
+    pub write_stalls: u64,
+    pub oversized_batches: u64,
+    pub automatic_compactions: u64,
+    pub failed_compactions: u64,
+    pub compaction_input_bytes: u64,
+    pub compaction_output_bytes: u64,
+    pub peak_compaction_buffer_bytes: u64,
+}
+
+/// The persisted segment set named by the current manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticSegmentSetSnapshot {
+    pub segments: u64,
+    pub segment_bytes: u64,
+    pub l0_segments: u64,
+    /// L0 segment count that triggers compaction.
+    pub l0_compaction_trigger: u64,
+    pub compaction_debt_segments: u64,
+    pub compaction_target_segment_bytes: u64,
+}
+
+/// The bounded decoded-page cache and the page reads it served or missed.
+/// Hit, miss, eviction, load, byte, and filter counters are cumulative since
+/// the process opened the store.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticPageCacheSnapshot {
+    pub capacity_bytes: u64,
+    pub resident_bytes: u64,
+    pub entries: u64,
+    pub hits: u64,
+    pub misses: u64,
+    pub evictions: u64,
+    pub page_loads: u64,
+    pub bytes_read: u64,
+    pub bytes_decoded: u64,
+    pub bytes_borrowed: u64,
+    pub bytes_allocated: u64,
+    pub bytes_copied: u64,
+    pub bytes_decompressed: u64,
+    pub filter_checks: u64,
+    pub filter_negatives: u64,
+}
+
+/// The segment read path rrflowKV requested.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticSegmentIoMode {
+    Auto,
+    Mmap,
+    IoUring,
+    Bounded,
+}
+
+/// Segment file I/O by access path, cumulative since the store opened.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticSegmentIoSnapshot {
+    pub requested_mode: DiagnosticSegmentIoMode,
+    pub mmap_segments: u64,
+    pub io_uring_segments: u64,
+    pub bounded_segments: u64,
+    pub fallbacks: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_fallback_reason: Option<String>,
+    pub read_operations: u64,
+    pub mmap_reads: u64,
+    pub io_uring_reads: u64,
+    pub bounded_reads: u64,
+    pub bytes_read: u64,
+    pub max_request_bytes: u64,
+    pub peak_request_bytes: u64,
+}
+
+/// rrflowKV physical state and counters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticRrflowKvSnapshot {
+    pub physical_sequence: u64,
+    pub manifest_generation: u64,
+    pub durable_sequence: u64,
+    pub memtable: DiagnosticMemtableSnapshot,
+    pub write_ahead_log: DiagnosticWriteAheadLogSnapshot,
+    pub maintenance: DiagnosticMaintenanceSnapshot,
+    pub segment_set: DiagnosticSegmentSetSnapshot,
+    pub page_cache: DiagnosticPageCacheSnapshot,
+    pub segment_io: DiagnosticSegmentIoSnapshot,
+}
+
+/// Process-local physical storage observation for the instance's storage
+/// profile. It carries `observation` authority: counters are measured at
+/// `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+/// process reopens its store.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnosticStorageSnapshot {
+    pub observed_at_unix_ms: u64,
+    pub profile: StorageProfileKind,
+    pub evidence_level: DiagnosticStorageEvidenceLevel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rrflow_kv: Option<DiagnosticRrflowKvSnapshot>,
+}
+
+impl DiagnosticStorageSnapshot {
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.observed_at_unix_ms == 0 {
+            return invalid("diagnostic storage observation time must be greater than zero");
+        }
+        match (self.profile, self.evidence_level, &self.rrflow_kv) {
+            (
+                StorageProfileKind::RrflowKv,
+                DiagnosticStorageEvidenceLevel::RrflowKvCounters,
+                Some(rrflow_kv),
+            ) => {
+                if rrflow_kv
+                    .segment_io
+                    .last_fallback_reason
+                    .as_ref()
+                    .is_some_and(|reason| {
+                        reason.is_empty()
+                            || reason.len() > MAX_MESSAGE_BYTES
+                            || reason.as_bytes().contains(&0)
+                    })
+                {
+                    return invalid("diagnostic segment I/O fallback reason is invalid");
+                }
+                Ok(())
+            }
+            (_, DiagnosticStorageEvidenceLevel::LogicalOnly, None) => Ok(()),
+            _ => invalid(
+                "diagnostic storage evidence level, profile, and rrflowKV counters disagree",
+            ),
+        }
+    }
+}
+
 /// First cohesive RRD diagnostic projection. All fields are assembled by the
 /// engine under one verified read stamp and are identical through embedded and
 /// daemon faces. Additional graph/reasoning/trace lenses extend this contract;
@@ -309,6 +496,7 @@ pub struct DiagnosticSnapshot {
     pub vector_collections: VectorCollectionCatalogueSnapshot,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub estate: Option<EstateSnapshot>,
+    pub storage: DiagnosticStorageSnapshot,
     pub changes: ChangefeedPage,
     pub audit: AuditPage,
     pub sections: Vec<DiagnosticSectionSnapshot>,
@@ -383,6 +571,10 @@ impl DiagnosticSnapshot {
             &self.scope,
             self.read.runtime_cursor,
         )?;
+        if self.storage.observed_at_unix_ms != self.observed_at_unix_ms {
+            return invalid("diagnostic storage observation differs from the snapshot time");
+        }
+        self.storage.validate()?;
         let mut model_ids = std::collections::BTreeSet::new();
         for model in &self.models.models {
             if model.required_property_count > model.property_count
