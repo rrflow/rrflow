@@ -70,9 +70,9 @@ func repositoryRoot() (string, error) {
 func render(raw []byte) ([]byte, error) {
 	var document struct {
 		Paths map[string]map[string]struct {
-			OperationID string                   `json:"operationId"`
-			Security    []map[string]interface{} `json:"security"`
-			Mutation    bool                     `json:"x-rrd-mutation"`
+			OperationID string           `json:"operationId"`
+			Security    []map[string]any `json:"security"`
+			Mutation    bool             `json:"x-rrd-mutation"`
 		} `json:"paths"`
 	}
 	if err := json.Unmarshal(raw, &document); err != nil {
@@ -134,7 +134,7 @@ func render(raw []byte) ([]byte, error) {
 
 func exportedName(value string) string {
 	var result strings.Builder
-	for _, part := range strings.Split(value, "-") {
+	for part := range strings.SplitSeq(value, "-") {
 		if part == "" {
 			continue
 		}

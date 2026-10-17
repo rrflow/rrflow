@@ -26,9 +26,9 @@ exploratory AI reasoning.
 
 [Open the required change checklist](rrflow-1.0-execution/change-authoring.md#required-change-checklist).
 
-#### Machine-bound active change package
+#### Pull request and CI binding
 
-[Open the current planning-only effect boundary](rrflow-1.0-active-change.json).
+[Open the pull request and CI binding](rrflow-1.0-execution/change-authoring.md#pull-request-and-ci-binding).
 
 ## Product terms versus implementation packages
 

@@ -13,14 +13,14 @@ FROM docker.io/library/ubuntu:24.04@sha256:496754492fb28b4d3049432f2ca787449331e
 ARG UBUNTU_SNAPSHOT=20260922T000000Z
 ARG RUSTUP_VERSION=1.29.1
 ARG RUSTUP_SHA256=dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71
-ARG RUST_VERSION=1.98.0
-ARG UV_VERSION=0.11.21
-ARG UV_SHA256=8c88519b0ef0af9801fcdee419bbb12116bd9e6b18e162ae093c932d8b264050
+ARG RUST_VERSION=1.99.1
+ARG UV_VERSION=0.13.1
+ARG UV_SHA256=eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220
 # The actions/python-versions build that setup-python installs on CI's
 # ubuntu-24.04 runners; the digest is GitHub's published asset SHA-256.
-ARG PYTHON_VERSION=3.11.16
-ARG PYTHON_RELEASE=3.11.16-31661435402
-ARG PYTHON_SHA256=07b61e35f30861939ff95314297921de8f57cd48f85bb18d777651b3ea45f2ee
+ARG PYTHON_VERSION=3.15.0
+ARG PYTHON_RELEASE=3.15.0-38076878863
+ARG PYTHON_SHA256=29cfca35b6fea4cd098c57fadf982d4c6a784b924fa102c6e16c6f94e27769c9
 
 # Podman's default OCI image format ignores SHELL, so every RUN is POSIX sh.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -33,16 +33,20 @@ ENV DEBIAN_FRONTEND=noninteractive \
     UV_PYTHON_DOWNLOADS=never \
     PATH=/usr/local/cargo/bin:${PATH}
 
-# ca-certificates comes from the signed archive so the HTTPS snapshot can be
-# reached; every other package resolves from one fixed snapshot date.
+# Bootstrap trust roots without installing the moving archive's OpenSSL. Apt
+# authenticates this package; all installed packages use the fixed snapshot.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
+ && cd /tmp \
+ && apt-get download ca-certificates \
+ && mkdir -p /tmp/rrflow-ca /etc/ssl/certs \
+ && dpkg-deb -x /tmp/ca-certificates_*.deb /tmp/rrflow-ca \
+ && cat /tmp/rrflow-ca/usr/share/ca-certificates/mozilla/*.crt > /etc/ssl/certs/ca-certificates.crt \
  && apt-get update --snapshot "${UBUNTU_SNAPSHOT}" \
  && apt-get install -y --no-install-recommends --snapshot "${UBUNTU_SNAPSHOT}" \
-      build-essential clang cmake curl git jq less libssl-dev lld \
+      ca-certificates build-essential clang cmake curl git jq less libssl-dev lld \
       openssh-client pkg-config procps unzip xz-utils \
       libgdbm-compat4t64 libgdbm6t64 libreadline8t64 libsqlite3-0 libtcl8.6 libtk8.6 \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* /tmp/rrflow-ca /tmp/ca-certificates_*.deb
 
 # Replace the image's default uid-1000 account with the workspace user so
 # rootless Podman --userns=keep-id maps the host user onto it.
@@ -89,18 +93,20 @@ CMD ["bash", "-l"]
 
 FROM rust AS full
 
-ARG NODE_VERSION=24.20.0
-ARG NODE_SHA256=2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2
-ARG PNPM_VERSION=11.22.0
-ARG PNPM_INTEGRITY=sha512-H/hwxMYTPf2I+yr8Rt0T1H8JyXlLQ4xv20fKmMrzvBY4HuC+k6CRuOOCTPAfiJ9G19niCRD7C+GrD7W6qA3WIQ==
-ARG GO_VERSION=1.24.13
-ARG GO_SHA256=1fc94b57134d51669c72173ad5d49fd62afb0f1db9bf3f798fd98ee423f8d730
-ARG JAVA_VERSION=21.0.12.1+1
-ARG JAVA_SHA256=ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94
-ARG MAVEN_VERSION=3.9.12
-ARG MAVEN_SHA512=0a1be79f02466533fc1a80abbef8796e4f737c46c6574ede5658b110899942a94db634477dfd3745501c80aef9aac0d4f841d38574373f7e2d24cce89d694f70
-ARG DOTNET_VERSION=10.0.111
-ARG DOTNET_SHA512=aae221be96a3b510d5b6fffefc69d8ad2fa595a1430299419316bb71c65f260a457ca9af24d044e1709b28a9118798caafec535ccfe58f7767c5acb735c00392
+ARG NODE_VERSION=24.22.0
+ARG NODE_SHA256=cc2f601cee82d9a5a233302fe307abc600727035fd7d2c3a3571755989e95008
+ARG PNPM_VERSION=12.14.0
+ARG PNPM_INTEGRITY=sha512-wYum2HmT09Fky16JSPMrLAbuhUSH4GzY2GeBNC+z5btGNDZwNHEehoArqpw3vqkGzhkprQjXCITJfYAd8TOJpg==
+ARG GO_VERSION=1.27.2
+ARG GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
+ARG JAVA_VERSION=25.0.4+101.0.LTS
+# setup-java uses the SemVer above; Temurin publishes this fourth-component tag.
+ARG JAVA_RELEASE=25.0.4.1+1
+ARG JAVA_SHA256=dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
+ARG MAVEN_VERSION=3.10.0
+ARG MAVEN_SHA512=908b1501bfb420bf7c8affb855534a9c407fd6099367bfb9f2f2dcb8e9799102bffb84518cde74c679bd76870247c6528683abdd620581bffa90f95d92d175aa
+ARG DOTNET_VERSION=10.0.402
+ARG DOTNET_SHA512=1904a98dda2db34ba78ba3c4fb1b224455329af91c341d83547843c1839e112b04ae699ee92fa2449a8f62249196a938723078c0c60b9f65c88539d5687729c2
 
 USER root
 
@@ -137,10 +143,10 @@ RUN curl -fsSLo /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.ta
  && tar -xzf /tmp/go.tar.gz -C /usr/local \
  && rm /tmp/go.tar.gz
 
-RUN java_tag="$(printf '%s' "${JAVA_VERSION}" | sed 's/+/%2B/')" \
- && java_file="$(printf '%s' "${JAVA_VERSION}" | sed 's/+/_/')" \
+RUN java_tag="$(printf '%s' "${JAVA_RELEASE}" | sed 's/+/%2B/')" \
+ && java_file="$(printf '%s' "${JAVA_RELEASE}" | sed 's/+/_/')" \
  && curl -fsSLo /tmp/jdk.tar.gz \
-      "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-${java_tag}/OpenJDK21U-jdk_x64_linux_hotspot_${java_file}.tar.gz" \
+      "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-${java_tag}/OpenJDK25U-jdk_x64_linux_hotspot_${java_file}.tar.gz" \
  && echo "${JAVA_SHA256}  /tmp/jdk.tar.gz" | sha256sum --check --strict \
  && install -d /opt/jdk \
  && tar -xzf /tmp/jdk.tar.gz -C /opt/jdk --strip-components=1 \

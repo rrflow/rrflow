@@ -52,11 +52,15 @@ pub use deployment::{
 pub use diagnostic::{
     DiagnosticAuthority, DiagnosticCoverage, DiagnosticGraphDifference,
     DiagnosticGraphRecordChange, DiagnosticGraphRecordSnapshot, DiagnosticGraphRelationChange,
-    DiagnosticGraphRelationSnapshot, DiagnosticGraphSnapshot, DiagnosticModelCatalogueSnapshot,
-    DiagnosticModelKind, DiagnosticModelSnapshot, DiagnosticReadStamp, DiagnosticRetentionPin,
-    DiagnosticRetentionSnapshot, DiagnosticRuntimeReference, DiagnosticSectionSnapshot,
-    DiagnosticSnapshot, DiagnosticSnapshotLease, DiagnosticVectorArtifactCatalogueSnapshot,
-    DiagnosticVectorArtifactKind, DiagnosticVectorArtifactSnapshot, ReadDiagnosticSnapshot,
+    DiagnosticGraphRelationSnapshot, DiagnosticGraphSnapshot, DiagnosticMaintenanceSnapshot,
+    DiagnosticMemtableSnapshot, DiagnosticModelCatalogueSnapshot, DiagnosticModelKind,
+    DiagnosticModelSnapshot, DiagnosticPageCacheSnapshot, DiagnosticReadStamp,
+    DiagnosticRetentionPin, DiagnosticRetentionSnapshot, DiagnosticRrflowKvSnapshot,
+    DiagnosticRuntimeReference, DiagnosticSectionSnapshot, DiagnosticSegmentIoMode,
+    DiagnosticSegmentIoSnapshot, DiagnosticSegmentSetSnapshot, DiagnosticSnapshot,
+    DiagnosticSnapshotLease, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
+    DiagnosticVectorArtifactCatalogueSnapshot, DiagnosticVectorArtifactKind,
+    DiagnosticVectorArtifactSnapshot, DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot,
     DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
     MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
 };
@@ -168,7 +172,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "96a232bda6cfb3135e75df86e8b97a77b8a5f098545ce9fe8dc0d3e7a6d6ad26";
+    "c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;

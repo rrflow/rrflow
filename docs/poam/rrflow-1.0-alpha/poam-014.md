@@ -47,8 +47,8 @@ Roadmap owners: [Gate C](../../roadmap/rrflow-1.0/gate-c.md),
 ## Closure evidence
 
 Preserve A-07 unchanged as its accepted baseline. Before each later package
-edits, moves, merges, or deletes implementation, its planning-only active
-change record must map current behavior, source modules, characterization
+edits, moves, merges, or deletes implementation, its pull request description
+must map current behavior, source modules, characterization
 tests, canonical destination, owning gate, removal obligation, and smallest
 failure oracle. Its linked package journal must report the resulting behavior,
 changed paths, replacement tests, failures, omissions, and exact accepted

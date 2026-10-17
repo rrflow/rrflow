@@ -31,7 +31,7 @@ services:
   # the candidate-CI pgvector-feature job.
   pgvector:
     profiles: ["pgvector"]
-    image: docker.io/pgvector/pgvector@sha256:1d50c689b0a6511b9ea0a15615281c81a59fd04a08eb35057ec8646fb3a2118a
+    image: docker.io/pgvector/pgvector@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
     network_mode: host
     environment:
       POSTGRES_USER: rrflow_test

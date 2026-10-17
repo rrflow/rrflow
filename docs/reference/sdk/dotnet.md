@@ -50,11 +50,11 @@ objects or reconstruct engine planning in this SDK.
 The current package ID is `Rrflow.Rrd.Client`, the assembly namespace is
 `Rrflow.Rrd`, and the package version is the repository's frozen `1.0.0`.
 That version does not imply alpha readiness or authorize publication. The
-workspace pins SDK `10.0.111` with roll-forward disabled, targets only
+workspace pins SDK `10.0.402` with roll-forward disabled, targets only
 `net10.0`, and centralizes nullable analysis, warnings-as-errors, the latest
 analysis level under that pinned SDK, deterministic compilation, and lock-file
 generation in `Directory.Build.props`. `Directory.Packages.props` is the sole
-source for the xUnit v3 3.2.2 test version. The client has no third-party
+source for the xUnit v3 4.0.2 test version. The client has no third-party
 runtime dependency. These source/build-policy facts do not qualify a release
 toolchain or offline dependency closure.
 
@@ -375,13 +375,13 @@ The resulting .NET subscription client must:
 
 ## .NET build, NuGet, and offline distribution boundary
 
-The solution and two SDK-style projects now select SDK `10.0.111` through
+The solution and two SDK-style projects now select SDK `10.0.402` through
 tracked `global.json` with roll-forward disabled. Common compiler, analysis,
 deterministic-compilation, target-framework, and lock-file-generation policy
 lives in `Directory.Build.props`; the xUnit version lives once in
 `Directory.Packages.props`. Exact locked restore still requires
 `--locked-mode`. The runtime lock has no package dependencies; the test lock
-records xUnit and fifteen transitive packages. A library lock does not control
+records xUnit and sixteen transitive packages. A library lock does not control
 the graph selected by a consuming application, so neither the pin nor either
 lock substitutes for the signed release closure.
 

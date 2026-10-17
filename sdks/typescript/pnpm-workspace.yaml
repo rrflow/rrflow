@@ -1,2 +1,9 @@
 allowBuilds:
   esbuild: true
+# openapi-typescript 7.13.0 declares a typescript ^5.x peer but builds the
+# generated schema through the compiler API TypeScript 6.0.3 keeps. The
+# generate:check oracle proves byte-identical output; the rule stops applying
+# when either pin changes.
+peerDependencyRules:
+  allowedVersions:
+    openapi-typescript@7.13.0>typescript: 6.0.3

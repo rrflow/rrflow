@@ -6,7 +6,7 @@
 //! stored in those transactions.
 
 use crate::access::{prepare_semantic_commit, SemanticCommitPlan};
-use crate::engine::{PhysicalStoreEvidence, StorageEngine};
+use crate::engine::{PhysicalStoreEvidence, StorageEngine, RRFLOW_KV_COUNTER_EVIDENCE};
 use crate::error::{Error, Result};
 use crate::key_codec::prefix_end;
 #[cfg(test)]
@@ -748,7 +748,7 @@ impl StorageEngine for RrflowKvStore {
         let memtable = database.memtable().profile();
         Ok(PhysicalStoreEvidence {
             backend: "rrflow_kv".into(),
-            evidence_level: "rrflow_kv_counters".into(),
+            evidence_level: RRFLOW_KV_COUNTER_EVIDENCE.into(),
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),
@@ -862,6 +862,23 @@ impl crate::access::runtime_state::AccessRead for RrflowKvSnapshotRead<'_> {
             .take(limit)
             .collect())
     }
+}
+
+/// Creates an empty database in the rrflowKV application format for an owner
+/// that applies rrflowKV commits through the `&Database` functions below,
+/// such as the Raft application bridge's canonical state.
+pub fn create_rrflow_kv_database(root: &Path) -> Result<Database> {
+    Ok(Database::create_with_application_format(
+        root,
+        DatabaseOptions::default(),
+        keyspaces::RRFLOW_KV_FORMAT,
+    )?)
+}
+
+/// Whether `database` carries the rrflowKV application format that the
+/// `&Database` functions below require.
+pub fn is_rrflow_kv_database(database: &Database) -> bool {
+    database_codec(database).is_ok()
 }
 
 /// Reads the exact rrflowKV cursor/schema pair used by the temporary Raft

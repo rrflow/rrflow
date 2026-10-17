@@ -238,7 +238,7 @@ audited commit.
 | `src-tauri/src/database/mod.rs` and `shell.rs` | Launches `rrflow start --user --pass ... --allow-all` with `rocksdb://`, `rrflowkv://`, or `tikv://`; joins shell command strings and can kill all `rrflow.exe` processes. This is not the current RRFlow CLI. | Delete after the installed lifecycle/launcher replacement exists. Never translate it into a second supervisor. The current product commands are `install plan/apply`, `serve`, `ready`, and `verify`. |
 | `src/providers/Context/index.tsx` | Hard-coded cloud WebSocket, namespace `rrflow`, database `cloud`, vendor client, fixed reconnect loop. | Remove. Live context must use the one native RRD connection and multiplexed public WebSocket contract with cursor/ACK/resume evidence. |
 | `src/rrflow/attunement.ts` | Client-authored phases, 30–45 minute estimate, statuses, and automation primitive definitions. | Remove as lifecycle truth. Render only engine-issued capability and durable job records. Client copy may survive only as non-authoritative fixture data under tests. |
-| `src/rrflow/diagnostics.ts` and `RuntimeDiagnosticsPage` | Separate `vyrm-diagnostics` protocol, prompt-flight runner, replay ledger, provider state, and private `/api/*` operations. | Remove. Project accepted diagnostics/traces/reasoning evidence from public RRD operations. |
+| `src/rrflow/diagnostics.ts` and `RuntimeDiagnosticsPage` | Separate retired diagnostics protocol, prompt-flight runner, replay ledger, provider state, and private `/api/*` operations. | Remove. Project accepted diagnostics/traces/reasoning evidence from public RRD operations. |
 | `src/rrflow/control-plane.ts` and `ControlPlanePage` | Client-invented `rrflow-control` protocol and managed-instance state. | Remove until a separately accepted fleet contract exists. Multi-instance navigation uses independent RRD connections and never invents fleet authority. |
 | `types.tsx::Connection` and inherited authentication fields | Runtime profiles reuse namespace/database/user/password/token fields from the old database client and serialize them in the renderer configuration model. | Introduce a minimal non-secret RRD profile: label, endpoint candidate, expected instance, project reference/opaque native handle, and presentation preferences. No secret, namespace, or database authority. |
 | `README.md` and `connectome-ci.yml` | README overstates strict identity/real connection; CI builds, renders against mocks, and tests the native client only against a fake server. | State current behavior exactly. Add the installed RRFlow artifact/restart suite and make absence of its artifact/configuration fail or explicitly skip without reporting conformance. |
@@ -367,7 +367,7 @@ git status --short --branch
 git rev-parse HEAD^{commit}
 
 git grep -n -E \
-  '@rrflow/client|npm:surrealdb|@surrealdb|Surreal as RRFlow|@rrflow/wasm|rrflowkv://|--allow-all|rrflow-control|vyrm-diagnostics|rrflow-cloud-|local_daemon|implementation_version.*0[.]1[.]0'
+  '@rrflow/client|npm:surrealdb|@surrealdb|Surreal as RRFlow|@rrflow/wasm|rrflowkv://|--allow-all|rrflow-control|vy[r]m-diagnostics|rrflow-cloud-|local_daemon|implementation_version.*0[.]1[.]0'
 
 git grep -n -E \
   'route[.]fulfill|page[.]route|fake RRD|mock.*RRD|RRD connected|verified' \
@@ -375,7 +375,7 @@ git grep -n -E \
 
 rg -n 'new RrdAuthenticatedClient|rrd_connect' src/screens src/rrflow
 rg -n 'api_key|Authorization|session_id|token' src src-tauri/src
-rg -n 'path\s*=\s*"\.\./|\.\./vyrm|\.\./rrflow' src-tauri/Cargo.toml package.json
+rg -n 'path\s*=\s*"\.\./|\.\./vy[r]m|\.\./rrflow' src-tauri/Cargo.toml package.json
 pnpm why surrealdb
 cargo tree --manifest-path src-tauri/Cargo.toml --locked
 ```

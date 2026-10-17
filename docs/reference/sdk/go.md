@@ -40,7 +40,7 @@ engine's public result.
 
 ## Audited current module
 
-The nested module is `github.com/rrflow/rrflow/sdks/go` and declares Go 1.24.
+The nested module is `github.com/rrflow/rrflow/sdks/go` and declares Go 1.27.2.
 It currently has no non-standard-library dependency, so the absence of a
 `go.sum` is expected rather than proof of incomplete locking. The reviewed
 layout is:
@@ -320,8 +320,8 @@ The resulting client must:
 
 ## Go module and offline distribution boundary
 
-The `go 1.24` line is the declared minimum toolchain requirement, not evidence
-that Go 1.24 is supported. This review executed Go 1.26.0 on Linux/amd64 only.
+The `go 1.27.2` line declares the minimum toolchain; candidate CI runs that
+same Go release, on Linux/amd64 only.
 Automatic Go toolchain selection can download another toolchain, so a release
 test must explicitly distinguish a locally available supported toolchain from
 network-assisted success.

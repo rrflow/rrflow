@@ -57,7 +57,10 @@ pub use backup::{
 };
 pub use control::{ControlJournalEntry, ControlTransition};
 pub use ds::{DataRuntime, DataRuntimeAccess, DataRuntimeRef, DataRuntimeStep};
-pub use engine::{PhysicalStoreEvidence, RrflowMxStore, StorageEngine, StorageProfile};
+pub use engine::{
+    PhysicalStoreEvidence, RrflowMxStore, StorageEngine, StorageProfile, LOGICAL_ONLY_EVIDENCE,
+    RRFLOW_KV_COUNTER_EVIDENCE,
+};
 pub use error::{Error, Result};
 pub use footprint::{measure_storage_footprint, FootprintBytes, StorageFootprint};
 pub use gc::{PairStatus, RemovalReport, Verdict};
@@ -84,10 +87,11 @@ pub use rrd_lsm::{
     publish_rename as publish_durable_rename, sync_directory as sync_directory_metadata,
 };
 pub use rrflow_kv::{
-    prepare_rrflow_kv_commit, rrflow_kv_commit_context, rrflow_kv_commit_outcome,
-    rrflow_kv_database_artifact_view, rrflow_kv_snapshot_all_object_references,
-    rrflow_kv_snapshot_artifact_view, rrflow_kv_snapshot_object_references, RrflowKvInspection,
-    RrflowKvInspector, RrflowKvOpenEvidence, RrflowKvReconciliationEvidence, RrflowKvStore,
+    create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,
+    rrflow_kv_commit_context, rrflow_kv_commit_outcome, rrflow_kv_database_artifact_view,
+    rrflow_kv_snapshot_all_object_references, rrflow_kv_snapshot_artifact_view,
+    rrflow_kv_snapshot_object_references, RrflowKvInspection, RrflowKvInspector,
+    RrflowKvOpenEvidence, RrflowKvReconciliationEvidence, RrflowKvStore,
     RRFLOW_KV_OPEN_EVIDENCE_VERSION,
 };
 pub use s3::{

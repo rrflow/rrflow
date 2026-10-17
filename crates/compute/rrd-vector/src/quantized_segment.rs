@@ -733,12 +733,18 @@ fn score_dense(
     {
         return invalid("quantized dense score requires finite matching vectors");
     }
-    #[cfg(target_arch = "x86_64")]
-    if kernel == QuantizedKernel::Auto && std::arch::is_x86_feature_detected!("avx2") {
-        // SAFETY: AVX2 support was checked and both slices have equal lengths.
-        return Ok(unsafe { score_dense_avx2(query, row, metric) });
+    match kernel {
+        QuantizedKernel::Scalar => Ok(score_dense_scalar(query, row, metric)),
+        QuantizedKernel::Auto => {
+            #[cfg(target_arch = "x86_64")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                // SAFETY: AVX2 support was checked and both slices have equal
+                // lengths.
+                return Ok(unsafe { score_dense_avx2(query, row, metric) });
+            }
+            Ok(score_dense_scalar(query, row, metric))
+        }
     }
-    Ok(score_dense_scalar(query, row, metric))
 }
 
 fn score_dense_scalar(query: &[f32], row: &[f32], metric: ScoreMetric) -> f64 {

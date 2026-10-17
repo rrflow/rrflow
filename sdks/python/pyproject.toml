@@ -2,21 +2,21 @@
 name = "rrflow-rrd-client"
 version = "1.0.0"
 description = "Supported Python client for the RRFlow Durable Runtime v1 API"
-requires-python = ">=3.11"
+requires-python = ">=3.15"
 dependencies = [
   "httpx==0.28.1",
-  "pydantic==2.13.4",
+  "pydantic==2.14.1",
 ]
 
 [build-system]
-requires = ["hatchling==1.32.0"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-  "mypy==2.3.1",
+  "mypy==2.4.0",
   "pytest==9.1.1",
-  "ruff==0.16.4",
+  "ruff==0.17.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -25,16 +25,17 @@ packages = ["src/rrd_client"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = ["error"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py315"
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.15"
 strict = true
 packages = ["rrd_client"]
 mypy_path = "src"

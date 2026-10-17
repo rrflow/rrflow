@@ -17,7 +17,7 @@ use rrd_core::{
     RuntimeSchemaRegistry, RuntimeTableSchema, RuntimeType, ScopeId,
 };
 use rrd_lsm::{recover, Database, Durability, Mutation, SnapshotBundle, WriteBatch};
-use rrd_store::{LocalObjectStore, RrflowKvStore, StorageEngine};
+use rrd_store::{is_rrflow_kv_database, LocalObjectStore, RrflowKvStore, StorageEngine};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -27,6 +27,11 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 struct RrdStoreBuilder;
 
 static TEST_SNAPSHOT_ORDINAL: AtomicU64 = AtomicU64::new(1);
+
+/// Every rrflowKV row key starts with the frozen typed-key format field: tag
+/// 0xf0 followed by the `RRKV0001` application format (see rrd-store's golden
+/// key-layout fixture).
+const RRFLOW_KV_KEY_PREFIX: &[u8] = b"\xf0RRKV0001";
 
 // OpenRaft fixes the conformance helper error type; keeping it unboxed lets
 // `?` compose directly with the suite's storage operations.
@@ -477,11 +482,11 @@ fn canonical_runtime_commit_is_atomic_idempotent_durable_and_transferable() {
                     .operations()
                     .iter()
                     .any(|operation| operation.key() == b"rrflow/raft/v4/state/current");
-                let has_runtime_change = decoded
+                let has_runtime_truth = decoded
                     .operations()
                     .iter()
-                    .any(|operation| operation.key().starts_with(b"runtime_changes\0"));
-                has_raft_state && has_runtime_change
+                    .any(|operation| operation.key().starts_with(RRFLOW_KV_KEY_PREFIX));
+                has_raft_state && has_runtime_truth
             });
             assert!(
                 atomic_frame,
@@ -768,6 +773,23 @@ fn store_is_permanently_bound_to_one_shard() {
     RrdRaftStore::open(directory.path(), ShardId(2)).unwrap();
     let error = match RrdRaftStore::open(directory.path(), ShardId(3)) {
         Ok(_) => panic!("foreign shard binding unexpectedly opened"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, ClusterError::Denied(_)));
+}
+
+#[test]
+fn canonical_state_is_an_rrflow_kv_database_and_other_formats_fail_closed() {
+    let directory = tempfile::tempdir().unwrap();
+    drop(RrdRaftStore::open(directory.path(), ShardId(4)).unwrap());
+    assert!(is_rrflow_kv_database(
+        &Database::open(directory.path()).unwrap()
+    ));
+
+    let foreign = tempfile::tempdir().unwrap();
+    drop(Database::create(foreign.path()).unwrap());
+    let error = match RrdRaftStore::open(foreign.path(), ShardId(4)) {
+        Ok(_) => panic!("canonical state without the rrflowKV application format opened"),
         Err(error) => error,
     };
     assert!(matches!(error, ClusterError::Denied(_)));

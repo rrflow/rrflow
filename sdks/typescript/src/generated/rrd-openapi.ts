@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 96a232bda6cfb3135e75df86e8b97a77b8a5f098545ce9fe8dc0d3e7a6d6ad26
+// OpenAPI SHA-256: c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -10310,8 +10310,7 @@ export interface operations {
                                 } | null;
                                 scope: string;
                                 sections: {
-                                    /** @enum {string} */
-                                    authority: "authoritative" | "projection";
+                                    authority: "authoritative" | "projection" | "observation";
                                     /** @enum {string} */
                                     coverage: "complete" | "bounded";
                                     /**
@@ -10328,6 +10327,174 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                storage: {
+                                    /** @description How much physical evidence the instance's storage profile reports. */
+                                    evidence_level: "logical_only" | "rrflow_kv_counters";
+                                    /** Format: uint64 */
+                                    observed_at_unix_ms: number;
+                                    /** @enum {string} */
+                                    profile: "rrflow_mx" | "rrflow_kv";
+                                    /** @description rrflowKV physical state and counters. */
+                                    rrflow_kv?: {
+                                        /** Format: uint64 */
+                                        durable_sequence: number;
+                                        /** @description Cumulative flush and compaction work since the process opened the store. */
+                                        maintenance: {
+                                            /** Format: uint64 */
+                                            automatic_compactions: number;
+                                            /** Format: uint64 */
+                                            automatic_flushes: number;
+                                            /** Format: uint64 */
+                                            compaction_input_bytes: number;
+                                            /** Format: uint64 */
+                                            compaction_output_bytes: number;
+                                            /** Format: uint64 */
+                                            failed_compactions: number;
+                                            /** Format: uint64 */
+                                            failed_flushes: number;
+                                            /** Format: uint64 */
+                                            oversized_batches: number;
+                                            /** Format: uint64 */
+                                            peak_compaction_buffer_bytes: number;
+                                            /** Format: uint64 */
+                                            write_stalls: number;
+                                        };
+                                        /** Format: uint64 */
+                                        manifest_generation: number;
+                                        /** @description The rrflowKV mutable write buffer. */
+                                        memtable: {
+                                            /** Format: uint64 */
+                                            approximate_bytes: number;
+                                            /** Format: uint64 */
+                                            key_payload_bytes: number;
+                                            /** Format: uint64 */
+                                            keys: number;
+                                            /**
+                                             * Format: uint64
+                                             * @description Version count that triggers an automatic flush.
+                                             */
+                                            max_versions: number;
+                                            /** Format: uint64 */
+                                            owned_bytes_lower_bound: number;
+                                            /** Format: uint64 */
+                                            spilled_chains: number;
+                                            /** Format: uint64 */
+                                            spilled_version_capacity: number;
+                                            /** Format: uint64 */
+                                            tombstones: number;
+                                            /** Format: uint64 */
+                                            value_payload_bytes: number;
+                                            /** Format: uint64 */
+                                            version_record_bytes: number;
+                                            /** Format: uint64 */
+                                            versions: number;
+                                        };
+                                        /**
+                                         * @description The bounded decoded-page cache and the page reads it served or missed.
+                                         *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                         *     the process opened the store.
+                                         */
+                                        page_cache: {
+                                            /** Format: uint64 */
+                                            bytes_allocated: number;
+                                            /** Format: uint64 */
+                                            bytes_borrowed: number;
+                                            /** Format: uint64 */
+                                            bytes_copied: number;
+                                            /** Format: uint64 */
+                                            bytes_decoded: number;
+                                            /** Format: uint64 */
+                                            bytes_decompressed: number;
+                                            /** Format: uint64 */
+                                            bytes_read: number;
+                                            /** Format: uint64 */
+                                            capacity_bytes: number;
+                                            /** Format: uint64 */
+                                            entries: number;
+                                            /** Format: uint64 */
+                                            evictions: number;
+                                            /** Format: uint64 */
+                                            filter_checks: number;
+                                            /** Format: uint64 */
+                                            filter_negatives: number;
+                                            /** Format: uint64 */
+                                            hits: number;
+                                            /** Format: uint64 */
+                                            misses: number;
+                                            /** Format: uint64 */
+                                            page_loads: number;
+                                            /** Format: uint64 */
+                                            resident_bytes: number;
+                                        };
+                                        /** Format: uint64 */
+                                        physical_sequence: number;
+                                        /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                        segment_io: {
+                                            /** Format: uint64 */
+                                            bounded_reads: number;
+                                            /** Format: uint64 */
+                                            bounded_segments: number;
+                                            /** Format: uint64 */
+                                            bytes_read: number;
+                                            /** Format: uint64 */
+                                            fallbacks: number;
+                                            /** Format: uint64 */
+                                            io_uring_reads: number;
+                                            /** Format: uint64 */
+                                            io_uring_segments: number;
+                                            last_fallback_reason?: string | null;
+                                            /** Format: uint64 */
+                                            max_request_bytes: number;
+                                            /** Format: uint64 */
+                                            mmap_reads: number;
+                                            /** Format: uint64 */
+                                            mmap_segments: number;
+                                            /** Format: uint64 */
+                                            peak_request_bytes: number;
+                                            /** Format: uint64 */
+                                            read_operations: number;
+                                            /**
+                                             * @description The segment read path rrflowKV requested.
+                                             * @enum {string}
+                                             */
+                                            requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                        };
+                                        /** @description The persisted segment set named by the current manifest. */
+                                        segment_set: {
+                                            /** Format: uint64 */
+                                            compaction_debt_segments: number;
+                                            /** Format: uint64 */
+                                            compaction_target_segment_bytes: number;
+                                            /**
+                                             * Format: uint64
+                                             * @description L0 segment count that triggers compaction.
+                                             */
+                                            l0_compaction_trigger: number;
+                                            /** Format: uint64 */
+                                            l0_segments: number;
+                                            /** Format: uint64 */
+                                            segment_bytes: number;
+                                            /** Format: uint64 */
+                                            segments: number;
+                                        };
+                                        /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                        write_ahead_log: {
+                                            /** Format: uint64 */
+                                            payload_bytes: number;
+                                            /**
+                                             * Format: uint64
+                                             * @description Payload size that triggers an automatic flush.
+                                             */
+                                            payload_max_bytes: number;
+                                        };
+                                    } | null;
+                                };
                                 vector_artifacts: {
                                     artifacts: {
                                         artifact_sha256: string;
@@ -12691,8 +12858,7 @@ export interface operations {
                                 } | null;
                                 scope: string;
                                 sections: {
-                                    /** @enum {string} */
-                                    authority: "authoritative" | "projection";
+                                    authority: "authoritative" | "projection" | "observation";
                                     /** @enum {string} */
                                     coverage: "complete" | "bounded";
                                     /**
@@ -12709,6 +12875,174 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                storage: {
+                                    /** @description How much physical evidence the instance's storage profile reports. */
+                                    evidence_level: "logical_only" | "rrflow_kv_counters";
+                                    /** Format: uint64 */
+                                    observed_at_unix_ms: number;
+                                    /** @enum {string} */
+                                    profile: "rrflow_mx" | "rrflow_kv";
+                                    /** @description rrflowKV physical state and counters. */
+                                    rrflow_kv?: {
+                                        /** Format: uint64 */
+                                        durable_sequence: number;
+                                        /** @description Cumulative flush and compaction work since the process opened the store. */
+                                        maintenance: {
+                                            /** Format: uint64 */
+                                            automatic_compactions: number;
+                                            /** Format: uint64 */
+                                            automatic_flushes: number;
+                                            /** Format: uint64 */
+                                            compaction_input_bytes: number;
+                                            /** Format: uint64 */
+                                            compaction_output_bytes: number;
+                                            /** Format: uint64 */
+                                            failed_compactions: number;
+                                            /** Format: uint64 */
+                                            failed_flushes: number;
+                                            /** Format: uint64 */
+                                            oversized_batches: number;
+                                            /** Format: uint64 */
+                                            peak_compaction_buffer_bytes: number;
+                                            /** Format: uint64 */
+                                            write_stalls: number;
+                                        };
+                                        /** Format: uint64 */
+                                        manifest_generation: number;
+                                        /** @description The rrflowKV mutable write buffer. */
+                                        memtable: {
+                                            /** Format: uint64 */
+                                            approximate_bytes: number;
+                                            /** Format: uint64 */
+                                            key_payload_bytes: number;
+                                            /** Format: uint64 */
+                                            keys: number;
+                                            /**
+                                             * Format: uint64
+                                             * @description Version count that triggers an automatic flush.
+                                             */
+                                            max_versions: number;
+                                            /** Format: uint64 */
+                                            owned_bytes_lower_bound: number;
+                                            /** Format: uint64 */
+                                            spilled_chains: number;
+                                            /** Format: uint64 */
+                                            spilled_version_capacity: number;
+                                            /** Format: uint64 */
+                                            tombstones: number;
+                                            /** Format: uint64 */
+                                            value_payload_bytes: number;
+                                            /** Format: uint64 */
+                                            version_record_bytes: number;
+                                            /** Format: uint64 */
+                                            versions: number;
+                                        };
+                                        /**
+                                         * @description The bounded decoded-page cache and the page reads it served or missed.
+                                         *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                         *     the process opened the store.
+                                         */
+                                        page_cache: {
+                                            /** Format: uint64 */
+                                            bytes_allocated: number;
+                                            /** Format: uint64 */
+                                            bytes_borrowed: number;
+                                            /** Format: uint64 */
+                                            bytes_copied: number;
+                                            /** Format: uint64 */
+                                            bytes_decoded: number;
+                                            /** Format: uint64 */
+                                            bytes_decompressed: number;
+                                            /** Format: uint64 */
+                                            bytes_read: number;
+                                            /** Format: uint64 */
+                                            capacity_bytes: number;
+                                            /** Format: uint64 */
+                                            entries: number;
+                                            /** Format: uint64 */
+                                            evictions: number;
+                                            /** Format: uint64 */
+                                            filter_checks: number;
+                                            /** Format: uint64 */
+                                            filter_negatives: number;
+                                            /** Format: uint64 */
+                                            hits: number;
+                                            /** Format: uint64 */
+                                            misses: number;
+                                            /** Format: uint64 */
+                                            page_loads: number;
+                                            /** Format: uint64 */
+                                            resident_bytes: number;
+                                        };
+                                        /** Format: uint64 */
+                                        physical_sequence: number;
+                                        /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                        segment_io: {
+                                            /** Format: uint64 */
+                                            bounded_reads: number;
+                                            /** Format: uint64 */
+                                            bounded_segments: number;
+                                            /** Format: uint64 */
+                                            bytes_read: number;
+                                            /** Format: uint64 */
+                                            fallbacks: number;
+                                            /** Format: uint64 */
+                                            io_uring_reads: number;
+                                            /** Format: uint64 */
+                                            io_uring_segments: number;
+                                            last_fallback_reason?: string | null;
+                                            /** Format: uint64 */
+                                            max_request_bytes: number;
+                                            /** Format: uint64 */
+                                            mmap_reads: number;
+                                            /** Format: uint64 */
+                                            mmap_segments: number;
+                                            /** Format: uint64 */
+                                            peak_request_bytes: number;
+                                            /** Format: uint64 */
+                                            read_operations: number;
+                                            /**
+                                             * @description The segment read path rrflowKV requested.
+                                             * @enum {string}
+                                             */
+                                            requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                        };
+                                        /** @description The persisted segment set named by the current manifest. */
+                                        segment_set: {
+                                            /** Format: uint64 */
+                                            compaction_debt_segments: number;
+                                            /** Format: uint64 */
+                                            compaction_target_segment_bytes: number;
+                                            /**
+                                             * Format: uint64
+                                             * @description L0 segment count that triggers compaction.
+                                             */
+                                            l0_compaction_trigger: number;
+                                            /** Format: uint64 */
+                                            l0_segments: number;
+                                            /** Format: uint64 */
+                                            segment_bytes: number;
+                                            /** Format: uint64 */
+                                            segments: number;
+                                        };
+                                        /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                        write_ahead_log: {
+                                            /** Format: uint64 */
+                                            payload_bytes: number;
+                                            /**
+                                             * Format: uint64
+                                             * @description Payload size that triggers an automatic flush.
+                                             */
+                                            payload_max_bytes: number;
+                                        };
+                                    } | null;
+                                };
                                 vector_artifacts: {
                                     artifacts: {
                                         artifact_sha256: string;

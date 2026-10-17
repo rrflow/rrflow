@@ -300,7 +300,7 @@ trace, local-process, or evaluation tests cannot close D-06 or Gate I.
 ## Planned implementation and evidence
 
 The roadmap owns the required dependency sequence below. Exact files for an
-active package belong to its planning-only change record and linked journal;
+active package belong to its pull request and linked journal;
 the [execution portal](../../roadmap/rrflow-1.0-execution-map.md) supplies
 generated discovery without becoming another order authority:
 

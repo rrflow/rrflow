@@ -38,7 +38,7 @@ budgets.
 
 ## Audited current package
 
-The current package has one runtime dependency, ArkType 2.2.3, and a locked
+The current package has one runtime dependency, ArkType 2.2.8, and a locked
 Node/TypeScript generation and test toolchain. Its executable layout is:
 
 ```text
@@ -87,6 +87,14 @@ binary without a shell. It feeds the complete OpenAPI 3.1 document to
 operation's identifier, method, path, first authentication scheme, and
 mutation extension. `generate:check` compares both complete generated files
 byte for byte.
+
+`openapi-typescript` 7.13.0 prints the schema through the classic TypeScript
+compiler API, which TypeScript 7 removed from its package entry point. The
+package therefore pins TypeScript 6.0.3, the newest release that keeps that
+API. Because the generator still declares a `typescript` `^5.x` peer,
+`pnpm-workspace.yaml` allows exactly that pair, and `generate:check` proves the
+output is unchanged. Moving to TypeScript 7 requires a generator that runs on
+the TypeScript 7 API.
 
 The audited projection contains:
 
@@ -275,7 +283,7 @@ neither JavaScript nor declarations. An `npm pack --dry-run` audit produced a
 70,658-byte archive with 1,529,059 unpacked bytes and included source,
 generator, tests, configuration, and the 1.49-MiB generated schema; it included
 no built JavaScript or `.d.ts` consumer entrypoint. This is not a qualified
-Node 20 or browser distribution.
+Node 24 or browser distribution.
 
 The release artifact is an ESM package built from the repository and included
 in RRFlow's signed, offline-verifiable distribution or an explicitly selected

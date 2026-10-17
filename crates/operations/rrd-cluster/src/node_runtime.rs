@@ -1074,7 +1074,7 @@ fn node_now_millis() -> u64 {
 
 fn telemetry_increment(counter: &AtomicU64, overflowed: &AtomicBool) {
     if counter
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
             value.checked_add(1)
         })
         .is_err()
