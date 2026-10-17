@@ -74,6 +74,9 @@ package, C-02's shared
 transaction/repository package, C-03's effect-complete semantic mutation
 batch, C-04's direct current/temporal read package, C-05's lower physical
 reader/dependency packages, and every Gate B contract package are complete.
+C-04 itself is reopened: every vector search still rebuilds the vector
+artifact and quantization catalogues from cursor 0
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)).
 C-05 and C-06 are accepted for the single-node alpha composition. D-01 is
 next, not another documentation or component-only detour. D-01 must produce
 the first walking installed-product

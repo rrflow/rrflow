@@ -6,15 +6,28 @@ use std::path::{Path, PathBuf};
 enum SensitiveReadUse {
     CausalLogPage,
     AlternateCausalLogPage,
+    UnstampedCausalLogPage,
+    SnapshotCausalLogPage,
     DataSnapshotReducer,
     GraphSnapshotReducer,
 }
+
+const SENSITIVE_READ_USES: [SensitiveReadUse; 6] = [
+    SensitiveReadUse::CausalLogPage,
+    SensitiveReadUse::AlternateCausalLogPage,
+    SensitiveReadUse::UnstampedCausalLogPage,
+    SensitiveReadUse::SnapshotCausalLogPage,
+    SensitiveReadUse::DataSnapshotReducer,
+    SensitiveReadUse::GraphSnapshotReducer,
+];
 
 impl SensitiveReadUse {
     fn needle(self) -> String {
         match self {
             Self::CausalLogPage => ["read", "_changes("].concat(),
             Self::AlternateCausalLogPage => ["runtime_read", "_changes("].concat(),
+            Self::UnstampedCausalLogPage => ["changes", "_since("].concat(),
+            Self::SnapshotCausalLogPage => ["snapshot", "_changes("].concat(),
             Self::DataSnapshotReducer => ["RuntimeDataSnapshot::from", "_changes("].concat(),
             Self::GraphSnapshotReducer => ["RuntimeGraphSnapshot::from", "_changes("].concat(),
         }
@@ -59,12 +72,6 @@ const ALLOWED_USES: &[AllowedUse] = &[
         kind: SensitiveReadUse::GraphSnapshotReducer,
         count: 2,
         operation: "explicit rollback current/target graph comparison",
-    },
-    AllowedUse {
-        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
-        kind: SensitiveReadUse::CausalLogPage,
-        count: 1,
-        operation: "explicit quantization projection-catalogue rebuild",
     },
     AllowedUse {
         path: "crates/authority/rrd-engine/src/runtime/data_plane.rs",
@@ -150,6 +157,171 @@ const ALLOWED_USES: &[AllowedUse] = &[
         count: 1,
         operation: "exact graph reducer oracle",
     },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/src/engine/changefeed.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "public change-feed page at a caller-supplied cursor",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/src/backup.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "explicit backup object-reference scan to the backup watermark",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/src/archive/export.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "explicit logical-archive export paging",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/src/archive/restore.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 2,
+        operation: "explicit archive-restore commit and watermark verification",
+    },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/tests/runtime_cluster_transfer_trace.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "cluster-transfer trace oracle over committed changes",
+    },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/tests/runtime_data_plane_trace.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 2,
+        operation: "data-plane trace and embedding-rebase oracles",
+    },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/tests/runtime_operator_knowledge_trace.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 2,
+        operation: "operator-knowledge trace and outbox-retry oracles",
+    },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/tests/runtime_query_trace.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "query trace oracle over committed changes",
+    },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/tests/runtime_trace.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 2,
+        operation: "runtime trace-phase oracle",
+    },
+    AllowedUse {
+        path: "crates/authority/rrd-engine/tests/runtime_vector_artifact_catalog.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "vector artifact publication oracle",
+    },
+    AllowedUse {
+        path: "crates/operations/rrd-cluster/tests/openraft_process.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "OpenRaft process replication oracle",
+    },
+    AllowedUse {
+        path: "crates/operations/rrd-cluster/tests/openraft_storage.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "OpenRaft storage transfer oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/durability.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "process-kill durability oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/logical_archive.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 2,
+        operation: "archive export and restore log-coordinate oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/logical_archive_resilience.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 2,
+        operation: "archive-resilience runtime equality oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/runtime.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 7,
+        operation: "change-page, scope-filter, and reopen hash-chain characterization",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/semantic_commit_atomicity.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "semantic commit atomicity oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/snapshot.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 3,
+        operation: "live and mixed-scope change-page characterization",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/snapshot.rs",
+        kind: SensitiveReadUse::SnapshotCausalLogPage,
+        count: 12,
+        operation: "snapshot-lease change-page characterization",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/trace.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "store trace oracle over committed changes",
+    },
+    AllowedUse {
+        path: "crates/transport/rrd-server/tests/http_process.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "public data-transaction replay oracle after restart",
+    },
+];
+
+/// A normal-path log replay that C-04 has not removed. Each is tolerated only
+/// while the POA&M record that names it is not closed, and removing the replay
+/// fails this test until its entry is deleted with it.
+#[derive(Debug, Clone, Copy)]
+struct KnownDeficientUse {
+    path: &'static str,
+    kind: SensitiveReadUse,
+    count: usize,
+    operation: &'static str,
+    poam: &'static str,
+}
+
+/// The POA&M ledger statuses of a deficiency that is still present.
+const PRESENT_DEFICIENCY_STATUSES: [&str; 3] = ["Open", "Sequenced", "Verifying"];
+
+const KNOWN_DEFICIENT_USES: &[KnownDeficientUse] = &[
+    KnownDeficientUse {
+        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "vector artifact catalogue rebuilt from cursor 0 on every vector search",
+        poam: "POAM-028",
+    },
+    KnownDeficientUse {
+        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
+        kind: SensitiveReadUse::CausalLogPage,
+        count: 1,
+        operation: "quantization catalogue rebuilt from cursor 0 on every vector search",
+        poam: "POAM-028",
+    },
+    KnownDeficientUse {
+        path: "crates/operations/rrd-maintenance/src/lib.rs",
+        kind: SensitiveReadUse::UnstampedCausalLogPage,
+        count: 1,
+        operation: "maintenance-run state rebuilt from cursor 0; the crate has no in-tree caller",
+        poam: "POAM-028",
+    },
 ];
 
 #[test]
@@ -172,12 +344,7 @@ fn causal_log_and_snapshot_reducer_uses_match_the_explicit_allowlist() {
             .chars()
             .filter(|character| !character.is_ascii_whitespace())
             .collect::<String>();
-        for kind in [
-            SensitiveReadUse::CausalLogPage,
-            SensitiveReadUse::AlternateCausalLogPage,
-            SensitiveReadUse::DataSnapshotReducer,
-            SensitiveReadUse::GraphSnapshotReducer,
-        ] {
+        for kind in SENSITIVE_READ_USES {
             let count = count_identifier_bounded(&compact, &kind.needle());
             if count > 0 {
                 actual.insert((relative.clone(), kind), count);
@@ -199,10 +366,42 @@ fn causal_log_and_snapshot_reducer_uses_match_the_explicit_allowlist() {
         );
     }
 
+    let ledger = fs::read_to_string(root.join("docs/poam/rrflow-1.0-alpha.md"))
+        .expect("the POA&M ledger is readable");
+    for deficient in KNOWN_DEFICIENT_USES {
+        assert!(
+            !deficient.operation.trim().is_empty() && deficient.count > 0,
+            "known deficiency must name a real operation and nonzero count: {deficient:?}"
+        );
+        assert!(
+            poam_status(&ledger, deficient.poam)
+                .is_some_and(|status| PRESENT_DEFICIENCY_STATUSES.contains(&status.as_str())),
+            "a known normal-path log replay needs a POA&M record that is not closed: {deficient:?}"
+        );
+        assert!(
+            expected
+                .insert((deficient.path.to_owned(), deficient.kind), deficient.count)
+                .is_none(),
+            "known deficiency duplicates an allowed path/kind: {deficient:?}"
+        );
+    }
+
     assert_eq!(
         actual, expected,
-        "causal-log or kernel snapshot-reducer source closure changed; normal query, vector, retrieval, context, memory, and inference reads may not be allowlisted"
+        "causal-log or kernel snapshot-reducer source closure changed; normal query, vector, retrieval, context, memory, and inference reads may not be allowlisted, and a known normal-path replay is listed only while its POA&M record is not closed"
     );
+}
+
+/// The ledger status of one POA&M row, read from its `| ID | Priority | Status |` cells.
+fn poam_status(ledger: &str, id: &str) -> Option<String> {
+    ledger.lines().find_map(|line| {
+        let cells = line.split('|').map(str::trim).collect::<Vec<_>>();
+        if cells.get(1) == Some(&id) {
+            cells.get(3).map(|status| (*status).to_owned())
+        } else {
+            None
+        }
+    })
 }
 
 fn workspace_root() -> PathBuf {

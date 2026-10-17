@@ -44,8 +44,9 @@ is JSON, the vector region is RRFlow's own aligned row layout, and the exact
 kernel reads it directly. Gate C-06 must decide and prove the canonical
 Arrow-compatible persistent page layout; Gate F must expose stamped batches
 through rrflowQL without falsely labeling this format as zero-copy Arrow.
-Current builds also receive candidates already reconstructed in memory from
-runtime history. C-04/E-04 must supply native versioned vector input.
+Current builds receive the scope's whole vector-version family through C-04's
+direct reader and reduce it in memory. E-04 must supply incremental,
+collection-addressed vector input.
 
 ## Accelerator boundary
 

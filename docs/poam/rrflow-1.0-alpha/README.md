@@ -37,4 +37,7 @@
 - [POAM-025 — verification, repair, restore, and salvage](poam-025.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-025`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-025) — active parent-owned POA&M detail
 - [POAM-026 — observability and diagnostic evidence](poam-026.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-026`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-026) — active parent-owned POA&M detail
 - [POAM-027 — change-package and repository enforcement](poam-027.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-027`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-027) — active parent-owned POA&M detail
+- [POAM-028 — vector catalogue history replay and C-04 source closure](poam-028.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-028`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-028) — active parent-owned POA&M detail
+- [POAM-029 — diagnostic snapshot under concurrent audited traffic](poam-029.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-029`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-029) — active parent-owned POA&M detail
+- [POAM-030 — bounded audit read across a partial final journal page](poam-030.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-030`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-030) — active parent-owned POA&M detail
 <!-- rrflow:generated-index:end -->

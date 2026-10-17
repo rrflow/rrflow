@@ -93,7 +93,9 @@ debug-host observation is
 it is not a release SLO or Qdrant-equivalence claim.
 
 Gate C-04 provides bounded direct canonical vector reads, and C-05 leaves one
-quantization authority. Gate E-04
+quantization authority; the lifecycle catalogue itself is still rebuilt from
+cursor 0 by every search and lifecycle operation
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). Gate E-04
 must make index deltas atomic with point commits and prove rebuild/reopen under
 failure. Gate F-03 must execute quantized candidate generation and exact
 reranking inside the stamped Arrow operator pipeline. H-04 must prove every

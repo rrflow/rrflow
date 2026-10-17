@@ -10,9 +10,10 @@ independently.
 
 ## Observed deficiency
 
-Accepted C-04 removes normal runtime-log reconstruction and proves authenticated, budgeted
-direct semantic-version reads with rrflowMX/rrflowKV equality and rrflowKV reopen/physical
-counters. C-06g exposes a bounded synchronous projected storage stream with owned pinned
+C-04's accepted evidence removes normal runtime-log reconstruction from query execution and
+proves authenticated, budgeted direct semantic-version reads with rrflowMX/rrflowKV equality
+and rrflowKV reopen/physical counters; C-04 is reopened because the vector catalogues still
+replay history ([POAM-028](poam-028.md)). C-06g exposes a bounded synchronous projected storage stream with owned pinned
 generations, selective page families, cancellation/drop release, compaction/GC survival, and
 operation-scoped counters. C-06h now drives that stream through deterministic
 independent-model histories, every injected storage boundary, stress replay,

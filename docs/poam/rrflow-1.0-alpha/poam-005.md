@@ -10,9 +10,10 @@ independently.
 
 ## Observed deficiency
 
-Accepted C-03 proves atomic multi-family publication/recovery, and accepted C-04 proves
-authenticated direct semantic-version selection and exact snapshots without normal
-runtime-log reconstruction. Temporal adjacency is not yet a native bounded traversal;
+Accepted C-03 proves atomic multi-family publication/recovery, and C-04's accepted evidence
+proves authenticated direct semantic-version selection and exact snapshots without normal
+runtime-log reconstruction. C-04 is reopened because every vector search still rebuilds the
+vector artifact and quantization catalogues from cursor 0 ([POAM-028](poam-028.md)). Temporal adjacency is not yet a native bounded traversal;
 scalar/unique state, incremental BM25 postings, and exact/approximate vector generations
 still do not form one planner-selected, stamped native access system. Elias-Fano/PFOR
 posting compression, TurboQuant_prod, and LSM-VEC-style disk navigation are evidence-gated

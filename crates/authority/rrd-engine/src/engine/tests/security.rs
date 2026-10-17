@@ -174,6 +174,141 @@ fn diagnostic_snapshot_requires_its_exact_grant() {
     assert!(matches!(result, Err(ServiceError::PermissionDenied)));
 }
 
+/// Characterizes POAM-029. The diagnostic read compares a before/after stamp
+/// that includes the control sequence, and every audited request, reads
+/// included, appends to the control journal. One audited read inside each
+/// assembly window therefore discards every attempt although no runtime state
+/// changes, which is what steady client traffic does to the live read. When
+/// POAM-029 is fixed, the observed read must assemble and this test inverts.
+#[test]
+fn an_audited_read_inside_every_assembly_window_exhausts_the_diagnostic_read() {
+    let (_root, engine) = isolated_engine();
+    let principal_id = CanonicalId::new("diagnostic-reader").unwrap();
+    let resource = ResourcePath {
+        segments: vec![ResourceId::new(ResourceKind::Instance, instance().as_str()).unwrap()],
+    };
+    let grants = [
+        SecurityAction::SessionCreate,
+        SecurityAction::DiagnosticsRead,
+        SecurityAction::ChangefeedRead,
+    ]
+    .into_iter()
+    .map(|action| ResourceGrant {
+        action,
+        resource_prefix: resource.clone(),
+        data_policy: None,
+    })
+    .collect();
+    SecurityRepository::new(&engine.storage, instance())
+        .initialize(
+            SecurityState {
+                format_version: rrd_security::SECURITY_FORMAT,
+                revision: 1,
+                principals: [(
+                    principal_id.clone(),
+                    Principal {
+                        id: principal_id.clone(),
+                        kind: PrincipalKind::Service,
+                        credential_sha256: digest::sha256_hex(b"diagnostic-key"),
+                        credential_revision: 1,
+                        not_before_unix_ms: 1,
+                        expires_at_unix_ms: u64::MAX,
+                        disabled: false,
+                        role_ids: Default::default(),
+                        grants,
+                    },
+                )]
+                .into_iter()
+                .collect(),
+                roles: Default::default(),
+                identity_bindings: Default::default(),
+                jwt_issuers: Default::default(),
+            },
+            1,
+            "security-test",
+            "request-security",
+            "operation-security",
+        )
+        .unwrap();
+    let lease = engine
+        .create_authenticated_session(
+            &principal_id,
+            b"diagnostic-key",
+            &session_request(5_000, 2),
+            &id("diagnostic-session"),
+            1_000,
+            "request-diagnostic-session",
+            "operation-diagnostic-session",
+        )
+        .unwrap();
+    let scope = format!("instance:{}", instance().as_str());
+    let request = rrd_contract::ReadDiagnosticSnapshot {
+        scope: scope.clone(),
+        graph_valid_at_unix_ms: 1_100,
+        graph_known_at_cursor: None,
+        graph_compare_cursor: 0,
+        runtime_max_scanned_changes: 1_024,
+        changes_after_cursor: 0,
+        change_limit: 1,
+        audit_after_sequence: 0,
+        audit_limit: 1,
+    };
+
+    // Alone, the read assembles on its first attempt.
+    let quiet = engine
+        .read_diagnostic_snapshot(
+            &lease.session_id,
+            &lease.token,
+            &request,
+            1_100,
+            "request-diagnostic-quiet",
+            "operation-diagnostic-quiet",
+        )
+        .unwrap();
+    assert_eq!(quiet.read.assembly_attempts, 1);
+
+    let runtime_cursor = engine.storage.runtime().cursor().unwrap();
+    let control_sequence = engine.storage.control().sequence().unwrap();
+    let mut attempts = Vec::new();
+    let busy = engine.read_diagnostic_snapshot_during_assembly(
+        &lease.session_id,
+        &lease.token,
+        &request,
+        1_200,
+        "request-diagnostic-busy",
+        "operation-diagnostic-busy",
+        &mut |attempt| {
+            attempts.push(attempt);
+            engine
+                .read_changefeed(
+                    &lease.session_id,
+                    &lease.token,
+                    &rrd_contract::ReadChangefeed {
+                        scope: scope.clone(),
+                        after_cursor: 0,
+                        limit: 1,
+                    },
+                    1_200,
+                    &format!("request-concurrent-read-{attempt}"),
+                    &format!("operation-concurrent-read-{attempt}"),
+                )
+                .map(|_| ())
+        },
+    );
+
+    assert!(
+        matches!(busy, Err(ServiceError::StorageConflict(_))),
+        "POAM-029: an audited read in every window must still exhaust the diagnostic read until it is fixed; got {busy:?}"
+    );
+    assert_eq!(attempts, [1, 2, 3]);
+    assert_eq!(
+        engine.storage.runtime().cursor().unwrap(),
+        runtime_cursor,
+        "only reads ran, so no runtime state changed"
+    );
+    assert!(engine.storage.control().sequence().unwrap() > control_sequence);
+}
+
 #[test]
 fn engine_invocation_owns_authorization_and_completion_audit() {
     let (_root, engine) = isolated_engine();
