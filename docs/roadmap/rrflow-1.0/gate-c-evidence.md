@@ -156,6 +156,29 @@ either independently.
   installation/attunement, routines/skills, Connectome, deployment,
   optimization, and release proof remain open.
 
+## C-04 reopened (2026-10-17):
+
+- The C-04 evidence above records that vector-search admission has no
+  causal-log source. That does not hold. Every vector search rebuilds the
+  vector artifact catalogue (`changes_since` from cursor 0, unstamped) and the
+  quantization catalogue (`read_changes` from cursor 0 at a fresh stamp)
+  through `reopen_vector_runtime_metadata`. HNSW build, publication preflight,
+  collection and payload-index deletion, and quantization operations rebuild
+  them too, and the unwired `rrd-maintenance` crate rebuilds its run state the
+  same way. [POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md) records the
+  deficiency.
+- The source-closure test behind that claim never searched for
+  `changes_since(` or `snapshot_changes(`, and it allowlisted the per-search
+  `read_changes(` call as an explicit quantization rebuild. It now enumerates
+  every public runtime change-page reader and lists the three replays as
+  POAM-028 known deficiencies.
+- C-04 stays unchecked until both catalogues are served by direct stamped
+  reads at the request's `ReadStamp` and POAM-028's closure evidence is
+  recorded. Record, relation, query, retrieval, context, memory, and
+  vector-candidate selection keep the direct-read behavior accepted above.
+- The package record is the
+  [C-04d source-closure audit correction journal](../../evidence/change-journals/gate-c/c-04d-source-closure-audit-correction-journal.md).
+
 ## C-05 accepted convergence evidence and audit correction (2026-09-09):
 
 - C-05a at `b8f07c97775d4440df728bceb261a1128c4d816a` removes the

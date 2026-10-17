@@ -132,11 +132,14 @@ proves all-or-none recovery at prepared, WAL-appended, WAL-synced, and visible-
 before-acknowledgement boundaries; public function-catalogue limits fit one
 physical batch; corrupt runtime-build substitution fails closed; and a durable
 receipt closes a lost acknowledgement without guest re-execution. C-04 is
-also complete: current and temporal state is selected through authenticated,
-budgeted semantic-version point/range reads at one `ReadStamp`; normal query,
-vector, retrieval, context, memory, and inference paths no longer reconstruct
-state from the runtime change log; and exact rrflowMX/rrflowKV, rrflowKV
-reopen, physical-counter, and source-closure evidence passes. C-05 is complete
+reopened: current and temporal state is selected through authenticated,
+budgeted semantic-version point/range reads at one `ReadStamp`, and normal
+query, retrieval, context, memory, inference, and vector-candidate paths no
+longer reconstruct state from the runtime change log, but every vector search
+still rebuilds the vector artifact and quantization catalogues from cursor 0
+([POAM-028](docs/poam/rrflow-1.0-alpha/poam-028.md)). Exact
+rrflowMX/rrflowKV, rrflowKV reopen, and physical-counter evidence passes for
+the direct reads. C-05 is complete
 for the single-node alpha composition: retired physical readers are absent;
 `rrd-store` is the only required production owner of `rrd-lsm`; schemas require
 one explicit logical table map; and every persisted vector requires its

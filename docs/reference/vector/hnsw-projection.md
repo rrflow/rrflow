@@ -84,7 +84,9 @@ edges or bitmaps, bounded native delta reads, compaction/reclamation under
 pinned snapshots, distributed placement, and qualified GPU construction are
 not complete.
 
-Gate C-04 must replace whole-log candidate discovery. Gate E-04 must commit
+Gate C-04 replaced whole-log candidate discovery with direct stamped reads and
+must still serve the artifact catalogue without replay
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). Gate E-04 must commit
 canonical vectors with atomic index deltas and prove immutable graph plus exact
 overlay through crash/reopen and corruption scenarios. Gate F-03 must expose
 HNSW candidate generation as a stamped native operator exchanging bounded

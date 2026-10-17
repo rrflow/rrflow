@@ -109,7 +109,7 @@
 | [x] | C-01 | [Gate C](rrflow-1.0/gate-c.md) |
 | [x] | C-02 | [Gate C](rrflow-1.0/gate-c.md) |
 | [x] | C-03 | [Gate C](rrflow-1.0/gate-c.md) |
-| [x] | C-04 | [Gate C](rrflow-1.0/gate-c.md) |
+| [ ] | C-04 | [Gate C](rrflow-1.0/gate-c.md) |
 | [x] | C-05 | [Gate C](rrflow-1.0/gate-c.md) |
 | [x] | C-06 | [Gate C](rrflow-1.0/gate-c.md) |
 | [ ] | C-07 | [Gate C](rrflow-1.0/gate-c.md) |
