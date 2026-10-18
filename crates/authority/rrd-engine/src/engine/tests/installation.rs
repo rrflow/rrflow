@@ -457,3 +457,145 @@ fn pre_canonical_rrflow_state_blocks_a_parallel_installation_authority() {
     .is_err());
     assert_eq!(inventory(project.path()), before);
 }
+
+#[test]
+fn installed_backups_and_restore_staging_live_beside_the_storage_roots() {
+    use crate::engine::estate_layout::{validate_recovery_estate, EstateLayout};
+    use rrd_contract::{
+        CreateInstanceBackup, CreateSession, ListInstanceBackups, RestoreInstanceBackup,
+        SessionLimits,
+    };
+
+    let project = tempfile::tempdir().unwrap();
+    std::fs::write(project.path().join("README.md"), "walking product\n").unwrap();
+    let preview = plan(project.path());
+    let executable = test_executable();
+    RrdEngine::apply_installation(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        1_800_000_000_000,
+        &executable,
+    )
+    .unwrap();
+    let instance = preview.installation.target.instance_id.clone();
+    let storage_root_id = preview.installation.storage_root_id.clone();
+
+    let engine = RrdEngine::open_installed(project.path(), &executable).unwrap();
+    let api_key = RrdEngine::read_installed_api_key(project.path()).unwrap();
+    let lease = engine
+        .create_authenticated_session(
+            &api_key.principal_id,
+            api_key.credential().as_bytes(),
+            &CreateSession {
+                limits: SessionLimits {
+                    idle_timeout_ms: 60_000,
+                    absolute_timeout_ms: 60_000,
+                    max_open_transactions: 1,
+                },
+            },
+            &id("installed-backup-session"),
+            1_800_000_000_100,
+            "request-installed-session",
+            "operation-installed-session",
+        )
+        .unwrap();
+
+    let backup = engine
+        .create_instance_backup(
+            &lease.session_id,
+            &lease.token,
+            &id("installed-backup-key"),
+            &CreateInstanceBackup {
+                label: "installed".into(),
+                created_at_unix_ms: 1_800_000_000_200,
+            },
+            1_800_000_000_200,
+            "request-installed-backup",
+            "operation-installed-backup",
+        )
+        .unwrap();
+    assert!(backup.backup.application_complete);
+
+    let catalogue = engine
+        .list_instance_backups(
+            &lease.session_id,
+            &lease.token,
+            &ListInstanceBackups {
+                verify_archives: true,
+            },
+            1_800_000_000_300,
+            "request-installed-backup-list",
+            "operation-installed-backup-list",
+        )
+        .unwrap();
+    assert!(catalogue.archives_verified);
+    assert_eq!(catalogue.backups.len(), 1);
+    assert_eq!(
+        catalogue.backups[0].backup_sha256,
+        backup.backup.backup_sha256
+    );
+
+    let restore_id = CanonicalId::new("restore-one").unwrap();
+    let restored = engine
+        .restore_instance_backup(
+            &lease.session_id,
+            &lease.token,
+            &id("installed-restore-key"),
+            &RestoreInstanceBackup {
+                backup_sha256: backup.backup.backup_sha256.clone(),
+                restore_id: restore_id.clone(),
+                restored_at_unix_ms: 1_800_000_000_400,
+            },
+            1_800_000_000_400,
+            "request-installed-restore",
+            "operation-installed-restore",
+        )
+        .unwrap();
+    assert!(restored.reopened);
+    drop(engine);
+
+    let container = project.path().join(".rrflow/rrd");
+    assert!(container
+        .join("backups")
+        .join(instance.as_str())
+        .join("catalogue.json")
+        .is_file());
+    assert!(container
+        .join("restores")
+        .join(instance.as_str())
+        .join(restore_id.as_str())
+        .is_dir());
+
+    let mut roots = std::fs::read_dir(container.join("roots"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect::<Vec<_>>();
+    roots.sort();
+    assert_eq!(
+        roots,
+        [storage_root_id.to_string()],
+        "roots/ holds only the storage root the locator selects"
+    );
+    assert!(
+        !inventory(project.path()).keys().any(|path| path
+            .components()
+            .any(|component| component.as_os_str() == "rrd-service")),
+        "an installed estate has no rrd-service tree"
+    );
+
+    let layout =
+        EstateLayout::new(&storage_root_id, &preview.installation.initial_principal_id).unwrap();
+    validate_recovery_estate(project.path(), &layout)
+        .expect("install recovery accepts an estate that holds backups and restore staging");
+
+    let reopened = RrdEngine::open_installed(project.path(), &executable).unwrap();
+    assert_eq!(
+        reopened
+            .readiness(1_800_000_000_500)
+            .unwrap()
+            .runtime_cursor,
+        2
+    );
+}
