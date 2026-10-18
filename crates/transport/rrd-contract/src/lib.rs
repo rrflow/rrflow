@@ -189,7 +189,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "733695656b3d7c52fc4167586229b1dbcc8cb2009d7c15a49525a008648f0d89";
+    "07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -2823,6 +2823,12 @@ pub struct InstanceBackupSnapshot {
     pub claims: BackupCoverageSnapshot,
     pub typed_runtime: BackupCoverageSnapshot,
     pub catalogues: BackupCoverageSnapshot,
+    /// The estate's control state outside the catalogues: installed record
+    /// and checkpoint, active configuration, security policy and audit chain,
+    /// attunement plan and job state, and estate documents. `included` means
+    /// the backup carries them as a replayable control-journal archive; the
+    /// token key and operator credential are never carried.
+    pub installed_control: BackupCoverageSnapshot,
     pub object_payloads: BackupCoverageSnapshot,
     pub projections: BackupCoverageSnapshot,
     pub invocation_telemetry: BackupCoverageSnapshot,

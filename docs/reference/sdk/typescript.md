@@ -102,10 +102,10 @@ The audited projection contains:
 - only `200` success envelopes plus the default error envelope;
 - `application/json` as the only declared response media type; and
 - OpenAPI SHA-256
-  `3c016e8f0b49623aa091254a37c19cb064efa6773a1fa19ce64edb179824fec0`.
+  `07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f`.
 
-The generated `rrd-openapi.ts` is 24,523 lines and 1,490,538 bytes. Its
-`paths`, `components`, and `operations` types are valuable compile-time
+The generated `rrd-openapi.ts` is a compile-time projection of roughly 1.6
+MiB. Its `paths`, `components`, and `operations` types are valuable compile-time
 projections. TypeScript erases them at runtime. `RequestPayload<K>` and
 `SuccessPayload<K>` therefore prevent many mistakes during type checking but
 cannot validate an untrusted JavaScript caller, server response, stored value,

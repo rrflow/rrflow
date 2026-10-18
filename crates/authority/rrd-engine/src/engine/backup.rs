@@ -377,6 +377,7 @@ fn public_backup(entry: &rrd_store::BackupEntry) -> InstanceBackupSnapshot {
         claims: public_backup_coverage(entry.claims.clone()),
         typed_runtime: public_backup_coverage(entry.typed_runtime.clone()),
         catalogues: public_backup_coverage(entry.catalogues.clone()),
+        installed_control: public_backup_coverage(entry.installed_control.clone()),
         object_payloads: public_backup_coverage(entry.object_payloads.clone()),
         projections: public_backup_coverage(entry.projections.clone()),
         invocation_telemetry: public_backup_coverage(entry.invocation_telemetry.clone()),

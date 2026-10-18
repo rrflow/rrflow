@@ -390,7 +390,10 @@ The backup catalogue is format version 2. Version 1 catalogues, whose
 application-complete entries omitted the control state, are refused rather
 than read as complete: `application_complete` is true only when the logical
 archive, object payloads, catalogue manifest, and control-journal archive are
-all present and digest-verified.
+all present and digest-verified. The public `InstanceBackupSnapshot` projects
+the control state as its own coverage dimension, `installed_control`, beside
+`claims`, `catalogues`, and `object_payloads`, so a client reads what a backup
+carries rather than inferring it from `application_complete`.
 
 Restore replays the archive after the catalogue and object payloads, one
 control transition per archived entry, each committed in the same physical
@@ -534,9 +537,6 @@ supported target:
   closed). Still D-11 work: locator replacement for a candidate whose
   configuration revision differs from the active locator, and the remaining
   restore and salvage items under POAM-025.
-- the public `InstanceBackupSnapshot` does not yet project the
-  `installed_control` coverage dimension; `application_complete` carries the
-  meaning on the wire until the generated surfaces are regenerated with it.
 - current WAL torn-tail repair is retained only as a physical primitive invoked
   by an exact engine repair plan.
 

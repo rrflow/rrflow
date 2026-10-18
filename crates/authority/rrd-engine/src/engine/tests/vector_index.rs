@@ -1656,6 +1656,10 @@ fn application_backup_restores_turboquant_payload_before_instance_activation() {
         backup.backup.object_payloads,
         BackupCoverageSnapshot::Included
     );
+    assert_eq!(
+        backup.backup.installed_control,
+        BackupCoverageSnapshot::Included
+    );
     assert!(backup.backup.application_complete);
 
     let restore_id = CanonicalId::new("vector-restore").unwrap();

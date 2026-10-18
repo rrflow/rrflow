@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 733695656b3d7c52fc4167586229b1dbcc8cb2009d7c15a49525a008648f0d89
+// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -2693,6 +2693,15 @@ export interface operations {
                                     claims: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** Format: uint64 */
                                     created_at_unix_ms: number;
+                                    /**
+                                     * @description The estate's control state outside the catalogues: installed record
+                                     *     and checkpoint, active configuration, security policy and audit chain,
+                                     *     attunement plan and job state, and estate documents. `included` means
+                                     *     the backup carries them as a replayable control-journal archive; the
+                                     *     token key and operator credential are never carried.
+                                     * @enum {string}
+                                     */
+                                    installed_control: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** @enum {string} */
                                     invocation_telemetry: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     label: string;
@@ -2773,6 +2782,15 @@ export interface operations {
                                     claims: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** Format: uint64 */
                                     created_at_unix_ms: number;
+                                    /**
+                                     * @description The estate's control state outside the catalogues: installed record
+                                     *     and checkpoint, active configuration, security policy and audit chain,
+                                     *     attunement plan and job state, and estate documents. `included` means
+                                     *     the backup carries them as a replayable control-journal archive; the
+                                     *     token key and operator credential are never carried.
+                                     * @enum {string}
+                                     */
+                                    installed_control: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** @enum {string} */
                                     invocation_telemetry: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     label: string;
@@ -2903,6 +2921,15 @@ export interface operations {
                                     claims: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** Format: uint64 */
                                     created_at_unix_ms: number;
+                                    /**
+                                     * @description The estate's control state outside the catalogues: installed record
+                                     *     and checkpoint, active configuration, security policy and audit chain,
+                                     *     attunement plan and job state, and estate documents. `included` means
+                                     *     the backup carries them as a replayable control-journal archive; the
+                                     *     token key and operator credential are never carried.
+                                     * @enum {string}
+                                     */
+                                    installed_control: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** @enum {string} */
                                     invocation_telemetry: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     label: string;
@@ -2985,6 +3012,15 @@ export interface operations {
                                     claims: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** Format: uint64 */
                                     created_at_unix_ms: number;
+                                    /**
+                                     * @description The estate's control state outside the catalogues: installed record
+                                     *     and checkpoint, active configuration, security policy and audit chain,
+                                     *     attunement plan and job state, and estate documents. `included` means
+                                     *     the backup carries them as a replayable control-journal archive; the
+                                     *     token key and operator credential are never carried.
+                                     * @enum {string}
+                                     */
+                                    installed_control: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     /** @enum {string} */
                                     invocation_telemetry: "included" | "referenced_only" | "rebuild_required" | "excluded";
                                     label: string;
