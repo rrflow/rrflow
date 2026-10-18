@@ -430,6 +430,32 @@ either independently.
 - The package record is the
   [A-07.3 security crate header correction journal](../../evidence/change-journals/gate-a/a-07-3-security-crate-header-correction-journal.md).
 
+## A-01 and A-05 correction (2026-10-17):
+
+- The owner's canonical terminology lacked names the owner uses for its own
+  plug-in configurations and knowledge units. It now defines RRO (Reason Ready
+  Object), RROFLOW, LFG, SWAG, Governance, and workspace once, and states that
+  the memory database is rrflowDB itself and that Connectome is the client.
+  SWAG replaces the working name Dalal; LFG's Gate G text predates the
+  LFG/SWAG split and is revised before Gate G work starts.
+- The topology record defines workspace as a set of estates grouped by an
+  account or client above the engine (decided by the repository owner on
+  2026-10-17), states that an account may own many estates, spells the estate
+  scope as `instance:{instance_id}`, and reconciles the reserved
+  namespace/database fields with the schema catalogue. `PLATFORM_TERMS` gives
+  workspace the `ClientGrouping` role; the table's replacement stays with
+  POAM-020.
+- Six supporting records described superseded implementation: cursor-zero
+  scans where the engine reads vector versions directly (the HNSW, quantization,
+  and retrieval references), a snapshot replay and missing adjacency and version
+  keys that the store no longer has (the multi-model object contract), a stale
+  segment version (rrflowKV current format), and a citation of a `SPEC.md`
+  section that does not exist (`rrd-core` claim tiers). Each now states the
+  code's behavior, including the POAM-028 catalogue replays that remain.
+- A-01, A-05, and A-07 stay checked. No behavior changes.
+- The package record is the
+  [A-01 canonical terminology and topology correction journal](../../evidence/change-journals/gate-a/a-01-canonical-terminology-and-topology-correction-journal.md).
+
 ## A-02 evidence (2026-09-04):
 
 - `crates/kernel/rrd-core/tests/fixtures/reasoning-tree-v1.json` is the shared frozen

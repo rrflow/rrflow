@@ -68,10 +68,12 @@ reranking produces final results.
 Artifact records, object references, and lifecycle events persist through the
 same `RrdEngine`/rrflowKV authority, and the engine integration test proves
 ready isolation, activation, search, close/reopen, retirement, update, rebuild,
-and reactivation. However, each build currently scans retained runtime changes
-from cursor zero and reconstructs all collection candidates before encoding a
-new full artifact. There is no native changed-vector input or incremental
-quantized-segment maintenance yet.
+and reactivation. However, each build currently reads every vector version in
+the scope at one read stamp (`read_vector_versions`) and reconstructs all
+collection candidates before encoding a new full artifact, and the quantization
+catalogue it publishes into is rebuilt by replaying retained changes from
+cursor zero ([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). There is no
+native changed-vector input or incremental quantized-segment maintenance yet.
 
 The generic vector-index request now configures HNSW only. Scalar, product,
 binary, and TurboQuant artifacts can be constructed only through the explicit

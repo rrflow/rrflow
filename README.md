@@ -44,8 +44,8 @@ definition; this portal does not reproduce those bodies.
 
 | Invariant | Owning section |
 |---|---|
-| Canonical names for RRFlow, RRD, `RrdEngine`, rrflowDB, rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, vectors, inference, LFG, and Connectome | [Canonical component terminology](docs/architecture/system-overview.md#canonical-component-terminology) |
-| One project ↔ one estate/rrflowDB ↔ one RRD instance; deployment form, storage profile, endpoint presentation, security, and physical placement remain distinct | [Locked alpha topology](docs/architecture/instance-topology.md#locked-alpha-topology) and [deployment profiles](docs/reference/deployment/modes.md#independent-profile-coordinates) |
+| Canonical names for RRFlow, RRD, `RrdEngine`, rrflowDB, rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, vectors, inference, RRO, RROFLOW, LFG, SWAG, Governance, workspace, and Connectome | [Canonical component terminology](docs/architecture/system-overview.md#canonical-component-terminology) |
+| One project ↔ one estate/rrflowDB ↔ one RRD instance; an account may own many estates and a workspace groups estates above the engine; deployment form, storage profile, endpoint presentation, security, and physical placement remain distinct | [Locked alpha topology](docs/architecture/instance-topology.md#locked-alpha-topology) and [deployment profiles](docs/reference/deployment/modes.md#independent-profile-coordinates) |
 | One semantic, security, transaction, mutation, and context authority | [ADR-0001 decision](docs/decisions/0001-single-engine-authority.md#decision) |
 | Adaptive exploration and model reasoning; closed contracts at durable state, external effect, replay, and evidence boundaries | [ADR-0002 decision](docs/decisions/0002-adaptive-reasoning-governed-effects.md#decision) |
 | No parallel product line: one current pre-release implementation with requirement-to-code/test traceability before direct convergence | [Pre-release convergence boundary](docs/architecture/system-overview.md#pre-release-convergence-boundary) and [implementation-requirements traceability](docs/roadmap/rrflow-1.0-execution-map.md#implementation-requirements-traceability) |

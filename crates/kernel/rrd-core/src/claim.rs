@@ -11,7 +11,9 @@ pub type Millis = u64;
 
 /// Tier the claim currently belongs to. Unconditional at tier 0, and present
 /// from the first revision so that promotion is a state transition rather than a
-/// migration. See `SPEC.md` §9.2.
+/// migration. `SPEC.md` ("Claims") defines claim versions and supersession;
+/// no current record specifies promotion between tiers, which the C-03/G-02
+/// convergence named below defines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Tier {
