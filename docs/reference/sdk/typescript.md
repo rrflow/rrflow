@@ -180,7 +180,10 @@ A qualified connection performs these steps explicitly:
    digest, limits, and available capabilities; and
 6. authenticate an application session before protected work.
 
-The current fetch call does not set redirect mode, so Fetch's default `follow`
+The client invokes its Fetch transport as a free function, never as a method
+of the client, because a browser's `fetch` throws "Illegal invocation" when
+called with any other `this`; a unit test injects such a transport. The
+current fetch call does not set redirect mode, so Fetch's default `follow`
 policy applies. The target uses `redirect: "error"` and verifies the final
 response URL/transport identity. Network reachability, CORS success, browser
 origin, TLS, and mesh membership never grant RRFlow authorization or initialize

@@ -36,8 +36,11 @@ export class RrdClient {
       16 * 1024 * 1024,
       "response limit",
     );
-    this.transport = config.fetch ?? globalThis.fetch;
-    if (!this.transport) throw new RrdClientError("a Fetch API implementation is required");
+    const transport = config.fetch ?? globalThis.fetch;
+    if (!transport) throw new RrdClientError("a Fetch API implementation is required");
+    // A browser's fetch must be invoked as a free function: called as a method
+    // of the client (`this.transport(...)`) it throws "Illegal invocation".
+    this.transport = (input, init) => transport(input, init);
   }
 
   async capabilities(): Promise<SuccessPayload<"capabilities-read">> {
