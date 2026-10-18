@@ -52,6 +52,10 @@
 
 [Open Gate D](rrflow-1.0/gate-d.md)
 
+#### Gate D accepted evidence
+
+[Open Gate D accepted evidence](rrflow-1.0/gate-d-evidence.md)
+
 ### Gate E — make graph and indexes native incremental access paths
 
 [Open Gate E](rrflow-1.0/gate-e.md)

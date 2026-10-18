@@ -21,6 +21,7 @@ mod model_manifest;
 mod platform;
 mod read;
 mod reasoning_tree;
+mod restore_publication;
 mod router;
 mod sdk_conformance;
 mod websocket;
@@ -139,6 +140,12 @@ pub use reasoning_tree::{
     MAX_REASONING_EVIDENCE_SOURCE_BYTES, MAX_REASONING_EVIDENCE_SUMMARY_BYTES,
     MAX_REASONING_TREE_EDGES, MAX_REASONING_TREE_NODES, MAX_REASONING_TREE_RECIPES,
     REASONING_TREE_CONTRACT_VERSION,
+};
+pub use restore_publication::{
+    restore_publication_plan_sha256, restore_publication_result_sha256, RestorePublicationAction,
+    RestorePublicationActionKind, RestorePublicationActionResult, RestorePublicationPlan,
+    RestorePublicationResult, RestoreRootEvidence, MAX_RESTORE_PUBLICATION_ACTIONS,
+    RESTORE_PUBLICATION_ACTIONS,
 };
 pub use router::{
     route_step_decision_schema_sha256, route_step_decision_sha256, route_step_request_sha256,

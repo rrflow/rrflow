@@ -71,6 +71,41 @@ pub enum Command {
         #[arg(long = "test-distribution-executable", hide = true)]
         test_distribution_executable: Option<std::path::PathBuf>,
     },
+    /// Preview or apply the publication of a verified restore while the estate is stopped.
+    Restore {
+        #[command(subcommand)]
+        action: RestoreAction,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum RestoreAction {
+    /// Emit an exact, digest-bound publication plan for one staged restore and perform no writes.
+    Plan {
+        #[arg(long, default_value = ".")]
+        project: std::path::PathBuf,
+        /// The restore id the `restore-create` operation staged.
+        #[arg(long)]
+        restore: String,
+        /// The SHA-256 identity of the catalogued backup the restore was staged from.
+        #[arg(long)]
+        backup: String,
+        /// Debug-test surrogate for the distribution executable.
+        #[arg(long = "test-distribution-executable", hide = true)]
+        test_distribution_executable: Option<std::path::PathBuf>,
+    },
+    /// Publish only the supplied plan after its SHA-256 is explicitly accepted.
+    Apply {
+        #[arg(long, default_value = ".")]
+        project: std::path::PathBuf,
+        #[arg(long)]
+        plan: std::path::PathBuf,
+        #[arg(long)]
+        expect: String,
+        /// Debug-test surrogate for the distribution executable.
+        #[arg(long = "test-distribution-executable", hide = true)]
+        test_distribution_executable: Option<std::path::PathBuf>,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]

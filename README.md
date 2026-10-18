@@ -221,10 +221,12 @@ distribution, or persistent reasoning/recall proof.
 
 The source-built walking product is not yet a releasable installed
 distribution. The primary executable now composes `version`, `install plan`,
-`install apply`, `serve`, authenticated `ready`, and read-only
-`verify --level quick`; its help and parser reject the removed raw-database and
-development commands. Repair, restore, uninstall, durable attunement execution,
-and release service management remain absent. The retained internal server and
+`install apply`, `serve`, authenticated `ready`, read-only
+`verify --level quick`, and offline `restore plan` and `restore apply`, which
+publish a staged restore into the storage root's own name with the previous
+root quarantined; its help and parser reject the removed raw-database and
+development commands. Repair, uninstall, durable attunement execution, and
+release service management remain absent. The retained internal server and
 adapter binaries open only an already-installed estate, but they are not a
 second supported operator command tree. No signed/offline-complete platform
 bundle or native Windows
