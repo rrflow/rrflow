@@ -1,0 +1,35 @@
+{
+  "contract_version": 1,
+  "machines": [
+    {
+      "id": "spark-1",
+      "memory_bytes": 137438953472,
+      "gpu": {
+        "memory_bytes": 137438953472
+      },
+      "disk_bytes": 4398046511104
+    },
+    {
+      "id": "spark-2",
+      "memory_bytes": 137438953472,
+      "gpu": {
+        "memory_bytes": 137438953472
+      },
+      "disk_bytes": 4398046511104
+    },
+    {
+      "id": "spark-3",
+      "memory_bytes": 137438953472,
+      "gpu": {
+        "memory_bytes": 137438953472
+      },
+      "disk_bytes": 4398046511104
+    },
+    {
+      "id": "proxmox-1",
+      "memory_bytes": 68719476736,
+      "gpu": null,
+      "disk_bytes": 2199023255552
+    }
+  ]
+}

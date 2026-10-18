@@ -9,6 +9,7 @@ mod attunement;
 mod capability_surface;
 mod deployment;
 mod diagnostic;
+mod endpoint_binding;
 mod function;
 #[path = "generated/signal_catalogue.rs"]
 mod generated_signal_catalogue;
@@ -63,6 +64,15 @@ pub use diagnostic::{
     DiagnosticVectorArtifactSnapshot, DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot,
     DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
     MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
+};
+pub use endpoint_binding::{
+    endpoint_profile_sha256, BindingKind, BindingLimits, CredentialReference, DeclaredFootprint,
+    EndpointBinding, EndpointLocator, EndpointProfile, EndpointProfileInput, GpuCapacity,
+    GpuRequirement, HardwareInventory, MachineCapacity, MachineLoad, WorkloadClass,
+    ENDPOINT_PROFILE_CONTRACT_VERSION, HARDWARE_INVENTORY_CONTRACT_VERSION, MAX_BINDINGS_PER_CLASS,
+    MAX_BINDING_CONCURRENCY, MAX_BINDING_INPUT_BYTES, MAX_BINDING_TIMEOUT_MS,
+    MAX_CREDENTIAL_NAME_BYTES, MAX_DECLARED_BYTES, MAX_ENDPOINT_URL_BYTES, MAX_INVENTORY_MACHINES,
+    MAX_PROFILE_BINDINGS,
 };
 pub use function::{
     validate_function_value, ExecuteFunction, FunctionArtifact, FunctionArtifactMediaType,
