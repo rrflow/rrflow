@@ -413,6 +413,23 @@ either independently.
   Connectome conformance, and clean deployment proof. B-04 is next after the
   completed B-03 model-admission contract.
 
+## A-07 correction (2026-10-17):
+
+- The `rrd-security` crate header still claimed that the crate owns policy
+  truth and named a retired provisioning role. The
+  [security authority reference](../../reference/security/authority.md)
+  assigns the removal of both to A-07, and A-07's closure left them in place.
+- The header now states the reference's component responsibilities:
+  `RrdEngine` is the only authority boundary; the crate supplies metadata,
+  pure decisions, audit values, and cryptographic helpers; and its public
+  storage repository remains implementation inventory recorded by
+  [POAM-016](../../poam/rrflow-1.0-alpha/poam-016.md). The reference's
+  deviation list and acceptance map no longer use the retired term.
+- A-07 stays checked. The direct `StorageEngine` repository and the rest of
+  POAM-016 remain open.
+- The package record is the
+  [A-07.3 security crate header correction journal](../../evidence/change-journals/gate-a/a-07-3-security-crate-header-correction-journal.md).
+
 ## A-02 evidence (2026-09-04):
 
 - `crates/kernel/rrd-core/tests/fixtures/reasoning-tree-v1.json` is the shared frozen
