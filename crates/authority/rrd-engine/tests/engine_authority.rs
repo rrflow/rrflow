@@ -882,6 +882,36 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
     .unwrap();
     assert!(recovered_gap.idempotent_replay);
 
+    // An existing target that is not a restored store is refused and left
+    // empty rather than created as a new database.
+    let empty_target = state_root.join("restores/instance-a/restore-empty");
+    std::fs::create_dir_all(&empty_target).unwrap();
+    let empty_error = RrdEngine::restore_estate_backup_store(
+        &database,
+        canonical("estate-control-instance"),
+        &state_root,
+        &policy_path,
+        &key_path,
+        canonical("estate-a"),
+        canonical("instance-a"),
+        second_id.clone(),
+        canonical("restore-empty"),
+        4_320,
+        4_330,
+        "restore-empty-request".into(),
+        canonical("restore-empty-operation"),
+        "restore-empty".into(),
+    )
+    .unwrap_err();
+    assert!(
+        !empty_error.to_string().contains("watermarks differ"),
+        "an empty directory is not a store with the wrong watermarks: {empty_error}"
+    );
+    assert!(
+        std::fs::read_dir(&empty_target).unwrap().next().is_none(),
+        "a refused restore creates nothing inside the target"
+    );
+
     let divergent_target = state_root.join("restores/instance-a/restore-divergent");
     let divergent = rrd_store::RrflowKvStore::open(&divergent_target).unwrap();
     divergent

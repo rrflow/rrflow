@@ -730,3 +730,55 @@ fn a_control_scope_overlapping_the_catalogue_families_is_refused() {
     assert!(error.to_string().contains("catalogue manifest scope"));
     assert!(!catalogue_root.exists(), "a refused scope writes nothing");
 }
+
+#[test]
+fn verification_reads_only_and_a_lost_catalogue_is_not_an_empty_one() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
+    let objects = LocalObjectStore::open(root.path().join("source-objects")).unwrap();
+    let catalogue_root = root.path().join("catalogue");
+    let entry = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "complete",
+        100,
+        &control_families(),
+    )
+    .unwrap();
+    verify_backup_catalogue(&catalogue_root).unwrap();
+
+    // A missing payload store fails verification without being recreated.
+    let payloads = catalogue_root.join("payloads");
+    let kept = root.path().join("payloads-kept");
+    std::fs::rename(&payloads, &kept).unwrap();
+    assert!(verify_backup_catalogue(&catalogue_root).is_err());
+    assert!(
+        !payloads.exists(),
+        "verification must not create the payload store it failed to find"
+    );
+    std::fs::rename(&kept, &payloads).unwrap();
+    verify_backup_catalogue(&catalogue_root).unwrap();
+
+    // Restore verification of a target that lost its object store fails
+    // without creating one.
+    let target = root.path().join("restored");
+    restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 200).unwrap();
+    verify_restored_backup_objects(&catalogue_root, &entry.backup_id, &target).unwrap();
+    let immutable = target.join("immutable");
+    let kept = root.path().join("immutable-kept");
+    std::fs::rename(&immutable, &kept).unwrap();
+    assert!(verify_restored_backup_objects(&catalogue_root, &entry.backup_id, &target).is_err());
+    assert!(!immutable.exists());
+    std::fs::rename(&kept, &immutable).unwrap();
+
+    // A catalogue file lost beside its retained artifacts is a loss, not an
+    // empty catalogue; an untouched root still reads as empty.
+    std::fs::remove_file(catalogue_root.join("catalogue.json")).unwrap();
+    let lost = load_backup_catalogue(&catalogue_root).unwrap_err();
+    assert!(lost.to_string().contains("absent while retained"));
+    assert!(verify_backup_catalogue(&catalogue_root).is_err());
+    let untouched = load_backup_catalogue(&root.path().join("never-used")).unwrap();
+    assert!(untouched.backups.is_empty());
+    assert_eq!(untouched.revision, 0);
+}

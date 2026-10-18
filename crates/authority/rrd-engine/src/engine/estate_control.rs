@@ -911,7 +911,7 @@ impl RrdEngine {
                             "existing restore target is not a direct canonical directory".into(),
                         ));
                     }
-                    let restored = RrflowKvStore::open(&target)?;
+                    let restored = RrflowKvStore::open_existing(&target)?;
                     if restored.claims().sequence()? != entry.archive.claim_sequence
                         || restored.runtime().cursor()? != entry.archive.runtime_cursor
                     {
@@ -934,7 +934,7 @@ impl RrdEngine {
                         &target,
                         at,
                     )?;
-                    let restored = RrflowKvStore::open(&target)?;
+                    let restored = RrflowKvStore::open_existing(&target)?;
                     if restored.claims().sequence()? != report.inventory.claim_sequence
                         || restored.runtime().cursor()? != report.inventory.runtime_cursor
                     {
