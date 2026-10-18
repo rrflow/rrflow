@@ -282,3 +282,14 @@ pub(super) fn safe_join(project: &Path, relative: &str) -> Result<PathBuf> {
     reject_existing_symlink_path(project, &path)?;
     Ok(path)
 }
+
+/// One installed instance's backup catalogue or restore staging root,
+/// `.rrflow/rrd/<kind>/<instance>` below its project. The served engine, the
+/// offline publication, and the estate controller all resolve the same path.
+pub(super) fn instance_operation_root(
+    project: &Path,
+    kind: &str,
+    instance: &CanonicalId,
+) -> Result<PathBuf> {
+    safe_join(project, &format!("{STORAGE_DIRECTORY}/{kind}/{instance}"))
+}

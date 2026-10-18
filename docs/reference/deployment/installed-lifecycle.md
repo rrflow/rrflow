@@ -516,11 +516,22 @@ supported target:
 - `rrflow-cli::dev::supervisor`, its private files, the standalone security
   initializer, `rrd-server initialize`, and create-on-start product paths are
   absent after the D-01 replacement tests passed.
-- the retained application-backup component now opens only an existing complete
-  component root. It intentionally cannot resolve the canonical installed
-  `roots/<install-id>` estate yet and cannot create a second store at the old
-  `.rrflow/rrd` parent. Installed backup/restore commands and
-  locator/distribution-bound controller inputs remain D-11/POA&M work.
+- the estate controller's backup, prune, and restore paths resolve a managed
+  instance as the installed project `instances/<instance>` under the estate
+  state root: they read its locator, require the controller's
+  `--distribution-executable` to be the installed distribution, and act on the
+  instance's own `.rrflow/rrd/backups/<id>` catalogue and
+  `.rrflow/rrd/restores/<id>/` staging roots — the catalogue the served engine
+  lists, and the staging roots `restore plan|apply` publishes from.
+  The backup driver opens the instance through `open_installed` with its real
+  token key; a project that is not an installed estate, a pre-canonical
+  `.rrflow/rrd` component store, or a different distribution is refused
+  permanently without creating anything. The former `<state-root>/backups` and
+  `<state-root>/restores` lane is gone. A retention decision applies only when
+  the estate's recovery points are exactly the instance's catalogue; a
+  catalogue that also holds backups created through the served engine's
+  `backup-create` is refused until the estate can register them (open D-11
+  work).
 - the engine's `backup-create`, `backup-list`, and `restore-create` operations
   on an installed estate (opened through `open_installed` by `serve`) write to
   `.rrflow/rrd/backups/<instance-id>/` and `.rrflow/rrd/restores/<instance-id>/`.

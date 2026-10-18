@@ -12,8 +12,8 @@
 //! publication receipt.
 
 use super::estate_layout::{
-    reject_existing_symlink_path, safe_join, BACKUPS_DIRECTORY_NAME, RESTORES_DIRECTORY_NAME,
-    STORAGE_DIRECTORY,
+    instance_operation_root, reject_existing_symlink_path, safe_join, BACKUPS_DIRECTORY_NAME,
+    RESTORES_DIRECTORY_NAME, STORAGE_DIRECTORY,
 };
 use super::installation::{
     canonical_prefixed, decode_control, estate_configuration_key, json_sha256, read_locator,
@@ -610,21 +610,20 @@ fn publication_paths(
     locator: &ProjectLocator,
     restore_id: &CanonicalId,
 ) -> Result<PublicationPaths> {
-    let instance = locator.identity.instance_id.as_str();
+    let instance = &locator.identity.instance_id;
     let restores = format!("{STORAGE_DIRECTORY}/{RESTORES_DIRECTORY_NAME}/{instance}");
     let storage_root_id = storage_root_id(locator)?;
     let candidate = format!("{restores}/{restore_id}");
     let quarantine = format!("{restores}/{restore_id}.quarantined-{storage_root_id}");
     let intent = format!("{restores}/.publish-{restore_id}.json");
-    let backups = format!("{STORAGE_DIRECTORY}/{BACKUPS_DIRECTORY_NAME}/{instance}");
     Ok(PublicationPaths {
         project: project.to_owned(),
         active: safe_join(project, &locator.storage_root)?,
         candidate: safe_join(project, &candidate)?,
         quarantine: safe_join(project, &quarantine)?,
         intent: safe_join(project, &intent)?,
-        restores: safe_join(project, &restores)?,
-        backups: safe_join(project, &backups)?,
+        restores: instance_operation_root(project, RESTORES_DIRECTORY_NAME, instance)?,
+        backups: instance_operation_root(project, BACKUPS_DIRECTORY_NAME, instance)?,
     })
 }
 
@@ -650,7 +649,10 @@ fn relative(project: &Path, path: &Path) -> Result<String> {
         .map(|segments| segments.join("/"))
 }
 
-fn require_distribution_binding(locator: &ProjectLocator, executable: &Path) -> Result<String> {
+pub(super) fn require_distribution_binding(
+    locator: &ProjectLocator,
+    executable: &Path,
+) -> Result<String> {
     let (_, profile_sha256) = DefaultInstallProfile::load(locator.profile_id.as_str())?;
     let executable_sha256 = sha256_file(executable)?;
     if executable_sha256 != locator.executable_sha256 || profile_sha256 != locator.profile_sha256 {

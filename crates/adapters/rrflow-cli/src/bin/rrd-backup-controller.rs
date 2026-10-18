@@ -11,6 +11,7 @@ struct Args {
     db: PathBuf,
     authority_instance: CanonicalId,
     state_root: PathBuf,
+    distribution_executable: PathBuf,
     estate: CanonicalId,
     worker: CanonicalId,
     lease_ms: u64,
@@ -32,6 +33,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         &args.db,
         args.authority_instance,
         &args.state_root,
+        &args.distribution_executable,
         args.estate,
         args.worker,
         args.lease_ms,
@@ -87,6 +89,7 @@ fn parse_args(arguments: impl Iterator<Item = String>) -> Result<Args, String> {
     let mut db = None;
     let mut authority_instance = None;
     let mut state_root = None;
+    let mut distribution_executable = None;
     let mut estate = None;
     let mut worker = None;
     let mut lease_ms = 30_000;
@@ -103,6 +106,12 @@ fn parse_args(arguments: impl Iterator<Item = String>) -> Result<Args, String> {
             }
             "--state-root" => {
                 state_root = Some(PathBuf::from(required(&mut arguments, "--state-root")?));
+            }
+            "--distribution-executable" => {
+                distribution_executable = Some(PathBuf::from(required(
+                    &mut arguments,
+                    "--distribution-executable",
+                )?));
             }
             "--estate" => {
                 estate = Some(
@@ -135,6 +144,8 @@ fn parse_args(arguments: impl Iterator<Item = String>) -> Result<Args, String> {
         db: db.ok_or("--db is required")?,
         authority_instance: authority_instance.ok_or("--authority-instance is required")?,
         state_root: state_root.ok_or("--state-root is required")?,
+        distribution_executable: distribution_executable
+            .ok_or("--distribution-executable is required")?,
         estate: estate.ok_or("--estate is required")?,
         worker: worker.ok_or("--worker is required")?,
         lease_ms,
@@ -170,6 +181,8 @@ mod tests {
                 "estate-authority",
                 "--state-root",
                 "/tmp/state",
+                "--distribution-executable",
+                "/opt/rrflow/bin/rrflow",
                 "--estate",
                 "estate-a",
                 "--worker",
@@ -186,6 +199,10 @@ mod tests {
         assert_eq!(args.db, PathBuf::from("/tmp/db"));
         assert_eq!(args.authority_instance.as_str(), "estate-authority");
         assert_eq!(args.state_root, PathBuf::from("/tmp/state"));
+        assert_eq!(
+            args.distribution_executable,
+            PathBuf::from("/opt/rrflow/bin/rrflow")
+        );
         assert_eq!(args.estate.as_str(), "estate-a");
         assert_eq!(args.worker.as_str(), "worker-a");
         assert_eq!(args.lease_ms, 9_000);

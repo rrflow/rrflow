@@ -21,10 +21,11 @@ executors, configuration apply, full verify, canonical installed backup resoluti
 repair, restore, ownership-safe uninstall, service installation, and a signed offline
 platform distribution. The public apply boundary also still accepts an injected
 installation timestamp; the primary CLI supplies its host wall clock, but a versioned
-trusted-clock capability and rollback/skew/failure evidence do not exist. The retained
-application-backup component is fail-closed open-existing code: it no longer creates a
-database at the pre-canonical parent, but it does not yet accept the installed locator and
-distribution binding.
+trusted-clock capability and rollback/skew/failure evidence do not exist. The estate-controller
+backup, prune, and restore paths resolve a managed instance through its installed locator
+and distribution binding and act on the instance's own catalogue and staging roots; the
+estate cannot yet register backups the served engine created, so a retention decision over
+such a catalogue is refused.
 
 ## Impact
 
