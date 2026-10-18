@@ -1,0 +1,308 @@
+{
+  "contract_version": 1,
+  "name": "ring-3",
+  "bindings": [
+    {
+      "id": "reasoning-primary",
+      "class": "large_model_serving",
+      "kind": "self_hosted",
+      "endpoint": {
+        "kind": "url",
+        "url": "http://spark-1.ring.example:8000"
+      },
+      "service_id": "reasoning-14b",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-1",
+      "footprint": {
+        "memory_bytes": 36507222016,
+        "gpu": {
+          "kind": "required",
+          "memory_bytes": 36507222016
+        }
+      },
+      "limits": {
+        "max_concurrency": 8,
+        "timeout_ms": 120000,
+        "max_input_bytes": 4194304
+      }
+    },
+    {
+      "id": "reasoning-fallback",
+      "class": "large_model_serving",
+      "kind": "self_hosted",
+      "endpoint": {
+        "kind": "url",
+        "url": "http://spark-2.ring.example:8000"
+      },
+      "service_id": "reasoning-14b",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-2",
+      "footprint": {
+        "memory_bytes": 36507222016,
+        "gpu": {
+          "kind": "required",
+          "memory_bytes": 36507222016
+        }
+      },
+      "limits": {
+        "max_concurrency": 8,
+        "timeout_ms": 120000,
+        "max_input_bytes": 4194304
+      }
+    },
+    {
+      "id": "reasoning-subscription",
+      "class": "large_model_serving",
+      "kind": "subscription",
+      "endpoint": {
+        "kind": "url",
+        "url": "https://subscription.provider.example/v1"
+      },
+      "service_id": "vendor-reasoning-subscription",
+      "manifest_sha256": null,
+      "credential": {
+        "provider": "infisical",
+        "name": "provider-subscription-token"
+      },
+      "placement": null,
+      "footprint": {
+        "memory_bytes": 67108864,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 4,
+        "timeout_ms": 120000,
+        "max_input_bytes": 4194304
+      }
+    },
+    {
+      "id": "reasoning-api",
+      "class": "large_model_serving",
+      "kind": "api",
+      "endpoint": {
+        "kind": "url",
+        "url": "https://api.provider.example/v1"
+      },
+      "service_id": "vendor-reasoning-api",
+      "manifest_sha256": null,
+      "credential": {
+        "provider": "infisical",
+        "name": "provider-api-key"
+      },
+      "placement": null,
+      "footprint": {
+        "memory_bytes": 67108864,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 16,
+        "timeout_ms": 120000,
+        "max_input_bytes": 4194304
+      }
+    },
+    {
+      "id": "lfg-kernel",
+      "class": "always_warm_small_models",
+      "kind": "local",
+      "endpoint": {
+        "kind": "in_process",
+        "component": "lfg"
+      },
+      "service_id": "lfg-kernel",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-3",
+      "footprint": {
+        "memory_bytes": 268435456,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 64,
+        "timeout_ms": 1000,
+        "max_input_bytes": 1048576
+      }
+    },
+    {
+      "id": "boundary-9b",
+      "class": "always_warm_small_models",
+      "kind": "local",
+      "endpoint": {
+        "kind": "url",
+        "url": "http://127.0.0.1:8081"
+      },
+      "service_id": "boundary-9b",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-3",
+      "footprint": {
+        "memory_bytes": 10737418240,
+        "gpu": {
+          "kind": "required",
+          "memory_bytes": 10737418240
+        }
+      },
+      "limits": {
+        "max_concurrency": 8,
+        "timeout_ms": 30000,
+        "max_input_bytes": 1048576
+      }
+    },
+    {
+      "id": "harrier-tei",
+      "class": "embedding_and_reranking",
+      "kind": "local",
+      "endpoint": {
+        "kind": "url",
+        "url": "http://127.0.0.1:8080"
+      },
+      "service_id": "harrier-0.6b",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-3",
+      "footprint": {
+        "memory_bytes": 2147483648,
+        "gpu": {
+          "kind": "required",
+          "memory_bytes": 2147483648
+        }
+      },
+      "limits": {
+        "max_concurrency": 16,
+        "timeout_ms": 30000,
+        "max_input_bytes": 67108864
+      }
+    },
+    {
+      "id": "rrflow-vectors",
+      "class": "vector_store",
+      "kind": "local",
+      "endpoint": {
+        "kind": "in_process",
+        "component": "rrflow-vector"
+      },
+      "service_id": "rrflow-vector-subsystem",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-3",
+      "footprint": {
+        "memory_bytes": 17179869184,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 32,
+        "timeout_ms": 30000,
+        "max_input_bytes": 67108864
+      }
+    },
+    {
+      "id": "rrflowkv",
+      "class": "canonical_store",
+      "kind": "local",
+      "endpoint": {
+        "kind": "in_process",
+        "component": "rrflowkv"
+      },
+      "service_id": "rrflowkv",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-3",
+      "footprint": {
+        "memory_bytes": 34359738368,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 64,
+        "timeout_ms": 60000,
+        "max_input_bytes": 1048576
+      }
+    },
+    {
+      "id": "lora-trainer",
+      "class": "weight_updates",
+      "kind": "self_hosted",
+      "endpoint": {
+        "kind": "url",
+        "url": "http://spark-2.ring.example:9000"
+      },
+      "service_id": "lora-trainer",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "spark-2",
+      "footprint": {
+        "memory_bytes": 68719476736,
+        "gpu": {
+          "kind": "required",
+          "memory_bytes": 68719476736
+        }
+      },
+      "limits": {
+        "max_concurrency": 1,
+        "timeout_ms": 3600000,
+        "max_input_bytes": 17179869184
+      }
+    },
+    {
+      "id": "trace-signals",
+      "class": "behavior_updates",
+      "kind": "api",
+      "endpoint": {
+        "kind": "url",
+        "url": "https://signals.provider.example/v1"
+      },
+      "service_id": "trace-signal-service",
+      "manifest_sha256": null,
+      "credential": {
+        "provider": "infisical",
+        "name": "signals-api-key"
+      },
+      "placement": null,
+      "footprint": {
+        "memory_bytes": 67108864,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 8,
+        "timeout_ms": 30000,
+        "max_input_bytes": 1048576
+      }
+    },
+    {
+      "id": "warden",
+      "class": "control_plane",
+      "kind": "self_hosted",
+      "endpoint": {
+        "kind": "url",
+        "url": "https://warden.estate.example"
+      },
+      "service_id": "warden",
+      "manifest_sha256": null,
+      "credential": null,
+      "placement": "proxmox-1",
+      "footprint": {
+        "memory_bytes": 4294967296,
+        "gpu": {
+          "kind": "none"
+        }
+      },
+      "limits": {
+        "max_concurrency": 8,
+        "timeout_ms": 30000,
+        "max_input_bytes": 1048576
+      }
+    }
+  ]
+}
