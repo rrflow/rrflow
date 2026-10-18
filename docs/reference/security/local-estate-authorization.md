@@ -91,9 +91,12 @@ public operation registry; speculative permission strings remain forbidden.
 
 `rrd-estate-admin` exposes six commands and `rrd-recovery-controller` exposes
 prune and restore. Both accept raw database, authority-instance, policy, key,
-estate, time, request, and operation coordinates; recovery also accepts a raw
-state root. The adapter calls static `RrdEngine::*_store` functions rather than
-an operation on an already resolved engine and authenticated invocation.
+estate, time, request, and operation coordinates; recovery and the backup
+controller also accept a raw state root and the distribution executable, and
+resolve the managed instance below that root through its installed locator
+rather than a caller-named catalogue or store path. The adapter calls static
+`RrdEngine::*_store` functions rather than an operation on an already resolved
+engine and authenticated invocation.
 There is no HTTP estate-mutation route or shared public-surface conformance
 corpus today.
 

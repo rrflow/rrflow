@@ -302,7 +302,7 @@ impl RrdEngine {
             .join(kind))
     }
 
-    fn backup_root(&self) -> Result<PathBuf> {
+    pub(super) fn backup_root(&self) -> Result<PathBuf> {
         self.operation_root(super::estate_layout::BACKUPS_DIRECTORY_NAME)
     }
 

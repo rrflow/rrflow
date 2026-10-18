@@ -1,3 +1,8 @@
+use super::estate_layout::{
+    instance_operation_root, BACKUPS_DIRECTORY_NAME, RESTORES_DIRECTORY_NAME,
+};
+use super::installation::read_locator;
+use super::restore_publication::require_distribution_binding;
 use super::security::AuditEvent;
 use super::*;
 use rrd_estate::{EstateBackupDriver, EstateDriver};
@@ -429,13 +434,15 @@ impl RrdEngine {
     }
 
     /// Advances one estate backup boundary with an engine-owned local backup
-    /// driver. The driver may open a managed instance only as another
-    /// `RrdEngine`; no physical store handle escapes the composition root.
+    /// driver. The driver opens a managed instance only as another installed
+    /// `RrdEngine`, bound to the estate's distribution executable; no physical
+    /// store handle escapes the composition root.
     #[allow(clippy::too_many_arguments)]
     pub fn reconcile_estate_backup_store(
         database: &Path,
         authority_instance: CanonicalId,
         state_root: &Path,
+        distribution_executable: &Path,
         estate_id: CanonicalId,
         worker: CanonicalId,
         lease_ms: u64,
@@ -452,6 +459,7 @@ impl RrdEngine {
             lease_ms,
             at,
             state_root.to_string_lossy(),
+            distribution_executable.to_string_lossy(),
         ))?;
         let engine = Self::open_local_authority(database, authority_instance)?;
         audit_estate_operation(
@@ -463,8 +471,8 @@ impl RrdEngine {
             audit_operation_id,
             audit_request_sha256,
             || {
-                let driver =
-                    EngineLocalBackupDriver::new(state_root).map_err(ServiceError::Contract)?;
+                let driver = EngineLocalBackupDriver::new(state_root, distribution_executable)
+                    .map_err(ServiceError::Contract)?;
                 let mut reconciler = rrd_estate::BackupReconciler::new(
                     &engine.storage,
                     estate_id,
@@ -489,6 +497,7 @@ impl RrdEngine {
         database: &Path,
         authority_instance: CanonicalId,
         state_root: &Path,
+        distribution_executable: &Path,
         policy_path: &Path,
         key_path: &Path,
         estate_id: CanonicalId,
@@ -513,8 +522,8 @@ impl RrdEngine {
             at,
         )?;
         let state_root = canonical_local_state_root(state_root)?;
-        ensure_direct_directory(&state_root, "backups").map_err(ServiceError::Contract)?;
-        let catalogue_root = state_root.join("backups").join(instance_id.as_str());
+        let managed = resolve_managed_instance(&state_root, &instance_id, distribution_executable)?;
+        let catalogue_root = managed.catalogue_root;
         require_direct_directory(&catalogue_root, "backup catalogue")?;
         let audit_resource = estate_audit_resource(&authority_instance, &authorization.estate_id);
         let audit_request_sha256 = operation_digest(&(
@@ -704,15 +713,17 @@ impl RrdEngine {
         )
     }
 
-    /// Restores one estate-owned recovery point only to the fixed, absent
-    /// `restores/<instance>/<restore-id>` hierarchy, verifies the reopened
-    /// closure, and records measured RPO/RTO evidence before releasing its
-    /// in-flight retention hold.
+    /// Restores one estate-owned recovery point only to the absent
+    /// `.rrflow/rrd/restores/<instance>/<restore-id>` staging root of the
+    /// managed instance, where the offline `restore plan|apply` publication
+    /// finds it; verifies the reopened closure; and records measured RPO/RTO
+    /// evidence before releasing its in-flight retention hold.
     #[allow(clippy::too_many_arguments)]
     pub fn restore_estate_backup_store(
         database: &Path,
         authority_instance: CanonicalId,
         state_root: &Path,
+        distribution_executable: &Path,
         policy_path: &Path,
         key_path: &Path,
         estate_id: CanonicalId,
@@ -740,15 +751,20 @@ impl RrdEngine {
             at,
         )?;
         let state_root = canonical_local_state_root(state_root)?;
-        for child in ["backups", "restores"] {
-            ensure_direct_directory(&state_root, child).map_err(ServiceError::Contract)?;
-        }
-        let catalogue_root = state_root.join("backups").join(instance_id.as_str());
+        let managed = resolve_managed_instance(&state_root, &instance_id, distribution_executable)?;
+        let catalogue_root = managed.catalogue_root;
         require_direct_directory(&catalogue_root, "backup catalogue")?;
-        let restore_parent = state_root.join("restores").join(instance_id.as_str());
-        create_direct_directory(&restore_parent).map_err(|error| {
-            ServiceError::Backup(format!("cannot create fixed restore parent: {error}"))
-        })?;
+        let restore_parent = managed.restore_parent;
+        for path in [
+            restore_parent
+                .parent()
+                .ok_or_else(|| ServiceError::Backup("restore parent has no container".into()))?,
+            restore_parent.as_path(),
+        ] {
+            create_direct_directory(path).map_err(|error| {
+                ServiceError::Backup(format!("cannot create fixed restore parent: {error}"))
+            })?;
+        }
         let canonical_restore_parent = fs::canonicalize(&restore_parent).map_err(|error| {
             ServiceError::Backup(format!("cannot resolve fixed restore parent: {error}"))
         })?;
@@ -1068,13 +1084,54 @@ impl EstateBackupDriver for BackupEffectHoldDriver {
     }
 }
 
-/// Engine-owned implementation of the fixed local estate backup layout.
-struct EngineLocalBackupDriver {
+/// Engine-owned backup driver over the estate's managed instances.
+///
+/// A managed instance is the installed project `instances/<instance>` below
+/// the estate's state root. The driver resolves it through its own locator,
+/// binds the estate's distribution executable, opens it through
+/// `RrdEngine::open_installed` (the same path `serve` and `verify` take, so
+/// the real token key and the installed record are checked), and writes the
+/// backup into the instance's own catalogue, `.rrflow/rrd/backups/<id>`,
+/// which the served engine lists and the estate prunes. There is no second
+/// catalogue lane.
+pub(in crate::engine) struct EngineLocalBackupDriver {
     state_root: PathBuf,
+    distribution_executable: PathBuf,
+}
+
+/// The resolved filesystem coordinates of one managed instance.
+struct ManagedInstance {
+    catalogue_root: PathBuf,
+    restore_parent: PathBuf,
+}
+
+/// Resolves `instances/<instance>` below the state root as an installed
+/// project: reads its locator, requires the supplied executable to be the
+/// installed distribution, and returns the instance's backup catalogue and
+/// restore staging roots. Nothing is opened and nothing is created.
+fn resolve_managed_instance(
+    state_root: &Path,
+    instance_id: &CanonicalId,
+    distribution_executable: &Path,
+) -> Result<ManagedInstance> {
+    let instances = state_root.join("instances");
+    require_direct_directory(&instances, "managed instances root")?;
+    let project = instances.join(instance_id.as_str());
+    require_direct_directory(&project, "managed instance project")?;
+    let (project, locator, _) = read_locator(&project)?;
+    require_distribution_binding(&locator, distribution_executable)?;
+    let installed = &locator.identity.instance_id;
+    Ok(ManagedInstance {
+        catalogue_root: instance_operation_root(&project, BACKUPS_DIRECTORY_NAME, installed)?,
+        restore_parent: instance_operation_root(&project, RESTORES_DIRECTORY_NAME, installed)?,
+    })
 }
 
 impl EngineLocalBackupDriver {
-    fn new(state_root: impl AsRef<Path>) -> std::result::Result<Self, String> {
+    pub(in crate::engine) fn new(
+        state_root: impl AsRef<Path>,
+        distribution_executable: impl AsRef<Path>,
+    ) -> std::result::Result<Self, String> {
         let supplied = state_root.as_ref();
         if !supplied.is_absolute() {
             return Err("local backup state root must be absolute".into());
@@ -1086,20 +1143,24 @@ impl EngineLocalBackupDriver {
         }
         ensure_direct_directory(&state_root, "instances")?;
         ensure_direct_directory(&state_root, "processes")?;
-        ensure_direct_directory(&state_root, "backups")?;
-        Ok(Self { state_root })
+        let executable = distribution_executable.as_ref();
+        if !executable.is_absolute() {
+            return Err("distribution executable path must be absolute".into());
+        }
+        let distribution_executable = fs::canonicalize(executable)
+            .map_err(|error| format!("cannot resolve distribution executable: {error}"))?;
+        if !distribution_executable.is_file() {
+            return Err("distribution executable must be a regular file".into());
+        }
+        Ok(Self {
+            state_root,
+            distribution_executable,
+        })
     }
 
-    fn source_path(&self, request: &rrd_estate::BackupDriverRequest) -> PathBuf {
+    fn project_path(&self, request: &rrd_estate::BackupDriverRequest) -> PathBuf {
         self.state_root
             .join("instances")
-            .join(request.instance_id.as_str())
-            .join(".rrflow/rrd")
-    }
-
-    fn catalogue_path(&self, request: &rrd_estate::BackupDriverRequest) -> PathBuf {
-        self.state_root
-            .join("backups")
             .join(request.instance_id.as_str())
     }
 
@@ -1127,62 +1188,35 @@ impl EngineLocalBackupDriver {
             }
         }
 
-        let source = self.source_path(request);
-        let canonical_source = fs::canonicalize(&source).map_err(|error| {
+        let project = self.project_path(request);
+        require_direct_directory(&project, "managed instance project")
+            .map_err(|error| permanent(request, error.to_string()))?;
+        // The instance is opened exactly as `serve` opens it: through its
+        // locator with the estate's distribution binding and its own token
+        // key. A project that is not an installed estate, or one installed by
+        // a different distribution, fails here without creating anything.
+        let engine = RrdEngine::open_installed(&project, &self.distribution_executable).map_err(
+            |error| permanent(request, format!("installed instance open failed: {error}")),
+        )?;
+        let catalogue_root = engine.backup_root().map_err(|error| {
             permanent(
                 request,
-                format!("cannot resolve the fixed instance data root: {error}"),
+                format!("backup catalogue root unresolved: {error}"),
             )
         })?;
-        if canonical_source != source || !canonical_source.is_dir() {
-            return Err(permanent(
-                request,
-                "fixed instance data root is not a direct canonical directory",
-            ));
-        }
-
-        let catalogue = self.catalogue_path(request);
-        create_direct_directory(&catalogue).map_err(|error| {
-            retryable(
-                request,
-                format!("cannot create the fixed backup catalogue root: {error}"),
-            )
-        })?;
-        let canonical_catalogue = fs::canonicalize(&catalogue).map_err(|error| {
-            retryable(
-                request,
-                format!("cannot resolve the fixed backup catalogue root: {error}"),
-            )
-        })?;
-        if canonical_catalogue != catalogue || !canonical_catalogue.is_dir() {
-            return Err(permanent(
-                request,
-                "fixed backup catalogue root is not a direct canonical directory",
-            ));
-        }
-
-        RrdEngine::verify_backup_catalogue(&canonical_catalogue).map_err(|error| {
+        RrdEngine::verify_backup_catalogue(&catalogue_root).map_err(|error| {
             permanent(
                 request,
-                format!("backup catalogue authentication failed: {error}"),
+                format!("backup catalogue verification failed: {error}"),
             )
         })?;
-        // This retained component path is not the canonical installed-estate
-        // resolver. It must never create a database when the fixed source is
-        // absent or now contains the installed `roots/<install-id>` layout.
-        let source_engine = RrdEngine::open_existing(
-            &canonical_source,
-            request.instance_id.clone(),
-            [0_u8; TOKEN_KEY_BYTES],
-        )
-        .map_err(|error| permanent(request, format!("instance engine open failed: {error}")))?;
         let entry = rrd_store::create_application_backup(
-            &source_engine.storage,
-            &source_engine.objects,
-            &canonical_catalogue,
+            &engine.storage,
+            &engine.objects,
+            &catalogue_root,
             &request.label,
             request.created_at,
-            &super::backup::installed_control_families(&request.instance_id),
+            &super::backup::installed_control_families(&engine.instance),
         )
         .map_err(|error| {
             retryable(
@@ -1190,13 +1224,12 @@ impl EngineLocalBackupDriver {
                 format!("application-complete backup creation failed: {error}"),
             )
         })?;
-        let verified =
-            RrdEngine::verify_backup_catalogue(&canonical_catalogue).map_err(|error| {
-                permanent(
-                    request,
-                    format!("created backup verification failed: {error}"),
-                )
-            })?;
+        let verified = RrdEngine::verify_backup_catalogue(&catalogue_root).map_err(|error| {
+            permanent(
+                request,
+                format!("created backup verification failed: {error}"),
+            )
+        })?;
         let retained = verified
             .backups
             .iter()
@@ -1205,7 +1238,7 @@ impl EngineLocalBackupDriver {
         if retained != &entry {
             return Err(permanent(
                 request,
-                "created backup entry diverges from its authenticated catalogue",
+                "created backup entry diverges from its verified catalogue",
             ));
         }
         let evidence_sha256 = digest::sha256_hex(

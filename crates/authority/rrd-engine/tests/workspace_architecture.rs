@@ -409,8 +409,11 @@ fn pre_canonical_startup_authorities_are_absent_from_product_tree() {
     .expect("estate control source must be readable");
     assert!(
         !estate_control.contains("RrdEngine::open(")
-            && estate_control.contains("RrdEngine::open_existing("),
-        "the retained backup component path must fail closed instead of creating a second store"
+            && !estate_control.contains("RrdEngine::open_existing(")
+            && estate_control.contains("RrdEngine::open_installed(")
+            && !estate_control.contains("join(\"backups\")")
+            && !estate_control.contains("join(\"restores\")"),
+        "the estate controller opens a managed instance only as an installed estate and keeps no catalogue or staging lane outside the instance"
     );
 }
 

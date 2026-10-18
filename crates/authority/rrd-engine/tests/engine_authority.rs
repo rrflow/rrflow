@@ -595,11 +595,42 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         fs::create_dir(&path).unwrap();
     }
     let state_root = fs::canonicalize(state_root).unwrap();
-    let source = state_root.join("instances/instance-a/.rrflow/rrd");
-    fs::create_dir_all(source.parent().unwrap()).unwrap();
-    drop(
-        RrdEngine::create_new(&source, canonical("instance-a"), [0_u8; 32])
-            .expect("component backup fixture must be a complete engine root"),
+    // The managed instance is a canonically installed estate: the estate names
+    // it `instance-a` (its project directory under `instances/`), while the
+    // installed engine carries its own derived instance identity, which names
+    // the backup catalogue and restore staging roots inside `.rrflow/rrd`.
+    let project = state_root.join("instances/instance-a");
+    fs::create_dir(&project).unwrap();
+    let executable = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+    let preview = RrdEngine::plan_installation(
+        &project,
+        InstallationTargetKind::ExistingProject,
+        "default",
+        None,
+        &executable,
+    )
+    .unwrap();
+    RrdEngine::apply_installation(
+        &project,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        5,
+        &executable,
+    )
+    .unwrap();
+    let installed_instance = preview.installation.target.instance_id.clone();
+    let catalogue_root = project
+        .join(".rrflow/rrd/backups")
+        .join(installed_instance.as_str());
+    let restores_root = project
+        .join(".rrflow/rrd/restores")
+        .join(installed_instance.as_str());
+    let storage_root = project.join(
+        &preview
+            .installation
+            .managed_path(InstallationManagedPathKind::StorageRoot)
+            .relative_path,
     );
 
     let key_path = temporary.path().join("operator.key");
@@ -724,6 +755,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
                 &database,
                 canonical("estate-control-instance"),
                 &state_root,
+                &executable,
                 canonical("estate-a"),
                 canonical("backup-worker"),
                 1_000,
@@ -733,9 +765,12 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
             .unwrap();
         }
     }
-    let before =
-        rrd_store::verify_backup_catalogue(&state_root.join("backups/instance-a")).unwrap();
+    let before = rrd_store::verify_backup_catalogue(&catalogue_root).unwrap();
     assert_eq!(before.backups.len(), 2);
+    assert!(
+        !state_root.join("backups").exists(),
+        "the estate controller writes only the instance's own catalogue"
+    );
     let first_id = before.backups[0].backup_id.clone();
     let second_id = before.backups[1].backup_id.clone();
 
@@ -743,6 +778,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -767,14 +803,14 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         Some(4_000)
     );
     assert!(pruned.recovery.prune_intents.is_empty());
-    let physical =
-        rrd_store::verify_backup_catalogue(&state_root.join("backups/instance-a")).unwrap();
+    let physical = rrd_store::verify_backup_catalogue(&catalogue_root).unwrap();
     assert_eq!(physical.backups.len(), 1);
     assert_eq!(physical.backups[0].backup_id, second_id);
     let prune_replay = RrdEngine::prune_estate_backups_store(
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -788,10 +824,32 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
     .unwrap();
     assert!(prune_replay.idempotent_replay);
 
+    // A different distribution is refused before any estate, catalogue, or
+    // filesystem state is touched.
+    let foreign_executable = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs");
+    let mismatch = RrdEngine::prune_estate_backups_store(
+        &database,
+        canonical("estate-control-instance"),
+        &state_root,
+        &foreign_executable,
+        &policy_path,
+        &key_path,
+        canonical("estate-a"),
+        canonical("instance-a"),
+        4_050,
+        4_050,
+        "prune-foreign-request".into(),
+        canonical("prune-foreign-operation"),
+        "prune-foreign".into(),
+    )
+    .unwrap_err();
+    assert!(matches!(mismatch, ServiceError::ProjectBindingMismatch));
+
     let restored = RrdEngine::restore_estate_backup_store(
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -815,17 +873,18 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         .unwrap();
     assert!(!evidence.rpo_within_objective);
     assert!(evidence.rto_within_objective);
-    assert!(state_root
-        .join("restores/instance-a/restore-one/CURRENT")
-        .is_file());
-    assert!(state_root
-        .join("instances/instance-a/.rrflow/rrd/CURRENT")
-        .is_file());
+    assert!(restores_root.join("restore-one/CURRENT").is_file());
+    assert!(storage_root.join("CURRENT").is_file());
+    assert!(
+        !state_root.join("restores").exists(),
+        "the estate controller stages restores only inside the instance's container"
+    );
 
     let pruned_restore = RrdEngine::restore_estate_backup_store(
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -845,6 +904,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -860,13 +920,13 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
     .unwrap();
     assert!(restore_replay.idempotent_replay);
 
-    let catalogue_root = state_root.join("backups/instance-a");
-    let gap_target = state_root.join("restores/instance-a/restore-gap");
+    let gap_target = restores_root.join("restore-gap");
     rrd_store::restore_catalogued_backup(&catalogue_root, &second_id, &gap_target, 4_250).unwrap();
     let recovered_gap = RrdEngine::restore_estate_backup_store(
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -884,12 +944,13 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
 
     // An existing target that is not a restored store is refused and left
     // empty rather than created as a new database.
-    let empty_target = state_root.join("restores/instance-a/restore-empty");
+    let empty_target = restores_root.join("restore-empty");
     std::fs::create_dir_all(&empty_target).unwrap();
     let empty_error = RrdEngine::restore_estate_backup_store(
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
@@ -912,7 +973,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         "a refused restore creates nothing inside the target"
     );
 
-    let divergent_target = state_root.join("restores/instance-a/restore-divergent");
+    let divergent_target = restores_root.join("restore-divergent");
     let divergent = rrd_store::RrflowKvStore::open(&divergent_target).unwrap();
     divergent
         .claims()
@@ -934,6 +995,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         &database,
         canonical("estate-control-instance"),
         &state_root,
+        &executable,
         &policy_path,
         &key_path,
         canonical("estate-a"),
