@@ -1,6 +1,6 @@
 use super::*;
 use crate::{InstallationPreview, InstallationVerificationStatus};
-use rrd_contract::{installation_plan_sha256, InstallationTargetKind};
+use rrd_contract::{installation_plan_sha256, InstallationTargetKind, SessionLease};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -597,5 +597,244 @@ fn installed_backups_and_restore_staging_live_beside_the_storage_roots() {
             .unwrap()
             .runtime_cursor,
         2
+    );
+}
+
+struct InstalledEstate {
+    _project: tempfile::TempDir,
+    project_path: PathBuf,
+    executable: PathBuf,
+    instance: CanonicalId,
+    active_root: PathBuf,
+}
+
+/// Installs a project, opens it as the product does, and authenticates with
+/// the installed credential. The caller owns the session.
+fn install_and_open() -> (InstalledEstate, RrdEngine, SessionLease) {
+    use rrd_contract::{CreateSession, InstallationManagedPathKind, SessionLimits};
+
+    let project = tempfile::tempdir().unwrap();
+    std::fs::write(project.path().join("README.md"), "walking product\n").unwrap();
+    let preview = plan(project.path());
+    let executable = test_executable();
+    RrdEngine::apply_installation(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        1_800_000_000_000,
+        &executable,
+    )
+    .unwrap();
+    let engine = RrdEngine::open_installed(project.path(), &executable).unwrap();
+    let api_key = RrdEngine::read_installed_api_key(project.path()).unwrap();
+    let lease = engine
+        .create_authenticated_session(
+            &api_key.principal_id,
+            api_key.credential().as_bytes(),
+            &CreateSession {
+                limits: SessionLimits {
+                    idle_timeout_ms: 60_000,
+                    absolute_timeout_ms: 60_000,
+                    max_open_transactions: 1,
+                },
+            },
+            &id("installed-session"),
+            1_800_000_000_100,
+            "request-installed-session",
+            "operation-installed-session",
+        )
+        .unwrap();
+    let estate = InstalledEstate {
+        project_path: project.path().to_path_buf(),
+        active_root: project.path().join(
+            &preview
+                .installation
+                .managed_path(InstallationManagedPathKind::StorageRoot)
+                .relative_path,
+        ),
+        _project: project,
+        executable,
+        instance: preview.installation.target.instance_id.clone(),
+    };
+    (estate, engine, lease)
+}
+
+fn restore(
+    engine: &RrdEngine,
+    lease: &SessionLease,
+    key: &str,
+    backup_sha256: &str,
+    restore_id: &str,
+    now: u64,
+) -> std::result::Result<rrd_contract::RestoreInstanceBackupResult, ServiceError> {
+    use rrd_contract::RestoreInstanceBackup;
+
+    engine.restore_instance_backup(
+        &lease.session_id,
+        &lease.token,
+        &id(key),
+        &RestoreInstanceBackup {
+            backup_sha256: backup_sha256.into(),
+            restore_id: CanonicalId::new(restore_id).unwrap(),
+            restored_at_unix_ms: now,
+        },
+        now,
+        &format!("request-{key}"),
+        &format!("operation-{key}"),
+    )
+}
+
+#[test]
+fn a_restore_into_an_existing_verified_target_is_recovered_without_a_second_writer() {
+    use rrd_contract::CreateInstanceBackup;
+
+    let (estate, engine, lease) = install_and_open();
+    let backup = engine
+        .create_instance_backup(
+            &lease.session_id,
+            &lease.token,
+            &id("backup-key"),
+            &CreateInstanceBackup {
+                label: "installed".into(),
+                created_at_unix_ms: 1_800_000_000_200,
+            },
+            1_800_000_000_200,
+            "request-backup",
+            "operation-backup",
+        )
+        .unwrap();
+
+    let fresh = restore(
+        &engine,
+        &lease,
+        "restore-key-one",
+        &backup.backup.backup_sha256,
+        "restore-one",
+        1_800_000_000_300,
+    )
+    .unwrap();
+    assert!(!fresh.idempotent_replay);
+    let target = estate
+        .project_path
+        .join(".rrflow/rrd/restores")
+        .join(estate.instance.as_str())
+        .join("restore-one");
+    assert!(target.is_dir());
+
+    // A different idempotency key for the same restore id finds the target
+    // already staged. That is the crash-recovery path: the earlier operation
+    // staged the root but its result was never recorded.
+    let recovered = restore(
+        &engine,
+        &lease,
+        "restore-key-two",
+        &backup.backup.backup_sha256,
+        "restore-one",
+        1_800_000_000_400,
+    )
+    .expect("an existing verified target is recovered, not rebuilt");
+    assert!(recovered.idempotent_replay);
+    assert_eq!(recovered.inventory, fresh.inventory);
+    assert_eq!(recovered.backup_sha256, fresh.backup_sha256);
+
+    // An existing target that is not a restored store fails closed instead of
+    // being created as a new database.
+    let empty = estate
+        .project_path
+        .join(".rrflow/rrd/restores")
+        .join(estate.instance.as_str())
+        .join("restore-empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    let refused = restore(
+        &engine,
+        &lease,
+        "restore-key-three",
+        &backup.backup.backup_sha256,
+        "restore-empty",
+        1_800_000_000_500,
+    );
+    assert!(
+        refused.is_err(),
+        "an empty target directory is not a restored store"
+    );
+    assert!(
+        std::fs::read_dir(&empty).unwrap().next().is_none(),
+        "a refused restore creates nothing inside the target"
+    );
+}
+
+/// Characterizes POAM-031. A backup of an installed estate carries its
+/// claims, runtime commits, immutable objects, and two catalogue control
+/// families, but not the installed record, the active configuration, the
+/// security state, or the attunement state. A restored root therefore cannot
+/// be opened as an installed estate, which blocks restore publication. When
+/// POAM-031 is fixed, the restored root must carry the record and this test
+/// must fail.
+#[test]
+fn a_restored_root_lacks_the_installed_record_and_security_state() {
+    use rrd_contract::CreateInstanceBackup;
+
+    let (estate, engine, lease) = install_and_open();
+    let backup = engine
+        .create_instance_backup(
+            &lease.session_id,
+            &lease.token,
+            &id("backup-key"),
+            &CreateInstanceBackup {
+                label: "installed".into(),
+                created_at_unix_ms: 1_800_000_000_200,
+            },
+            1_800_000_000_200,
+            "request-backup",
+            "operation-backup",
+        )
+        .unwrap();
+    assert!(backup.backup.application_complete);
+    restore(
+        &engine,
+        &lease,
+        "restore-key",
+        &backup.backup.backup_sha256,
+        "restore-one",
+        1_800_000_000_300,
+    )
+    .unwrap();
+    drop(engine);
+
+    let active = rrd_store::RrflowKvStore::open_existing(&estate.active_root).unwrap();
+    let restored = rrd_store::RrflowKvStore::open_existing(
+        &estate
+            .project_path
+            .join(".rrflow/rrd/restores")
+            .join(estate.instance.as_str())
+            .join("restore-one"),
+    )
+    .unwrap();
+    let configuration_key = format!("server/state/{}/configuration/active", estate.instance);
+    for key in [
+        "server/state/install/record",
+        "server/state/install/checkpoint",
+        configuration_key.as_str(),
+    ] {
+        assert!(
+            active.control().get(key).unwrap().is_some(),
+            "the active root holds {key}"
+        );
+        assert!(
+            restored.control().get(key).unwrap().is_none(),
+            "POAM-031: the restored root must lack {key} until backups carry the installed control state"
+        );
+    }
+    assert_eq!(
+        restored.runtime().cursor().unwrap(),
+        active.runtime().cursor().unwrap(),
+        "the restored root carries every runtime commit"
+    );
+    drop(restored);
+    drop(active);
+    assert!(
+        RrdEngine::open_installed(&estate.project_path, &estate.executable).is_ok(),
+        "the active estate still opens"
     );
 }
