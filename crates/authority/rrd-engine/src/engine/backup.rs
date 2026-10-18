@@ -104,6 +104,7 @@ impl RrdEngine {
                 &root,
                 &state.storage_label,
                 request.created_at_unix_ms,
+                &installed_control_families(&self.instance),
             )?,
         };
         let catalogue = rrd_store::verify_backup_catalogue(&root)?;
@@ -308,6 +309,30 @@ impl RrdEngine {
     fn restore_root(&self) -> Result<PathBuf> {
         self.operation_root(super::estate_layout::RESTORES_DIRECTORY_NAME)
     }
+}
+
+/// The control-journal families an application-complete backup carries as the
+/// estate's control state: the installed record and install checkpoint, the
+/// active configuration, the security policy and audit chain, the attunement
+/// plan and job state, and the estate document.
+///
+/// Every value in these families is non-secret: credentials appear only as
+/// digests, and the token key and operator credential are files outside the
+/// store. Transient and operational families stay out: session leases,
+/// subscriptions, backup and restore operation receipts, and estate-recovery
+/// receipts. The two catalogue families travel in the catalogue manifest.
+pub(in crate::engine) fn installed_control_families(instance: &CanonicalId) -> Vec<String> {
+    let mut families = vec![
+        "server/state/estate".to_owned(),
+        "server/state/install".to_owned(),
+        format!("server/state/{instance}/attunement"),
+        format!("server/state/{instance}/audit"),
+        format!("server/state/{instance}/audit-head"),
+        format!("server/state/{instance}/configuration"),
+        format!("server/state/{instance}/security"),
+    ];
+    families.sort();
+    families
 }
 
 fn backup_operation_key(

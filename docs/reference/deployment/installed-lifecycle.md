@@ -350,9 +350,52 @@ be "fixed" by guessed values.
 
 Backup creation is an authenticated engine operation at one snapshot boundary.
 The application-complete form includes logical semantic commits, catalogues,
-immutable objects, configuration/schema identities, projection source
-coordinates, and the receipts needed to prove completeness. Backup verification
-is read-only and authenticates the whole catalogue closure.
+immutable objects, the estate's control state, configuration/schema
+identities, projection source coordinates, and the receipts needed to prove
+completeness. Backup verification is read-only and authenticates the whole
+catalogue closure.
+
+The control state travels as a content-addressed control-journal archive
+(`control-archives/<sha256>.rrd-control-archive`, format `RRDCJA01`), not as
+materialized values: readers such as the security audit chain derive state from
+the control journal's actions and order, so a restore replays the same
+transitions in the same order. The engine declares the families it carries,
+and the archive records them:
+
+| Family | Content |
+|---|---|
+| `server/state/install` | installed record and install checkpoint |
+| `server/state/<instance>/configuration` | active estate configuration |
+| `server/state/<instance>/security` | security policy (principals, roles, bindings, issuers; credentials as digests) |
+| `server/state/<instance>/audit`, `server/state/<instance>/audit-head` | the hash-chained audit records and their durable head |
+| `server/state/<instance>/attunement` | attunement plan and job state |
+| `server/state/estate` | estate documents |
+
+Every value in these families is non-secret. The token key (`RRD.TOKEN`) and
+the operator credential are files outside the store and are never part of a
+backup; a restored root has no token key until publication supplies one. Not
+carried: session leases, subscriptions, backup and restore operation receipts,
+and estate-recovery receipts, which are transient or belong to the instance
+that performed the operation. The two catalogue families travel in the
+catalogue manifest. A backup whose scope would overlap the catalogue families,
+or whose families overlap each other, is refused before any artifact is
+written.
+
+The backup catalogue is format version 2. Version 1 catalogues, whose
+application-complete entries omitted the control state, are refused rather
+than read as complete: `application_complete` is true only when the logical
+archive, object payloads, catalogue manifest, and control-journal archive are
+all present and authenticated.
+
+Restore replays the archive after the catalogue and object payloads, one
+control transition per archived entry, each committed in the same physical
+transaction as a replay-progress marker in the restored root's system space.
+An interrupted replay resumes after its last committed entry; a target whose
+control state does not hold an entry's recorded before-state fails closed
+before any further mutation. The marker stays in the root as restore
+provenance, and restore verification checks that the restored journal carries
+every archived entry contiguously and in order with the same key, before-state,
+value, time, actor, action, and request identities.
 
 On an installed estate the backup catalogue lives at
 `.rrflow/rrd/backups/<instance-id>/` and restore staging roots at
@@ -454,12 +497,17 @@ supported target:
   locator replacement remains D-11 work. A restore into an already staged
   target is recovered by opening it as an existing store and verifying it,
   never by creating a database there.
-- a backup of an installed estate is not yet application-complete in the sense
-  above: it omits the installed record, install checkpoint, active
-  configuration, security state, and attunement state, so a restored root
-  cannot be opened as an installed estate
-  ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md)). Publication depends on
-  closing it.
+- a backup of an installed estate now carries the installed control state as
+  the control-journal archive above, so a restored root holds the installed
+  record, install checkpoint, active configuration, security policy, audit
+  chain, and attunement state, and its audit chain reads back
+  ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md), verifying). What
+  remains for its closure is publication: swapping the verified staging root
+  into the installed root's name with the old root quarantined, carrying the
+  token key over, and opening the result through `open_installed`.
+- the public `InstanceBackupSnapshot` does not yet project the
+  `installed_control` coverage dimension; `application_complete` carries the
+  meaning on the wire until the generated surfaces are regenerated with it.
 - current WAL torn-tail repair is retained only as a physical primitive invoked
   by an exact engine repair plan.
 

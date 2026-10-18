@@ -14,6 +14,7 @@ mod projection;
 mod runtime;
 
 pub use claims::ClaimRepository;
+pub(crate) use control::prepare_control_batch;
 pub use control::ControlRepository;
 pub use function::FunctionCatalogueRepository;
 pub use invocation::InvocationRepository;
