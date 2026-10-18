@@ -60,6 +60,8 @@ http_dispatch_catalogue! {
     EstateRead => ("estate-read", RrdOperation::EstateRead),
     HealthLive => ("health-live", RrdOperation::ServiceInspect),
     HealthReady => ("health-ready", RrdOperation::ServiceInspect),
+    KnowledgeTreeList => ("knowledge-tree-list", RrdOperation::KnowledgeTreeRead),
+    KnowledgeTreeReplace => ("knowledge-tree-replace", RrdOperation::KnowledgeTreeWrite),
     OpenapiRead => ("openapi-read", RrdOperation::ServiceInspect),
     QueryExecute => ("query-execute", RrdOperation::QueryExecute),
     QueryIndexEnsure => ("query-index-ensure", RrdOperation::QueryIndexEnsure),
@@ -196,6 +198,12 @@ impl AppState {
                         ApiError::new(ErrorCode::Internal, error.to_string(), false),
                     ),
                 }
+            }
+            Some(HttpDispatch::KnowledgeTreeList) => {
+                self.list_knowledge_trees(&headers, &body, now)
+            }
+            Some(HttpDispatch::KnowledgeTreeReplace) => {
+                self.replace_knowledge_trees(&headers, &body, now)
             }
             Some(HttpDispatch::SessionCreate) => self.create_session(&headers, &body, now),
             Some(HttpDispatch::SessionRenew) => self.renew_session(&headers, &body, &path, now),

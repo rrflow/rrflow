@@ -55,7 +55,7 @@ authoritative databases or engines.
 
 | Term | Canonical meaning | Implementation boundary |
 |---|---|---|
-| **RRFlow** | Reason Ready Flow, the complete product and platform. | This repository supplies the engine and bundled adapters; Connectome is a separate public client. |
+| **RRFlow** | Reason Ready Flow, the reasoning engine and complete product/platform, associated with the owner's `rrflow.ai` domain. | This repository supplies the engine and bundled adapters; Connectome is a separate public client. |
 | **RRD** | Reason Ready Daemon, the embedded/server runtime hosting RRFlow. | `rrd-server` plus embedded `RrdEngine` composition. |
 | **`RrdEngine`** | The only semantic coordinator and mutation authority. | `crates/authority/rrd-engine` |
 | **RRFlow kernel** | Canonical temporal values, identities, read stamps, mutations, and invariants; it defines meaning without owning transport or physical storage. | `rrd-core` |
@@ -66,7 +66,7 @@ authoritative databases or engines.
 | **RRFlow temporal graph** | Typed records and relations resolved from the canonical log at one runtime read stamp and valid-time coordinate; never a separate graph database. | Kernel graph values, persistence adjacency, native query operators, and `RrdEngine` authorization. |
 | **RRFlow memory** | Durable temporal claims, records, relations, schemas, vectors, and evidence owned by the same engine; never a separate memory store. The "memory database" is rrflowDB itself. | rrflowDB semantic data composed through `RrdEngine`. |
 | **RRO** | Reason Ready Object: one persisted, versioned unit of knowledge the engine reasons over, such as a record, relation, claim, vector, or reasoning node, read at one stamp with its evidence. The abbreviation names no component, role, or provisioning path. | Kernel values in `rrd-core`; persistence through `rrd-store`; no type carries this name. |
-| **RROFLOW** | The recursive self-improvement configuration of RRFlow: committed reasoning outcomes, verdicts, and corrections promote into better rules, exemplars, and claims, each promotion an authorized, versioned, reversible engine change, never an automatic hook. | No roadmap item owns it yet; nearest owners are Gate G reasoning trees and Gate I triggers, routines, and skills. A record precedes any work. |
+| **RROFLOW** | RRFlow's recursive-learning and self-improvement configuration, associated with the owner's `rroflow.ai` domain. The design promotes committed reasoning outcomes, verdicts, and corrections into better rules, exemplars, and claims through authorized, versioned, reversible engine changes; automatic hooks remain prohibited. | Design intent under the same `RrdEngine` authority; [inference extensions](../reference/inference-extensions.md), Gate G G-08 and Gate I own the learning track. Execution remains unimplemented. |
 | **rrflowQL** | RRFlow Query Language: syntax, AST, binding, logical and physical planning, and execution. | `rrd-query` |
 | **Arrow substrate** | The columnar buffer model for eligible immutable rrflowKV pages and stamped analytical batches. | Apache Arrow types composed by storage and query boundaries. |
 | **DataFusion execution** | Bounded vectorized computation over stamped Arrow batches. It cannot authorize or commit state. | DataFusion integration inside `rrd-query` |
@@ -77,8 +77,8 @@ authoritative databases or engines.
 | **project-tree snapshot** | One deterministic, bounded, committed inventory of observed root-relative project entries, errors, containment, policy, and change evidence; it is required when RRFlow persists a project model, applies a reproducible project mutation, or claims snapshot-complete evidence, but not merely to inspect or reason about available files. | Pure proposal construction in planned `rrd-attunement`; authorized durable reads and commit coordination in `RrdEngine`. |
 | **RRFlow vector subsystem** | Native vector-database capability inside rrflowDB: exact values, payload filters, candidate indexes, and exact reranking. | `rrd-vector`, `rrd-query`, and `RrdEngine` |
 | **RRFlow inference** | Provider-neutral, manifest-gated execution of embedding and routing models, each reached through a configured endpoint so that a local or remote binding changes no behavior. | `rrd-inference`; LFG and SWAG are the plug-in configurations below. |
-| **LFG** | A CPU-based, optional plug-in configuration that classifies work and feeds SWAG data points such as complexity. Whether a model runs inside it is undecided. | No code. Gate G's current text predates the LFG/SWAG split and is revised before Gate G work starts. |
-| **SWAG** | The System One controller and model gateway: the plug-in configuration that makes the fast decision, selects a model through its configured endpoint, and dispatches the call. It replaces the earlier working name Dalal; the concept is unchanged. | No code or record yet; a record precedes any work. It never gains planning, authorization, or persistence authority, which stay in `RrdEngine`. |
+| **LFG** | A CPU-based, optional plug-in configuration that classifies work and feeds SWAG data points such as complexity. Whether a model runs inside it is undecided. | No extension implementation. The [inference-extension contract](../reference/inference-extensions.md) and revised Gate G G-01/G-07 own classification and configuration. |
+| **SWAG** | The System One controller and model gateway: the plug-in configuration that makes the fast decision, selects a model through its configured endpoint, and dispatches the call. It replaces the earlier working name Dalal; the concept is unchanged. | No extension implementation. The [inference-extension contract](../reference/inference-extensions.md) and Gate G own it; planning, authorization and persistence authority stay in `RrdEngine`. |
 | **Governance** | Deterministic-first verification and permission: checks named as data on terminal reasoning nodes, the permission scope checked at the effect boundary before any verification, and the proof pattern (name the seam, freeze it with a golden file, prove it with a kept artifact). | `verification_requirement` on reasoning nodes (`rrd-core`), authorization in `RrdEngine`; the permission-scope type does not exist yet. |
 | **RRFlow seat** | A durable provider-neutral identity represented by one or more authenticated provider identities at a read coordinate; representation establishes attribution, not authorization. Clyffy is this repository's primary seat specialization, not another kernel, repository, runtime, or provider. | Canonical seat/provider/relation values in rrflowDB; resolution, authorization, routing, and mutation through `RrdEngine`. |
 | **engine event** | One immutable, identity- and provenance-bound occurrence committed through `RrdEngine`; it is data, not a callback or lifecycle owner. | Canonical event value in the RRFlow kernel, public submission envelope in `rrd-contract`, and semantic persistence through `rrd-store`. |
@@ -88,6 +88,17 @@ authoritative databases or engines.
 | **host-event adapter** | An optional, explicitly installed stateless translator from a host callback or external signal into the canonical engine-event submission operation. | Outward `rrflow-*` adapter; never an automatic hook or scheduler. |
 | **Connectome** | The RRFlow client: a separate operator and developer workbench using public RRD capabilities. The name no longer means a storage substrate; that role is RRFlow's. | Separate repository; no embedded engine authority. |
 | **workspace** | A set of estates grouped by an account or client above the engine. It is never an engine scope, resource, or authorization boundary; the [instance-topology record](instance-topology.md#canonical-identities-and-cardinality) owns the relation. | Client and account concern; no engine type. |
+
+Connectome is the shared UI for the reasoning engine and its recursive-learning
+configuration. Both domain identities remain within one RRFlow system and its
+public RRD contracts. **RRO** retains its separate meaning as a Reason Ready
+Object.
+
+The owner's intended study of Raindrop.ai is a research direction for making
+RRFlow configuration and extension effortless. Accepted behavior must enter
+the owning RRFlow contract and roadmap before implementation. This records
+design intent; it claims no implemented Raindrop feature, integration, or
+cloud deployment.
 
 Product documentation uses the exact spellings **RRFlow**, **RRD**,
 **`RrdEngine`**, **rrflowDB**, **rrflowKV**, **rrflowMX**, **rrflowQL**,
@@ -211,7 +222,21 @@ after the signed bundle is acquired. An optional model or adapter bundle may be
 side-loaded only when the operator selects it explicitly; anything required by
 the default profile belongs in the default distribution.
 
-Connectome remains a separate client release. PostgreSQL, Turso, SQLite,
+Connectome remains a separate client release. Its optional source checkout is
+pinned at root `connectome/` as a Git submodule of
+`https://github.com/rrflow/connectome-development.git`, tracking the owner's
+`agent/layman-lenses-wip` branch. This is a development
+convenience for the management UI, outside the engine source closure and Cargo
+workspace. Engine build, installation, readiness, recovery, and verification
+must work with that submodule uninitialized. No other submodule or required
+first-party source outside this repository is permitted.
+
+Desktop and planned cloud/browser Connectome delivery consume the same public
+RRD authority. Browser delivery requires its own supported authentication and
+transport profile; it does not add an engine deployment form or authorize a
+client-owned fleet control plane.
+
+PostgreSQL, Turso, SQLite,
 Dragonfly, object stores, Zuul Zero/shippin.ai meshes, and model providers
 remain optional integrations. None is needed to make a local rrflowKV estate
 ready, commit data, close, reopen, recover, or verify itself.

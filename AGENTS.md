@@ -47,6 +47,14 @@ Connectome, project databases, mesh services, providers, and other external
 systems remain optional public-contract integrations and cannot be required
 for default RRFlow readiness.
 
+The optional root `connectome/` Git submodule is the one client-source
+exception: it pins `https://github.com/rrflow/connectome-development.git`
+from the owner's `agent/layman-lenses-wip` branch for joint development while
+preserving Connectome's own authored UI, history, build,
+tests, and release boundary. Initialize it explicitly; never make it an engine
+Cargo dependency, required build input, install-time fetch, or readiness
+prerequisite. Other Git submodules remain prohibited.
+
 RRFlow is an independently installable and operable reasoning and recall
 engine. A project's code or schema generator, build/test/evaluation harness,
 CI system, database, mesh, model provider, or development tool may be

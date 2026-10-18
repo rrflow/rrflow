@@ -2,7 +2,7 @@
 
 package rrd
 
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
 
 type OperationID string
 
@@ -20,6 +20,8 @@ const (
 	OperationEstateRead             OperationID = "estate-read"
 	OperationHealthLive             OperationID = "health-live"
 	OperationHealthReady            OperationID = "health-ready"
+	OperationKnowledgeTreeList      OperationID = "knowledge-tree-list"
+	OperationKnowledgeTreeReplace   OperationID = "knowledge-tree-replace"
 	OperationOpenapiRead            OperationID = "openapi-read"
 	OperationQueryExecute           OperationID = "query-execute"
 	OperationQueryIndexEnsure       OperationID = "query-index-ensure"
@@ -56,6 +58,8 @@ var endpoints = map[OperationID]Endpoint{
 	OperationEstateRead:             {Method: "POST", Path: "/v1/estates/{estate}/read", Authentication: "session_bearer", Mutation: false},
 	OperationHealthLive:             {Method: "GET", Path: "/v1/health/live", Authentication: "public", Mutation: false},
 	OperationHealthReady:            {Method: "GET", Path: "/v1/health/ready", Authentication: "public", Mutation: false},
+	OperationKnowledgeTreeList:      {Method: "POST", Path: "/v1/knowledge/trees/list", Authentication: "session_bearer", Mutation: false},
+	OperationKnowledgeTreeReplace:   {Method: "POST", Path: "/v1/knowledge/trees/replace", Authentication: "session_bearer", Mutation: true},
 	OperationOpenapiRead:            {Method: "GET", Path: "/v1/schema/openapi", Authentication: "public", Mutation: false},
 	OperationQueryExecute:           {Method: "POST", Path: "/v1/query", Authentication: "session_bearer", Mutation: false},
 	OperationQueryIndexEnsure:       {Method: "POST", Path: "/v1/query/indexes/ensure", Authentication: "session_bearer", Mutation: true},

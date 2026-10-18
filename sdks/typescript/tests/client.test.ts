@@ -10,10 +10,22 @@ const jsonResponse = (value: unknown, status = 200) =>
   });
 
 test("generated catalogue tracks all mutation boundaries", () => {
-  assert.equal(Object.keys(endpoints).length, 33);
+  assert.equal(Object.keys(endpoints).length, 35);
   assert.equal(endpoints["audit-export"].path, "/v1/audit/export");
   assert.equal(endpoints["backup-create"].mutation, true);
   assert.equal(endpoints["transaction-preview"].mutation, true);
+  assert.deepEqual(endpoints["knowledge-tree-list"], {
+    method: "POST",
+    path: "/v1/knowledge/trees/list",
+    authentication: "session_bearer",
+    mutation: false,
+  });
+  assert.deepEqual(endpoints["knowledge-tree-replace"], {
+    method: "POST",
+    path: "/v1/knowledge/trees/replace",
+    authentication: "session_bearer",
+    mutation: true,
+  });
 });
 
 test("public negotiation retries transport loss and validates the ArkType envelope", async () => {

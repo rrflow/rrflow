@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -16,6 +16,8 @@ public enum OperationId {
     ESTATE_READ("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SESSION_BEARER, false),
     HEALTH_LIVE("health-live", "GET", "/v1/health/live", Authentication.PUBLIC, false),
     HEALTH_READY("health-ready", "GET", "/v1/health/ready", Authentication.PUBLIC, false),
+    KNOWLEDGE_TREE_LIST("knowledge-tree-list", "POST", "/v1/knowledge/trees/list", Authentication.SESSION_BEARER, false),
+    KNOWLEDGE_TREE_REPLACE("knowledge-tree-replace", "POST", "/v1/knowledge/trees/replace", Authentication.SESSION_BEARER, true),
     OPENAPI_READ("openapi-read", "GET", "/v1/schema/openapi", Authentication.PUBLIC, false),
     QUERY_EXECUTE("query-execute", "POST", "/v1/query", Authentication.SESSION_BEARER, false),
     QUERY_INDEX_ENSURE("query-index-ensure", "POST", "/v1/query/indexes/ensure", Authentication.SESSION_BEARER, true),

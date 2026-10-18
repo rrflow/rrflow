@@ -237,6 +237,25 @@ pub(super) fn capabilities(
             }),
         },
         CapabilityDescriptor {
+            name: CanonicalId::new("knowledge-tree-catalogue").unwrap(),
+            contract_version: rrd_contract::KNOWLEDGE_TREE_CONTRACT_VERSION,
+            status: if engine.installed_estate_identity().is_some() {
+                CapabilityStatus::Experimental
+            } else {
+                CapabilityStatus::Unavailable
+            },
+            limits: BTreeMap::from([
+                (CanonicalId::new("max-trees").unwrap(), rrd_contract::MAX_KNOWLEDGE_TREES as u64),
+                (CanonicalId::new("max-paths").unwrap(), rrd_contract::MAX_KNOWLEDGE_PATHS as u64),
+                (CanonicalId::new("max-catalogue-bytes").unwrap(), rrd_contract::MAX_KNOWLEDGE_CATALOGUE_BYTES as u64),
+            ]),
+            limitation: Some(if engine.installed_estate_identity().is_some() {
+                "authenticated project-bound catalogue configuration with revision compare-and-swap and idempotent receipts; external bindings do not establish provider execution or synchronization".into()
+            } else {
+                "knowledge trees require the identity of an installed project estate".into()
+            }),
+        },
+        CapabilityDescriptor {
             name: CanonicalId::new("lifecycle-journal").unwrap(),
             contract_version: 1,
             status: CapabilityStatus::Available,

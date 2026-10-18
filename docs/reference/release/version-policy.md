@@ -26,8 +26,11 @@ same release version.
 
 Connectome is a separate repository and participates in the same public
 release train. Its own version gate must verify its JavaScript and Tauri
-manifests locally. RRFlow does not inspect a sibling checkout or support a
-second, mounted `apps/connectome` layout.
+manifests locally. RRFlow pins the optional root `connectome/` submodule but
+does not mirror or inspect its product versions as engine declarations. It
+does not inspect a sibling checkout or support a second, mounted
+`apps/connectome` layout. A submodule revision update does not authorize a
+product-version change in either repository.
 
 The product release version is independent of internal protocol, contract,
 fixture, persisted-format, and schema identifiers such as `v1`. Those are

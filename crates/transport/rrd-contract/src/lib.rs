@@ -15,6 +15,7 @@ mod function;
 mod generated_signal_catalogue;
 mod inference;
 mod knowledge;
+mod knowledge_tree;
 mod memory_context;
 mod memory_estate;
 mod model_manifest;
@@ -104,6 +105,13 @@ pub use knowledge::{
     MAX_KNOWLEDGE_PACKAGE_BODY_BYTES, MAX_KNOWLEDGE_RECORDS, MAX_KNOWLEDGE_REVISION_BYTES,
     MAX_KNOWLEDGE_SOURCE_PATH_BYTES,
 };
+pub use knowledge_tree::{
+    KnowledgePath, KnowledgePathBinding, KnowledgeTree, KnowledgeTreeCatalogue, ListKnowledgeTrees,
+    ReplaceKnowledgeTrees, ReplaceKnowledgeTreesResult, KNOWLEDGE_TREE_CONTRACT_VERSION,
+    MAX_KNOWLEDGE_CATALOGUE_BYTES, MAX_KNOWLEDGE_NAME_BYTES, MAX_KNOWLEDGE_PATHS,
+    MAX_KNOWLEDGE_PATHS_PER_TREE, MAX_KNOWLEDGE_PATH_DEPTH,
+    MAX_KNOWLEDGE_PROVIDER_IDENTIFIER_BYTES, MAX_KNOWLEDGE_TREES,
+};
 pub use memory_context::{
     context_packet_sha256, context_plan_sha256, context_plan_stage_sha256, context_request_sha256,
     AssembleContext, ContextAccessPath, ContextEvidence, ContextEvidenceKind, ContextItem,
@@ -189,7 +197,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f";
+    "9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -2970,12 +2978,14 @@ pub enum SecurityAction {
     MemoryContextRead,
     ReasoningRead,
     ReasoningWrite,
+    KnowledgeTreeRead,
+    KnowledgeTreeWrite,
 }
 
 impl SecurityAction {
     /// Canonical policy-action catalogue. Installation profiles and other
     /// projections consume this list instead of maintaining parallel copies.
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 49] = [
         Self::ServiceInspect,
         Self::UnknownRequest,
         Self::SessionCreate,
@@ -3023,6 +3033,8 @@ impl SecurityAction {
         Self::MemoryContextRead,
         Self::ReasoningRead,
         Self::ReasoningWrite,
+        Self::KnowledgeTreeRead,
+        Self::KnowledgeTreeWrite,
     ];
 }
 
@@ -3550,6 +3562,26 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "Readiness",
         ),
         endpoint(
+            "knowledge-tree-list",
+            HttpMethod::Post,
+            "/v1/knowledge/trees/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::KnowledgeTreeRead,
+            "ListKnowledgeTrees",
+            "KnowledgeTreeCatalogue",
+        ),
+        endpoint(
+            "knowledge-tree-replace",
+            HttpMethod::Post,
+            "/v1/knowledge/trees/replace",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::KnowledgeTreeWrite,
+            "ReplaceKnowledgeTrees",
+            "ReplaceKnowledgeTreesResult",
+        ),
+        endpoint(
             "openapi-read",
             HttpMethod::Get,
             "/v1/schema/openapi",
@@ -4067,6 +4099,8 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ExportAudit" => schema_json::<RequestEnvelope<ExportAudit>>(),
         "EnsureQueryIndex" => schema_json::<RequestEnvelope<EnsureQueryIndex>>(),
         "EnsureVectorCollection" => schema_json::<RequestEnvelope<EnsureVectorCollection>>(),
+        "ListKnowledgeTrees" => schema_json::<RequestEnvelope<ListKnowledgeTrees>>(),
+        "ReplaceKnowledgeTrees" => schema_json::<RequestEnvelope<ReplaceKnowledgeTrees>>(),
         "ListQueryIndexes" => schema_json::<RequestEnvelope<ListQueryIndexes>>(),
         "ListVectorCollections" => schema_json::<RequestEnvelope<ListVectorCollections>>(),
         "OpenSubscription" => schema_json::<RequestEnvelope<OpenSubscription>>(),
@@ -4106,6 +4140,10 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "EstateSnapshot" => schema_json::<ResponseEnvelope<EstateSnapshot>>(),
         "InstanceBackupCatalogueSnapshot" => {
             schema_json::<ResponseEnvelope<InstanceBackupCatalogueSnapshot>>()
+        }
+        "KnowledgeTreeCatalogue" => schema_json::<ResponseEnvelope<KnowledgeTreeCatalogue>>(),
+        "ReplaceKnowledgeTreesResult" => {
+            schema_json::<ResponseEnvelope<ReplaceKnowledgeTreesResult>>()
         }
         "Liveness" => schema_json::<ResponseEnvelope<Liveness>>(),
         "LiveQueryDeltaResult" => schema_json::<ResponseEnvelope<LiveQueryDeltaResult>>(),

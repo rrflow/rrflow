@@ -89,6 +89,7 @@ mod function;
 mod index_foundation;
 mod installation;
 mod installation_recovery;
+mod knowledge;
 mod lifecycle;
 mod memory_estate;
 mod native_inference;

@@ -4,6 +4,7 @@ mod changefeed;
 mod context;
 mod data;
 mod diagnostic;
+mod knowledge;
 mod session;
 mod subscription;
 mod vector;

@@ -5,6 +5,12 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
+The owner controls `rrflow.ai` for the reasoning engine and `rroflow.ai` for
+RROFLOW's recursive-learning aspects. Connectome is the shared UI for both,
+operating through the same RRFlow authority. The
+[system overview](docs/architecture/system-overview.md#canonical-component-terminology)
+owns that distinction and the current design intent.
+
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;
 it delegates each detailed subject to exactly one linked memory record. The
@@ -17,11 +23,50 @@ baseline is established. Current maturity is **pre-alpha**. The version is a
 contract line, not a claim that the complete system is stable, optimized, or
 release-ready.
 
+## Connectome management UI
+
+Connectome is the UI for operating RRFlow estates through the public RRD
+contract. Its independent repository is pinned here as the optional
+`connectome/` Git submodule from the owner's `agent/layman-lenses-wip` branch.
+The parent pins an exact reviewed commit, preserving that authored UI and its
+independent history. Engine builds and operation work without initializing it.
+
+```bash
+git submodule update --init connectome
+cargo build --locked -p rrflow-cli --bin rrflow
+cd connectome
+pnpm install --frozen-lockfile
+pnpm tauri:dev
+```
+
+Until the desktop bundle includes the engine, add the built `rrflow` executable
+to PATH or select its absolute path in **Settings → Serving**. On Windows the
+debug build is `target/debug/rrflow.exe` under the engine checkout; on macOS
+and Linux it is `target/debug/rrflow`. Use the engine revision pinned by
+Connectome's native contract dependencies, currently `4705941`; the product
+version alone does not establish protocol compatibility.
+
+Click **Start serving**. The serving console should show `[install] …`,
+`[serve] Listening at http://127.0.0.1:<port> as instance-…`, then
+`[ready] The estate answered an authenticated readiness check`. Acceptance is
+the Records lens with all three handshake cards green. Report the actual
+error text if the sequence fails; an open port or compiled UI is insufficient.
+
+The cloud version is a planned browser delivery of the same Connectome UI
+over the public RRD contract. It needs a supported browser authentication and
+remote transport profile; a desktop build does not establish cloud readiness.
+The [Connectome client contract](docs/reference/client/connectome.md) owns
+that boundary and the current conformance limits. Updating the submodule pin
+is an explicit parent-repository change; normal submodule initialization uses
+the reviewed commit rather than following `main` automatically.
+
 ## Enter RRFlow
 
 | Need | Single owning record |
 |---|---|
 | Understand the product, components, and boundaries | [RRFlow system overview](docs/architecture/system-overview.md) |
+| Configure knowledge trees, native/external paths and inspect provider readiness | [Knowledge trees and provider paths](docs/reference/knowledge-trees.md) |
+| Understand LFG, the SWAG System One controller and recursive-learning boundaries | [Inference extensions](docs/reference/inference-extensions.md) |
 | Understand project, estate, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
 | Select and prove deployment form, storage profile, and endpoint presentation independently | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
 | Install, serve, verify, repair, restore, and remove one project estate through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |

@@ -1,6 +1,6 @@
 # RRFlow Connectome client contract
 
-**Status:** active target client contract; canonical RRFlow discovery handoff exists, separate checkout remains non-conforming
+**Status:** active target client contract; optional authored client source is pinned, H-06 conformance remains unqualified
 **Coordinate:** `rrflow://rrflow-instance/data/reference/client/connectome`
 **Owner:** Connectome connection, projection, interaction, local-state, and conformance requirements
 
@@ -24,6 +24,38 @@ versioned, tested, and released from its own repository. RRFlow can reach local,
 remote, or explicitly mesh-resolved instances without Connectome, and the
 default RRFlow distribution does not require the Connectome checkout or
 artifact.
+
+## Joint development and delivery
+
+The engine repository pins Connectome's independent development history at
+root `connectome/` through a Git submodule whose source is
+`https://github.com/rrflow/connectome-development.git` and the owner's
+`agent/layman-lenses-wip` branch. This selects the authored Connectome UI;
+updating from another branch is not an implicit integration step. Initialize it with
+`git submodule update --init connectome`. The gitlink selects an exact reviewed
+client revision; advancing that pin is an explicit engine-repository change.
+Connectome is excluded from the engine Cargo workspace, default build,
+distribution, and readiness prerequisites. A checkout with the client
+uninitialized must still build and operate RRFlow.
+
+Connectome is the management UI for available estate operations. The desktop
+Tauri shell can drive the primary `rrflow` executable's install/serve/ready
+sequence and then render authenticated engine state. Until binary bundling
+lands, the executable must be on PATH or selected in Settings → Serving and
+must match the client's pinned native contract. The root README supplies the
+development commands and serving-handshake oracle. Exposing a control does
+not make an unavailable engine operation implemented.
+
+The cloud version is a planned browser delivery of the same client and public
+operation contract. Hosting and physical placement do not add an engine
+deployment form. Browser transport and short-lived, origin-constrained
+authentication must be implemented and qualified before this delivery can
+claim authenticated estate management; the desktop secret boundary cannot be
+copied into browser storage. Local process launch remains a desktop
+capability. Any cloud provisioning or fleet control service requires its own
+accepted public contract and cannot be inferred from client navigation.
+
+## Projection authority
 
 Connectome is a projection client. It may:
 
@@ -280,11 +312,12 @@ contract; a client-local `rrflow-control` protocol cannot create one.
 
 ## Current separate-checkout audit
 
-The reviewed implementation baseline is the clean separate repository at
+The historical reviewed implementation baseline was the clean separate repository at
 `../connectome`, commit
 `38f68ce7adda9d03501f3591165f0e14996899ec` (`feat: add authenticated native
 RRD client`). Its successful checks characterize useful code; they do not prove
-H-06.
+H-06. That path and revision identify the audit below, not the current
+submodule checkout or a current conformance result.
 
 | Current implementation | Useful behavior retained as a requirement | Direct-convergence gap |
 |---|---|---|

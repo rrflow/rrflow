@@ -8,13 +8,14 @@ use rrd_contract::{
     ChangefeedFollowResult, ChangefeedPage, CommitReceipt, CommitTransaction, ContextPacket,
     CorrelationId, CreateInstanceBackup, CreateInstanceBackupResult, DiagnosticSnapshot,
     EnsureVectorCollection, EnsureVectorCollectionResult, EstateSnapshot, ExecuteQuery,
-    ExportAudit, FollowChangefeed, InstanceBackupCatalogueSnapshot, ListInstanceBackups,
-    ListVectorCollections, PreviewTransaction, QueryResult, ReadAudit, ReadChangefeed,
-    ReadDiagnosticSnapshot, ReadEstate, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
-    ResourcePath, ResponseEnvelope, ResponseOutcome, RestoreInstanceBackup,
-    RestoreInstanceBackupResult, RetrieveVectorPoints, ScrollVectorPoints, SearchVectors,
-    TransactionLease, TransactionPreview, VectorCollectionCatalogueSnapshot, VectorPointBatch,
-    VectorPointPage, VectorSearchResult, PROTOCOL, PROTOCOL_VERSION,
+    ExportAudit, FollowChangefeed, InstanceBackupCatalogueSnapshot, KnowledgeTreeCatalogue,
+    ListInstanceBackups, ListKnowledgeTrees, ListVectorCollections, PreviewTransaction,
+    QueryResult, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot, ReadEstate,
+    ReplaceKnowledgeTrees, ReplaceKnowledgeTreesResult, RequestContext, RequestEnvelope,
+    ResourceId, ResourceKind, ResourcePath, ResponseEnvelope, ResponseOutcome,
+    RestoreInstanceBackup, RestoreInstanceBackupResult, RetrieveVectorPoints, ScrollVectorPoints,
+    SearchVectors, TransactionLease, TransactionPreview, VectorCollectionCatalogueSnapshot,
+    VectorPointBatch, VectorPointPage, VectorSearchResult, PROTOCOL, PROTOCOL_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -198,6 +199,47 @@ impl RrdClient {
         .await
     }
 
+    pub async fn list_knowledge_trees(
+        &self,
+        session: &Session,
+        request: ListKnowledgeTrees,
+        options: RequestOptions,
+    ) -> Result<KnowledgeTreeCatalogue> {
+        request.validate().map_err(contract)?;
+        let catalogue: KnowledgeTreeCatalogue = self
+            .session_call(
+                Method::POST,
+                "/v1/knowledge/trees/list",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        catalogue.validate().map_err(contract)?;
+        Ok(catalogue)
+    }
+
+    pub async fn replace_knowledge_trees(
+        &self,
+        session: &Session,
+        request: ReplaceKnowledgeTrees,
+        options: RequestOptions,
+    ) -> Result<ReplaceKnowledgeTreesResult> {
+        request.validate().map_err(contract)?;
+        let result: ReplaceKnowledgeTreesResult = self
+            .session_call(
+                Method::POST,
+                "/v1/knowledge/trees/replace",
+                session,
+                request,
+                options,
+                true,
+            )
+            .await?;
+        result.catalogue.validate().map_err(contract)?;
+        Ok(result)
+    }
     pub async fn scroll_vector_points(
         &self,
         session: &Session,

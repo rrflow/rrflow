@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+# OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[
@@ -16,6 +16,8 @@ OperationId = Literal[
     "estate-read",
     "health-live",
     "health-ready",
+    "knowledge-tree-list",
+    "knowledge-tree-replace",
     "openapi-read",
     "query-execute",
     "query-index-ensure",
@@ -124,6 +126,18 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "GET",
         "mutation": False,
         "path": "/v1/health/ready",
+    },
+    "knowledge-tree-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/knowledge/trees/list",
+    },
+    "knowledge-tree-replace": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/knowledge/trees/replace",
     },
     "openapi-read": {
         "authentication": "public",

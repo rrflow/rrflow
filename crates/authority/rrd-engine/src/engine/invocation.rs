@@ -48,6 +48,8 @@ pub enum RrdOperation {
     MemoryContextRead,
     ReasoningRead,
     ReasoningWrite,
+    KnowledgeTreeRead,
+    KnowledgeTreeWrite,
 }
 
 impl RrdOperation {
@@ -75,6 +77,7 @@ impl RrdOperation {
                 | Self::VectorPayloadIndexEnsure
                 | Self::VectorPayloadIndexDelete
                 | Self::ReasoningWrite
+                | Self::KnowledgeTreeWrite
         )
     }
 
@@ -123,6 +126,8 @@ impl RrdOperation {
             Self::MemoryContextRead => SecurityAction::MemoryContextRead,
             Self::ReasoningRead => SecurityAction::ReasoningRead,
             Self::ReasoningWrite => SecurityAction::ReasoningWrite,
+            Self::KnowledgeTreeRead => SecurityAction::KnowledgeTreeRead,
+            Self::KnowledgeTreeWrite => SecurityAction::KnowledgeTreeWrite,
         }
     }
 }

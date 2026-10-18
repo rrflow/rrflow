@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -198,6 +198,40 @@ export interface paths {
         get: operations["health-ready"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/knowledge/trees/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD knowledge-tree-list */
+        post: operations["knowledge-tree-list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/knowledge/trees/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD knowledge-tree-replace */
+        post: operations["knowledge-tree-replace"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2436,7 +2470,7 @@ export interface operations {
                                 chain_head_sha256?: string | null;
                                 records: {
                                     /** @enum {string} */
-                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     /** Format: uint64 */
                                     at_unix_ms: number;
                                     /**
@@ -2526,7 +2560,7 @@ export interface operations {
                                 chain_head_sha256?: string | null;
                                 records: {
                                     /** @enum {string} */
-                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     /** Format: uint64 */
                                     at_unix_ms: number;
                                     /**
@@ -8114,7 +8148,7 @@ export interface operations {
                                     chain_head_sha256?: string | null;
                                     records: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** Format: uint64 */
                                         at_unix_ms: number;
                                         /**
@@ -10662,7 +10696,7 @@ export interface operations {
                                     chain_head_sha256?: string | null;
                                     records: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** Format: uint64 */
                                         at_unix_ms: number;
                                         /**
@@ -13887,6 +13921,1134 @@ export interface operations {
             };
         };
     };
+    "knowledge-tree-list": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        project_id: string;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            /**
+                             * @description One project's catalogue within an existing data scope. Revision zero is
+                             *     the empty initial state. Replacements receive the next revision from the
+                             *     engine; clients do not submit an independently asserted revision or digest.
+                             */
+                            payload: {
+                                /** Format: uint16 */
+                                contract_version: number;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                project_id: string;
+                                /** Format: uint64 */
+                                revision: number;
+                                scope: string;
+                                trees: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    id: string;
+                                    name: string;
+                                    paths: {
+                                        /**
+                                         * @description A logical grouping or an explicit vector-store source. Provider identifiers
+                                         *     are open canonical identities; their presence does not advertise an adapter.
+                                         */
+                                        binding: {
+                                            /** @constant */
+                                            kind: "group";
+                                        } | {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            collection_id: string;
+                                            /** @constant */
+                                            kind: "native";
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            vector_name: string;
+                                        } | {
+                                            collection?: string | null;
+                                            /**
+                                             * @description Existing endpoint/credential-reference and admission-limit contract.
+                                             *     API/subscription bindings require a credential reference; a declared
+                                             *     local or self-hosted service may permit anonymous access.
+                                             */
+                                            endpoint: {
+                                                /**
+                                                 * @description The eight workload classes. Code depends on a class contract; a profile
+                                                 *     decides which endpoint serves it.
+                                                 */
+                                                class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                                /** @description Required for subscription and API bindings. Never a value. */
+                                                credential?: {
+                                                    name: string;
+                                                    /**
+                                                     * @description A canonical public identifier component.
+                                                     *
+                                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                     *     labels are separate data and may use arbitrary Unicode.
+                                                     */
+                                                    provider: string;
+                                                } | null;
+                                                /**
+                                                 * @description Where a binding is reached. In-process execution is the narrow local
+                                                 *     exception; everything else is a URL.
+                                                 */
+                                                endpoint: {
+                                                    /**
+                                                     * @description A canonical public identifier component.
+                                                     *
+                                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                     *     labels are separate data and may use arbitrary Unicode.
+                                                     */
+                                                    component: string;
+                                                    /** @constant */
+                                                    kind: "in_process";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "url";
+                                                    url: string;
+                                                };
+                                                /**
+                                                 * @description Memory a binding declares it consumes on its placement machine. Declared
+                                                 *     values are replaced by measured ones once observation exists.
+                                                 */
+                                                footprint: {
+                                                    /** @description GPU memory a binding declares it needs on its placement machine. */
+                                                    gpu: {
+                                                        /** @constant */
+                                                        kind: "none";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "required";
+                                                        /** Format: uint64 */
+                                                        memory_bytes: number;
+                                                    };
+                                                    /** Format: uint64 */
+                                                    memory_bytes: number;
+                                                };
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                id: string;
+                                                /**
+                                                 * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                                 *     the class contract.
+                                                 */
+                                                kind: "local" | "self_hosted" | "subscription" | "api";
+                                                /**
+                                                 * @description Generic admission limits for one binding. Class-specific limits stay with
+                                                 *     their class contracts.
+                                                 */
+                                                limits: {
+                                                    /** Format: uint32 */
+                                                    max_concurrency: number;
+                                                    /** Format: uint64 */
+                                                    max_input_bytes: number;
+                                                    /** Format: uint64 */
+                                                    timeout_ms: number;
+                                                };
+                                                /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                                manifest_sha256?: string | null;
+                                                /**
+                                                 * @description The inventory machine this binding runs on. Required for local and
+                                                 *     self-hosted bindings, absent for subscription and API bindings.
+                                                 */
+                                                placement?: string | null;
+                                                /**
+                                                 * @description The model or service this binding reaches: a router model manifest id,
+                                                 *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                                 */
+                                                service_id: string;
+                                            };
+                                            index?: string | null;
+                                            /** @constant */
+                                            kind: "external";
+                                            namespace?: string | null;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider_id: string;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        name: string;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        parent_id?: string | null;
+                                    }[];
+                                }[];
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            /**
+                             * @description One project's catalogue within an existing data scope. Revision zero is
+                             *     the empty initial state. Replacements receive the next revision from the
+                             *     engine; clients do not submit an independently asserted revision or digest.
+                             */
+                            payload: {
+                                /** Format: uint16 */
+                                contract_version: number;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                project_id: string;
+                                /** Format: uint64 */
+                                revision: number;
+                                scope: string;
+                                trees: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    id: string;
+                                    name: string;
+                                    paths: {
+                                        /**
+                                         * @description A logical grouping or an explicit vector-store source. Provider identifiers
+                                         *     are open canonical identities; their presence does not advertise an adapter.
+                                         */
+                                        binding: {
+                                            /** @constant */
+                                            kind: "group";
+                                        } | {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            collection_id: string;
+                                            /** @constant */
+                                            kind: "native";
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            vector_name: string;
+                                        } | {
+                                            collection?: string | null;
+                                            /**
+                                             * @description Existing endpoint/credential-reference and admission-limit contract.
+                                             *     API/subscription bindings require a credential reference; a declared
+                                             *     local or self-hosted service may permit anonymous access.
+                                             */
+                                            endpoint: {
+                                                /**
+                                                 * @description The eight workload classes. Code depends on a class contract; a profile
+                                                 *     decides which endpoint serves it.
+                                                 */
+                                                class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                                /** @description Required for subscription and API bindings. Never a value. */
+                                                credential?: {
+                                                    name: string;
+                                                    /**
+                                                     * @description A canonical public identifier component.
+                                                     *
+                                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                     *     labels are separate data and may use arbitrary Unicode.
+                                                     */
+                                                    provider: string;
+                                                } | null;
+                                                /**
+                                                 * @description Where a binding is reached. In-process execution is the narrow local
+                                                 *     exception; everything else is a URL.
+                                                 */
+                                                endpoint: {
+                                                    /**
+                                                     * @description A canonical public identifier component.
+                                                     *
+                                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                     *     labels are separate data and may use arbitrary Unicode.
+                                                     */
+                                                    component: string;
+                                                    /** @constant */
+                                                    kind: "in_process";
+                                                } | {
+                                                    /** @constant */
+                                                    kind: "url";
+                                                    url: string;
+                                                };
+                                                /**
+                                                 * @description Memory a binding declares it consumes on its placement machine. Declared
+                                                 *     values are replaced by measured ones once observation exists.
+                                                 */
+                                                footprint: {
+                                                    /** @description GPU memory a binding declares it needs on its placement machine. */
+                                                    gpu: {
+                                                        /** @constant */
+                                                        kind: "none";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "required";
+                                                        /** Format: uint64 */
+                                                        memory_bytes: number;
+                                                    };
+                                                    /** Format: uint64 */
+                                                    memory_bytes: number;
+                                                };
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                id: string;
+                                                /**
+                                                 * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                                 *     the class contract.
+                                                 */
+                                                kind: "local" | "self_hosted" | "subscription" | "api";
+                                                /**
+                                                 * @description Generic admission limits for one binding. Class-specific limits stay with
+                                                 *     their class contracts.
+                                                 */
+                                                limits: {
+                                                    /** Format: uint32 */
+                                                    max_concurrency: number;
+                                                    /** Format: uint64 */
+                                                    max_input_bytes: number;
+                                                    /** Format: uint64 */
+                                                    timeout_ms: number;
+                                                };
+                                                /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                                manifest_sha256?: string | null;
+                                                /**
+                                                 * @description The inventory machine this binding runs on. Required for local and
+                                                 *     self-hosted bindings, absent for subscription and API bindings.
+                                                 */
+                                                placement?: string | null;
+                                                /**
+                                                 * @description The model or service this binding reaches: a router model manifest id,
+                                                 *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                                 */
+                                                service_id: string;
+                                            };
+                                            index?: string | null;
+                                            /** @constant */
+                                            kind: "external";
+                                            namespace?: string | null;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider_id: string;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        name: string;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        parent_id?: string | null;
+                                    }[];
+                                }[];
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "knowledge-tree-replace": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /**
+                     * @description Full desired catalogue contents under compare-and-swap. Omitting an entry
+                     *     removes it. Changing a label does not change identity; moving a retained
+                     *     path identity between trees is rejected by validate_against.
+                     */
+                    payload: {
+                        /** Format: uint64 */
+                        expected_revision: number;
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        project_id: string;
+                        scope: string;
+                        trees: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            name: string;
+                            paths: {
+                                /**
+                                 * @description A logical grouping or an explicit vector-store source. Provider identifiers
+                                 *     are open canonical identities; their presence does not advertise an adapter.
+                                 */
+                                binding: {
+                                    /** @constant */
+                                    kind: "group";
+                                } | {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    collection_id: string;
+                                    /** @constant */
+                                    kind: "native";
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    vector_name: string;
+                                } | {
+                                    collection?: string | null;
+                                    /**
+                                     * @description Existing endpoint/credential-reference and admission-limit contract.
+                                     *     API/subscription bindings require a credential reference; a declared
+                                     *     local or self-hosted service may permit anonymous access.
+                                     */
+                                    endpoint: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    };
+                                    index?: string | null;
+                                    /** @constant */
+                                    kind: "external";
+                                    namespace?: string | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    provider_id: string;
+                                };
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                id: string;
+                                name: string;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                parent_id?: string | null;
+                            }[];
+                        }[];
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description One project's catalogue within an existing data scope. Revision zero is
+                                 *     the empty initial state. Replacements receive the next revision from the
+                                 *     engine; clients do not submit an independently asserted revision or digest.
+                                 */
+                                catalogue: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                    scope: string;
+                                    trees: {
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        name: string;
+                                        paths: {
+                                            /**
+                                             * @description A logical grouping or an explicit vector-store source. Provider identifiers
+                                             *     are open canonical identities; their presence does not advertise an adapter.
+                                             */
+                                            binding: {
+                                                /** @constant */
+                                                kind: "group";
+                                            } | {
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                collection_id: string;
+                                                /** @constant */
+                                                kind: "native";
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                vector_name: string;
+                                            } | {
+                                                collection?: string | null;
+                                                /**
+                                                 * @description Existing endpoint/credential-reference and admission-limit contract.
+                                                 *     API/subscription bindings require a credential reference; a declared
+                                                 *     local or self-hosted service may permit anonymous access.
+                                                 */
+                                                endpoint: {
+                                                    /**
+                                                     * @description The eight workload classes. Code depends on a class contract; a profile
+                                                     *     decides which endpoint serves it.
+                                                     */
+                                                    class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                                    /** @description Required for subscription and API bindings. Never a value. */
+                                                    credential?: {
+                                                        name: string;
+                                                        /**
+                                                         * @description A canonical public identifier component.
+                                                         *
+                                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                         *     labels are separate data and may use arbitrary Unicode.
+                                                         */
+                                                        provider: string;
+                                                    } | null;
+                                                    /**
+                                                     * @description Where a binding is reached. In-process execution is the narrow local
+                                                     *     exception; everything else is a URL.
+                                                     */
+                                                    endpoint: {
+                                                        /**
+                                                         * @description A canonical public identifier component.
+                                                         *
+                                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                         *     labels are separate data and may use arbitrary Unicode.
+                                                         */
+                                                        component: string;
+                                                        /** @constant */
+                                                        kind: "in_process";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "url";
+                                                        url: string;
+                                                    };
+                                                    /**
+                                                     * @description Memory a binding declares it consumes on its placement machine. Declared
+                                                     *     values are replaced by measured ones once observation exists.
+                                                     */
+                                                    footprint: {
+                                                        /** @description GPU memory a binding declares it needs on its placement machine. */
+                                                        gpu: {
+                                                            /** @constant */
+                                                            kind: "none";
+                                                        } | {
+                                                            /** @constant */
+                                                            kind: "required";
+                                                            /** Format: uint64 */
+                                                            memory_bytes: number;
+                                                        };
+                                                        /** Format: uint64 */
+                                                        memory_bytes: number;
+                                                    };
+                                                    /**
+                                                     * @description A canonical public identifier component.
+                                                     *
+                                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                     *     labels are separate data and may use arbitrary Unicode.
+                                                     */
+                                                    id: string;
+                                                    /**
+                                                     * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                                     *     the class contract.
+                                                     */
+                                                    kind: "local" | "self_hosted" | "subscription" | "api";
+                                                    /**
+                                                     * @description Generic admission limits for one binding. Class-specific limits stay with
+                                                     *     their class contracts.
+                                                     */
+                                                    limits: {
+                                                        /** Format: uint32 */
+                                                        max_concurrency: number;
+                                                        /** Format: uint64 */
+                                                        max_input_bytes: number;
+                                                        /** Format: uint64 */
+                                                        timeout_ms: number;
+                                                    };
+                                                    /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                                    manifest_sha256?: string | null;
+                                                    /**
+                                                     * @description The inventory machine this binding runs on. Required for local and
+                                                     *     self-hosted bindings, absent for subscription and API bindings.
+                                                     */
+                                                    placement?: string | null;
+                                                    /**
+                                                     * @description The model or service this binding reaches: a router model manifest id,
+                                                     *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                                     */
+                                                    service_id: string;
+                                                };
+                                                index?: string | null;
+                                                /** @constant */
+                                                kind: "external";
+                                                namespace?: string | null;
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                provider_id: string;
+                                            };
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            parent_id?: string | null;
+                                        }[];
+                                    }[];
+                                };
+                                idempotent_replay: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description One project's catalogue within an existing data scope. Revision zero is
+                                 *     the empty initial state. Replacements receive the next revision from the
+                                 *     engine; clients do not submit an independently asserted revision or digest.
+                                 */
+                                catalogue: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                    scope: string;
+                                    trees: {
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        name: string;
+                                        paths: {
+                                            /**
+                                             * @description A logical grouping or an explicit vector-store source. Provider identifiers
+                                             *     are open canonical identities; their presence does not advertise an adapter.
+                                             */
+                                            binding: {
+                                                /** @constant */
+                                                kind: "group";
+                                            } | {
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                collection_id: string;
+                                                /** @constant */
+                                                kind: "native";
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                vector_name: string;
+                                            } | {
+                                                collection?: string | null;
+                                                /**
+                                                 * @description Existing endpoint/credential-reference and admission-limit contract.
+                                                 *     API/subscription bindings require a credential reference; a declared
+                                                 *     local or self-hosted service may permit anonymous access.
+                                                 */
+                                                endpoint: {
+                                                    /**
+                                                     * @description The eight workload classes. Code depends on a class contract; a profile
+                                                     *     decides which endpoint serves it.
+                                                     */
+                                                    class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                                    /** @description Required for subscription and API bindings. Never a value. */
+                                                    credential?: {
+                                                        name: string;
+                                                        /**
+                                                         * @description A canonical public identifier component.
+                                                         *
+                                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                         *     labels are separate data and may use arbitrary Unicode.
+                                                         */
+                                                        provider: string;
+                                                    } | null;
+                                                    /**
+                                                     * @description Where a binding is reached. In-process execution is the narrow local
+                                                     *     exception; everything else is a URL.
+                                                     */
+                                                    endpoint: {
+                                                        /**
+                                                         * @description A canonical public identifier component.
+                                                         *
+                                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                         *     labels are separate data and may use arbitrary Unicode.
+                                                         */
+                                                        component: string;
+                                                        /** @constant */
+                                                        kind: "in_process";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "url";
+                                                        url: string;
+                                                    };
+                                                    /**
+                                                     * @description Memory a binding declares it consumes on its placement machine. Declared
+                                                     *     values are replaced by measured ones once observation exists.
+                                                     */
+                                                    footprint: {
+                                                        /** @description GPU memory a binding declares it needs on its placement machine. */
+                                                        gpu: {
+                                                            /** @constant */
+                                                            kind: "none";
+                                                        } | {
+                                                            /** @constant */
+                                                            kind: "required";
+                                                            /** Format: uint64 */
+                                                            memory_bytes: number;
+                                                        };
+                                                        /** Format: uint64 */
+                                                        memory_bytes: number;
+                                                    };
+                                                    /**
+                                                     * @description A canonical public identifier component.
+                                                     *
+                                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                     *     labels are separate data and may use arbitrary Unicode.
+                                                     */
+                                                    id: string;
+                                                    /**
+                                                     * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                                     *     the class contract.
+                                                     */
+                                                    kind: "local" | "self_hosted" | "subscription" | "api";
+                                                    /**
+                                                     * @description Generic admission limits for one binding. Class-specific limits stay with
+                                                     *     their class contracts.
+                                                     */
+                                                    limits: {
+                                                        /** Format: uint32 */
+                                                        max_concurrency: number;
+                                                        /** Format: uint64 */
+                                                        max_input_bytes: number;
+                                                        /** Format: uint64 */
+                                                        timeout_ms: number;
+                                                    };
+                                                    /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                                    manifest_sha256?: string | null;
+                                                    /**
+                                                     * @description The inventory machine this binding runs on. Required for local and
+                                                     *     self-hosted bindings, absent for subscription and API bindings.
+                                                     */
+                                                    placement?: string | null;
+                                                    /**
+                                                     * @description The model or service this binding reaches: a router model manifest id,
+                                                     *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                                     */
+                                                    service_id: string;
+                                                };
+                                                index?: string | null;
+                                                /** @constant */
+                                                kind: "external";
+                                                namespace?: string | null;
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                provider_id: string;
+                                            };
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            parent_id?: string | null;
+                                        }[];
+                                    }[];
+                                };
+                                idempotent_replay: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
     "query-execute": {
         parameters: {
             query?: never;
@@ -15967,7 +17129,7 @@ export interface operations {
                                 endpoints: {
                                     action: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** @constant */
                                         source: "fixed";
                                     };
@@ -15994,7 +17156,7 @@ export interface operations {
                                     /** @enum {string} */
                                     authentication: "public" | "api_key" | "session_bearer";
                                     /** @enum {string} */
-                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     frame_type: string;
                                     /**
                                      * @description A canonical public identifier component.
@@ -16041,7 +17203,7 @@ export interface operations {
                                 endpoints: {
                                     action: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** @constant */
                                         source: "fixed";
                                     };
@@ -16068,7 +17230,7 @@ export interface operations {
                                     /** @enum {string} */
                                     authentication: "public" | "api_key" | "session_bearer";
                                     /** @enum {string} */
-                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write";
+                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     frame_type: string;
                                     /**
                                      * @description A canonical public identifier component.

@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "docs" / "roadmap" / "rrflow-1.0-file-plan.jsonl"
 ROADMAP = ROOT / "docs" / "roadmap" / "rrflow-1.0.md"
 ACTIVE_CHANGE_PLAN = "docs/roadmap/rrflow-1.0-active-change.json"
+CONNECTOME_PATH = "connectome"
+CONNECTOME_REPOSITORY = "https://github.com/rrflow/connectome-development.git"
+CONNECTOME_BRANCH = "agent/layman-lenses-wip"
 
 PACKAGE_GATES: dict[str, tuple[str, ...]] = {
     "rrd-core": ("A-07", "C-01", "C-02", "C-03", "H-05", "I-01"),
@@ -1668,6 +1671,59 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 
+def gitlinks() -> dict[str, str]:
+    """Read pins from the parent index; optional client contents are never inputs."""
+    result = subprocess.run(
+        ["git", "ls-files", "--stage", "-z"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    links = {}
+    for encoded in result.stdout.split(b"\0"):
+        if not encoded:
+            continue
+        metadata, path = encoded.decode("utf-8").split("\t", 1)
+        mode, revision, stage = metadata.split()
+        if mode != "160000":
+            continue
+        if path != CONNECTOME_PATH or stage != "0":
+            raise ValueError(f"only the optional connectome gitlink is allowed: {path}")
+        if not re.fullmatch(r"[0-9a-f]{40}", revision) or revision == "0" * 40:
+            raise ValueError(f"connectome gitlink has no exact commit: {revision}")
+        links[path] = revision
+
+    modules = ROOT / ".gitmodules"
+    if not modules.exists():
+        if links:
+            raise ValueError("connectome gitlink requires canonical .gitmodules")
+        return links
+    result = subprocess.run(
+        ["git", "config", "--file", str(modules), "--null", "--list"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    entries = [
+        entry.decode("utf-8").split("\n", 1)
+        for entry in result.stdout.split(b"\0")
+        if entry
+    ]
+    declaration = {
+        "submodule.connectome.path": CONNECTOME_PATH,
+        "submodule.connectome.url": CONNECTOME_REPOSITORY,
+        "submodule.connectome.branch": CONNECTOME_BRANCH,
+    }
+    if (
+        len(entries) != len(declaration)
+        or any(len(entry) != 2 for entry in entries)
+        or dict(entries) != declaration
+        or set(links) != {CONNECTOME_PATH}
+    ):
+        raise ValueError(".gitmodules must declare only the canonical connectome repository")
+    return links
+
+
 def git_files() -> list[str]:
     result = subprocess.run(
         [
@@ -1838,9 +1894,26 @@ def current_record(path: str) -> dict[str, object]:
     }
 
 
+def gitlink_record(path: str, revision: str) -> dict[str, object]:
+    return {
+        "path": path,
+        "state": "current",
+        "kind": "optional-client-gitlink",
+        "repository": CONNECTOME_REPOSITORY,
+        "git_revision": revision,
+        "coverage": "parent gitlink only; client checkout is optional and independently owned",
+        "planned_gates": ["D-01", "H-06"],
+        "action": "pin the separately released public-contract client; never require its source for the engine build, installation, or readiness",
+    }
+
+
 def records() -> list[dict[str, object]]:
+    links = gitlinks()
     current_paths = git_files()
-    result = [current_record(path) for path in current_paths]
+    result = [
+        gitlink_record(path, links[path]) if path in links else current_record(path)
+        for path in current_paths
+    ]
     current_set = set(current_paths)
     for path, gates in PLANNED_PATHS.items():
         if path in current_set:
@@ -1861,6 +1934,7 @@ def records() -> list[dict[str, object]]:
 
 
 def validate(records_to_check: list[dict[str, object]]) -> None:
+    links = gitlinks()
     roadmap = ROADMAP.read_text(encoding="utf-8")
     roadmap_ids = set(
         re.findall(r"(?m)^\| \[[ x]\] \| ((?:[A-J]-\d{2})|(?:KB-\d{2})) \|", roadmap)
@@ -1915,7 +1989,10 @@ def validate(records_to_check: list[dict[str, object]]) -> None:
             raise ValueError(f"execution-plan path {path} has unknown gates: {unknown}")
         state = record["state"]
         if state == "current":
-            if not {"bytes", "sha256", "coverage"}.issubset(record):
+            if path in links:
+                if record != gitlink_record(path, links[path]):
+                    raise ValueError(f"optional client record does not match the gitlink: {path}")
+            elif not {"bytes", "sha256", "coverage"}.issubset(record):
                 raise ValueError(
                     f"current path lacks complete baseline evidence: {path}"
                 )

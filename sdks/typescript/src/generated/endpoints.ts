@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -72,6 +72,18 @@ export const endpoints = {
     "path": "/v1/health/ready",
     "authentication": "public",
     "mutation": false
+  },
+  "knowledge-tree-list": {
+    "method": "POST",
+    "path": "/v1/knowledge/trees/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "knowledge-tree-replace": {
+    "method": "POST",
+    "path": "/v1/knowledge/trees/replace",
+    "authentication": "session_bearer",
+    "mutation": true
   },
   "query-execute": {
     "method": "POST",

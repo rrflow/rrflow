@@ -33,8 +33,14 @@ struct DependencyInput {
 
 struct GitIndexEntry {
     mode: String,
+    revision: String,
+    stage: String,
     path: PathBuf,
 }
+
+const CONNECTOME_PATH: &str = "connectome";
+const CONNECTOME_REPOSITORY: &str = "https://github.com/rrflow/connectome-development.git";
+const CONNECTOME_BRANCH: &str = "agent/layman-lenses-wip";
 
 #[test]
 fn workspace_packages_use_the_canonical_grouped_layout() {
@@ -1117,6 +1123,14 @@ fn workspace_source_inputs_are_repository_closed() {
         .collect::<BTreeSet<_>>();
 
     let mut violations = Vec::new();
+    for package in metadata.packages.values() {
+        if package.manifest.starts_with(CONNECTOME_PATH) {
+            violations.push(format!(
+                "optional Connectome client is a Cargo workspace member at {}",
+                package.manifest.display()
+            ));
+        }
+    }
     for source in &metadata.target_sources {
         let path = metadata.root.join(source);
         let canonical = fs::canonicalize(&path)
@@ -1126,6 +1140,14 @@ fn workspace_source_inputs_are_repository_closed() {
                 "Cargo target {} resolves outside the repository to {}",
                 source.display(),
                 canonical.display()
+            ));
+        }
+        if source.starts_with(CONNECTOME_PATH)
+            || canonical.starts_with(canonical_root.join(CONNECTOME_PATH))
+        {
+            violations.push(format!(
+                "Cargo target {} depends on optional Connectome source",
+                source.display()
             ));
         }
     }
@@ -1148,7 +1170,14 @@ fn workspace_source_inputs_are_repository_closed() {
         };
         let canonical = fs::canonicalize(path)
             .unwrap_or_else(|error| panic!("cannot resolve {}: {error}", path.display()));
-        if !canonical.starts_with(&canonical_root) {
+        if canonical.starts_with(canonical_root.join(CONNECTOME_PATH)) {
+            violations.push(format!(
+                "{} depends on optional Connectome package {} at {}",
+                dependency.owner,
+                dependency.name,
+                canonical.display()
+            ));
+        } else if !canonical.starts_with(&canonical_root) {
             violations.push(format!(
                 "{} depends on local package {} outside the repository at {}",
                 dependency.owner,
@@ -1175,24 +1204,24 @@ fn workspace_source_inputs_are_repository_closed() {
         violations.push("Cargo.lock contains a transitive Git source".to_owned());
     }
 
-    for entry in git_index_entries(&metadata.root) {
-        if entry.mode == "160000" {
-            violations.push(format!(
-                "tracked Git submodule supplies repository input at {}",
-                entry.path.display()
-            ));
-        }
+    let entries = git_index_entries(&metadata.root);
+    violations.extend(optional_client_gitlink_violations(
+        &entries,
+        &gitmodule_declarations(&metadata.root),
+    ));
+    for entry in entries {
         if entry.mode != "120000" {
             continue;
         }
         let path = metadata.root.join(&entry.path);
         match fs::canonicalize(&path) {
-            Ok(canonical) if canonical.starts_with(&canonical_root) => {}
-            Ok(canonical) => violations.push(format!(
-                "tracked symlink {} escapes the repository to {}",
-                entry.path.display(),
-                canonical.display()
-            )),
+            Ok(canonical) => {
+                if let Some(violation) =
+                    tracked_symlink_target_violation(&canonical_root, &entry.path, &canonical)
+                {
+                    violations.push(violation);
+                }
+            }
             Err(error) => violations.push(format!(
                 "tracked symlink {} cannot be resolved: {error}",
                 entry.path.display()
@@ -1203,8 +1232,116 @@ fn workspace_source_inputs_are_repository_closed() {
     violations.sort();
     assert!(
         violations.is_empty(),
-        "RRFlow first-party source must be supplied by this workspace without Git, submodule, or escaping-path inputs: {violations:#?}"
+        "RRFlow engine source must be repository-contained; only the optional Connectome client may be a pinned submodule: {violations:#?}"
     );
+}
+
+#[test]
+fn tracked_symlink_targets_cannot_import_optional_client_assets() {
+    // Canonicalization supplies the same target path for file and directory
+    // symlinks. Exercise its policy without requiring Windows symlink privilege
+    // or initializing the optional client checkout.
+    let root = fs::canonicalize(std::env::current_dir().expect("current directory must exist"))
+        .expect("current directory must resolve");
+    for (source, client_target) in [
+        ("schemas/estate.json", "schemas/estate.json"),
+        (
+            "crates/adapters/rrflow-cli/templates/project-v1",
+            "templates/project-v1",
+        ),
+        ("deploy/default.toml", "configuration/default.toml"),
+        ("fixtures/client-assets", ""),
+    ] {
+        let target = root.join(CONNECTOME_PATH).join(client_target);
+        let violation = tracked_symlink_target_violation(&root, Path::new(source), &target)
+            .expect("a tracked parent symlink cannot import optional client assets");
+        assert!(violation.contains(source));
+        assert!(violation.contains("optional Connectome"));
+    }
+    for target in [
+        root.join("schemas/shared.json"),
+        root.join("crates/adapters/rrflow-cli/templates"),
+        root.join("connectome-fixtures/default.toml"),
+    ] {
+        assert!(
+            tracked_symlink_target_violation(&root, Path::new("fixtures/shared"), &target)
+                .is_none()
+        );
+    }
+    let outside = root
+        .parent()
+        .expect("repository must have a parent")
+        .join("external");
+    let violation = tracked_symlink_target_violation(&root, Path::new("schemas/foreign"), &outside)
+        .expect("escaping symlinks must remain rejected");
+    assert!(violation.contains("escapes the repository"));
+}
+
+#[test]
+fn optional_connectome_gitlink_guard_rejects_other_source_inputs() {
+    let entry = |path: &str| GitIndexEntry {
+        mode: "160000".to_owned(),
+        revision: "1234567890abcdef1234567890abcdef12345678".to_owned(),
+        stage: "0".to_owned(),
+        path: PathBuf::from(path),
+    };
+    let canonical = BTreeMap::from([
+        (
+            "submodule.connectome.path".to_owned(),
+            vec![CONNECTOME_PATH.to_owned()],
+        ),
+        (
+            "submodule.connectome.url".to_owned(),
+            vec![CONNECTOME_REPOSITORY.to_owned()],
+        ),
+        (
+            "submodule.connectome.branch".to_owned(),
+            vec![CONNECTOME_BRANCH.to_owned()],
+        ),
+    ]);
+    assert!(optional_client_gitlink_violations(&[], &BTreeMap::new()).is_empty());
+    assert!(optional_client_gitlink_violations(&[entry(CONNECTOME_PATH)], &canonical).is_empty());
+
+    for entries in [
+        vec![entry("crates/foreign-engine")],
+        vec![entry(CONNECTOME_PATH), entry("other")],
+        vec![],
+    ] {
+        assert!(!optional_client_gitlink_violations(&entries, &canonical).is_empty());
+    }
+    for (key, values) in [
+        ("submodule.connectome.path", vec!["apps/connectome"]),
+        (
+            "submodule.connectome.url",
+            vec!["https://github.com/other/client.git"],
+        ),
+        ("submodule.connectome.branch", vec!["other"]),
+        ("submodule.connectome.branch", vec!["main"]),
+        ("submodule.connectome.update", vec!["!custom-command"]),
+        ("submodule.other.path", vec!["other"]),
+        (
+            "submodule.connectome.path",
+            vec!["connectome", "connectome"],
+        ),
+    ] {
+        let mut declaration = canonical.clone();
+        declaration.insert(
+            key.to_owned(),
+            values.into_iter().map(str::to_owned).collect(),
+        );
+        assert!(
+            !optional_client_gitlink_violations(&[entry(CONNECTOME_PATH)], &declaration).is_empty()
+        );
+    }
+    assert!(
+        !optional_client_gitlink_violations(&[entry(CONNECTOME_PATH)], &BTreeMap::new()).is_empty()
+    );
+    let mut unmerged = entry(CONNECTOME_PATH);
+    unmerged.stage = "1".to_owned();
+    assert!(!optional_client_gitlink_violations(&[unmerged], &canonical).is_empty());
+    let mut unpinned = entry(CONNECTOME_PATH);
+    unpinned.revision = "0".repeat(40);
+    assert!(!optional_client_gitlink_violations(&[unpinned], &canonical).is_empty());
 }
 
 #[test]
@@ -1662,16 +1799,134 @@ fn git_index_entries(root: &Path) -> Vec<GitIndexEntry> {
             let (metadata, path) = record
                 .split_once('\t')
                 .expect("git index record must contain a path");
+            let mut fields = metadata.split_whitespace();
             GitIndexEntry {
-                mode: metadata
-                    .split_whitespace()
+                mode: fields
                     .next()
                     .expect("git index record must contain a mode")
+                    .to_owned(),
+                revision: fields
+                    .next()
+                    .expect("git index record must contain a revision")
+                    .to_owned(),
+                stage: fields
+                    .next()
+                    .expect("git index record must contain a stage")
                     .to_owned(),
                 path: PathBuf::from(path),
             }
         })
         .collect()
+}
+
+fn tracked_symlink_target_violation(
+    canonical_root: &Path,
+    source: &Path,
+    canonical_target: &Path,
+) -> Option<String> {
+    if canonical_target.starts_with(canonical_root.join(CONNECTOME_PATH)) {
+        Some(format!(
+            "tracked symlink {} imports optional Connectome source or assets at {}",
+            source.display(),
+            canonical_target.display()
+        ))
+    } else if !canonical_target.starts_with(canonical_root) {
+        Some(format!(
+            "tracked symlink {} escapes the repository to {}",
+            source.display(),
+            canonical_target.display()
+        ))
+    } else {
+        None
+    }
+}
+
+fn gitmodule_declarations(root: &Path) -> BTreeMap<String, Vec<String>> {
+    let modules = root.join(".gitmodules");
+    if !modules.exists() {
+        return BTreeMap::new();
+    }
+    let output = Command::new("git")
+        .current_dir(root)
+        .args(["config", "--file"])
+        .arg(modules)
+        .args(["--null", "--list"])
+        .output()
+        .expect("git config must start");
+    assert!(
+        output.status.success(),
+        "invalid .gitmodules: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mut declarations = BTreeMap::<String, Vec<String>>::new();
+    for encoded in output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+    {
+        let entry = std::str::from_utf8(encoded).expect(".gitmodules must be UTF-8");
+        let (key, value) = entry.split_once('\n').unwrap_or((entry, ""));
+        declarations
+            .entry(key.to_owned())
+            .or_default()
+            .push(value.to_owned());
+    }
+    declarations
+}
+
+fn optional_client_gitlink_violations(
+    entries: &[GitIndexEntry],
+    declarations: &BTreeMap<String, Vec<String>>,
+) -> Vec<String> {
+    let links = entries
+        .iter()
+        .filter(|entry| entry.mode == "160000")
+        .collect::<Vec<_>>();
+    if links.is_empty() && declarations.is_empty() {
+        return Vec::new();
+    }
+    let expected = BTreeMap::from([
+        (
+            "submodule.connectome.path".to_owned(),
+            vec![CONNECTOME_PATH.to_owned()],
+        ),
+        (
+            "submodule.connectome.url".to_owned(),
+            vec![CONNECTOME_REPOSITORY.to_owned()],
+        ),
+        (
+            "submodule.connectome.branch".to_owned(),
+            vec![CONNECTOME_BRANCH.to_owned()],
+        ),
+    ]);
+    let mut violations = Vec::new();
+    if declarations != &expected {
+        violations.push(
+            ".gitmodules must declare only the canonical optional Connectome client".to_owned(),
+        );
+    }
+    if links.len() != 1 || links[0].path != Path::new(CONNECTOME_PATH) {
+        violations.push(format!(
+            "only the root Connectome gitlink is allowed: {:?}",
+            links.iter().map(|entry| &entry.path).collect::<Vec<_>>()
+        ));
+    }
+    for link in links {
+        if link.stage != "0"
+            || link.revision.len() != 40
+            || !link
+                .revision
+                .bytes()
+                .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+            || link.revision.bytes().all(|value| value == b'0')
+        {
+            violations.push(format!(
+                "optional client gitlink is not pinned to one commit: {}",
+                link.path.display()
+            ));
+        }
+    }
+    violations
 }
 
 fn is_build_or_install_input(path: &Path) -> bool {

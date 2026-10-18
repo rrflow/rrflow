@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -17,6 +17,8 @@ public enum OperationId
     EstateRead,
     HealthLive,
     HealthReady,
+    KnowledgeTreeList,
+    KnowledgeTreeReplace,
     OpenapiRead,
     QueryExecute,
     QueryIndexEnsure,
@@ -55,7 +57,7 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const int Count = 33;
+    public const int Count = 35;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -72,6 +74,8 @@ public static class EndpointCatalog
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),
         OperationId.HealthLive => new("health-live", "GET", "/v1/health/live", Authentication.Public, false),
         OperationId.HealthReady => new("health-ready", "GET", "/v1/health/ready", Authentication.Public, false),
+        OperationId.KnowledgeTreeList => new("knowledge-tree-list", "POST", "/v1/knowledge/trees/list", Authentication.SessionBearer, false),
+        OperationId.KnowledgeTreeReplace => new("knowledge-tree-replace", "POST", "/v1/knowledge/trees/replace", Authentication.SessionBearer, true),
         OperationId.OpenapiRead => new("openapi-read", "GET", "/v1/schema/openapi", Authentication.Public, false),
         OperationId.QueryExecute => new("query-execute", "POST", "/v1/query", Authentication.SessionBearer, false),
         OperationId.QueryIndexEnsure => new("query-index-ensure", "POST", "/v1/query/indexes/ensure", Authentication.SessionBearer, true),
