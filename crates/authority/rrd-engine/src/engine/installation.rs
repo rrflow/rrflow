@@ -2,6 +2,7 @@ use super::*;
 use crate::engine::estate_layout::{
     create_estate_directories, reject_existing_estate, reject_existing_symlink_path, safe_join,
     validate_managed_relative, validate_recovery_estate, EstateLayout, LOCATOR_RELATIVE_PATH,
+    STORAGE_DIRECTORY,
 };
 use crate::engine::memory_estate::build_memory_estate_plan;
 use crate::engine::token_key::{read_api_key_document, read_token_key, ApiKeyDocument};
@@ -983,6 +984,7 @@ impl RrdEngine {
             locator.identity.clone(),
             installed.installation.deployment.clone(),
             configuration,
+            safe_join(&project, STORAGE_DIRECTORY)?,
         )?;
         if !engine.security_enforced()? {
             return Err(ServiceError::Storage(

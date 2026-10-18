@@ -276,18 +276,31 @@ impl RrdEngine {
         Ok(result)
     }
 
-    fn operation_root(&self) -> Result<PathBuf> {
+    /// Where backup catalogues and restore staging roots live.
+    ///
+    /// An installed estate keeps them inside its managed persistent container,
+    /// `.rrflow/rrd/<kind>/<instance>`, beside `roots/` and never below it:
+    /// `roots/` holds only storage roots the locator can select, and install
+    /// recovery rejects anything else there. A component or test root opened
+    /// outside an installation keeps the sibling `rrd-service/<instance>` tree.
+    fn operation_root(&self, kind: &str) -> Result<PathBuf> {
         let storage = self.require_persistent_root("backup and restore")?;
+        if let Some(container) = &self.installed_storage_container {
+            return Ok(container.join(kind).join(self.instance.as_str()));
+        }
         let parent = storage.parent().unwrap_or_else(|| Path::new("."));
-        Ok(parent.join("rrd-service").join(self.instance.as_str()))
+        Ok(parent
+            .join("rrd-service")
+            .join(self.instance.as_str())
+            .join(kind))
     }
 
     fn backup_root(&self) -> Result<PathBuf> {
-        Ok(self.operation_root()?.join("backups"))
+        self.operation_root(super::estate_layout::BACKUPS_DIRECTORY_NAME)
     }
 
     fn restore_root(&self) -> Result<PathBuf> {
-        Ok(self.operation_root()?.join("restores"))
+        self.operation_root(super::estate_layout::RESTORES_DIRECTORY_NAME)
     }
 }
 

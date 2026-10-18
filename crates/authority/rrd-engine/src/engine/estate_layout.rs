@@ -7,6 +7,13 @@ pub(super) const ESTATE_DIRECTORY: &str = ".rrflow";
 pub(super) const STORAGE_DIRECTORY: &str = ".rrflow/rrd";
 pub(super) const STORAGE_ROOTS_DIRECTORY: &str = ".rrflow/rrd/roots";
 pub(super) const CREDENTIAL_DIRECTORY: &str = ".rrflow/credentials";
+/// Backups of an installed estate live under `.rrflow/rrd/backups/<instance>`,
+/// beside the storage roots and never below `roots/`, which holds only roots
+/// the locator can select. Created on first use; retained by uninstall.
+pub(super) const BACKUPS_DIRECTORY_NAME: &str = "backups";
+/// Restore staging roots live under `.rrflow/rrd/restores/<instance>/<id>`
+/// until an explicit publication plan promotes one into `roots/`.
+pub(super) const RESTORES_DIRECTORY_NAME: &str = "restores";
 pub(super) const LOCATOR_RELATIVE_PATH: &str = ".rrflow/config.toml";
 const INSTALL_INTENT_PREFIX: &str = ".rrflow-install-";
 const INSTALL_INTENT_SUFFIX: &str = ".json";
@@ -184,7 +191,11 @@ pub(super) fn validate_recovery_estate(project: &Path, layout: &EstateLayout) ->
         ESTATE_DIRECTORY,
         &["rrd", "credentials", "config.toml", locator_pending],
     )?;
-    validate_directory_entries(project, STORAGE_DIRECTORY, &["roots"])?;
+    validate_directory_entries(
+        project,
+        STORAGE_DIRECTORY,
+        &["roots", BACKUPS_DIRECTORY_NAME, RESTORES_DIRECTORY_NAME],
+    )?;
     validate_directory_entries(project, STORAGE_ROOTS_DIRECTORY, &[storage_id])?;
     validate_directory_entries(project, CREDENTIAL_DIRECTORY, &[credential_name])
 }

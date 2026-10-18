@@ -354,6 +354,16 @@ immutable objects, configuration/schema identities, projection source
 coordinates, and the receipts needed to prove completeness. Backup verification
 is read-only and authenticates the whole catalogue closure.
 
+On an installed estate the backup catalogue lives at
+`.rrflow/rrd/backups/<instance-id>/` and restore staging roots at
+`.rrflow/rrd/restores/<instance-id>/<restore-id>/`, both inside the managed
+persistent container beside `roots/` and never below it: `roots/` holds only
+storage roots the locator can select, and install recovery rejects any other
+entry there. Both directories are created on first use, not by installation,
+and uninstall retains them with the rrflowDB data. A component or test root
+opened outside an installation keeps its sibling `rrd-service/<instance>` tree;
+that tree is not an installed-estate location.
+
 Restore never overlays the live data root. It writes an absent staging root,
 validates format and application identity before replay, restores canonical
 semantic state, validates every object, rebuilds or authenticates projections,
@@ -422,8 +432,11 @@ supported target:
   installed project plus the exact distribution executable and call
   `RrdEngine::open_installed`; neither can initialize absent state. They remain
   internal/adapter artifacts rather than additional operator lifecycle roots.
-- `RrflowKvStore::open` is split into explicit create-new and open-existing
-  operations; inspection is separate and read-only.
+- `RrflowKvStore` has explicit `create_new` and `open_existing` constructors
+  beside the retained create-or-open `open`, which the local estate authority
+  and both restore paths still call when they check a restored target;
+  inspection is separate and read-only. Replacing those create-or-open calls
+  is D-11 work.
 - `rrflow-cli::dev::supervisor`, its private files, the standalone security
   initializer, `rrd-server initialize`, and create-on-start product paths are
   absent after the D-01 replacement tests passed.
@@ -432,6 +445,13 @@ supported target:
   `roots/<install-id>` estate yet and cannot create a second store at the old
   `.rrflow/rrd` parent. Installed backup/restore commands and
   locator/distribution-bound controller inputs remain D-11/POA&M work.
+- the engine's `backup-create`, `backup-list`, and `restore-create` operations
+  on an installed estate (opened through `open_installed` by `serve`) write to
+  `.rrflow/rrd/backups/<instance-id>/` and `.rrflow/rrd/restores/<instance-id>/`.
+  Before that correction they wrote below `roots/`, where install recovery
+  rejects any entry but the storage root. Restore still stages without a
+  publication plan; publication into `roots/<candidate-storage-root-id>/` with
+  locator replacement remains D-11 work.
 - current WAL torn-tail repair is retained only as a physical primitive invoked
   by an exact engine repair plan.
 
