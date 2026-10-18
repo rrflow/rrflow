@@ -451,7 +451,15 @@ supported target:
   Before that correction they wrote below `roots/`, where install recovery
   rejects any entry but the storage root. Restore still stages without a
   publication plan; publication into `roots/<candidate-storage-root-id>/` with
-  locator replacement remains D-11 work.
+  locator replacement remains D-11 work. A restore into an already staged
+  target is recovered by opening it as an existing store and verifying it,
+  never by creating a database there.
+- a backup of an installed estate is not yet application-complete in the sense
+  above: it omits the installed record, install checkpoint, active
+  configuration, security state, and attunement state, so a restored root
+  cannot be opened as an installed estate
+  ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md)). Publication depends on
+  closing it.
 - current WAL torn-tail repair is retained only as a physical primitive invoked
   by an exact engine repair plan.
 

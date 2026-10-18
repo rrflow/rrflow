@@ -44,3 +44,4 @@
 | POAM-028 | High | Open | [vector catalogue history replay and C-04 source closure](rrflow-1.0-alpha/poam-028.md) |
 | POAM-029 | High | Sequenced | [diagnostic snapshot under concurrent audited traffic](rrflow-1.0-alpha/poam-029.md) |
 | POAM-030 | High | Sequenced | [bounded audit read across a partial final journal page](rrflow-1.0-alpha/poam-030.md) |
+| POAM-031 | Critical | Open | [installed-estate backups omit the installed control state](rrflow-1.0-alpha/poam-031.md) |

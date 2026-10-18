@@ -229,7 +229,12 @@ impl RrdEngine {
             .ok_or_else(|| ServiceError::Backup("backup is not catalogued".into()))?;
         let target = self.restore_root()?.join(request.restore_id.as_str());
         let (inventory, reopened, recovered) = if target.exists() {
-            let restored = rrd_store::RrflowKvStore::open(&target)?;
+            // An existing target is a root an earlier attempt staged and
+            // published before its result was recorded. It is opened as an
+            // existing store, so an empty or foreign directory fails closed
+            // instead of becoming a new database, and the handle is released
+            // before object verification reopens the root.
+            let restored = rrd_store::RrflowKvStore::open_existing(&target)?;
             if restored.claims().sequence()? != backup.archive.claim_sequence
                 || restored.runtime().cursor()? != backup.archive.runtime_cursor
             {
@@ -237,6 +242,7 @@ impl RrdEngine {
                     "existing restore target watermarks differ from the backup".into(),
                 ));
             }
+            drop(restored);
             rrd_store::verify_restored_backup_objects(
                 &backup_root,
                 &request.backup_sha256,
