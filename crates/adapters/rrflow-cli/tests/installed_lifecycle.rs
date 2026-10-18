@@ -8,8 +8,8 @@
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
     transaction_operation_sha256, BeginTransaction, CanonicalId, CloseSession, CommitTransaction,
-    CreateSession, ErrorCode, ExecuteQuery, QueryBudget, QueryValue, SessionLimits,
-    TransactionMutation,
+    CreateInstanceBackup, CreateSession, ErrorCode, ExecuteQuery, QueryBudget, QueryValue,
+    RestoreInstanceBackup, SessionLimits, TransactionMutation,
 };
 use rrd_engine::RrdEngine;
 use std::collections::BTreeMap;
@@ -96,7 +96,7 @@ fn primary_help_exposes_only_the_installed_product_lifecycle() {
     let output = invoke(&["--help"]);
     assert_success(&output, "primary help");
     let help = String::from_utf8(output.stdout).unwrap();
-    for command in ["version", "install", "serve", "ready", "verify"] {
+    for command in ["version", "install", "serve", "ready", "verify", "restore"] {
         assert!(
             help.contains(command),
             "missing {command} from help:\n{help}"
@@ -431,7 +431,7 @@ max_elapsed_ms = 20000
         ClientConfig::default(),
     )
     .unwrap();
-    tokio::runtime::Builder::new_current_thread()
+    let backup_sha256 = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -563,6 +563,87 @@ max_elapsed_ms = 20000
                 query.rows[0].values.get("object"),
                 Some(&QueryValue::String("ui-queryable".into()))
             );
+
+            // A backup at runtime cursor 3, a later commit the backup does not
+            // carry, and a staged restore of the backup for offline publication.
+            let backup = client
+                .create_backup(
+                    &session,
+                    CreateInstanceBackup {
+                        label: "cli-publication".into(),
+                        created_at_unix_ms: installed_at + 1_000,
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-backup-request",
+                        "installed-test-backup-operation",
+                        "installed-test-backup-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert!(backup.backup.application_complete);
+            let later = client
+                .begin_transaction(
+                    &session,
+                    BeginTransaction {
+                        scope: CanonicalId::new("claims").unwrap(),
+                        timeout_ms: 10_000,
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-later-begin-request",
+                        "installed-test-later-begin-operation",
+                        "installed-test-later-begin-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            let later_mutations = vec![TransactionMutation::AssertClaim {
+                subject: CanonicalId::new("installed-walking-product").unwrap(),
+                predicate: CanonicalId::new("status").unwrap(),
+                object: "after-backup".into(),
+                valid_from: installed_at + 2_000,
+                tx_time: installed_at + 2_000,
+                producer: CanonicalId::new("local-operator").unwrap(),
+                confidence: Some(1.0),
+            }];
+            client
+                .commit_transaction(
+                    &session,
+                    &later.transaction_id,
+                    CommitTransaction {
+                        operation_sha256: transaction_operation_sha256(&later_mutations),
+                        mutations: later_mutations,
+                    },
+                    RequestOptions::new(
+                        "installed-test-later-commit-request",
+                        "installed-test-later-commit-operation",
+                        Some("installed-test-later-commit-idempotency"),
+                        Some(u64::MAX),
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            let staged = client
+                .restore_backup(
+                    &session,
+                    RestoreInstanceBackup {
+                        backup_sha256: backup.backup.backup_sha256.clone(),
+                        restore_id: CanonicalId::new("restore-cli").unwrap(),
+                        restored_at_unix_ms: installed_at + 3_000,
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-restore-request",
+                        "installed-test-restore-operation",
+                        "installed-test-restore-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(staged.inventory.runtime_cursor, 3);
             client
                 .close_session(
                     &session,
@@ -576,6 +657,7 @@ max_elapsed_ms = 20000
                 )
                 .await
                 .unwrap();
+            backup.backup.backup_sha256
         });
 
     let live_verify = invoke(&[
@@ -615,7 +697,100 @@ max_elapsed_ms = 20000
     assert_success(&reopened, "post-shutdown reopen and verify");
     let reopened: serde_json::Value = serde_json::from_slice(&reopened.stdout).unwrap();
     assert_eq!(reopened["status"], "passed");
+    assert_eq!(reopened["runtime_cursor"], 4);
     assert!(reopened["control_journal_sequence"].as_u64().unwrap() > 8);
+
+    // Offline publication of the staged restore through the primary command
+    // tree: a deterministic, no-write plan, an exact-digest apply, and a
+    // verified estate at the backup's state with the old root quarantined.
+    let publication_plan_file = root.path().join("restore-plan.json");
+    let publication_plan_arg = publication_plan_file.to_str().unwrap();
+    let plan_arguments = [
+        "restore",
+        "plan",
+        "--project",
+        project_arg,
+        "--restore",
+        "restore-cli",
+        "--backup",
+        &backup_sha256,
+        "--test-distribution-executable",
+        executable_arg,
+    ];
+    let before_publication = inventory(&project);
+    let first_plan = invoke(&plan_arguments);
+    let second_plan = invoke(&plan_arguments);
+    capture_output(&first_plan, &mut lifecycle_output);
+    assert_success(&first_plan, "restore plan");
+    assert_success(&second_plan, "second restore plan");
+    assert_eq!(
+        first_plan.stdout, second_plan.stdout,
+        "plan must be byte stable"
+    );
+    assert_eq!(
+        inventory(&project),
+        before_publication,
+        "planning mutated the project"
+    );
+    let publication: serde_json::Value = serde_json::from_slice(&first_plan.stdout).unwrap();
+    assert_eq!(publication["active_root"], locator.storage_root);
+    assert_eq!(publication["candidate"]["runtime_cursor"], 3);
+    assert_eq!(publication["active"]["runtime_cursor"], 4);
+    let publication_sha256 = publication["plan_sha256"].as_str().unwrap().to_owned();
+    std::fs::write(&publication_plan_file, &first_plan.stdout).unwrap();
+    let rejected = invoke(&[
+        "restore",
+        "apply",
+        "--project",
+        project_arg,
+        "--plan",
+        publication_plan_arg,
+        "--expect",
+        &"0".repeat(64),
+        "--test-distribution-executable",
+        executable_arg,
+    ]);
+    capture_output(&rejected, &mut lifecycle_output);
+    assert!(!rejected.status.success());
+    assert_eq!(inventory(&project), before_publication);
+    let published = invoke(&[
+        "--json",
+        "restore",
+        "apply",
+        "--project",
+        project_arg,
+        "--plan",
+        publication_plan_arg,
+        "--expect",
+        &publication_sha256,
+        "--test-distribution-executable",
+        executable_arg,
+    ]);
+    capture_output(&published, &mut lifecycle_output);
+    assert_success(&published, "restore apply");
+    let published: serde_json::Value = serde_json::from_slice(&published.stdout).unwrap();
+    assert_eq!(published["plan_sha256"], publication_sha256);
+    assert_eq!(published["runtime_cursor"], 3);
+    assert_eq!(published["idempotent_replay"], false);
+    assert!(project
+        .join(published["quarantine_root"].as_str().unwrap())
+        .is_dir());
+    let after_publication = invoke(&[
+        "--json",
+        "verify",
+        "--project",
+        project_arg,
+        "--level",
+        "quick",
+        "--test-distribution-executable",
+        executable_arg,
+    ]);
+    capture_output(&after_publication, &mut lifecycle_output);
+    assert_success(&after_publication, "post-publication verify");
+    let after_publication: serde_json::Value =
+        serde_json::from_slice(&after_publication.stdout).unwrap();
+    assert_eq!(after_publication["status"], "passed");
+    assert_eq!(after_publication["runtime_cursor"], 3);
 
     // Neither successful nor rejected lifecycle stdout/stderr may contain the
     // generated credential.

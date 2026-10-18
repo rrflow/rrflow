@@ -1176,7 +1176,7 @@ pub fn attunement_verification_sha256(verification: &AttunementVerification) -> 
     )
 }
 
-fn validate_contract_version(version: u16) -> Result<()> {
+pub(crate) fn validate_contract_version(version: u16) -> Result<()> {
     if version != INSTALL_ATTUNEMENT_CONTRACT_VERSION {
         return invalid(format!(
             "unsupported install/attunement contract version {version}; expected {INSTALL_ATTUNEMENT_CONTRACT_VERSION}"
@@ -1185,7 +1185,7 @@ fn validate_contract_version(version: u16) -> Result<()> {
     Ok(())
 }
 
-fn validate_project_relative_path(value: &str) -> Result<()> {
+pub(crate) fn validate_project_relative_path(value: &str) -> Result<()> {
     validate_bounded_text(value, "installation managed relative_path", 4_096)?;
     if value.starts_with('/') || value.contains('\\') {
         return invalid("installation managed path must use portable project-relative syntax");
@@ -1230,7 +1230,7 @@ fn validate_job_command_binding(
     Ok(())
 }
 
-fn validate_bounded_text(value: &str, field: &str, maximum: usize) -> Result<()> {
+pub(crate) fn validate_bounded_text(value: &str, field: &str, maximum: usize) -> Result<()> {
     if value.trim().is_empty() || value.len() > maximum || value.as_bytes().contains(&0) {
         return invalid(format!(
             "{field} must be non-empty, contain no NUL, and use at most {maximum} bytes"
@@ -1239,7 +1239,7 @@ fn validate_bounded_text(value: &str, field: &str, maximum: usize) -> Result<()>
     Ok(())
 }
 
-fn digest_json<T: Serialize>(domain: &[u8], value: &T) -> Result<String> {
+pub(crate) fn digest_json<T: Serialize>(domain: &[u8], value: &T) -> Result<String> {
     let encoded = serde_json::to_vec(value).map_err(|error| {
         crate::ContractError(format!("contract digest encoding failed: {error}"))
     })?;

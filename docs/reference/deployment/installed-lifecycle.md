@@ -414,6 +414,30 @@ opens it through the same installed engine path, and emits a publication plan.
 Publication requires the operator to choose the retained/quarantined old root
 and accept the exact digest.
 
+Publication is offline and takes the plan/apply shape of installation.
+`rrflow restore plan --restore <id> --backup <sha256>` emits a deterministic,
+digest-bound plan that binds the staged candidate, the active storage root it
+replaces, the backup that produced the candidate, and read-only evidence of
+both roots (physical digest, runtime manifest, runtime cursor, claim sequence,
+control sequence); the candidate's installed record must equal the active
+record and its configuration must match the locator, and the plan refuses a
+served estate because the read-only inspector cannot take its shared lock under
+a running writer. `rrflow restore apply --plan <file> --expect <sha256>`
+executes only that plan: it holds an exclusive publication lease for the
+instance, re-verifies both roots and the candidate's backup closure, carries the
+token key into the candidate (a backup never contains it), renames the active
+root to `.rrflow/rrd/restores/<instance-id>/<restore-id>.quarantined-<storage-root-id>/`,
+renames the candidate into the storage root's own name, opens the result
+through `open_installed`, records the publication receipt in its control
+journal, and passes quick verification. Because the candidate takes the
+storage root's own name, the locator, the installed record, and the single-root
+install-recovery rule are unchanged; the quarantined root is never overwritten.
+Every stage is durable in a private intent beside the candidate, so a rerun
+after a crash at any stage completes the same publication once, and a rerun
+after completion returns the recorded receipt as a replay. A candidate whose
+configuration revision differs from the active locator is refused; locator
+replacement for that case is D-11 work.
+
 ## Uninstall and data destruction
 
 Uninstall uses plan/apply and owns only RRFlow-installed integration. It
@@ -492,19 +516,18 @@ supported target:
   on an installed estate (opened through `open_installed` by `serve`) write to
   `.rrflow/rrd/backups/<instance-id>/` and `.rrflow/rrd/restores/<instance-id>/`.
   Before that correction they wrote below `roots/`, where install recovery
-  rejects any entry but the storage root. Restore still stages without a
-  publication plan; publication into `roots/<candidate-storage-root-id>/` with
-  locator replacement remains D-11 work. A restore into an already staged
-  target is recovered by opening it as an existing store and verifying it,
-  never by creating a database there.
-- a backup of an installed estate now carries the installed control state as
-  the control-journal archive above, so a restored root holds the installed
-  record, install checkpoint, active configuration, security policy, audit
-  chain, and attunement state, and its audit chain reads back
-  ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md), verifying). What
-  remains for its closure is publication: swapping the verified staging root
-  into the installed root's name with the old root quarantined, carrying the
-  token key over, and opening the result through `open_installed`.
+  rejects any entry but the storage root. Restore stages; publication is the
+  offline `restore plan|apply` described above. A restore into an already
+  staged target is recovered by opening it as an existing store and verifying
+  it, never by creating a database there.
+- a backup of an installed estate carries the installed control state as the
+  control-journal archive above, and `rrflow restore plan|apply` publishes a
+  staged restore into the storage root's own name with the previous root
+  quarantined, so a restored estate opens through `open_installed` and reaches
+  authenticated readiness ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md),
+  closed). Still D-11 work: locator replacement for a candidate whose
+  configuration revision differs from the active locator, and the remaining
+  restore and salvage items under POAM-025.
 - the public `InstanceBackupSnapshot` does not yet project the
   `installed_control` coverage dimension; `application_complete` carries the
   meaning on the wire until the generated surfaces are regenerated with it.

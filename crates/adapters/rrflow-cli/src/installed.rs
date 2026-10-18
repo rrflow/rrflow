@@ -4,10 +4,11 @@
 //! storage, and verification remain engine-owned; the CLI only translates
 //! explicit operator arguments and renders typed results.
 
-use crate::command::{Command, Execution, InstallAction, InstallMode, VerifyLevel};
+use crate::command::{Command, Execution, InstallAction, InstallMode, RestoreAction, VerifyLevel};
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
-    CloseSession, CreateSession, InstallationTargetKind, SessionLimits, PROTOCOL, PROTOCOL_VERSION,
+    CanonicalId, CloseSession, CreateSession, InstallationTargetKind, RestorePublicationPlan,
+    SessionLimits, PROTOCOL, PROTOCOL_VERSION,
 };
 use rrd_engine::{digest, InstallationPreview, RrdEngine};
 use rrd_server::RrdHttpServer;
@@ -88,6 +89,75 @@ pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, Box
             test_distribution_executable.as_deref(),
             json,
         ),
+        Command::Restore { action } => restore(action, now, json),
+    }
+}
+
+fn restore(action: &RestoreAction, now: u64, json: bool) -> Result<Execution, BoxError> {
+    match action {
+        RestoreAction::Plan {
+            project,
+            restore,
+            backup,
+            test_distribution_executable,
+        } => {
+            let started = Instant::now();
+            let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
+            let restore_id = CanonicalId::new(restore)?;
+            let plan =
+                RrdEngine::plan_restore_publication(project, &restore_id, backup, &executable)?;
+            tracing::info!(
+                target: "rrflow::installed",
+                operation = "restore.plan",
+                plan_sha256 = %plan.plan_sha256,
+                restore_id = %plan.restore_id,
+                backup_sha256 = %plan.backup_sha256,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "installed lifecycle operation completed"
+            );
+            // Like an installation plan, a publication plan is the exact JSON
+            // document `restore apply` accepts, whatever the rendering flag.
+            Ok(serde_json::to_string_pretty(&plan)?.into())
+        }
+        RestoreAction::Apply {
+            project,
+            plan,
+            expect,
+            test_distribution_executable,
+        } => {
+            let started = Instant::now();
+            let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
+            let plan = read_publication_plan(plan)?;
+            let result =
+                RrdEngine::apply_restore_publication(project, &plan, expect, now, &executable)?;
+            tracing::info!(
+                target: "rrflow::installed",
+                operation = "restore.apply",
+                plan_sha256 = %result.plan_sha256,
+                runtime_cursor = result.runtime_cursor,
+                control_journal_sequence = result.control_journal_sequence,
+                idempotent_replay = result.idempotent_replay,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "installed lifecycle operation completed"
+            );
+            let text = render(
+                &result,
+                json,
+                format!(
+                    "RRFlow restore published: {}\npublished root: {}\nquarantined root: {}\nruntime cursor: {}\ncontrol journal: {}\nidempotent replay: {}",
+                    result.plan_sha256,
+                    result.published_root,
+                    result.quarantine_root,
+                    result.runtime_cursor,
+                    result.control_journal_sequence,
+                    result.idempotent_replay,
+                ),
+            )?;
+            Ok(Execution {
+                text,
+                success: true,
+            })
+        }
     }
 }
 
@@ -408,6 +478,25 @@ fn read_installation_plan(path: &Path) -> Result<InstallationPreview, BoxError> 
     let preview: InstallationPreview = serde_json::from_slice(&bytes)?;
     preview.validate()?;
     Ok(preview)
+}
+
+fn read_publication_plan(path: &Path) -> Result<RestorePublicationPlan, BoxError> {
+    let metadata = std::fs::symlink_metadata(path)?;
+    if metadata.file_type().is_symlink()
+        || !metadata.is_file()
+        || metadata.len() > MAX_INSTALLATION_PLAN_BYTES
+    {
+        return Err(
+            "restore publication plan must be a bounded regular file, not a symlink".into(),
+        );
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    std::fs::File::open(path)?
+        .take(MAX_INSTALLATION_PLAN_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    let plan: RestorePublicationPlan = serde_json::from_slice(&bytes)?;
+    plan.validate()?;
+    Ok(plan)
 }
 
 fn target_kind(mode: InstallMode) -> InstallationTargetKind {

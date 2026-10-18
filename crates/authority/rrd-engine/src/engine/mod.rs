@@ -114,6 +114,7 @@ mod memory_estate;
 mod model;
 mod query;
 mod query_transaction;
+mod restore_publication;
 mod retrieval;
 mod retrieval_query;
 mod rollback;

@@ -28,19 +28,23 @@ installation identity, configuration revision, credentials, policy, and audit ch
 `application_complete` flag overstated what a backup covered, restore publication (D-11) was
 blocked, and a restore rehearsal could not reach authenticated readiness.
 
-## Remediation in progress
+## Remediation
 
-The backup catalogue is format version 2. An application-complete backup carries the
-control-journal entries of the engine-declared families (installed record and checkpoint,
-configuration, security policy, audit records and head, attunement, estate documents) as a
-content-addressed control-journal archive, and a restore replays them in order, each transition
-committed with a replay-progress marker so an interruption resumes without duplication. The
-token key and operator credential are files outside the store and are never carried; session
-leases, subscriptions, and operation receipts stay out of the scope. Version 1 catalogues are
-refused rather than read as complete. `a_restored_root_carries_the_installed_control_state`
-replaces the characterization: the restored root holds the record, checkpoint, configuration,
-and security policy byte-identically, every in-scope journal entry up to the backup watermark in
-order, no transient family, and an audit chain that reads back and closes on its head.
+Pull request #10 (`5d1f87d`) made the backup catalogue format version 2: an application-complete
+backup carries the control-journal entries of the engine-declared families (installed record and
+checkpoint, configuration, security policy, audit records and head, attunement, estate documents)
+as a content-addressed control-journal archive, and a restore replays them in order, each
+transition committed with a replay-progress marker so an interruption resumes without
+duplication. The token key and operator credential are files outside the store and are never
+carried; session leases, subscriptions, and operation receipts stay out of the scope. Version 1
+catalogues are refused rather than read as complete.
+
+Restore publication (`rrflow restore plan|apply`) then promotes the verified staging root into
+the storage root's own name: the plan binds both roots and the backup by digest and refuses a
+served estate; apply carries the token key into the candidate, quarantines the active root under
+`restores/<instance>/`, renames the candidate into place, opens it through `open_installed`,
+records the publication receipt, and passes quick verification, resuming from a durable intent
+after an interruption at any stage.
 
 ## Owning gates
 
@@ -51,11 +55,12 @@ Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md) and
 
 ## Closure evidence
 
-A backup of an installed estate includes, or binds through an authenticated manifest, the
-installed record, install checkpoint, active configuration, security state, and attunement
-state, with the token key and every other secret excluded (present); `application_complete` is
-true only when that closure is present (present); a restored root opens through
-`open_installed` after publication and reaches authenticated readiness (open: restore
-publication, D-11); and the characterization test is replaced by the open-installed assertion
-(the restored-state assertion is in place; the open-installed assertion lands with
-publication).
+Present, recorded in [Gate D accepted evidence](../../roadmap/rrflow-1.0/gate-d-evidence.md):
+a backup of an installed estate includes the installed record, install checkpoint, active
+configuration, security state, and attunement state, with the token key and every other secret
+excluded; `application_complete` is true only when that closure is present; a restored root
+opens through `open_installed` after publication and reaches authenticated readiness at the
+backup's runtime cursor (`a_staged_restore_is_published_in_place_and_the_estate_opens_from_the_backup`,
+`an_interrupted_publication_resumes_from_its_recorded_stage`, and the real-process installed
+lifecycle test); and the characterization test is replaced by
+`a_restored_root_carries_the_installed_control_state` and the open-installed assertions.

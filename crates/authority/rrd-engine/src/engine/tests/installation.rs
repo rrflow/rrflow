@@ -985,3 +985,334 @@ fn a_restored_root_carries_the_installed_control_state() {
         "the active estate still opens"
     );
 }
+
+/// Installs, backs up, stages a restore of that backup, then performs more
+/// audited work on the active estate so the restored state is visibly older
+/// than the active one. Returns the backup identity and the restore id.
+fn install_backup_and_stage() -> (InstalledEstate, String, CanonicalId) {
+    use rrd_contract::CreateInstanceBackup;
+
+    let (estate, engine, lease) = install_and_open();
+    let backup = engine
+        .create_instance_backup(
+            &lease.session_id,
+            &lease.token,
+            &id("backup-key"),
+            &CreateInstanceBackup {
+                label: "publish".into(),
+                created_at_unix_ms: 1_800_000_000_200,
+            },
+            1_800_000_000_200,
+            "request-backup",
+            "operation-backup",
+        )
+        .unwrap();
+    let restore_id = CanonicalId::new("restore-publish").unwrap();
+    restore(
+        &engine,
+        &lease,
+        "restore-key",
+        &backup.backup.backup_sha256,
+        restore_id.as_str(),
+        1_800_000_000_300,
+    )
+    .unwrap();
+    // Later work on the active estate: another backup, which appends audit
+    // records and operation receipts the restored state must not carry.
+    engine
+        .create_instance_backup(
+            &lease.session_id,
+            &lease.token,
+            &id("backup-key-later"),
+            &CreateInstanceBackup {
+                label: "later".into(),
+                created_at_unix_ms: 1_800_000_000_400,
+            },
+            1_800_000_000_400,
+            "request-backup-later",
+            "operation-backup-later",
+        )
+        .unwrap();
+    drop(engine);
+    (estate, backup.backup.backup_sha256, restore_id)
+}
+
+fn authenticated_readiness(estate: &InstalledEstate, now: u64) -> rrd_contract::Readiness {
+    use rrd_contract::{CreateSession, SessionLimits};
+
+    let engine = RrdEngine::open_installed(&estate.project_path, &estate.executable).unwrap();
+    let api_key = RrdEngine::read_installed_api_key(&estate.project_path).unwrap();
+    engine
+        .create_authenticated_session(
+            &api_key.principal_id,
+            api_key.credential().as_bytes(),
+            &CreateSession {
+                limits: SessionLimits {
+                    idle_timeout_ms: 60_000,
+                    absolute_timeout_ms: 60_000,
+                    max_open_transactions: 1,
+                },
+            },
+            &id(&format!("published-session-{now}")),
+            now,
+            "request-published-session",
+            "operation-published-session",
+        )
+        .expect("the published estate authenticates its operator credential");
+    engine.readiness(now).unwrap()
+}
+
+/// POAM-031 closure, second half (Decision 6 A): a verified restore staging
+/// root is published into the storage root's own name, the previous root is
+/// quarantined beside the staging roots, the token key travels with the
+/// estate rather than with the backup, and the published estate opens through
+/// `open_installed` and reaches authenticated readiness at the backup's state.
+#[test]
+fn a_staged_restore_is_published_in_place_and_the_estate_opens_from_the_backup() {
+    use crate::engine::estate_layout::{validate_recovery_estate, EstateLayout};
+
+    let (estate, backup_sha256, restore_id) = install_backup_and_stage();
+    let locator = RrdEngine::read_project_locator(&estate.project_path).unwrap();
+    let candidate = estate
+        .project_path
+        .join(".rrflow/rrd/restores")
+        .join(estate.instance.as_str())
+        .join(restore_id.as_str());
+    let active_before = rrd_store::RrflowKvInspector::open(&estate.active_root).unwrap();
+    let active_control_sequence = active_before.inspection().control_journal_sequence;
+    drop(active_before);
+
+    // Planning fails while the estate is served and writes nothing.
+    let served = RrdEngine::open_installed(&estate.project_path, &estate.executable).unwrap();
+    assert!(
+        RrdEngine::plan_restore_publication(
+            &estate.project_path,
+            &restore_id,
+            &backup_sha256,
+            &estate.executable,
+        )
+        .is_err(),
+        "a served estate cannot be published over"
+    );
+    drop(served);
+    let before = inventory(&estate.project_path);
+
+    let plan = RrdEngine::plan_restore_publication(
+        &estate.project_path,
+        &restore_id,
+        &backup_sha256,
+        &estate.executable,
+    )
+    .unwrap();
+    assert_eq!(
+        inventory(&estate.project_path),
+        before,
+        "planning has no effect"
+    );
+    plan.validate().unwrap();
+    assert_eq!(plan.target, locator.identity);
+    assert_eq!(plan.active_root, locator.storage_root);
+    assert_eq!(
+        plan.candidate_root,
+        format!(".rrflow/rrd/restores/{}/{}", estate.instance, restore_id)
+    );
+    assert_eq!(
+        plan.quarantine_root,
+        format!(
+            ".rrflow/rrd/restores/{}/{}.quarantined-{}",
+            estate.instance, restore_id, plan.storage_root_id
+        )
+    );
+    assert_eq!(
+        plan.installed_record_sha256,
+        locator.installed_record_sha256
+    );
+    assert!(
+        plan.active.control_journal_sequence > plan.candidate.control_journal_sequence,
+        "the active estate has moved past the backup"
+    );
+    assert_eq!(plan.active.runtime_cursor, plan.candidate.runtime_cursor);
+    let replanned = RrdEngine::plan_restore_publication(
+        &estate.project_path,
+        &restore_id,
+        &backup_sha256,
+        &estate.executable,
+    )
+    .unwrap();
+    assert_eq!(replanned, plan, "planning is deterministic");
+    assert!(
+        RrdEngine::apply_restore_publication(
+            &estate.project_path,
+            &plan,
+            &"0".repeat(64),
+            1_800_000_000_500,
+            &estate.executable,
+        )
+        .is_err(),
+        "an unaccepted digest applies nothing"
+    );
+    assert_eq!(inventory(&estate.project_path), before);
+
+    let result = RrdEngine::apply_restore_publication(
+        &estate.project_path,
+        &plan,
+        &plan.plan_sha256,
+        1_800_000_000_500,
+        &estate.executable,
+    )
+    .unwrap();
+    result.validate_for(&plan).unwrap();
+    assert!(!result.idempotent_replay);
+    assert_eq!(result.published_root, plan.active_root);
+    assert_eq!(result.quarantine_root, plan.quarantine_root);
+    assert_eq!(result.runtime_cursor, plan.candidate.runtime_cursor);
+    assert!(!candidate.exists(), "the candidate moved into roots/");
+    let quarantine = estate.project_path.join(&plan.quarantine_root);
+    assert!(quarantine.is_dir(), "the previous root is quarantined");
+    let quarantined = rrd_store::RrflowKvInspector::open(&quarantine).unwrap();
+    assert_eq!(
+        quarantined.inspection().control_journal_sequence,
+        active_control_sequence,
+        "the quarantined root is the previous active root, untouched"
+    );
+    drop(quarantined);
+    let mut roots = std::fs::read_dir(estate.project_path.join(".rrflow/rrd/roots"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect::<Vec<_>>();
+    roots.sort();
+    assert_eq!(roots, [plan.storage_root_id.to_string()]);
+    assert!(
+        !estate
+            .project_path
+            .join(".rrflow/rrd/restores")
+            .join(estate.instance.as_str())
+            .join(format!(".publish-{restore_id}.json"))
+            .exists(),
+        "the intent is acknowledged"
+    );
+    let token = std::fs::read(estate.active_root.join("RRD.TOKEN")).unwrap();
+    assert_eq!(digest::sha256_hex(&token), plan.token_key_sha256);
+    assert_eq!(
+        std::fs::read(quarantine.join("RRD.TOKEN")).unwrap(),
+        token,
+        "the token key travels with the estate"
+    );
+    let layout = EstateLayout::new(
+        &plan.storage_root_id,
+        &RrdEngine::read_installed_api_key(&estate.project_path)
+            .unwrap()
+            .principal_id,
+    )
+    .unwrap();
+    validate_recovery_estate(&estate.project_path, &layout)
+        .expect("install recovery accepts the published estate");
+
+    // POAM-031 closure: the published root is the installed estate.
+    let readiness = authenticated_readiness(&estate, 1_800_000_000_600);
+    assert_eq!(readiness.runtime_cursor, plan.candidate.runtime_cursor);
+    let report = RrdEngine::inspect_installed(&estate.project_path, &estate.executable).unwrap();
+    assert_eq!(report.status, InstallationVerificationStatus::Passed);
+    let published = rrd_store::RrflowKvStore::open_existing(&estate.active_root).unwrap();
+    assert!(
+        published
+            .control()
+            .get(&format!(
+                "server/state/{}/restore/publication/{}",
+                estate.instance, plan.id
+            ))
+            .unwrap()
+            .is_some(),
+        "the published root carries the publication receipt"
+    );
+    assert!(published
+        .control()
+        .get("server/state/install/record")
+        .unwrap()
+        .is_some());
+    drop(published);
+
+    // Replay returns the recorded receipt; a new plan for the consumed
+    // candidate is refused.
+    let replay = RrdEngine::apply_restore_publication(
+        &estate.project_path,
+        &plan,
+        &plan.plan_sha256,
+        1_800_000_000_700,
+        &estate.executable,
+    )
+    .unwrap();
+    assert!(replay.idempotent_replay);
+    assert_eq!(replay.plan_sha256, result.plan_sha256);
+    assert_eq!(replay.action_results, result.action_results);
+    assert_eq!(replay.applied_at_unix_ms, result.applied_at_unix_ms);
+    assert!(RrdEngine::plan_restore_publication(
+        &estate.project_path,
+        &restore_id,
+        &backup_sha256,
+        &estate.executable,
+    )
+    .is_err());
+}
+
+#[test]
+fn an_interrupted_publication_resumes_from_its_recorded_stage() {
+    use super::super::restore_publication::PublicationStage;
+
+    for fail_after in [
+        PublicationStage::CandidateVerified,
+        PublicationStage::TokenCarried,
+        PublicationStage::ActiveQuarantined,
+        PublicationStage::CandidatePublished,
+    ] {
+        let (estate, backup_sha256, restore_id) = install_backup_and_stage();
+        let plan = RrdEngine::plan_restore_publication(
+            &estate.project_path,
+            &restore_id,
+            &backup_sha256,
+            &estate.executable,
+        )
+        .unwrap();
+        let interrupted = RrdEngine::apply_restore_publication_with_failure(
+            &estate.project_path,
+            &plan,
+            &plan.plan_sha256,
+            1_800_000_000_500,
+            &estate.executable,
+            fail_after,
+        );
+        assert!(interrupted.is_err(), "failpoint after {fail_after:?} fires");
+        let intent = estate
+            .project_path
+            .join(".rrflow/rrd/restores")
+            .join(estate.instance.as_str())
+            .join(format!(".publish-{restore_id}.json"));
+        assert!(intent.is_file(), "the intent survives the interruption");
+        assert!(
+            RrdEngine::plan_restore_publication(
+                &estate.project_path,
+                &restore_id,
+                &backup_sha256,
+                &estate.executable,
+            )
+            .is_err(),
+            "an in-progress publication refuses a second plan"
+        );
+
+        let result = RrdEngine::apply_restore_publication(
+            &estate.project_path,
+            &plan,
+            &plan.plan_sha256,
+            1_800_000_000_600,
+            &estate.executable,
+        )
+        .unwrap_or_else(|error| panic!("resume after {fail_after:?} failed: {error}"));
+        result.validate_for(&plan).unwrap();
+        assert!(!result.idempotent_replay);
+        assert!(!intent.exists());
+        assert!(estate.project_path.join(&plan.quarantine_root).is_dir());
+        assert!(!estate.project_path.join(&plan.candidate_root).exists());
+        let readiness = authenticated_readiness(&estate, 1_800_000_000_700);
+        assert_eq!(readiness.runtime_cursor, plan.candidate.runtime_cursor);
+    }
+}
