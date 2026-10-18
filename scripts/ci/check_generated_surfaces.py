@@ -40,6 +40,16 @@ SIGNAL_OUTPUTS = {
     "dotnet signal catalogue": ROOT
     / "sdks/dotnet/src/Rrflow.Rrd.Client/Generated/SignalCatalogue.g.cs",
 }
+# Authored records that cite the current OpenAPI digest by hand. They are not
+# rendered by this tool, so the check requires the citation to be current.
+DIGEST_CITATIONS = {
+    "public contract reference": ROOT / "docs/reference/protocol/public-contract.md",
+    "typescript sdk reference": ROOT / "docs/reference/sdk/typescript.md",
+    "python sdk reference": ROOT / "docs/reference/sdk/python.md",
+    "go sdk reference": ROOT / "docs/reference/sdk/go.md",
+    "java sdk reference": ROOT / "docs/reference/sdk/java.md",
+    "dotnet sdk reference": ROOT / "docs/reference/sdk/dotnet.md",
+}
 SIGNAL_TOP_LEVEL_FIELDS = {
     "contract_version",
     "default_diagnostic_level",
@@ -281,6 +291,16 @@ def validate_endpoint_outputs(
             f"missing={missing} extra={extra} mismatched={mismatched}"
         )
     return len(expected)
+
+
+def validate_digest_citations(digest: str) -> None:
+    for name, path in DIGEST_CITATIONS.items():
+        require(path.is_file(), f"{name} is absent: {path.relative_to(ROOT)}")
+        require(
+            digest in path.read_text(encoding="utf-8"),
+            f"{name} cites a stale OpenAPI digest: {path.relative_to(ROOT)} "
+            f"must cite {digest}",
+        )
 
 
 def require_string_list(
@@ -822,6 +842,8 @@ def main() -> None:
     operation_count = validate_endpoint_outputs(
         document, digest, require_current_digest=not args.write
     )
+    if not args.write:
+        validate_digest_citations(digest)
     catalogue, fingerprint = signal_projection(document)
     require(
         catalogue == kernel_catalogue,

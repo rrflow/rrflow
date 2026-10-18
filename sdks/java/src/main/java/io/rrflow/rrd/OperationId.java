@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 733695656b3d7c52fc4167586229b1dbcc8cb2009d7c15a49525a008648f0d89
+// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
 package io.rrflow.rrd;
 
 public enum OperationId {

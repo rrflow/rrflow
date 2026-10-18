@@ -7,9 +7,9 @@
 
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
-    transaction_operation_sha256, BeginTransaction, CanonicalId, CloseSession, CommitTransaction,
-    CreateInstanceBackup, CreateSession, ErrorCode, ExecuteQuery, QueryBudget, QueryValue,
-    RestoreInstanceBackup, SessionLimits, TransactionMutation,
+    transaction_operation_sha256, BackupCoverageSnapshot, BeginTransaction, CanonicalId,
+    CloseSession, CommitTransaction, CreateInstanceBackup, CreateSession, ErrorCode, ExecuteQuery,
+    QueryBudget, QueryValue, RestoreInstanceBackup, SessionLimits, TransactionMutation,
 };
 use rrd_engine::RrdEngine;
 use std::collections::BTreeMap;
@@ -583,6 +583,11 @@ max_elapsed_ms = 20000
                 .await
                 .unwrap();
             assert!(backup.backup.application_complete);
+            assert_eq!(
+                backup.backup.installed_control,
+                BackupCoverageSnapshot::Included,
+                "the SDK-visible backup names the installed control state it carries"
+            );
             let later = client
                 .begin_transaction(
                     &session,
