@@ -280,6 +280,9 @@ pub struct LocalObjectStore {
 }
 
 impl LocalObjectStore {
+    /// Opens an object store, creating its directories when absent. Writers
+    /// and restore targets use this; verification uses `open_existing` so a
+    /// read-only check never creates bytes.
     pub fn open(root: impl AsRef<Path>) -> Result<Self> {
         let root = root.as_ref().to_path_buf();
         fs::create_dir_all(root.join("objects/sha256"))?;
@@ -287,6 +290,26 @@ impl LocalObjectStore {
         fs::create_dir_all(root.join("quarantine"))?;
         sync_directory_metadata(&root)?;
         Ok(Self { root })
+    }
+
+    /// Opens an object store whose object directory already exists and
+    /// creates nothing; an absent or non-directory root fails closed.
+    pub fn open_existing(root: impl AsRef<Path>) -> Result<Self> {
+        let root = root.as_ref().to_path_buf();
+        let objects = root.join("objects/sha256");
+        match fs::symlink_metadata(&objects) {
+            Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+                Ok(Self { root })
+            }
+            Ok(_) => Err(Error::Substrate(format!(
+                "object store directory is not a directory: {}",
+                objects.display()
+            ))),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(Error::Substrate(
+                format!("object store is absent: {}", objects.display()),
+            )),
+            Err(error) => Err(Error::from(error)),
+        }
     }
 
     pub fn root(&self) -> &Path {

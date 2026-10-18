@@ -1,4 +1,5 @@
-//! Content-authenticated archive of one control-journal subsequence.
+//! Content-addressed, digest-verified archive of one control-journal
+//! subsequence.
 //!
 //! An application-complete backup carries the estate's control state as the
 //! ordered control-journal entries whose keys fall under a declared set of
@@ -342,14 +343,14 @@ impl ControlArchiveWriter {
     }
 }
 
-/// Authenticates a control-journal archive without yielding its entries.
+/// Verifies a control-journal archive's digest without yielding its entries.
 pub fn inspect_control_archive(path: &Path) -> Result<ControlArchiveInventory> {
     read_control_archive(path, |_| Ok(()))
 }
 
-/// Streams every entry of an authenticated control-journal archive in order.
-/// The footer digest is checked after the last entry; a caller that must not
-/// act on unauthenticated entries inspects the archive first.
+/// Streams every entry of a control-journal archive in order. The footer
+/// digest is checked after the last entry; a caller that must not act on
+/// unverified entries inspects the archive first.
 pub fn read_control_archive(
     path: &Path,
     mut accept: impl FnMut(&ControlJournalEntry) -> Result<()>,
@@ -595,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_scope_archives_nothing_and_authenticates() {
+    fn empty_scope_archives_nothing_and_verifies() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("empty.rrd-control-archive");
         let inventory = ControlArchiveWriter::create(&path, 0, &[])

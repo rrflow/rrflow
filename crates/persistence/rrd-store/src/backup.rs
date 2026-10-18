@@ -1,4 +1,9 @@
-//! Authenticated local backup catalogue over retained logical archives.
+//! Digest-verified local backup catalogue over retained logical archives.
+//!
+//! Every digest here detects changed bytes. None authenticates a producer:
+//! the catalogue shares the estate's filesystem trust domain, so a keyed
+//! authenticator would be stored beside the key it protects. Operations that
+//! read a catalogue say "verify", never "authenticate".
 
 use crate::access::runtime_state::{checked_key, get};
 use crate::archive::{ControlArchiveWriter, CATALOGUE_CONTROL_FAMILIES};
@@ -234,6 +239,7 @@ pub fn create_logical_backup<E: StorageEngine>(
     created_at: u64,
 ) -> Result<BackupEntry> {
     validate_label(label)?;
+    initialize_catalogue(catalogue_root)?;
     let archives = catalogue_root.join(ARCHIVE_DIRECTORY);
     fs::create_dir_all(&archives).map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -318,7 +324,7 @@ pub fn create_logical_backup<E: StorageEngine>(
 /// and operator credential are files outside every family), and transient
 /// families such as sessions, subscriptions, and operation receipts stay out
 /// of the scope. Logical replay, object bytes, catalogues, and control entries
-/// remain separate physical artifacts, but one authenticated catalogue entry
+/// remain separate physical artifacts, but one digest-verified catalogue entry
 /// binds their content identities. A concurrent source mutation rejects the
 /// backup before it is catalogued.
 pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
@@ -331,6 +337,7 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
 ) -> Result<BackupEntry> {
     validate_label(label)?;
     validate_control_families(control_families)?;
+    initialize_catalogue(catalogue_root)?;
     let control_sequence = engine.control().sequence()?;
     let archives = catalogue_root.join(ARCHIVE_DIRECTORY);
     fs::create_dir_all(&archives).map_err(backup_io)?;
@@ -402,17 +409,18 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     retain_catalogue_entry(catalogue_root, entry)
 }
 
-/// Loads and authenticates the catalogue payload. Archive bytes are verified
-/// separately by `verify_backup_catalogue` so listing remains bounded.
+/// Loads the catalogue and verifies its payload digest. Archive bytes are
+/// verified separately by `verify_backup_catalogue` so listing remains bounded.
+///
+/// A catalogue that was never written reads as empty. A catalogue file that
+/// is absent while retained artifacts exist beside it fails closed: those
+/// artifacts belonged to entries, and reading them as "no backups" would hide
+/// the loss.
 pub fn load_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
     let path = catalogue_root.join(CATALOGUE_FILE);
     if !path.exists() {
-        return catalogue_from_payload(CataloguePayload {
-            format_version: BACKUP_CATALOGUE_VERSION,
-            revision: 0,
-            backups: Vec::new(),
-            prune_receipts: Vec::new(),
-        });
+        require_no_orphan_artifacts(catalogue_root)?;
+        return catalogue_from_payload(empty_catalogue_payload());
     }
     let bytes = fs::read(&path).map_err(backup_io)?;
     let stored: StoredCatalogue = serde_json::from_slice(&bytes)?;
@@ -439,7 +447,9 @@ pub fn load_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
     })
 }
 
-/// Authenticates the catalogue and every retained archive it references.
+/// Verifies the digests of the catalogue and of every retained artifact it
+/// references, reading only: nothing is created or repaired. The digests
+/// detect changed bytes; they do not authenticate a producer.
 pub fn verify_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
     let catalogue = load_backup_catalogue(catalogue_root)?;
     for entry in &catalogue.backups {
@@ -460,10 +470,10 @@ pub fn verify_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue>
     Ok(catalogue)
 }
 
-/// Publishes one authenticated successor catalogue for a complete retention
+/// Publishes one digest-verified successor catalogue for a complete retention
 /// partition, then reclaims only artifacts that no retained entry references.
 /// Exact replay is recovered from the bounded receipt embedded in the
-/// authenticated catalogue.
+/// catalogue.
 pub fn prune_backup_catalogue(
     catalogue_root: &Path,
     plan: &BackupPrunePlan,
@@ -583,9 +593,9 @@ pub fn restore_catalogued_backup(
     }
 }
 
-/// Verifies that an already published restore still contains the complete,
-/// authenticated immutable payload closure, catalogue state, and replayed
-/// control journal for a catalogued backup.
+/// Verifies, reading only, that an already published restore still contains
+/// the complete immutable payload closure, catalogue state, and replayed
+/// control journal of a catalogued backup.
 pub fn verify_restored_backup_objects(
     catalogue_root: &Path,
     backup_id: &str,
@@ -603,7 +613,7 @@ pub fn verify_restored_backup_objects(
         ));
     }
     let manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
-    let restored = LocalObjectStore::open(restored_root.join("immutable"))?;
+    let restored = LocalObjectStore::open_existing(restored_root.join("immutable"))?;
     for object in &manifest.objects {
         let verified = restored.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -657,8 +667,8 @@ fn restore_control_journal(
     expected: &ControlArchiveInventory,
     staging_root: &Path,
 ) -> Result<()> {
-    let authenticated = inspect_control_archive(archive)?;
-    if &authenticated != expected {
+    let inspected = inspect_control_archive(archive)?;
+    if &inspected != expected {
         return Err(Error::Archive(
             "control-journal archive inventory does not match its catalogue entry".into(),
         ));
@@ -1270,7 +1280,7 @@ fn validate_catalogue_manifest(manifest: &CatalogueManifest) -> Result<()> {
 
 fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &Path) -> Result<()> {
     validate_catalogue_manifest(manifest)?;
-    let engine = RrflowKvStore::open(staging_root)?;
+    let engine = RrflowKvStore::open_existing(staging_root)?;
     for scope in &manifest.scopes {
         let records = manifest
             .records
@@ -1341,7 +1351,7 @@ fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &Path) -> Resu
 }
 
 fn verify_restored_catalogues(manifest: &CatalogueManifest, restored_root: &Path) -> Result<()> {
-    let engine = RrflowKvStore::open(restored_root)?;
+    let engine = RrflowKvStore::open_existing(restored_root)?;
     for record in &manifest.records {
         if engine.control().get(&record.key)?.as_deref() != Some(record.value.as_slice()) {
             return Err(Error::Archive(format!(
@@ -1441,7 +1451,7 @@ fn retain_object_payloads(
 
 fn verify_object_payloads(catalogue_root: &Path, entry: &BackupEntry) -> Result<()> {
     let manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
-    let payloads = LocalObjectStore::open(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let payloads = LocalObjectStore::open_existing(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
     for object in manifest.objects {
         let verified = payloads.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -1459,7 +1469,7 @@ fn restore_object_payloads(
     manifest: &ObjectPayloadManifest,
     staging_root: &Path,
 ) -> Result<()> {
-    let source = LocalObjectStore::open(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let source = LocalObjectStore::open_existing(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
     let target = LocalObjectStore::open(staging_root.join("immutable"))?;
     for object in &manifest.objects {
         let verified = source.verify(&object.sha256)?;
@@ -1562,6 +1572,50 @@ fn validate_object_manifest(manifest: &ObjectPayloadManifest) -> Result<()> {
         previous = Some(&object.sha256);
     }
     Ok(())
+}
+
+fn empty_catalogue_payload() -> CataloguePayload {
+    CataloguePayload {
+        format_version: BACKUP_CATALOGUE_VERSION,
+        revision: 0,
+        backups: Vec::new(),
+        prune_receipts: Vec::new(),
+    }
+}
+
+/// Retained artifacts exist only for catalogued entries, so a catalogue file
+/// that is absent beside them was lost; reading it as empty would hide that.
+fn require_no_orphan_artifacts(catalogue_root: &Path) -> Result<()> {
+    if let Some(directory) = [
+        ARCHIVE_DIRECTORY,
+        OBJECT_MANIFEST_DIRECTORY,
+        CATALOGUE_MANIFEST_DIRECTORY,
+        CONTROL_ARCHIVE_DIRECTORY,
+        OBJECT_PAYLOAD_DIRECTORY,
+    ]
+    .into_iter()
+    .find(|directory| catalogue_root.join(directory).exists())
+    {
+        return Err(Error::Archive(format!(
+            "backup catalogue is absent while retained {directory} exist beside it"
+        )));
+    }
+    Ok(())
+}
+
+/// Publishes the empty catalogue before the first artifact is retained, so
+/// every retained artifact is younger than the catalogue that owns it and an
+/// absent catalogue beside artifacts is always a loss.
+fn initialize_catalogue(catalogue_root: &Path) -> Result<()> {
+    if catalogue_root.join(CATALOGUE_FILE).exists() {
+        return Ok(());
+    }
+    require_no_orphan_artifacts(catalogue_root)?;
+    fs::create_dir_all(catalogue_root).map_err(backup_io)?;
+    write_catalogue(
+        catalogue_root,
+        catalogue_from_payload(empty_catalogue_payload())?,
+    )
 }
 
 fn catalogue_from_payload(payload: CataloguePayload) -> Result<BackupCatalogue> {
