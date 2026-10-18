@@ -367,8 +367,7 @@ catalogued public inspection may remain anonymous.
 
 The complete review found these direct-convergence requirements:
 
-1. `rrd-security` still documents itself as policy truth, refers to removed RRO
-   provisioning, depends on `rrd-store`, and exports a `SecurityRepository`
+1. `rrd-security` depends on `rrd-store` and exports a `SecurityRepository`
    that can commit directly to any `StorageEngine`. A-07 must retain its useful
    values and pure decisions while making `RrdEngine` the only caller that can
    persist or replace authority and audit state.
@@ -410,7 +409,7 @@ pre-release security mode.
 | `rrd-security` tests | Current validation, exact-scope denial, role inheritance failure, API-key/JWT/identity binding, rotation/revocation, audit chain, concurrent append, and rrflowKV reopen behavior. The suite is not an engine-authority or MX/KV semantic differential. |
 | `rrd-engine` security tests | Current engine invocation, embedded denial, credential-revision invalidation, query policy injection, context fail-closed behavior, and audit phases. They do not prove atomic policy/data stamps or effect-level write authorization. |
 | Server/client real-process tests | Current API-key sessions, denials, redaction, audit read/export, TLS 1.3 mTLS identity, authenticated HTTP/WSS, and selected reopen behavior. They do not qualify every adapter, provider, rotation mode, or deployment. |
-| A-07 | Remove the direct-store/public-repository authority, obsolete RRO language, ambiguous action vocabulary, and dependency-direction conflicts while mapping every retained invariant to its one owner. |
+| A-07 | Remove the direct-store/public-repository authority, the retired provisioning-role vocabulary, ambiguous action vocabulary, and dependency-direction conflicts while mapping every retained invariant to its one owner. |
 | C-01 through C-04 | Encode and transact security/audit state through the one accepted rrflowMX/rrflowKV substrate; bind policy and data observations; atomically include audit with accepted writes. |
 | D-01/D-02/D-06 | D-01 now proves exact local preview/apply, fresh-target checks, one engine-generated credential/token, atomic binding/policy/audit/checkpoint commit, and eight-stage same-plan replay. Complete capability-scoped secret I/O, typed verifiers, delivery/rotation receipts, native ACLs, external identity providers, and optional adapters without copying credentials into canonical state. |
 | F-01 through F-05 | Prove native and DataFusion plans see only authorized stamped batches, enforce budgets, and never return stale authorization-scoped cache entries. |
