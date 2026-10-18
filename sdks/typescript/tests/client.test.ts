@@ -85,6 +85,34 @@ test("public negotiation retries transport loss and validates the ArkType envelo
   assert.equal(attempts, 2);
 });
 
+test("the transport is invoked as a free function, as a browser's fetch requires", async () => {
+  // Browsers throw "Illegal invocation" when `fetch` runs with any `this`
+  // other than the global object; the client must never call it as a method.
+  const transport = function (this: unknown, input: RequestInfo | URL) {
+    if (this !== undefined && this !== globalThis) {
+      throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+    }
+    assert.equal(new URL(input.toString()).pathname, "/v1/health/live");
+    return Promise.resolve(
+      jsonResponse({
+        protocol: "rrd",
+        protocol_version: 1,
+        request_id: "server-request",
+        operation_id: "server-operation",
+        outcome: { status: "ok", payload: { observed_at_unix_ms: 7 } },
+      }),
+    );
+  } as typeof fetch;
+  const client = new RrdClient({
+    baseUrl: "http://127.0.0.1:9477",
+    instance: "sdk-test",
+    maxAttempts: 1,
+    fetch: transport,
+  });
+  const liveness = await client.call("health-live", undefined, {});
+  assert.equal(liveness.observed_at_unix_ms, 7);
+});
+
 test("session and query calls construct authenticated bounded v1 envelopes", async () => {
   const requests: { url: URL; init: RequestInit }[] = [];
   const transport: typeof fetch = async (input, init = {}) => {
