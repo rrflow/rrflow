@@ -94,6 +94,9 @@ staging state leaves the requested target absent.
 | Immutable-object references | Included | Included | References are replayed with runtime state |
 | Immutable-object payload bytes | Referenced only | Included through a content-addressed manifest | Verified and copied to the restored `immutable` store before publication |
 | Vector-collection and index catalogue records | Excluded | Included from their two current control-journal keyspaces | Values and per-scope catalogue revisions are reconstructed before publication |
+| Estate control state (installed record and checkpoint, active configuration, security policy and audit chain, attunement plan and job, estate documents) | Excluded | Included as the ordered control-journal entries of the engine-declared families, in a content-addressed `RRDCJA01` control-journal archive | Replayed one transition per entry after the catalogues and objects, each committed with a replay-progress marker; verified contiguous and field-identical before publication |
+| Session leases, subscriptions, backup/restore and estate-recovery receipts | Excluded | Excluded | No recovery claim; they belong to the instance that performed the operation |
+| Token key and operator credential | Excluded | Excluded | Files outside the store; publication carries the token key, never a backup |
 | Scalar, BM25, vector, HNSW, and analytical projections | Not retained | Not retained | Must be rebuilt from authoritative state |
 | Invocation telemetry | Excluded | Excluded | No recovery claim |
 | Snapshot leases | Excluded | Excluded | No recovery claim |
@@ -104,9 +107,11 @@ table. It does not mean every future application or control-state family is
 implicitly covered. Adding a family requires an explicit coverage value,
 bounded manifest representation, corrupt-input denial, and restore test.
 
-The backup catalogue is local JSON at `catalogue.json`. Archives, object
-manifests, catalogue manifests, and payloads are content-addressed beneath the
-catalogue root. Entries bind caller-supplied label/time to component digests,
+The backup catalogue is local JSON at `catalogue.json`, format version 2; a
+version 1 catalogue, whose application-complete entries carried no control
+state, is refused rather than read as complete. Archives, object manifests,
+catalogue manifests, control-journal archives, and payloads are
+content-addressed beneath the catalogue root. Entries bind caller-supplied label/time to component digests,
 are canonically ordered, and are published through a synced temporary file and
 rename. Pruning requires a complete retained/pruned partition bound to the
 current catalogue digest; replay is idempotent, and shared artifacts remain

@@ -589,25 +589,25 @@ fn read_action(file: &mut File, digest: &mut Sha256) -> Result<(ArchiveAction, u
     Ok((serde_json::from_slice(&payload)?, length))
 }
 
-fn read_hashed(file: &mut File, digest: &mut Sha256, bytes: &mut [u8]) -> Result<()> {
+pub(super) fn read_hashed(file: &mut File, digest: &mut Sha256, bytes: &mut [u8]) -> Result<()> {
     file.read_exact(bytes).map_err(archive_read_error)?;
     digest.update(bytes);
     Ok(())
 }
 
-fn read_u16_hashed(file: &mut File, digest: &mut Sha256) -> Result<u16> {
+pub(super) fn read_u16_hashed(file: &mut File, digest: &mut Sha256) -> Result<u16> {
     let mut bytes = [0u8; 2];
     read_hashed(file, digest, &mut bytes)?;
     Ok(u16::from_be_bytes(bytes))
 }
 
-fn read_u64_hashed(file: &mut File, digest: &mut Sha256) -> Result<u64> {
+pub(super) fn read_u64_hashed(file: &mut File, digest: &mut Sha256) -> Result<u64> {
     let mut bytes = [0u8; 8];
     read_hashed(file, digest, &mut bytes)?;
     Ok(u64::from_be_bytes(bytes))
 }
 
-fn read_u64_raw(file: &mut File) -> Result<u64> {
+pub(super) fn read_u64_raw(file: &mut File) -> Result<u64> {
     let mut bytes = [0u8; 8];
     file.read_exact(&mut bytes).map_err(archive_read_error)?;
     Ok(u64::from_be_bytes(bytes))

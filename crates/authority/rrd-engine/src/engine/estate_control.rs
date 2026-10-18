@@ -1182,6 +1182,7 @@ impl EngineLocalBackupDriver {
             &canonical_catalogue,
             &request.label,
             request.created_at,
+            &super::backup::installed_control_families(&request.instance_id),
         )
         .map_err(|error| {
             retryable(

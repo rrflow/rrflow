@@ -961,6 +961,7 @@ enum SystemEntry {
     RuntimeLastAuditDigest = 0x0b,
     RuntimeAccumulatorState = 0x0c,
     RuntimeAccumulatorNode = 0x0d,
+    ControlRestoreProgress = 0x0e,
 }
 
 fn system_key(entry: SystemEntry, parts: &[KeyPart<'_>]) -> Vec<u8> {
@@ -1037,6 +1038,13 @@ pub(crate) fn runtime_accumulator_node_key(level: u8, index: u64) -> Vec<u8> {
         SystemEntry::RuntimeAccumulatorNode,
         &[KeyPart::U8(level), KeyPart::U64(index)],
     )
+}
+
+/// Progress of a control-journal archive replay into this root. Written in
+/// the same physical transaction as each replayed control transition, so a
+/// resumed restore never re-applies or skips an entry.
+pub(crate) fn control_restore_progress_key() -> Vec<u8> {
+    system_key(SystemEntry::ControlRestoreProgress, &[])
 }
 
 /// Persistence policy for a write transaction.

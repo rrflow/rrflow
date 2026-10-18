@@ -764,15 +764,30 @@ fn a_restore_into_an_existing_verified_target_is_recovered_without_a_second_writ
     );
 }
 
-/// Characterizes POAM-031. A backup of an installed estate carries its
-/// claims, runtime commits, immutable objects, and two catalogue control
-/// families, but not the installed record, the active configuration, the
-/// security state, or the attunement state. A restored root therefore cannot
-/// be opened as an installed estate, which blocks restore publication. When
-/// POAM-031 is fixed, the restored root must carry the record and this test
-/// must fail.
+/// Collects a root's complete control journal in order.
+fn control_journal(store: &rrd_store::RrflowKvStore) -> Vec<rrd_store::ControlJournalEntry> {
+    let mut entries = Vec::new();
+    let mut after = 0u64;
+    loop {
+        let page = store.control().journal_since(after, 256).unwrap();
+        match page.last() {
+            Some(last) => after = last.sequence,
+            None => return entries,
+        }
+        entries.extend(page);
+    }
+}
+
+/// POAM-031 closure, first half: a backup of an installed estate carries the
+/// installed control state as replayable control-journal entries, so a
+/// restored root holds the installed record, the install checkpoint, the
+/// active configuration, the security policy, and an audit chain that reads
+/// back from the restored root. Secrets stay files outside the store, and the
+/// transient families (session leases, operation receipts) are not carried.
+/// The second half, opening the restored root through `open_installed`, is
+/// restore publication's evidence.
 #[test]
-fn a_restored_root_lacks_the_installed_record_and_security_state() {
+fn a_restored_root_carries_the_installed_control_state() {
     use rrd_contract::CreateInstanceBackup;
 
     let (estate, engine, lease) = install_and_open();
@@ -791,6 +806,32 @@ fn a_restored_root_lacks_the_installed_record_and_security_state() {
         )
         .unwrap();
     assert!(backup.backup.application_complete);
+    let families = super::super::backup::installed_control_families(&estate.instance);
+    rrd_store::validate_control_families(&families).unwrap();
+    let catalogue = rrd_store::load_backup_catalogue(
+        &estate
+            .project_path
+            .join(".rrflow/rrd/backups")
+            .join(estate.instance.as_str()),
+    )
+    .unwrap();
+    assert_eq!(
+        catalogue.format_version,
+        rrd_store::BACKUP_CATALOGUE_VERSION
+    );
+    let entry = catalogue
+        .backups
+        .iter()
+        .find(|entry| entry.backup_id == backup.backup.backup_sha256)
+        .unwrap();
+    assert_eq!(entry.installed_control, rrd_store::BackupCoverage::Included);
+    let archive = entry.control_archive.as_ref().unwrap();
+    assert_eq!(archive.families, families);
+    assert!(
+        archive.entry_count >= 8,
+        "install writes at least eight control entries"
+    );
+
     restore(
         &engine,
         &lease,
@@ -811,25 +852,131 @@ fn a_restored_root_lacks_the_installed_record_and_security_state() {
             .join("restore-one"),
     )
     .unwrap();
+
+    // Installed state that the estate has not changed since install is
+    // byte-identical in the restored root.
     let configuration_key = format!("server/state/{}/configuration/active", estate.instance);
+    let security_key = format!("server/state/{}/security/policy", estate.instance);
     for key in [
         "server/state/install/record",
         "server/state/install/checkpoint",
         configuration_key.as_str(),
+        security_key.as_str(),
     ] {
-        assert!(
-            active.control().get(key).unwrap().is_some(),
-            "the active root holds {key}"
-        );
-        assert!(
-            restored.control().get(key).unwrap().is_none(),
-            "POAM-031: the restored root must lack {key} until backups carry the installed control state"
+        let value = active.control().get(key).unwrap();
+        assert!(value.is_some(), "the active root holds {key}");
+        assert_eq!(
+            restored.control().get(key).unwrap(),
+            value,
+            "the restored root carries {key}"
         );
     }
     assert_eq!(
         restored.runtime().cursor().unwrap(),
         active.runtime().cursor().unwrap(),
         "the restored root carries every runtime commit"
+    );
+
+    // Every in-scope control-journal entry up to the backup's watermark is
+    // replayed in order with the same transition; nothing outside the scope
+    // is carried, and nothing was invented.
+    let source_entries = control_journal(&active)
+        .into_iter()
+        .filter(|entry| entry.sequence <= archive.source_control_sequence)
+        .filter(|entry| rrd_store::control_family_of(&families, &entry.key).is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(source_entries.len() as u64, archive.entry_count);
+    let restored_entries = control_journal(&restored);
+    let replayed = restored_entries
+        .iter()
+        .filter(|entry| rrd_store::control_family_of(&families, &entry.key).is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(replayed.len(), source_entries.len());
+    for (restored_entry, source_entry) in replayed.iter().zip(&source_entries) {
+        assert_eq!(restored_entry.key, source_entry.key);
+        assert_eq!(restored_entry.before_sha256, source_entry.before_sha256);
+        assert_eq!(restored_entry.replacement, source_entry.replacement);
+        assert_eq!(restored_entry.at, source_entry.at);
+        assert_eq!(restored_entry.actor, source_entry.actor);
+        assert_eq!(restored_entry.action, source_entry.action);
+        assert_eq!(restored_entry.request_id, source_entry.request_id);
+        assert_eq!(restored_entry.operation_id, source_entry.operation_id);
+    }
+    let excluded = [
+        format!("server/state/{}/session/", estate.instance),
+        format!("server/state/{}/backup/", estate.instance),
+        format!("server/state/{}/restore/", estate.instance),
+    ];
+    assert!(
+        control_journal(&active)
+            .iter()
+            .any(|entry| entry.key.starts_with(&excluded[0])),
+        "the active root holds the session lease"
+    );
+    assert!(
+        restored_entries
+            .iter()
+            .all(|entry| excluded.iter().all(|prefix| !entry.key.starts_with(prefix))),
+        "session leases and operation receipts are not carried"
+    );
+    let foreign = restored_entries
+        .iter()
+        .filter(|entry| rrd_store::control_family_of(&families, &entry.key).is_none())
+        .map(|entry| entry.key.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        foreign.iter().all(
+            |key| key.starts_with("server/state/vector-collection-catalogue/")
+                || key.starts_with("server/state/index-catalogue/")
+        ),
+        "only catalogue restores sit beside the replayed control state: {foreign:?}"
+    );
+
+    // The audit chain reads back from the restored root and closes on its
+    // durable head.
+    let page = SecurityRepository::new(&restored, estate.instance.clone())
+        .audit_since(0, 64)
+        .unwrap();
+    let head: serde_json::Value = serde_json::from_slice(
+        &restored
+            .control()
+            .get(&format!("server/state/{}/audit-head", estate.instance))
+            .unwrap()
+            .expect("the restored root holds the audit head"),
+    )
+    .unwrap();
+    assert_eq!(
+        head["record_count"].as_u64().unwrap(),
+        page.records.len() as u64
+    );
+    assert!(
+        page.records.len() >= 2,
+        "install genesis plus the session's audits"
+    );
+    assert_eq!(
+        page.chain_head_sha256.as_deref(),
+        head["audit_sha256"].as_str()
+    );
+    assert!(
+        rrd_security::SecurityRepository::new(&restored, estate.instance.clone())
+            .is_initialized()
+            .unwrap(),
+        "the restored root has a security authority"
+    );
+    let progress = rrd_store::control_restore_progress(&restored)
+        .unwrap()
+        .unwrap();
+    assert!(progress.complete);
+    assert_eq!(progress.applied, archive.entry_count);
+    assert!(
+        !estate
+            .project_path
+            .join(".rrflow/rrd/restores")
+            .join(estate.instance.as_str())
+            .join("restore-one")
+            .join("RRD.TOKEN")
+            .exists(),
+        "the token key is never part of a backup"
     );
     drop(restored);
     drop(active);
