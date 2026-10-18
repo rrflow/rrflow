@@ -159,7 +159,7 @@ batch. BM25 term dictionaries/postings, exact-vector access, TurboQuant, and
 HNSW generations are not constructed here; Gates E-03 and E-04 consume the
 committed deltas and must prove their independent publication and exact
 fallback behavior. These semantic values remain encoded value bytes within
-the v5 Arrow-layout buffers. A columnar physical envelope does not by itself
+the v6 Arrow-layout buffers. A columnar physical envelope does not by itself
 qualify their native access paths, candidate generation, recall, or exact
 fallback behavior.
 

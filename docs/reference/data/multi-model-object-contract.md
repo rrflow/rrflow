@@ -49,12 +49,15 @@ mutations or projection work.
 | `ImmutableObjectStore` | Holds immutable content bytes addressed by SHA-256; only their verified references enter the logical commit | Durability depends on the selected object adapter and remains outside the rrflowKV transaction |
 | `rrflowQL` / DataFusion | Reads and computes over engine-authorized state | It is not a transaction coordinator and never publishes canonical mutations directly |
 
-The rrflowKV batch currently stores canonical model values as JSON in separate
-keyspaces keyed primarily by scope and logical identity, alongside the
-authenticated mutation log. That is a real durable implementation, but it is
-not yet the Gate C target: versioned native keys, bidirectional adjacency,
-synchronous scalar/BM25/vector index mutations, and Arrow-compatible segment
-pages in one physical commit.
+The rrflowKV batch stores canonical model values as JSON in separate keyspaces:
+a current head keyed by scope and logical identity, a version keyed by scope,
+identity, valid time, and cursor, and, for relations, both adjacency directions,
+alongside the authenticated mutation log. That is a real durable implementation
+with versioned native keys, bidirectional adjacency, and Arrow-layout segment
+pages (segment v6). It is not yet the complete Gate C and Gate E target: values
+are JSON rather than native encodings, nothing in production reads the
+adjacency keys (E-01), and scalar, BM25, and vector index deltas are not
+consumed by native readers (E-02 to E-04).
 
 ## Immutable-object visibility
 
@@ -105,12 +108,15 @@ That prevents a query from silently combining facts accepted at different
 logical heads. It does not yet prove the intended low-latency reasoning and
 recall execution:
 
-- `runtime_data_snapshot` currently reads retained changes from cursor zero
-  and reconstructs all logical families for the requested valid time;
-- current-state rrflowKV values are not versioned native point/range keys, so
-  they cannot yet replace replay for historical stamped reads;
-- relations are stored by relation identity, not as both native adjacency
-  directions required for bounded graph prefix scans;
+- `runtime_data_snapshot` reads every version family directly at the read
+  stamp (`RuntimeVersionedSource::all()`) and reconstructs all logical families
+  for the requested valid time; it is a whole-scope read, not an indexed one;
+- the vector artifact and quantization catalogues are still rebuilt by
+  replaying retained changes from cursor zero on every vector operation
+  ([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md));
+- both adjacency directions are written as native keys, but no production
+  reader uses them; traversal still loads relations by identity and scans them
+  (E-01);
 - vector values are canonical JSON records; HNSW, quantization, BM25, and
   scalar structures remain derived artifacts or in-memory execution paths;
 - time-series and geospatial values have typed semantics but no specialized

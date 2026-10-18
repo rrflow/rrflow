@@ -38,7 +38,8 @@ RRFlow — AI governance, reasoning, recall, and context platform
 │   └── canonical vectors → filtered candidates → HNSW/quantized indexes
 │       → exact reranking
 │
-├── RRFlow inference — replaceable embedding and LFG adapters
+├── RRFlow inference — replaceable embedding adapters and the LFG and SWAG
+│   plug-in configurations, every model reached through a configured endpoint
 ├── RRFlow seats — durable provider-neutral identities; Clyffy is this
 │   repository's primary specialization
 ├── RRFlow attunement — bounded project evidence → committed derived knowledge
@@ -63,7 +64,9 @@ authoritative databases or engines.
 | **rrflowKV** | The durable physical engine beneath rrflowDB: WAL, MVCC, LSM, manifests, snapshots, compaction, and recovery. | `rrd-lsm` through `rrd-store` |
 | **rrflowMX** | RRFlow Memory Execution, the non-durable process-local implementation of the same semantic storage port. | Volatile implementation in `rrd-store`, behind the semantic storage port. |
 | **RRFlow temporal graph** | Typed records and relations resolved from the canonical log at one runtime read stamp and valid-time coordinate; never a separate graph database. | Kernel graph values, persistence adjacency, native query operators, and `RrdEngine` authorization. |
-| **RRFlow memory** | Durable temporal claims, records, relations, schemas, vectors, and evidence owned by the same engine; never a separate memory store. | rrflowDB semantic data composed through `RrdEngine`. |
+| **RRFlow memory** | Durable temporal claims, records, relations, schemas, vectors, and evidence owned by the same engine; never a separate memory store. The "memory database" is rrflowDB itself. | rrflowDB semantic data composed through `RrdEngine`. |
+| **RRO** | Reason Ready Object: one persisted, versioned unit of knowledge the engine reasons over, such as a record, relation, claim, vector, or reasoning node, read at one stamp with its evidence. The abbreviation names no component, role, or provisioning path. | Kernel values in `rrd-core`; persistence through `rrd-store`; no type carries this name. |
+| **RROFLOW** | The recursive self-improvement configuration of RRFlow: committed reasoning outcomes, verdicts, and corrections promote into better rules, exemplars, and claims, each promotion an authorized, versioned, reversible engine change, never an automatic hook. | No roadmap item owns it yet; nearest owners are Gate G reasoning trees and Gate I triggers, routines, and skills. A record precedes any work. |
 | **rrflowQL** | RRFlow Query Language: syntax, AST, binding, logical and physical planning, and execution. | `rrd-query` |
 | **Arrow substrate** | The columnar buffer model for eligible immutable rrflowKV pages and stamped analytical batches. | Apache Arrow types composed by storage and query boundaries. |
 | **DataFusion execution** | Bounded vectorized computation over stamped Arrow batches. It cannot authorize or commit state. | DataFusion integration inside `rrd-query` |
@@ -73,17 +76,22 @@ authoritative databases or engines.
 | **context assembly** | Bounded discovery and deterministic fusion owned by `RrdEngine`, returning a read-stamped `ContextPacket` with evidence. | `rrd-contract` operation and `rrd-engine` implementation. |
 | **project-tree snapshot** | One deterministic, bounded, committed inventory of observed root-relative project entries, errors, containment, policy, and change evidence; it is required when RRFlow persists a project model, applies a reproducible project mutation, or claims snapshot-complete evidence, but not merely to inspect or reason about available files. | Pure proposal construction in planned `rrd-attunement`; authorized durable reads and commit coordination in `RrdEngine`. |
 | **RRFlow vector subsystem** | Native vector-database capability inside rrflowDB: exact values, payload filters, candidate indexes, and exact reranking. | `rrd-vector`, `rrd-query`, and `RrdEngine` |
-| **RRFlow inference** | Provider-neutral, manifest-gated execution of embedding and routing models. | `rrd-inference`; LFG is a constrained routing adapter. |
+| **RRFlow inference** | Provider-neutral, manifest-gated execution of embedding and routing models, each reached through a configured endpoint so that a local or remote binding changes no behavior. | `rrd-inference`; LFG and SWAG are the plug-in configurations below. |
+| **LFG** | A CPU-based, optional plug-in configuration that classifies work and feeds SWAG data points such as complexity. Whether a model runs inside it is undecided. | No code. Gate G's current text predates the LFG/SWAG split and is revised before Gate G work starts. |
+| **SWAG** | The System One controller and model gateway: the plug-in configuration that makes the fast decision, selects a model through its configured endpoint, and dispatches the call. It replaces the earlier working name Dalal; the concept is unchanged. | No code or record yet; a record precedes any work. It never gains planning, authorization, or persistence authority, which stay in `RrdEngine`. |
+| **Governance** | Deterministic-first verification and permission: checks named as data on terminal reasoning nodes, the permission scope checked at the effect boundary before any verification, and the proof pattern (name the seam, freeze it with a golden file, prove it with a kept artifact). | `verification_requirement` on reasoning nodes (`rrd-core`), authorization in `RrdEngine`; the permission-scope type does not exist yet. |
 | **RRFlow seat** | A durable provider-neutral identity represented by one or more authenticated provider identities at a read coordinate; representation establishes attribution, not authorization. Clyffy is this repository's primary seat specialization, not another kernel, repository, runtime, or provider. | Canonical seat/provider/relation values in rrflowDB; resolution, authorization, routing, and mutation through `RrdEngine`. |
 | **engine event** | One immutable, identity- and provenance-bound occurrence committed through `RrdEngine`; it is data, not a callback or lifecycle owner. | Canonical event value in the RRFlow kernel, public submission envelope in `rrd-contract`, and semantic persistence through `rrd-store`. |
 | **trigger** | A persisted deterministic condition over committed engine events that may propose an authorized operation or routine start but cannot mutate independently. | `RrdEngine` evaluation over rrflowDB state. |
 | **routine** | A versioned, durable graph of public `RrdEngine` operations with explicit state, budgets, leases, checkpoints, cancellation, compensation, verification, and terminal outcome. | Definition and run state in rrflowDB; orchestration in `RrdEngine`. |
 | **skill** | An immutable, digest-addressed instruction and resource package resolved as governed context; it grants no capability and executes no lifecycle code. | Contract and manifest in `rrd-contract`; content and bindings in rrflowDB; resolution in `RrdEngine`. |
 | **host-event adapter** | An optional, explicitly installed stateless translator from a host callback or external signal into the canonical engine-event submission operation. | Outward `rrflow-*` adapter; never an automatic hook or scheduler. |
-| **Connectome** | Separate operator and developer workbench using public RRD capabilities. | Separate repository; no embedded engine authority. |
+| **Connectome** | The RRFlow client: a separate operator and developer workbench using public RRD capabilities. The name no longer means a storage substrate; that role is RRFlow's. | Separate repository; no embedded engine authority. |
+| **workspace** | A set of estates grouped by an account or client above the engine. It is never an engine scope, resource, or authorization boundary; the [instance-topology record](instance-topology.md#canonical-identities-and-cardinality) owns the relation. | Client and account concern; no engine type. |
 
 Product documentation uses the exact spellings **RRFlow**, **RRD**,
-**`RrdEngine`**, **rrflowDB**, **rrflowKV**, **rrflowMX**, and **rrflowQL**.
+**`RrdEngine`**, **rrflowDB**, **rrflowKV**, **rrflowMX**, **rrflowQL**,
+**RRO**, **RROFLOW**, **LFG**, and **SWAG**.
 Rust package names remain `rrd-*` for internal daemon/runtime boundaries and
 `rrflow-*` for outward product adapters.
 

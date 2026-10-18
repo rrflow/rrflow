@@ -30,9 +30,10 @@ operate over materialized `RuntimeProperties`.
 
 ## Current physical flow
 
-The operation first reads retained runtime changes from cursor zero and builds
-an in-memory vector candidate set. Physical work is then repeated by some
-leaves:
+The operation first reads every vector version in the scope at its read stamp
+(`read_vector_versions`, a whole-family read rather than a cursor-zero replay)
+and builds an in-memory vector candidate set. Physical work is then repeated by
+some leaves:
 
 ```text
 ExecuteRetrievalQuery
@@ -41,9 +42,11 @@ ExecuteRetrievalQuery
 RrdEngine authorization + one ReadStamp + collection catalogue
         |
         v
-whole runtime-change scan -> in-memory collection vectors
+whole vector-version read -> in-memory collection vectors
         |
-        +--> nearest ------> search_vectors_at -> another runtime-change scan
+        +--> nearest ------> search_vectors_at -> another whole vector-version
+        |                    read plus two catalogue replays from cursor zero
+        |                    (POAM-028)
         |
         +--> keyword ------> stamped rrflowQL pipeline -> materialized batches
         |
@@ -58,8 +61,10 @@ result + plan digest + ordered stage evidence
 
 Multiple leaves still share the same validated stamp, but the old claim that
 canonical changes were reduced only once was incorrect. Each nearest branch
-invokes the current vector search path, which scans history again; the keyword
-branch performs its own stamped query. Structural request bounds do not yet
+invokes the current vector search path, which reads every vector version again
+and replays both vector catalogues from cursor zero
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)); the keyword branch
+performs its own stamped query. Structural request bounds do not yet
 constitute one cross-operator physical I/O budget.
 
 The keyword branch delegates to `StampedQueryPipeline` and consumes its
@@ -126,7 +131,8 @@ Only the embedded Rust engine capability is implemented; the current product
 capability catalogue marks outward HTTP, WebSocket, SDK, CLI, and MCP surfaces
 as planned.
 
-C-04 must remove whole-log reads. E-01 through E-05 must provide native graph,
+C-04 must remove the remaining whole-log reads, the two catalogue replays of
+POAM-028. E-01 through E-05 must provide native graph,
 payload, BM25, vector, and cost-selected paths. F-01 through F-04 must stream
 and budget one Arrow/DataFusion physical plan. G-05 and H-01/H-02 must lower
 model context intent into that plan, keep query-time RRF pure, persist verified

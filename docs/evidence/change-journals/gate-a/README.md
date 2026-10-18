@@ -8,6 +8,7 @@ The roadmap owns Gate A acceptance. This generated index only discovers its
 linked package evidence.
 
 <!-- rrflow:generated-index:start -->
+- [A-01 canonical terminology and topology correction journal](a-01-canonical-terminology-and-topology-correction-journal.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-01-canonical-terminology-and-topology-correction-journal`](rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-01-canonical-terminology-and-topology-correction-journal) — active immutable change-journal evidence
 - [A-07.0 evidence journal](a-07-0-evidence-journal.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-07-0-evidence-journal`](rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-07-0-evidence-journal) — active immutable change-journal evidence
 - [A-07.1a evidence journal](a-07-1a-evidence-journal.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-07-1a-evidence-journal`](rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-07-1a-evidence-journal) — active immutable change-journal evidence
 - [A-07.1b evidence journal](a-07-1b-evidence-journal.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-07-1b-evidence-journal`](rrflow://rrflow-instance/data/evidence/change-journal/gate-a/a-07-1b-evidence-journal) — active immutable change-journal evidence
