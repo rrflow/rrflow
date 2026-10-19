@@ -5,6 +5,17 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
+**rrflowDB is the database within RRFlow: a pure Rust, PostgreSQL-inspired
+database dedicated to AI and designed for AI use, with PostgreSQL compatibility
+as a product requirement.** It stores the knowledge, memory, reasoning state,
+and evidence of each project estate. The [database identity and compatibility
+boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary)
+separates that target from current implementation and compatibility evidence.
+The [PostgreSQL compatibility and independent database contract](docs/reference/protocol/postgresql.md)
+defines the first SQL/client profile, native-engine integration, Turso exit,
+data portability and qualification. [H-08](docs/roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+owns its implementation packages; compatibility is not yet implemented.
+
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;
 it delegates each detailed subject to exactly one linked memory record. The
@@ -40,6 +51,12 @@ define how these experiences share one engine; the existing roadmap and
 pre-alpha status remain authoritative.
 
 ## Enter RRFlow
+
+Start with the [runnable local rrflowDB integration](docs/reference/sdk/rrflowdb-local.md):
+build the native engine, create related records, query them with rrflowQL and
+reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
+defines local operation without an account and the explicit cloud opt-in boundary.
+Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
 
 | Need | Single owning record |
 |---|---|

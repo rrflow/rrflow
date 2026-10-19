@@ -15,3 +15,4 @@ automation authority. Wire shapes remain owned by the
 | Client | Durable warp | Checkout record | State |
 |---|---|---|---|
 | Connectome operator/developer workbench | [`rrflow://rrflow-instance/data/reference/client/connectome`](rrflow://rrflow-instance/data/reference/client/connectome) | [`connectome.md`](connectome.md) | active target contract; separate implementation is partial and non-conforming |
+| DevPulse local engine and optional shippin.cloud account | [`rrflow://rrflow-instance/data/reference/client/devpulse-cloud`](rrflow://rrflow-instance/data/reference/client/devpulse-cloud) | [`devpulse-cloud.md`](devpulse-cloud.md) | local native database integration exists; account synchronization is not implemented |
