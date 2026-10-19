@@ -106,6 +106,7 @@ mod error;
 mod estate;
 mod estate_control;
 mod estate_layout;
+mod flight;
 mod function;
 mod inference;
 mod installation;

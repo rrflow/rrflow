@@ -1,0 +1,1166 @@
+//! Prompt flights: governed, durable records of one prompt's passage through
+//! the runtime boundary.
+//!
+//! A flight is one `rrflow-prompt-flight` record plus append-only
+//! `rrflow-prompt-flight-event` events in the canonical runtime log. The
+//! engine prepares the flight at one authenticated read stamp, assembles any
+//! injected context through the same `context-assemble` path every client
+//! uses, and commits record and events in one cursor-CAS runtime commit.
+//! Reads are stamped, kind-prefixed versioned reads; nothing replays the
+//! whole log, and no client-side flight lifecycle exists.
+//!
+//! A flight records only externally observable runtime events. It never
+//! requests, infers, or persists hidden chain-of-thought.
+
+use super::*;
+use rrd_contract::{
+    context_request_sha256, prompt_cohort_sha256, ContextPacket, ContextReadStamp,
+    LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights, PromptFlight,
+    PromptFlightContextMode, PromptFlightContextRequest, PromptFlightContextSummary,
+    PromptFlightEvent, PromptFlightMetrics, PromptFlightPage, PromptFlightProvider,
+    PromptFlightReadResult, PromptFlightRecord, PromptFlightStage, PromptFlightStatus,
+    ReadPromptFlight, PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_FORMAT_VERSION, PROMPT_FLIGHT_KIND,
+};
+use rrd_store::{RuntimeReadBudget, RuntimeVersionedSource};
+use std::collections::BTreeSet;
+
+/// Launch attempts before a persistent cursor race is reported as a conflict.
+const MAX_FLIGHT_COMMIT_ATTEMPTS: u8 = 3;
+/// Direct-read key budget for the launch's own idempotency and schema reads.
+/// Flight rows are bounded by their key prefix, so this is the ceiling on how
+/// many prior versions of one flight a launch may authenticate.
+const FLIGHT_LAUNCH_READ_KEYS: u64 = 4_096;
+
+impl RrdEngine {
+    /// Records one prompt flight. The `observe` provider prepares the prompt
+    /// packet inside the engine, so the flight completes synchronously and
+    /// durably as `prepared`; nothing outside the engine runs.
+    #[allow(clippy::too_many_arguments)]
+    pub fn launch_prompt_flight(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        idempotency_key: &CorrelationId,
+        request: &LaunchPromptFlight,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<LaunchPromptFlightResult> {
+        request
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        let assemble = request
+            .context
+            .assemble_context(&request.scope, &request.prompt);
+        self.enforce_recall_configuration("flight.launch", &assemble)?;
+        let (_, _, authorization) = self.authorize_resource_without_data_policy(
+            session_id,
+            token,
+            SecurityAction::FlightLaunch,
+            &self.instance_resource(),
+            now,
+            request_id,
+            operation_id,
+        )?;
+        let scope = self.query_scope(&request.scope)?;
+        let operation_sha256 = operation_digest(request)?;
+        let flight_id = flight_id(&self.instance, session_id, idempotency_key)?;
+        let reference = flight_reference(&flight_id)?;
+        let started = Instant::now();
+
+        for _ in 0..MAX_FLIGHT_COMMIT_ATTEMPTS {
+            let read = self.storage.runtime().read_stamp(&scope)?;
+            let current_schema = self.storage.runtime().schema(&scope)?;
+            if current_schema.as_ref().map(|schema| schema.revision) != read.schema_revision {
+                continue;
+            }
+
+            // Exact replay: the same session and idempotency key already
+            // recorded this flight. The stored operation digest decides
+            // between a replay and a conflicting reuse of the key.
+            let existing = self.read_flight_versions(
+                &read,
+                &request.scope,
+                &reference,
+                FLIGHT_LAUNCH_READ_KEYS,
+                false,
+            )?;
+            if let Some(record) = existing.record {
+                if record.operation_sha256 != operation_sha256 {
+                    return Err(ServiceError::IdempotencyConflict);
+                }
+                let flight = self.read_flight_at(
+                    &read,
+                    &request.scope,
+                    &reference,
+                    FLIGHT_LAUNCH_READ_KEYS,
+                )?;
+                return Ok(LaunchPromptFlightResult {
+                    flight,
+                    idempotent_replay: true,
+                });
+            }
+
+            let mut events = Vec::with_capacity(3);
+            let elapsed = |started: &Instant| {
+                u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
+            };
+            events.push(flight_event(
+                now,
+                0,
+                PromptFlightStage::Prompt,
+                "prompt_received",
+                "Prompt entered the runtime boundary",
+                String::new(),
+                BTreeMap::from([(
+                    "prompt_bytes".into(),
+                    QueryValue::Unsigned(request.prompt.len() as u64),
+                )]),
+            )?);
+
+            let context = match request.context_mode {
+                PromptFlightContextMode::Fresh => {
+                    events.push(flight_event(
+                        now,
+                        elapsed(&started),
+                        PromptFlightStage::Context,
+                        "fresh_baseline",
+                        "Baseline context withheld",
+                        "No canonical context is injected ahead of the prompt. Authoritative history is unchanged and remains readable outside the packet.".into(),
+                        BTreeMap::from([("context_items".into(), QueryValue::Unsigned(0))]),
+                    )?);
+                    None
+                }
+                PromptFlightContextMode::Pruned => {
+                    let packet = self.assemble_context_at(&assemble, authorization.as_ref())?;
+                    if packet.read.runtime_cursor != read.commit_cursor
+                        || packet.read.runtime_manifest_sha256 != read.manifest_id
+                    {
+                        // The runtime moved between the flight stamp and the
+                        // context read; one flight never mixes two stamps.
+                        continue;
+                    }
+                    events.push(context_assembled_event(now, elapsed(&started), &packet)?);
+                    Some(context_summary(&assemble, &packet)?)
+                }
+            };
+
+            events.push(flight_event(
+                now,
+                elapsed(&started),
+                PromptFlightStage::Outcome,
+                "handoff_ready",
+                "Prompt packet prepared without launching a provider",
+                "The packet, its context coordinates, and every stage event are durable. A provider arm is an explicit opt-in adapter; none ran.".into(),
+                BTreeMap::from([(
+                    "provider".into(),
+                    QueryValue::String(PromptFlightProvider::Observe.as_str().into()),
+                )]),
+            )?);
+            for (ordinal, event) in events.iter_mut().enumerate() {
+                event.ordinal = u64::try_from(ordinal).map_err(|_| {
+                    ServiceError::Contract("flight event ordinal exceeds u64".into())
+                })?;
+            }
+            let elapsed_ms = events.last().map_or(0, |event| event.elapsed_ms);
+            let event_count = u64::try_from(events.len())
+                .map_err(|_| ServiceError::Contract("flight event count exceeds u64".into()))?;
+
+            let mut mutations = Vec::with_capacity(events.len() + 2);
+            let mut registry = current_schema
+                .clone()
+                .unwrap_or_else(|| RuntimeSchemaRegistry::empty(1, "install prompt flight tables"));
+            if register_flight_schema(&mut registry)? {
+                if let Some(current) = &current_schema {
+                    registry.revision = current.revision.checked_add(1).ok_or_else(|| {
+                        ServiceError::Contract("runtime schema revision overflowed".into())
+                    })?;
+                    registry.migration = "install prompt flight tables".into();
+                }
+                mutations.push(RuntimeMutation::Schema { registry });
+            }
+            let schema_offset = mutations.len() as u64;
+            let record_cursor = read.commit_cursor + 1 + schema_offset;
+            let record = PromptFlightRecord {
+                format_version: PROMPT_FLIGHT_FORMAT_VERSION,
+                flight_id: flight_id.clone(),
+                scope: request.scope.clone(),
+                cohort_sha256: prompt_cohort_sha256(&request.prompt),
+                prompt: request.prompt.clone(),
+                provider: request.provider,
+                context_mode: request.context_mode,
+                context_request: request.context.clone(),
+                acceptance_marker: request.acceptance_marker.clone(),
+                status: PromptFlightStatus::Prepared,
+                created_at_unix_ms: now,
+                idempotency_key: idempotency_key.clone(),
+                operation_sha256: operation_sha256.clone(),
+                read: public_read_stamp(&read),
+                metrics: PromptFlightMetrics {
+                    context_items: context.as_ref().map_or(0, |context| context.items),
+                    context_output_bytes: context
+                        .as_ref()
+                        .map_or(0, |context| context.output_bytes),
+                    elapsed_ms,
+                },
+                context,
+                flight_cursor: record_cursor,
+                known_at_cursor: record_cursor,
+                event_count,
+            };
+            mutations.push(RuntimeMutation::Record {
+                record: RuntimeRecord {
+                    reference: reference.clone(),
+                    valid_from: now,
+                    valid_to: None,
+                    properties: record_properties(&record)?,
+                },
+            });
+            for event in &events {
+                mutations.push(RuntimeMutation::Event {
+                    event: RuntimeEvent {
+                        kind: event_kind()?,
+                        subject: Some(reference.clone()),
+                        properties: event_properties(event)?,
+                    },
+                });
+            }
+            let commit = RuntimeCommit {
+                scope: scope.clone(),
+                at: now,
+                actor: format!("session:{}", session_id.as_str()),
+                expected_cursor: read.commit_cursor,
+                mutations,
+            };
+            commit.validate().map_err(core_contract)?;
+
+            // The gate closes the in-process race with a unique-index
+            // installation that may be proving rows in this same table.
+            let _transaction_guard = self
+                .transaction_gate
+                .lock()
+                .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+            match self.storage.runtime().commit(&commit) {
+                Ok(outcome) => {
+                    if outcome.first_cursor + schema_offset != record_cursor {
+                        return Err(ServiceError::Storage(format!(
+                            "prompt flight record cursor {record_cursor} disagrees with commit cursor {}",
+                            outcome.first_cursor + schema_offset
+                        )));
+                    }
+                    let flight = PromptFlight { record, events };
+                    flight
+                        .validate()
+                        .map_err(|error| ServiceError::Contract(error.to_string()))?;
+                    return Ok(LaunchPromptFlightResult {
+                        flight,
+                        idempotent_replay: false,
+                    });
+                }
+                Err(rrd_store::Error::RuntimeConflict { .. }) => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Err(ServiceError::StorageConflict(format!(
+            "prompt flight launch lost the runtime cursor race in all {MAX_FLIGHT_COMMIT_ATTEMPTS} attempts"
+        )))
+    }
+
+    /// Bounded page of flight records in creation order at one read stamp.
+    pub fn list_prompt_flights(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &ListPromptFlights,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<PromptFlightPage> {
+        request
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        self.authorize(
+            session_id,
+            token,
+            SecurityAction::FlightRead,
+            now,
+            request_id,
+            operation_id,
+        )?;
+        let scope = self.query_scope(&request.scope)?;
+        let read = self.storage.runtime().read_stamp(&scope)?;
+        let direct = self.storage.runtime().read_versioned(
+            &read,
+            &[RuntimeVersionedSource::Records {
+                kind: Some(record_kind()?),
+            }],
+            read_budget(request.max_storage_keys)?,
+        )?;
+        let selected_versions = version_count(direct.changes.len())?;
+        let mut rows = BTreeMap::<RuntimeRef, FlightVersions>::new();
+        for change in &direct.changes {
+            let RuntimeMutation::Record { record } = &change.mutation else {
+                continue;
+            };
+            rows.entry(record.reference.clone())
+                .or_default()
+                .observe(change.cursor, record);
+        }
+        let mut flights = rows
+            .into_values()
+            .filter(|versions| versions.first_cursor > request.after_cursor)
+            .map(|versions| versions.record(&request.scope))
+            .collect::<Result<Vec<_>>>()?;
+        flights.sort_by_key(|record| record.flight_cursor);
+        let limit = usize::from(request.limit);
+        let truncated = flights.len() > limit;
+        flights.truncate(limit);
+        let page = PromptFlightPage {
+            scope: request.scope.clone(),
+            read: public_read_stamp(&read),
+            requested_after_cursor: request.after_cursor,
+            flights,
+            truncated,
+            selected_versions,
+            read_evidence: crate::runtime::public_read_evidence(direct.evidence)?,
+        };
+        page.validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        Ok(page)
+    }
+
+    /// One complete flight, record and events, at one read stamp.
+    pub fn read_prompt_flight(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &ReadPromptFlight,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<PromptFlightReadResult> {
+        request
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        self.authorize(
+            session_id,
+            token,
+            SecurityAction::FlightRead,
+            now,
+            request_id,
+            operation_id,
+        )?;
+        let scope = self.query_scope(&request.scope)?;
+        let read = self.storage.runtime().read_stamp(&scope)?;
+        let reference = flight_reference(&request.flight_id)?;
+        let versions = self.read_flight_versions(
+            &read,
+            &request.scope,
+            &reference,
+            request.max_storage_keys,
+            true,
+        )?;
+        let record = versions.record.ok_or(ServiceError::FlightNotFound)?;
+        let flight = assemble_flight(record, versions.events)?;
+        let result = PromptFlightReadResult {
+            flight,
+            read: public_read_stamp(&read),
+            selected_versions: versions.selected_versions,
+            read_evidence: versions.read_evidence,
+        };
+        result
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        Ok(result)
+    }
+
+    fn read_flight_at(
+        &self,
+        read: &ReadStamp,
+        scope: &str,
+        reference: &RuntimeRef,
+        max_storage_keys: u64,
+    ) -> Result<PromptFlight> {
+        let versions = self.read_flight_versions(read, scope, reference, max_storage_keys, true)?;
+        let record = versions.record.ok_or(ServiceError::FlightNotFound)?;
+        assemble_flight(record, versions.events)
+    }
+
+    /// Stamped direct read of one flight's row history and, when requested,
+    /// every flight event in the scope filtered to this subject. Events are
+    /// keyed by their log cursor, so one flight's events are selected from the
+    /// kind prefix rather than through a subject index.
+    fn read_flight_versions(
+        &self,
+        read: &ReadStamp,
+        scope: &str,
+        reference: &RuntimeRef,
+        max_storage_keys: u64,
+        with_events: bool,
+    ) -> Result<FlightRead> {
+        let mut sources = vec![RuntimeVersionedSource::Identity {
+            model: RuntimeLogicalModel::LifecycleRecord,
+            reference: reference.clone(),
+        }];
+        if with_events {
+            sources.push(RuntimeVersionedSource::Events {
+                kind: Some(event_kind()?),
+            });
+        }
+        let direct = self.storage.runtime().read_versioned(
+            read,
+            &sources,
+            read_budget(max_storage_keys)?,
+        )?;
+        let mut versions = FlightVersions::default();
+        let mut events = Vec::new();
+        for change in &direct.changes {
+            match &change.mutation {
+                RuntimeMutation::Record { record } if record.reference == *reference => {
+                    versions.observe(change.cursor, record);
+                }
+                RuntimeMutation::Event { event }
+                    if with_events && event.subject.as_ref() == Some(reference) =>
+                {
+                    events.push(public_event(&event.properties)?);
+                }
+                _ => {}
+            }
+        }
+        events.sort_by_key(|event| event.ordinal);
+        Ok(FlightRead {
+            record: if versions.first_cursor == 0 {
+                None
+            } else {
+                Some(versions.record(scope)?)
+            },
+            events,
+            selected_versions: version_count(direct.changes.len())?,
+            read_evidence: crate::runtime::public_read_evidence(direct.evidence)?,
+        })
+    }
+}
+
+struct FlightRead {
+    record: Option<PromptFlightRecord>,
+    events: Vec<PromptFlightEvent>,
+    selected_versions: u64,
+    read_evidence: rrd_contract::ReadEvidence,
+}
+
+/// The versions of one flight row seen at a read stamp. The first version
+/// fixes creation order; the latest version is the current projection.
+#[derive(Default)]
+struct FlightVersions {
+    first_cursor: u64,
+    latest_cursor: u64,
+    latest: Option<RuntimeRecord>,
+}
+
+impl FlightVersions {
+    fn observe(&mut self, cursor: u64, record: &RuntimeRecord) {
+        if self.first_cursor == 0 || cursor < self.first_cursor {
+            self.first_cursor = cursor;
+        }
+        if cursor >= self.latest_cursor {
+            self.latest_cursor = cursor;
+            self.latest = Some(record.clone());
+        }
+    }
+
+    fn record(self, scope: &str) -> Result<PromptFlightRecord> {
+        let latest = self
+            .latest
+            .ok_or_else(|| ServiceError::Storage("prompt flight row has no version".into()))?;
+        public_record(&latest, scope, self.first_cursor, self.latest_cursor)
+    }
+}
+
+fn assemble_flight(
+    record: PromptFlightRecord,
+    events: Vec<PromptFlightEvent>,
+) -> Result<PromptFlight> {
+    if events.len() as u64 != record.event_count {
+        return Err(ServiceError::Storage(format!(
+            "prompt flight {} has {} events at this stamp but records {}",
+            record.flight_id,
+            events.len(),
+            record.event_count
+        )));
+    }
+    let flight = PromptFlight { record, events };
+    flight
+        .validate()
+        .map_err(|error| ServiceError::Storage(error.to_string()))?;
+    Ok(flight)
+}
+
+/// Deterministic flight identity: one session and one idempotency key name
+/// exactly one flight, so a replayed launch finds its row without a second
+/// receipt store.
+fn flight_id(
+    instance: &CanonicalId,
+    session_id: &CorrelationId,
+    idempotency_key: &CorrelationId,
+) -> Result<CanonicalId> {
+    let identity = digest::sha256_hex(
+        format!(
+            "rrd-prompt-flight-v1\0{}\0{}\0{}",
+            instance.as_str(),
+            session_id.as_str(),
+            idempotency_key.as_str()
+        )
+        .as_bytes(),
+    );
+    CanonicalId::new(format!("flight-{identity}"))
+        .map_err(|error| ServiceError::Contract(error.to_string()))
+}
+
+fn flight_reference(flight_id: &CanonicalId) -> Result<RuntimeRef> {
+    RuntimeRef::new(PROMPT_FLIGHT_KIND, flight_id.as_str()).map_err(core_contract)
+}
+
+fn record_kind() -> Result<RuntimeType> {
+    RuntimeType::new(PROMPT_FLIGHT_KIND).map_err(core_contract)
+}
+
+fn event_kind() -> Result<RuntimeType> {
+    RuntimeType::new(PROMPT_FLIGHT_EVENT_KIND).map_err(core_contract)
+}
+
+fn read_budget(max_storage_keys: u64) -> Result<RuntimeReadBudget> {
+    RuntimeReadBudget::new(max_storage_keys)
+        .map_err(|error| ServiceError::Contract(error.to_string()))
+}
+
+fn version_count(count: usize) -> Result<u64> {
+    u64::try_from(count)
+        .map_err(|_| ServiceError::Storage("selected prompt flight versions exceed u64".into()))
+}
+
+fn public_read_stamp(read: &ReadStamp) -> ContextReadStamp {
+    ContextReadStamp {
+        runtime_manifest_sha256: read.manifest_id.clone(),
+        runtime_cursor: read.commit_cursor,
+        schema_revision: read.schema_revision,
+        catalogue_revision: read.catalog_revision,
+    }
+}
+
+fn flight_event(
+    now: u64,
+    elapsed_ms: u64,
+    stage: PromptFlightStage,
+    kind: &str,
+    label: &str,
+    detail: String,
+    data: BTreeMap<String, QueryValue>,
+) -> Result<PromptFlightEvent> {
+    Ok(PromptFlightEvent {
+        ordinal: 0,
+        at_unix_ms: now.saturating_add(elapsed_ms),
+        elapsed_ms,
+        stage,
+        kind: CanonicalId::new(kind).map_err(|error| ServiceError::Contract(error.to_string()))?,
+        label: label.into(),
+        detail,
+        data,
+    })
+}
+
+/// The context stage event carries the engine-owned plan decisions, not the
+/// packet items: a client renders which avenues were selected or skipped and
+/// why, and fetches items through `context-assemble` under its own grant.
+fn context_assembled_event(
+    now: u64,
+    elapsed_ms: u64,
+    packet: &ContextPacket,
+) -> Result<PromptFlightEvent> {
+    let stages = packet
+        .plan
+        .stages
+        .iter()
+        .map(|stage| {
+            let mut entry = BTreeMap::from([
+                (
+                    "kind".to_owned(),
+                    QueryValue::String(enum_text(&stage.kind)?),
+                ),
+                (
+                    "status".to_owned(),
+                    QueryValue::String(enum_text(&stage.status)?),
+                ),
+                ("exact".to_owned(), QueryValue::Bool(stage.exact)),
+                (
+                    "reason".to_owned(),
+                    QueryValue::String(stage.reason.clone()),
+                ),
+                (
+                    "decision_sha256".to_owned(),
+                    QueryValue::Digest(stage.decision_sha256.clone()),
+                ),
+            ]);
+            if let Some(path) = &stage.access_path {
+                entry.insert(
+                    "access_path".to_owned(),
+                    QueryValue::String(enum_text(path)?),
+                );
+            }
+            Ok(QueryValue::Map(entry))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let (kind, label) = if packet.items.is_empty() {
+        ("context_empty", "Prompt matched no canonical context")
+    } else {
+        ("context_assembled", "Prompt-matched context assembled")
+    };
+    flight_event(
+        now,
+        elapsed_ms,
+        PromptFlightStage::Context,
+        kind,
+        label,
+        format!(
+            "{} item(s), {} byte(s), truncated={}, selected_versions={} at runtime cursor {}.",
+            packet.items.len(),
+            packet.output_bytes,
+            packet.truncated,
+            packet.selected_versions,
+            packet.read.runtime_cursor
+        ),
+        BTreeMap::from([
+            (
+                "context_items".into(),
+                QueryValue::Unsigned(packet.items.len() as u64),
+            ),
+            (
+                "output_bytes".into(),
+                QueryValue::Unsigned(packet.output_bytes),
+            ),
+            ("truncated".into(), QueryValue::Bool(packet.truncated)),
+            (
+                "plan_sha256".into(),
+                QueryValue::Digest(packet.plan.plan_sha256.clone()),
+            ),
+            (
+                "packet_sha256".into(),
+                QueryValue::Digest(packet.packet_sha256.clone()),
+            ),
+            ("stages".into(), QueryValue::List(stages)),
+        ]),
+    )
+}
+
+fn enum_text<T: Serialize>(value: &T) -> Result<String> {
+    match serde_json::to_value(value).map_err(contract_json)? {
+        serde_json::Value::String(text) => Ok(text),
+        other => Err(ServiceError::Contract(format!(
+            "context plan field {other} is not a text enumeration"
+        ))),
+    }
+}
+
+fn context_summary(
+    assemble: &rrd_contract::AssembleContext,
+    packet: &ContextPacket,
+) -> Result<PromptFlightContextSummary> {
+    Ok(PromptFlightContextSummary {
+        request_sha256: context_request_sha256(assemble)
+            .map_err(|error| ServiceError::Contract(error.to_string()))?,
+        plan_sha256: packet.plan.plan_sha256.clone(),
+        packet_sha256: packet.packet_sha256.clone(),
+        items: packet.items.len() as u64,
+        output_bytes: packet.output_bytes,
+        truncated: packet.truncated,
+        selected_versions: packet.selected_versions,
+    })
+}
+
+/// Installs or repairs the canonical flight tables in a schema under
+/// construction. The caller owns the revision bump because that
+/// compare-and-swap belongs to its exact read stamp.
+fn register_flight_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> {
+    let record_kind = record_kind()?;
+    let event_kind = event_kind()?;
+    let required = |value_type: RuntimeValueType| RuntimePropertySchema::required(value_type);
+    let optional = |value_type: RuntimeValueType| RuntimePropertySchema::optional(value_type);
+    let record_schema = RuntimeRecordSchema {
+        properties: BTreeMap::from([
+            (
+                "format_version".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            ("cohort_sha256".into(), required(RuntimeValueType::Digest)),
+            ("prompt".into(), required(RuntimeValueType::String)),
+            ("provider".into(), required(RuntimeValueType::String)),
+            ("context_mode".into(), required(RuntimeValueType::String)),
+            (
+                "context_valid_at_unix_ms".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            ("context_seeds".into(), required(RuntimeValueType::List)),
+            (
+                "context_max_graph_depth".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            (
+                "context_max_items".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            (
+                "context_max_output_bytes".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            (
+                "context_max_storage_keys".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            (
+                "acceptance_marker".into(),
+                optional(RuntimeValueType::String),
+            ),
+            ("status".into(), required(RuntimeValueType::String)),
+            (
+                "created_at_unix_ms".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            ("idempotency_key".into(), required(RuntimeValueType::String)),
+            (
+                "operation_sha256".into(),
+                required(RuntimeValueType::Digest),
+            ),
+            (
+                "read_runtime_manifest_sha256".into(),
+                required(RuntimeValueType::Digest),
+            ),
+            (
+                "read_runtime_cursor".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            (
+                "read_schema_revision".into(),
+                optional(RuntimeValueType::Unsigned),
+            ),
+            (
+                "read_catalogue_revision".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            (
+                "context_request_sha256".into(),
+                optional(RuntimeValueType::Digest),
+            ),
+            (
+                "context_plan_sha256".into(),
+                optional(RuntimeValueType::Digest),
+            ),
+            (
+                "context_packet_sha256".into(),
+                optional(RuntimeValueType::Digest),
+            ),
+            ("context_items".into(), required(RuntimeValueType::Unsigned)),
+            (
+                "context_output_bytes".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            ("context_truncated".into(), required(RuntimeValueType::Bool)),
+            (
+                "context_selected_versions".into(),
+                required(RuntimeValueType::Unsigned),
+            ),
+            ("elapsed_ms".into(), required(RuntimeValueType::Unsigned)),
+            ("event_count".into(), required(RuntimeValueType::Unsigned)),
+        ]),
+        allow_additional_properties: false,
+        unique_properties: BTreeSet::new(),
+    };
+    let event_schema = RuntimeEventSchema {
+        subject_required: true,
+        subject_types: BTreeSet::from([record_kind.clone()]),
+        properties: BTreeMap::from([
+            ("ordinal".into(), required(RuntimeValueType::Unsigned)),
+            ("at_unix_ms".into(), required(RuntimeValueType::Unsigned)),
+            ("elapsed_ms".into(), required(RuntimeValueType::Unsigned)),
+            ("stage".into(), required(RuntimeValueType::String)),
+            ("kind".into(), required(RuntimeValueType::String)),
+            ("label".into(), required(RuntimeValueType::String)),
+            ("detail".into(), required(RuntimeValueType::String)),
+            ("data".into(), required(RuntimeValueType::Map)),
+        ]),
+        allow_additional_properties: false,
+    };
+    let record_changed = registry
+        .define_record_table(
+            record_kind,
+            RuntimeLogicalModel::LifecycleRecord,
+            record_schema,
+        )
+        .map_err(core_contract)?;
+    let event_changed = registry
+        .define_event_table(
+            event_kind,
+            RuntimeLogicalModel::LifecycleEvent,
+            event_schema,
+        )
+        .map_err(core_contract)?;
+    Ok(record_changed || event_changed)
+}
+
+fn record_properties(record: &PromptFlightRecord) -> Result<RuntimeProperties> {
+    let mut properties = RuntimeProperties::from([
+        (
+            "format_version".to_owned(),
+            RuntimeValue::Unsigned(u64::from(record.format_version)),
+        ),
+        (
+            "cohort_sha256".to_owned(),
+            RuntimeValue::Digest(record.cohort_sha256.clone()),
+        ),
+        (
+            "prompt".to_owned(),
+            RuntimeValue::String(record.prompt.clone()),
+        ),
+        (
+            "provider".to_owned(),
+            RuntimeValue::String(record.provider.as_str().into()),
+        ),
+        (
+            "context_mode".to_owned(),
+            RuntimeValue::String(record.context_mode.as_str().into()),
+        ),
+        (
+            "context_valid_at_unix_ms".to_owned(),
+            RuntimeValue::Unsigned(record.context_request.valid_at),
+        ),
+        (
+            "context_seeds".to_owned(),
+            RuntimeValue::List(
+                record
+                    .context_request
+                    .seeds
+                    .iter()
+                    .map(|seed| {
+                        RuntimeValue::Map(BTreeMap::from([
+                            (
+                                "kind".to_owned(),
+                                RuntimeValue::String(seed.kind.as_str().into()),
+                            ),
+                            (
+                                "id".to_owned(),
+                                RuntimeValue::String(seed.id.as_str().into()),
+                            ),
+                        ]))
+                    })
+                    .collect(),
+            ),
+        ),
+        (
+            "context_max_graph_depth".to_owned(),
+            RuntimeValue::Unsigned(u64::from(record.context_request.max_graph_depth)),
+        ),
+        (
+            "context_max_items".to_owned(),
+            RuntimeValue::Unsigned(record.context_request.max_items),
+        ),
+        (
+            "context_max_output_bytes".to_owned(),
+            RuntimeValue::Unsigned(record.context_request.max_output_bytes),
+        ),
+        (
+            "context_max_storage_keys".to_owned(),
+            RuntimeValue::Unsigned(record.context_request.max_storage_keys),
+        ),
+        (
+            "status".to_owned(),
+            RuntimeValue::String(record.status.as_str().into()),
+        ),
+        (
+            "created_at_unix_ms".to_owned(),
+            RuntimeValue::Unsigned(record.created_at_unix_ms),
+        ),
+        (
+            "idempotency_key".to_owned(),
+            RuntimeValue::String(record.idempotency_key.as_str().into()),
+        ),
+        (
+            "operation_sha256".to_owned(),
+            RuntimeValue::Digest(record.operation_sha256.clone()),
+        ),
+        (
+            "read_runtime_manifest_sha256".to_owned(),
+            RuntimeValue::Digest(record.read.runtime_manifest_sha256.clone()),
+        ),
+        (
+            "read_runtime_cursor".to_owned(),
+            RuntimeValue::Unsigned(record.read.runtime_cursor),
+        ),
+        (
+            "read_catalogue_revision".to_owned(),
+            RuntimeValue::Unsigned(record.read.catalogue_revision),
+        ),
+        (
+            "context_items".to_owned(),
+            RuntimeValue::Unsigned(record.metrics.context_items),
+        ),
+        (
+            "context_output_bytes".to_owned(),
+            RuntimeValue::Unsigned(record.metrics.context_output_bytes),
+        ),
+        (
+            "context_truncated".to_owned(),
+            RuntimeValue::Bool(
+                record
+                    .context
+                    .as_ref()
+                    .is_some_and(|context| context.truncated),
+            ),
+        ),
+        (
+            "context_selected_versions".to_owned(),
+            RuntimeValue::Unsigned(
+                record
+                    .context
+                    .as_ref()
+                    .map_or(0, |context| context.selected_versions),
+            ),
+        ),
+        (
+            "elapsed_ms".to_owned(),
+            RuntimeValue::Unsigned(record.metrics.elapsed_ms),
+        ),
+        (
+            "event_count".to_owned(),
+            RuntimeValue::Unsigned(record.event_count),
+        ),
+    ]);
+    if let Some(marker) = &record.acceptance_marker {
+        properties.insert(
+            "acceptance_marker".into(),
+            RuntimeValue::String(marker.clone()),
+        );
+    }
+    if let Some(revision) = record.read.schema_revision {
+        properties.insert(
+            "read_schema_revision".into(),
+            RuntimeValue::Unsigned(revision),
+        );
+    }
+    if let Some(context) = &record.context {
+        properties.insert(
+            "context_request_sha256".into(),
+            RuntimeValue::Digest(context.request_sha256.clone()),
+        );
+        properties.insert(
+            "context_plan_sha256".into(),
+            RuntimeValue::Digest(context.plan_sha256.clone()),
+        );
+        properties.insert(
+            "context_packet_sha256".into(),
+            RuntimeValue::Digest(context.packet_sha256.clone()),
+        );
+    }
+    Ok(properties)
+}
+
+/// Projects one stored row. A flight row carries no scope property: the scope
+/// is the runtime scope it was committed in, which every reader names.
+fn public_record(
+    record: &RuntimeRecord,
+    scope: &str,
+    flight_cursor: u64,
+    known_at_cursor: u64,
+) -> Result<PromptFlightRecord> {
+    let properties = &record.properties;
+    let format_version = u16::try_from(unsigned(properties, "format_version")?)
+        .map_err(|_| flight_storage("format_version exceeds u16"))?;
+    if format_version != PROMPT_FLIGHT_FORMAT_VERSION {
+        return Err(flight_storage(&format!(
+            "unsupported prompt flight format version {format_version}"
+        )));
+    }
+    let flight_id = CanonicalId::new(record.reference.id.as_str())
+        .map_err(|error| flight_storage(&error.to_string()))?;
+    let context_mode = PromptFlightContextMode::parse(&text(properties, "context_mode")?)
+        .map_err(|error| flight_storage(&error.to_string()))?;
+    let context = match context_mode {
+        PromptFlightContextMode::Fresh => None,
+        PromptFlightContextMode::Pruned => Some(PromptFlightContextSummary {
+            request_sha256: digest_text(properties, "context_request_sha256")?,
+            plan_sha256: digest_text(properties, "context_plan_sha256")?,
+            packet_sha256: digest_text(properties, "context_packet_sha256")?,
+            items: unsigned(properties, "context_items")?,
+            output_bytes: unsigned(properties, "context_output_bytes")?,
+            truncated: boolean(properties, "context_truncated")?,
+            selected_versions: unsigned(properties, "context_selected_versions")?,
+        }),
+    };
+    let seeds = match properties.get("context_seeds") {
+        Some(RuntimeValue::List(values)) => values
+            .iter()
+            .map(|value| match value {
+                RuntimeValue::Map(entry) => Ok(DataReference {
+                    kind: canonical_entry(entry, "kind")?,
+                    id: canonical_entry(entry, "id")?,
+                }),
+                _ => Err(flight_storage("context seed is not a reference map")),
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(flight_storage("context_seeds is missing or not a list")),
+    };
+    Ok(PromptFlightRecord {
+        format_version,
+        flight_id,
+        scope: scope.to_owned(),
+        cohort_sha256: digest_text(properties, "cohort_sha256")?,
+        prompt: text(properties, "prompt")?,
+        provider: PromptFlightProvider::parse(&text(properties, "provider")?)
+            .map_err(|error| flight_storage(&error.to_string()))?,
+        context_mode,
+        context_request: PromptFlightContextRequest {
+            valid_at: unsigned(properties, "context_valid_at_unix_ms")?,
+            seeds,
+            max_graph_depth: u8::try_from(unsigned(properties, "context_max_graph_depth")?)
+                .map_err(|_| flight_storage("context_max_graph_depth exceeds u8"))?,
+            max_items: unsigned(properties, "context_max_items")?,
+            max_output_bytes: unsigned(properties, "context_max_output_bytes")?,
+            max_storage_keys: unsigned(properties, "context_max_storage_keys")?,
+        },
+        acceptance_marker: optional_text(properties, "acceptance_marker")?,
+        status: PromptFlightStatus::parse(&text(properties, "status")?)
+            .map_err(|error| flight_storage(&error.to_string()))?,
+        created_at_unix_ms: unsigned(properties, "created_at_unix_ms")?,
+        idempotency_key: CorrelationId::new(text(properties, "idempotency_key")?)
+            .map_err(|error| flight_storage(&error.to_string()))?,
+        operation_sha256: digest_text(properties, "operation_sha256")?,
+        read: ContextReadStamp {
+            runtime_manifest_sha256: digest_text(properties, "read_runtime_manifest_sha256")?,
+            runtime_cursor: unsigned(properties, "read_runtime_cursor")?,
+            schema_revision: optional_unsigned(properties, "read_schema_revision")?,
+            catalogue_revision: unsigned(properties, "read_catalogue_revision")?,
+        },
+        context,
+        metrics: PromptFlightMetrics {
+            context_items: unsigned(properties, "context_items")?,
+            context_output_bytes: unsigned(properties, "context_output_bytes")?,
+            elapsed_ms: unsigned(properties, "elapsed_ms")?,
+        },
+        flight_cursor,
+        known_at_cursor,
+        event_count: unsigned(properties, "event_count")?,
+    })
+}
+
+fn event_properties(event: &PromptFlightEvent) -> Result<RuntimeProperties> {
+    Ok(RuntimeProperties::from([
+        ("ordinal".to_owned(), RuntimeValue::Unsigned(event.ordinal)),
+        (
+            "at_unix_ms".to_owned(),
+            RuntimeValue::Unsigned(event.at_unix_ms),
+        ),
+        (
+            "elapsed_ms".to_owned(),
+            RuntimeValue::Unsigned(event.elapsed_ms),
+        ),
+        (
+            "stage".to_owned(),
+            RuntimeValue::String(event.stage.as_str().into()),
+        ),
+        (
+            "kind".to_owned(),
+            RuntimeValue::String(event.kind.as_str().into()),
+        ),
+        (
+            "label".to_owned(),
+            RuntimeValue::String(event.label.clone()),
+        ),
+        (
+            "detail".to_owned(),
+            RuntimeValue::String(event.detail.clone()),
+        ),
+        (
+            "data".to_owned(),
+            RuntimeValue::Map(runtime_properties(&event.data)?),
+        ),
+    ]))
+}
+
+fn public_event(properties: &RuntimeProperties) -> Result<PromptFlightEvent> {
+    let data = match properties.get("data") {
+        Some(RuntimeValue::Map(values)) => public_properties(values)?,
+        _ => return Err(flight_storage("event data is missing or not a map")),
+    };
+    Ok(PromptFlightEvent {
+        ordinal: unsigned(properties, "ordinal")?,
+        at_unix_ms: unsigned(properties, "at_unix_ms")?,
+        elapsed_ms: unsigned(properties, "elapsed_ms")?,
+        stage: PromptFlightStage::parse(&text(properties, "stage")?)
+            .map_err(|error| flight_storage(&error.to_string()))?,
+        kind: CanonicalId::new(text(properties, "kind")?)
+            .map_err(|error| flight_storage(&error.to_string()))?,
+        label: text(properties, "label")?,
+        detail: text(properties, "detail")?,
+        data,
+    })
+}
+
+fn flight_storage(reason: &str) -> ServiceError {
+    ServiceError::Storage(format!("prompt flight row is malformed: {reason}"))
+}
+
+fn unsigned(properties: &RuntimeProperties, name: &str) -> Result<u64> {
+    match properties.get(name) {
+        Some(RuntimeValue::Unsigned(value)) => Ok(*value),
+        _ => Err(flight_storage(&format!(
+            "{name} is missing or not unsigned"
+        ))),
+    }
+}
+
+fn optional_unsigned(properties: &RuntimeProperties, name: &str) -> Result<Option<u64>> {
+    match properties.get(name) {
+        None => Ok(None),
+        Some(RuntimeValue::Unsigned(value)) => Ok(Some(*value)),
+        _ => Err(flight_storage(&format!("{name} is not unsigned"))),
+    }
+}
+
+fn boolean(properties: &RuntimeProperties, name: &str) -> Result<bool> {
+    match properties.get(name) {
+        Some(RuntimeValue::Bool(value)) => Ok(*value),
+        _ => Err(flight_storage(&format!("{name} is missing or not boolean"))),
+    }
+}
+
+fn text(properties: &RuntimeProperties, name: &str) -> Result<String> {
+    match properties.get(name) {
+        Some(RuntimeValue::String(value)) => Ok(value.clone()),
+        _ => Err(flight_storage(&format!("{name} is missing or not text"))),
+    }
+}
+
+fn optional_text(properties: &RuntimeProperties, name: &str) -> Result<Option<String>> {
+    match properties.get(name) {
+        None => Ok(None),
+        Some(RuntimeValue::String(value)) => Ok(Some(value.clone())),
+        _ => Err(flight_storage(&format!("{name} is not text"))),
+    }
+}
+
+fn digest_text(properties: &RuntimeProperties, name: &str) -> Result<String> {
+    match properties.get(name) {
+        Some(RuntimeValue::Digest(value)) => Ok(value.clone()),
+        _ => Err(flight_storage(&format!(
+            "{name} is missing or not a digest"
+        ))),
+    }
+}
+
+fn canonical_entry(entry: &BTreeMap<String, RuntimeValue>, name: &str) -> Result<CanonicalId> {
+    match entry.get(name) {
+        Some(RuntimeValue::String(value)) => {
+            CanonicalId::new(value.as_str()).map_err(|error| flight_storage(&error.to_string()))
+        }
+        _ => Err(flight_storage(&format!(
+            "context seed {name} is missing or not text"
+        ))),
+    }
+}

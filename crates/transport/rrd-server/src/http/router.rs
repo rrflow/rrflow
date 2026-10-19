@@ -56,6 +56,9 @@ http_dispatch_catalogue! {
     ChangefeedRead => ("changefeed-read", RrdOperation::ChangefeedRead),
     ContextAssemble => ("context-assemble", RrdOperation::MemoryContextRead),
     DiagnosticsRead => ("diagnostics-read", RrdOperation::DiagnosticsRead),
+    FlightLaunch => ("flight-launch", RrdOperation::FlightLaunch),
+    FlightList => ("flight-list", RrdOperation::FlightRead),
+    FlightRead => ("flight-read", RrdOperation::FlightRead),
     EndpointCatalogue => ("endpoint-catalogue", RrdOperation::ServiceInspect),
     EstateRead => ("estate-read", RrdOperation::EstateRead),
     HealthLive => ("health-live", RrdOperation::ServiceInspect),
@@ -218,6 +221,9 @@ impl AppState {
             Some(HttpDispatch::DiagnosticsRead) => {
                 self.read_diagnostic_snapshot(&headers, &body, now)
             }
+            Some(HttpDispatch::FlightLaunch) => self.launch_prompt_flight(&headers, &body, now),
+            Some(HttpDispatch::FlightList) => self.list_prompt_flights(&headers, &body, now),
+            Some(HttpDispatch::FlightRead) => self.read_prompt_flight(&headers, &body, now),
             Some(HttpDispatch::VectorCollectionEnsure) => {
                 self.ensure_vector_collection(&headers, &body, now)
             }
