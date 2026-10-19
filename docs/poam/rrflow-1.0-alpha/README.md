@@ -42,4 +42,5 @@
 - [POAM-030 — bounded audit read across a partial final journal page](poam-030.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-030`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-030) — active parent-owned POA&M detail
 - [POAM-031 — installed-estate backups omit the installed control state](poam-031.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-031`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-031) — active parent-owned POA&M detail
 - [POAM-032 — prompt flights removed without engine absorption](poam-032.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-032`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-032) — active parent-owned POA&M detail
+- [POAM-033 — commit-time schema constraints load the whole scope](poam-033.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-033`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-033) — active parent-owned POA&M detail
 <!-- rrflow:generated-index:end -->

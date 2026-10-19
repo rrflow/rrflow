@@ -1120,7 +1120,11 @@ fn register_flight_schema(
                         ("evidence".into(), required(RuntimeValueType::List)),
                     ]),
                     allow_additional_properties: false,
-                    unique_pair: true,
+                    // One edge per distinct packet record is constructed here
+                    // and validated by the contract. A schema pair constraint
+                    // would make every later commit in the scope load every
+                    // relation in it (POAM-033).
+                    unique_pair: false,
                     max_outgoing: None,
                     max_incoming: None,
                 },
