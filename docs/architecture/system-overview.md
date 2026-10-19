@@ -148,17 +148,13 @@ temporal memory, reasoning state, graph and vector retrieval, context, and
 evidence are native database concerns. PostgreSQL compatibility is part of
 this target.
 
-The exact PostgreSQL versions and compatibility matrix still require an
-accepted specification and real-client evidence. Wire protocol and driver
-behavior, SQL syntax and semantics, types, transactions, catalogue discovery,
-extensions, and operational tooling need explicit coverage decisions; the
-general compatibility requirement does not establish any of them as already
-implemented. PostgreSQL's [protocol](https://www.postgresql.org/docs/18/protocol.html)
-and [SQL conformance](https://www.postgresql.org/docs/18/features.html)
-references are separate inputs to that specification. The current outward
-PostgreSQL/pgvector adapter connects to an external database; it is not evidence
-that PostgreSQL clients can connect to rrflowDB. The remaining gap is tracked
-in [POAM-011](../poam/rrflow-1.0-alpha/poam-011.md).
+The [PostgreSQL compatibility contract](../reference/protocol/postgresql.md)
+owns the selected core profile, SQL/type/transaction/client matrix, semantic
+mapping, data portability and qualification. [H-08](../roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+owns implementation order. The current outward PostgreSQL/pgvector adapter
+connects to an external database; it does not implement an inbound compatible
+server. [POAM-011](../poam/rrflow-1.0-alpha/poam-011.md) remains open until the
+new profile has real-client and installed-engine evidence.
 
 Compatibility must enter through RRFlow's public transport/query boundaries
 and preserve `RrdEngine` authorization, semantics, transactions, and receipts.

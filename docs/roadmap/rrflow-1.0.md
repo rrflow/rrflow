@@ -78,6 +78,9 @@
 4. **H-05d —** [physical path coverage](rrflow-1.0/gate-h.md#h-05d--physical-path-coverage)
 5. **H-05e —** [capture and proof](rrflow-1.0/gate-h.md#h-05e--capture-and-proof)
 
+[H-08 PostgreSQL compatibility packages](rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+define the native rrflowDB SQL/client and data-portability work.
+
 ### Gate I — add explicit automation scaffolding without automatic hooks
 
 [Open Gate I](rrflow-1.0/gate-i.md)
@@ -151,6 +154,7 @@
 | [ ] | H-05 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | H-06 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | H-07 | [Gate H](rrflow-1.0/gate-h.md) |
+| [ ] | H-08 | [Gate H](rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages) |
 | [ ] | I-01 | [Gate I](rrflow-1.0/gate-i.md) |
 | [ ] | I-02 | [Gate I](rrflow-1.0/gate-i.md) |
 | [ ] | I-03 | [Gate I](rrflow-1.0/gate-i.md) |

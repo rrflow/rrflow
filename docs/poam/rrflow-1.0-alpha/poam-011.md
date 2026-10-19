@@ -27,20 +27,22 @@ catalogue as semantic owner, but the complete one-invocation compiler and
 installed cross-surface corpus have not been implemented. Hand-maintained
 operation/model/reference/conformance copies can therefore still drift.
 
-The owner's rrflowDB identity also requires PostgreSQL compatibility. There is
-no accepted PostgreSQL compatibility matrix or qualifying real-client corpus
-in the current public-surface owners. The inspected server exposes RRD
-HTTP/WebSocket; the PostgreSQL code in `rrd-operator-knowledge` is an outbound
-adapter to an external PostgreSQL/pgvector instance. Neither establishes a
-PostgreSQL-compatible rrflowDB server. The matrix must identify supported
-versions, drivers, wire behavior, SQL/types/transactions, catalogue discovery,
-extensions and tools before implementation can make a bounded compatibility
-claim. Its precise scope and delivery sequence remain open; this correction
-does not mark a gate complete or silently add a qualified surface to H-04.
+The owner's rrflowDB identity requires PostgreSQL compatibility. The new
+[core-profile contract](../../reference/protocol/postgresql.md) defines the
+first compatibility matrix and [H-08](../../roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+defines bounded implementation packages. Neither is implementation evidence.
+The inspected server exposes RRD HTTP/WebSocket; `rrd-operator-knowledge`
+contains an outbound PostgreSQL adapter. The native value/schema model and
+snapshot transaction port still need SQL type, relational constraint,
+statement-snapshot, savepoint and concurrency semantics. Wire/client conformance,
+authorized catalogue discovery, bulk transfer, vector SQL, source-exit import
+and installed-profile qualification remain open. No required profile case is
+currently accepted as a PostgreSQL compatibility pass.
 
 ## Current-detail owners
 
 - [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)
+- [PostgreSQL compatibility and independent database contract](../../reference/protocol/postgresql.md)
 - [Executable public contract](../../reference/protocol/public-contract.md)
 - [Generated-surface design](../../roadmap/rrflow-1.0-execution/generated-surfaces.md)
 - [SDK index](../../reference/sdk/README.md):
@@ -64,15 +66,25 @@ qualify an incomplete or unusable installed surface.
 
 ## Owning gates
 
-A-07, B-04, B-05, D-01, H-04 through H-07, J-01 through J-05
+A-07, B-04, B-05, C-07, D-01/D-06/D-11, F, H-04 through H-08, J-01 through J-05
 
 Roadmap owners: [Gate A](../../roadmap/rrflow-1.0/gate-a.md),
 [Gate B](../../roadmap/rrflow-1.0/gate-b.md),
+[Gate C](../../roadmap/rrflow-1.0/gate-c.md),
 [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
+[Gate F](../../roadmap/rrflow-1.0/gate-f.md),
 [Gate H](../../roadmap/rrflow-1.0/gate-h.md), and
 [Gate J](../../roadmap/rrflow-1.0/gate-j.md).
 
 ## Closure evidence
+
+H-08 additionally requires every required PostgreSQL core-profile case to pass
+against pinned reference/client versions and installed native rrflowDB, with
+shared-engine result/authorization/receipt equivalence, concurrency and crash
+proof, explicit unsupported-feature denials, and a verified synthetic external
+import/export and recovery rehearsal. A wire handshake or parser alone cannot
+close this gap. H-04 and H-08 evidence are both required; neither substitutes
+for the other.
 
 One deterministic compiler projects the executable wire types and
 operation/capability catalogue into internal dispatch metadata, OpenAPI,
