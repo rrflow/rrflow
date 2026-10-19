@@ -5,6 +5,13 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
+**rrflowDB is the database within RRFlow: a pure Rust, PostgreSQL-inspired
+database dedicated to AI and designed for AI use, with PostgreSQL compatibility
+as a product requirement.** It stores the knowledge, memory, reasoning state,
+and evidence of each project estate. The [database identity and compatibility
+boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary)
+separates that target from current implementation and compatibility evidence.
+
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;
 it delegates each detailed subject to exactly one linked memory record. The

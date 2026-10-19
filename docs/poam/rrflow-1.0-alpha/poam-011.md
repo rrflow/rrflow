@@ -27,8 +27,20 @@ catalogue as semantic owner, but the complete one-invocation compiler and
 installed cross-surface corpus have not been implemented. Hand-maintained
 operation/model/reference/conformance copies can therefore still drift.
 
+The owner's rrflowDB identity also requires PostgreSQL compatibility. There is
+no accepted PostgreSQL compatibility matrix or qualifying real-client corpus
+in the current public-surface owners. The inspected server exposes RRD
+HTTP/WebSocket; the PostgreSQL code in `rrd-operator-knowledge` is an outbound
+adapter to an external PostgreSQL/pgvector instance. Neither establishes a
+PostgreSQL-compatible rrflowDB server. The matrix must identify supported
+versions, drivers, wire behavior, SQL/types/transactions, catalogue discovery,
+extensions and tools before implementation can make a bounded compatibility
+claim. Its precise scope and delivery sequence remain open; this correction
+does not mark a gate complete or silently add a qualified surface to H-04.
+
 ## Current-detail owners
 
+- [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)
 - [Executable public contract](../../reference/protocol/public-contract.md)
 - [Generated-surface design](../../roadmap/rrflow-1.0-execution/generated-surfaces.md)
 - [SDK index](../../reference/sdk/README.md):

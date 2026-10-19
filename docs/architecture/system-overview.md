@@ -60,7 +60,7 @@ authoritative databases or engines.
 | **`RrdEngine`** | The only semantic coordinator and mutation authority. | `crates/authority/rrd-engine` |
 | **RRFlow kernel** | Canonical temporal values, identities, read stamps, mutations, and invariants; it defines meaning without owning transport or physical storage. | `rrd-core` |
 | **canonical runtime log** | The ordered source of truth for committed RRFlow changes from which temporal snapshots are resolved. | Semantic types in `rrd-core`, persistence mapping in `rrd-store`, and durable bytes in rrflowKV. |
-| **rrflowDB** | One persistent project AI estate containing governed temporal knowledge, reasoning state, evidence, and index definitions. | Semantic state composed by `RrdEngine`; physical durability supplied by rrflowKV. |
+| **rrflowDB** | The pure Rust, PostgreSQL-inspired database dedicated to AI and designed for AI use, with PostgreSQL compatibility as a product requirement. Each instance stores a persistent project AI estate containing governed knowledge, reasoning state, evidence, and index definitions. | Semantic state composed by `RrdEngine`; physical durability supplied by rrflowKV. PostgreSQL compatibility remains unqualified. |
 | **rrflowKV** | The durable physical engine beneath rrflowDB: WAL, MVCC, LSM, manifests, snapshots, compaction, and recovery. | `rrd-lsm` through `rrd-store` |
 | **rrflowMX** | RRFlow Memory Execution, the non-durable process-local implementation of the same semantic storage port. | Volatile implementation in `rrd-store`, behind the semantic storage port. |
 | **RRFlow temporal graph** | Typed records and relations resolved from the canonical log at one runtime read stamp and valid-time coordinate; never a separate graph database. | Kernel graph values, persistence adjacency, native query operators, and `RrdEngine` authorization. |
@@ -141,9 +141,32 @@ behind its owning adapter.
 
 ## Persistence and memory boundary
 
-rrflowDB is the persistent logical estate. rrflowKV is its physical storage
-engine. The rrflowKV memtable is the hot mutable tier inside a persistent
-rrflowDB instance.
+rrflowDB is the database; a persistent project estate is the governed data it
+holds. Its product target is a pure Rust database engine inspired by PostgreSQL,
+dedicated to AI workloads and designed for AI systems to use. Knowledge,
+temporal memory, reasoning state, graph and vector retrieval, context, and
+evidence are native database concerns. PostgreSQL compatibility is part of
+this target.
+
+The exact PostgreSQL versions and compatibility matrix still require an
+accepted specification and real-client evidence. Wire protocol and driver
+behavior, SQL syntax and semantics, types, transactions, catalogue discovery,
+extensions, and operational tooling need explicit coverage decisions; the
+general compatibility requirement does not establish any of them as already
+implemented. PostgreSQL's [protocol](https://www.postgresql.org/docs/18/protocol.html)
+and [SQL conformance](https://www.postgresql.org/docs/18/features.html)
+references are separate inputs to that specification. The current outward
+PostgreSQL/pgvector adapter connects to an external database; it is not evidence
+that PostgreSQL clients can connect to rrflowDB. The remaining gap is tracked
+in [POAM-011](../poam/rrflow-1.0-alpha/poam-011.md).
+
+Compatibility must enter through RRFlow's public transport/query boundaries
+and preserve `RrdEngine` authorization, semantics, transactions, and receipts.
+rrflowKV remains rrflowDB's native physical storage engine; PostgreSQL is not a
+required server or persistence backend. The rrflowKV memtable is the hot
+mutable tier inside a persistent rrflowDB instance. The pure Rust identity is
+a database-engine requirement, not an audited claim that every optional adapter
+or transitive platform dependency is implemented in Rust.
 
 rrflowMX is different: it is an intentionally non-durable composition for
 volatile and conformance execution. It does not silently flush or promote into
