@@ -55,7 +55,7 @@ authoritative databases or engines.
 
 | Term | Canonical meaning | Implementation boundary |
 |---|---|---|
-| **RRFlow** | Reason Ready Flow, the complete product and platform. | This repository supplies the engine and bundled adapters; Connectome is a separate public client. |
+| **RRFlow** | Reason Ready Flow, the complete product and platform. | This repository supplies the engine and bundled adapters; Connectome is a separate public-contract UI client pinned as an optional submodule. |
 | **RRD** | Reason Ready Daemon, the embedded/server runtime hosting RRFlow. | `rrd-server` plus embedded `RrdEngine` composition. |
 | **`RrdEngine`** | The only semantic coordinator and mutation authority. | `crates/authority/rrd-engine` |
 | **RRFlow kernel** | Canonical temporal values, identities, read stamps, mutations, and invariants; it defines meaning without owning transport or physical storage. | `rrd-core` |
@@ -87,7 +87,9 @@ authoritative databases or engines.
 | **routine** | A versioned, durable graph of public `RrdEngine` operations with explicit state, budgets, leases, checkpoints, cancellation, compensation, verification, and terminal outcome. | Definition and run state in rrflowDB; orchestration in `RrdEngine`. |
 | **skill** | An immutable, digest-addressed instruction and resource package resolved as governed context; it grants no capability and executes no lifecycle code. | Contract and manifest in `rrd-contract`; content and bindings in rrflowDB; resolution in `RrdEngine`. |
 | **host-event adapter** | An optional, explicitly installed stateless translator from a host callback or external signal into the canonical engine-event submission operation. | Outward `rrflow-*` adapter; never an automatic hook or scheduler. |
-| **Connectome** | The RRFlow client: a separate operator and developer workbench using public RRD capabilities. The name no longer means a storage substrate; that role is RRFlow's. | Separate repository; no embedded engine authority. |
+| **Connectome** | The RRFlow client: a separate operator and developer workbench using public RRD capabilities. The name no longer means a storage substrate; that role is RRFlow's. | Separate repository pinned at `connectome/`; no embedded engine authority. |
+| **shippin.cloud** | Planned hosted RRFlow offering with private development spaces, project execution, UI previews, and web deployment. | Cloud delivery and account services consume explicit public engine and project-execution contracts. |
+| **DevPulse** | Planned desktop application offering a local RRFlow engine and optional shippin.cloud signup and synchronization. | Local client and distribution integration; engine state remains under `RrdEngine`. |
 | **workspace** | A set of estates grouped by an account or client above the engine. It is never an engine scope, resource, or authorization boundary; the [instance-topology record](instance-topology.md#canonical-identities-and-cardinality) owns the relation. | Client and account concern; no engine type. |
 
 Product documentation uses the exact spellings **RRFlow**, **RRD**,
@@ -236,7 +238,14 @@ after the signed bundle is acquired. An optional model or adapter bundle may be
 side-loaded only when the operator selects it explicitly; anything required by
 the default profile belongs in the default distribution.
 
-Connectome remains a separate client release. PostgreSQL, Turso, SQLite,
+Connectome remains a separate client release, pinned in this repository as the
+optional `connectome/` UI submodule under the declared, pinned-source policy.
+Engine and bundled-adapter builds cannot consume source or assets from it.
+An engine-only checkout and default distribution need no submodule acquisition.
+The [client contract](../reference/client/connectome.md#repository-checkout)
+owns its source identity and explicit acquisition procedure.
+
+PostgreSQL, Turso, SQLite,
 Dragonfly, object stores, Zuul Zero/shippin.ai meshes, and model providers
 remain optional integrations. None is needed to make a local rrflowKV estate
 ready, commit data, close, reopen, recover, or verify itself.
@@ -269,6 +278,43 @@ projection, interaction, local-state, and client-conformance requirements. The
 owns the project-installation and attunement contract; roadmap
 [H-06](../roadmap/rrflow-1.0.md#gate-h--prove-context-flow-feedback-live-delivery-and-connectome)
 owns the real-client acceptance evidence.
+
+## Delivery experiences
+
+The root [product portal](../../README.md#engine-ui-cloud-and-desktop) owns the
+offering: one RRFlow reasoning engine, Connectome UI, hosted private devspaces
+through shippin.cloud, and local operation through DevPulse. These are target
+delivery experiences; neither this record nor submodule registration proves
+that they are available.
+
+| Experience | Intended behavior | Authority boundary |
+|---|---|---|
+| Connectome UI | Present engine state and invoke available public operations from its independently built UI. | RRFlow's pinned submodule identifies UI source; the public client contract governs connections and effects. |
+| shippin.cloud | Offer RRFlow as a cloud service with an included private devspace, initially for friends-and-family demonstrations of AI-assisted development. Supply project creation, Rust/Python/Go execution, private running-UI previews, and web launch capabilities. | Hosted provisioning, toolchains, execution, preview routing, and deployment are explicit services/adapters; they do not become another reasoning or persistence engine. |
+| DevPulse | Offer the local reasoning engine and invite the user to create a shippin.cloud account and synchronize selected work. | Account creation, project selection, transfer permissions, and synchronization are explicit choices; signup alone grants no upload or mutation permission. |
+
+A devspace is the hosted project development environment, distinct from an
+RRD instance or its estate. Running project code uses a configured execution
+capability with explicit filesystem/network permissions, resource and time
+budgets, cancellation, and observable results. A private UI preview is scoped
+to its authorized devspace; publishing a web application is a separate,
+explicit deployment effect. A successful build or preview cannot claim that
+the engine's reasoning or persistence gates passed.
+
+DevPulse's local instance and a hosted instance retain their exact project,
+estate, and instance identities. Synchronization needs a versioned public
+contract covering selected data, authorization, conflicts, retry uncertainty,
+and receipts. Copying storage files or equating an account/workspace with an
+estate cannot substitute for that contract. The local engine remains usable
+without a cloud account or synchronization.
+
+The [Connectome client contract](../reference/client/connectome.md),
+[project command capabilities](../reference/automation/project-command-capabilities.md),
+and [instance topology](instance-topology.md) own the existing integration
+boundaries. H-06/H-07 and [POAM-011](../poam/rrflow-1.0-alpha/poam-011.md)
+track client/transport qualification. Hosted provisioning, language execution,
+preview/deployment, account, and synchronization implementations require their
+own bounded packages and acceptance evidence before being advertised as ready.
 
 ## External integrations
 

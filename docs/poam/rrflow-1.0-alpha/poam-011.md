@@ -46,6 +46,28 @@ persistence are prerequisites, not sync proof. The [integration contract](../../
 defines local independence, opt-in, replay/conflict/revocation requirements and
 real-account acceptance under D-06/H-04/H-07. This gap remains sequenced.
 
+The Connectome source is now pinned through the optional `connectome/`
+submodule, but source registration does not close the client-conformance gap.
+The repository previously rejected all gitlinks and attempted to read a
+gitlink directory as a file during inventory generation; the
+[source-integration journal](../../evidence/change-journals/gate-h/h-06-connectome-submodule-and-delivery-positioning.md)
+records the bounded correction and its checks. Current main subsequently
+required recursive checkout in every CI job.
+The [policy-integration receipt](../../evidence/change-journals/gate-h/h-06-connectome-submodule-policy-integration.md)
+records reconciliation with that owner-approved source policy. The owner then
+explicitly authorized making Connectome public. The
+[publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records anonymous source access and successful recursive candidate checkouts.
+That acquisition blocker is resolved; full candidate CI and client qualification
+remain separate requirements, and POAM-011 remains open.
+
+The [delivery targets](../../architecture/system-overview.md#delivery-experiences)
+also lack qualified end-to-end evidence here for shippin.cloud private
+devspaces, Rust/Python/Go execution and UI previews, web deployment, and
+DevPulse account creation and synchronization. The linked DevPulse contract now defines the account/sync boundary; its
+implementation and acceptance evidence remain open. H-06 source registration
+alone cannot close those delivery gaps.
+
 ## Current-detail owners
 
 - [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)
