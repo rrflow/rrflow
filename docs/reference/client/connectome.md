@@ -25,6 +25,45 @@ remote, or explicitly mesh-resolved instances without Connectome, and the
 default RRFlow distribution does not require the Connectome checkout or
 artifact.
 
+### Repository checkout
+
+The RRFlow repository registers Connectome at `connectome/` as an optional Git
+submodule of `https://github.com/rrflow/connectome-development.git`. The parent
+Git tree pins the exact UI revision; `.gitmodules` owns the source URL. UI
+changes are developed and reviewed in that separate repository, then a bounded
+RRFlow change advances the pin with its integration evidence. A submodule pin
+does not qualify the UI or create engine authority.
+
+For UI development, explicitly acquire the pinned checkout:
+
+```bash
+git submodule update --init -- connectome
+git submodule status -- connectome
+```
+
+The Connectome development repository is public and supports anonymous
+acquisition. Engine-only local clones can omit initialization. Candidate CI
+recursively checks out the pinned UI source under the repository source policy.
+The [publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records the authorized visibility change and anonymous-access verification. The
+default engine build and installed distribution cannot read source or assets
+from the UI checkout. A UI distribution must package its required assets;
+installed startup cannot fetch this repository.
+
+The parent inventory records the gitlink revision without traversing child
+files. Local UI edits remain owned by the child repository. Never replace its
+pin with an escaping sibling path or treat a dirty checkout as reproducible
+integration evidence. Use `git submodule update --init -- connectome` to restore
+the recorded revision, rather than updating to an unreviewed branch tip.
+
+The [delivery architecture](../../architecture/system-overview.md#delivery-experiences)
+relates this UI to shippin.cloud private devspaces and the DevPulse local
+offering. Hosted project execution, previews, web launch, account creation,
+and synchronization are product targets requiring their own public-contract
+integration and proof; this source registration supplies none of those effects.
+
+### Projection authority
+
 Connectome is a projection client. It may:
 
 - discover and invoke available public RRD operations;
