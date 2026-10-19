@@ -29,6 +29,21 @@ operation/model/reference/conformance copies can therefore still drift.
 
 ## Current-detail owners
 
+The Connectome source is now pinned through the optional `connectome/`
+submodule, but source registration does not close the client-conformance gap.
+The repository previously rejected all gitlinks and attempted to read a
+gitlink directory as a file during inventory generation; the
+[source-integration journal](../../evidence/change-journals/gate-h/h-06-connectome-submodule-and-delivery-positioning.md)
+records the bounded correction and its checks. The private UI source requires
+separate access for UI work; engine-only checks remain independent of it.
+
+The [delivery targets](../../architecture/system-overview.md#delivery-experiences)
+also lack qualified end-to-end evidence here for shippin.cloud private
+devspaces, Rust/Python/Go execution and UI previews, web deployment, and
+DevPulse account creation and synchronization. Their contracts and acceptance
+packages must be established before implementation or readiness claims; H-06
+source registration alone cannot close those delivery gaps.
+
 - [Executable public contract](../../reference/protocol/public-contract.md)
 - [Generated-surface design](../../roadmap/rrflow-1.0-execution/generated-surfaces.md)
 - [SDK index](../../reference/sdk/README.md):

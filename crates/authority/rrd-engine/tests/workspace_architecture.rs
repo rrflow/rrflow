@@ -1116,7 +1116,39 @@ fn workspace_source_inputs_are_repository_closed() {
         })
         .collect::<BTreeSet<_>>();
 
-    let mut violations = Vec::new();
+    let entries = git_index_entries(&metadata.root);
+    let modules = Command::new("git")
+        .current_dir(&metadata.root)
+        .args([
+            "config",
+            "--no-includes",
+            "--file",
+            ".gitmodules",
+            "--null",
+            "--list",
+        ])
+        .output()
+        .expect("git config must start");
+    assert!(
+        modules.status.success(),
+        "cannot read .gitmodules: {}",
+        String::from_utf8_lossy(&modules.stderr)
+    );
+    let mut violations = optional_ui_registration_violations(
+        &entries,
+        std::str::from_utf8(&modules.stdout).expect("submodule registration must be UTF-8"),
+    );
+    let ui_root = metadata.root.join("connectome");
+    let canonical_ui =
+        fs::canonicalize(&ui_root).unwrap_or_else(|_| canonical_root.join("connectome"));
+    for member in &member_roots {
+        if member.starts_with(&canonical_ui) {
+            violations.push(format!(
+                "engine workspace member enters optional UI source at {}",
+                member.display()
+            ));
+        }
+    }
     for source in &metadata.target_sources {
         let path = metadata.root.join(source);
         let canonical = fs::canonicalize(&path)
@@ -1126,6 +1158,12 @@ fn workspace_source_inputs_are_repository_closed() {
                 "Cargo target {} resolves outside the repository to {}",
                 source.display(),
                 canonical.display()
+            ));
+        }
+        if source.starts_with("connectome") || canonical.starts_with(&canonical_ui) {
+            violations.push(format!(
+                "Cargo target enters optional UI source at {}",
+                source.display()
             ));
         }
     }
@@ -1148,6 +1186,13 @@ fn workspace_source_inputs_are_repository_closed() {
         };
         let canonical = fs::canonicalize(path)
             .unwrap_or_else(|error| panic!("cannot resolve {}: {error}", path.display()));
+        if canonical.starts_with(&canonical_ui) {
+            violations.push(format!(
+                "{} depends on optional UI source at {}",
+                dependency.owner,
+                path.display()
+            ));
+        }
         if !canonical.starts_with(&canonical_root) {
             violations.push(format!(
                 "{} depends on local package {} outside the repository at {}",
@@ -1175,13 +1220,7 @@ fn workspace_source_inputs_are_repository_closed() {
         violations.push("Cargo.lock contains a transitive Git source".to_owned());
     }
 
-    for entry in git_index_entries(&metadata.root) {
-        if entry.mode == "160000" {
-            violations.push(format!(
-                "tracked Git submodule supplies repository input at {}",
-                entry.path.display()
-            ));
-        }
+    for entry in entries {
         if entry.mode != "120000" {
             continue;
         }
@@ -1203,8 +1242,87 @@ fn workspace_source_inputs_are_repository_closed() {
     violations.sort();
     assert!(
         violations.is_empty(),
-        "RRFlow first-party source must be supplied by this workspace without Git, submodule, or escaping-path inputs: {violations:#?}"
+        "RRFlow engine source must be repository-contained; only the declared optional Connectome UI submodule is allowed: {violations:#?}"
     );
+}
+
+fn optional_ui_registration_violations(entries: &[GitIndexEntry], modules: &str) -> Vec<String> {
+    let mut violations = Vec::new();
+    let links = entries
+        .iter()
+        .filter(|entry| entry.mode == "160000")
+        .map(|entry| entry.path.clone())
+        .collect::<Vec<_>>();
+    if links != [PathBuf::from("connectome")] {
+        violations.push(format!(
+            "expected only the connectome UI gitlink, found {links:?}"
+        ));
+    }
+    if !entries
+        .iter()
+        .any(|entry| entry.path == Path::new(".gitmodules") && entry.mode == "100644")
+    {
+        violations.push(".gitmodules must be an ordinary tracked file".to_owned());
+    }
+    let actual = modules
+        .split('\0')
+        .filter(|entry| !entry.is_empty())
+        .collect::<BTreeSet<_>>();
+    let expected = BTreeSet::from([
+        "submodule.connectome.path\nconnectome",
+        "submodule.connectome.url\nhttps://github.com/rrflow/connectome-development.git",
+    ]);
+    if actual != expected
+        || modules
+            .split('\0')
+            .filter(|entry| !entry.is_empty())
+            .count()
+            != expected.len()
+    {
+        violations.push(
+            ".gitmodules must declare only the exact Connectome development URL and path"
+                .to_owned(),
+        );
+    }
+    violations
+}
+
+#[test]
+fn optional_ui_registration_rejects_other_repositories_paths_and_settings() {
+    let mut entries = vec![
+        GitIndexEntry {
+            mode: "100644".to_owned(),
+            path: PathBuf::from(".gitmodules"),
+        },
+        GitIndexEntry {
+            mode: "160000".to_owned(),
+            path: PathBuf::from("connectome"),
+        },
+    ];
+    let modules = "submodule.connectome.path\nconnectome\0submodule.connectome.url\nhttps://github.com/rrflow/connectome-development.git\0";
+    assert!(optional_ui_registration_violations(&entries, modules).is_empty());
+    for invalid in [
+        modules.replace(
+            "https://github.com/rrflow/connectome-development.git",
+            "../connectome",
+        ),
+        modules.replace("path\nconnectome", "path\ncrates/ui"),
+        format!("{modules}submodule.connectome.update\nnone\0"),
+        format!("{modules}submodule.connectome.path\nconnectome\0"),
+        String::new(),
+    ] {
+        assert!(!optional_ui_registration_violations(&entries, &invalid).is_empty());
+    }
+    entries.push(GitIndexEntry {
+        mode: "160000".to_owned(),
+        path: PathBuf::from("crates/foreign"),
+    });
+    assert!(!optional_ui_registration_violations(&entries, modules).is_empty());
+    entries.pop();
+    entries[0].mode = "120000".to_owned();
+    assert!(!optional_ui_registration_violations(&entries, modules).is_empty());
+    entries.pop();
+    assert!(!optional_ui_registration_violations(&entries, modules).is_empty());
 }
 
 #[test]

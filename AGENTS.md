@@ -38,8 +38,14 @@ All first-party code that implements the RRFlow engine or a bundled RRFlow
 adapter, plus its schemas, bootstrap templates, default configuration,
 installation logic, release assembly, verification, and recovery tooling, must
 live in this repository.
-Do not add a sibling-checkout dependency, escaping local path, Git submodule,
-undeclared generator, or install-time/runtime fetch. Locked third-party source
+Do not add a sibling-checkout dependency, escaping local path, engine-source
+Git submodule, undeclared generator, or install-time/runtime fetch. The sole
+submodule exception is the optional Connectome UI at `connectome/`, pinned to
+the separate `rrflow/connectome-development` repository. It must not supply
+engine or bundled-adapter source, build inputs, installation, or default
+readiness; its source relationship and explicit checkout procedure are owned
+by `docs/reference/client/connectome.md#repository-checkout`.
+Locked third-party source
 dependencies are permitted build inputs, but the signed default distribution
 must contain every linked binary and runtime asset needed to install, start,
 persist, recover, and verify RRFlow after the bundle has been acquired.

@@ -109,7 +109,9 @@ jobs:
           cmp --silent "$first" "$second"
           python3 scripts/knowledge/test_export.py
       - name: Enforce exhaustive RRFlow 1.0 file planning
-        run: python3 scripts/ci/build_execution_inventory.py --check
+        run: |
+          python3 scripts/ci/test_execution_inventory.py
+          python3 scripts/ci/build_execution_inventory.py --check
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership

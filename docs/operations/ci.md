@@ -49,6 +49,16 @@ package and become current inventory records when created. Regenerate the
 inventory with `python3 scripts/ci/build_execution_inventory.py` after an
 accepted path or content change.
 
+The optional Connectome UI submodule is not initialized by engine candidate
+CI; its private repository credentials are unnecessary for engine checks.
+The architecture suite permits only the declared Connectome source URL and
+path and denies engine dependencies or targets inside it. The inventory
+records the parent gitlink revision without traversing the child repository.
+`python3 scripts/ci/test_execution_inventory.py` proves identical inventory
+with absent, populated, and locally edited child files, changed identity when
+the pin changes, and rejection of unresolved index conflicts. UI builds and
+real-engine conformance remain separate H-06 evidence.
+
 Marked documentation indexes are derived from their immediate coordinated
 children. Run `python3 scripts/knowledge/render_navigation.py` after adding,
 moving, or removing a child record; `--check` is non-mutating and fails on
