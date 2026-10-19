@@ -21,18 +21,28 @@ request, and because candidate CI triggers only on `pull_request`,
 the service-protocol suite's backup kill-matrix test failed while the
 per-change validator passed.
 
-One gap remains: the pull request rule is written policy, not enforced. No
-recorded repository ruleset yet requires pull requests and the stable
-candidate check, or denies branch deletion and force pushes, on `main`. On
-2026-09-11 GitHub returned HTTP 403 for both rulesets and `main`
-branch-protection APIs while the repository was private; the repository owner
-confirmed on 2026-10-16 that `rrflow/rrflow-development` is public, where those
-controls are available.
+The pull request rule is now enforced. On 2026-10-19 ruleset `25439032` was
+created and made active on `main` of `rrflow/rrflow-development`: it requires
+a pull request and the GitHub Actions `pipeline / ci-gate` check on an
+up-to-date branch, and denies force pushes and branch deletion. Repository
+administrators may bypass only while merging a pull request. A direct push of
+an empty probe commit with administrator credentials was rejected and `main`
+was unchanged. The exact rule identity, API evidence, and probe are recorded in
+the [POAM-027e journal](../../evidence/change-journals/repository/poam-027e-main-ruleset-and-direct-push-record.md).
+
+Earlier the same day, before the ruleset existed, commit `b298fa96` reached
+`main` by a direct push: the authoring branch tracked `main` and the
+repository's `push.default=upstream` sent it there. It carried no failing
+change; its candidate CI evidence is recorded in the same journal.
+
+The hosted Actions setting that requires full-SHA action references is still
+off; workflow pinning is enforced in the checkout by
+`scripts/ci/check_workflow.py`.
 
 ## Impact
 
-A direct push can still bypass candidate CI and land a failing revision on
-`main`. Installing a client Git, editor, or provider hook would remain
+Before 2026-10-19 a direct push could bypass candidate CI and land a failing
+revision on `main`; the active ruleset now rejects that path. Installing a client Git, editor, or provider hook would remain
 unportable and would create a forbidden parallel lifecycle mechanism.
 
 ## Owning gates
@@ -57,4 +67,5 @@ becomes RRFlow runtime authority.
 - [POAM-027b canonical package-identity correction](../../evidence/change-journals/repository/poam-027b-canonical-package-identity-correction-journal.md)
 - [POAM-027c linked execution records and generated navigation](../../evidence/change-journals/repository/poam-027c-linked-execution-records-and-generated-navigation.md)
 - [POAM-027d pull-request landing and CI gate](../../evidence/change-journals/repository/poam-027d-pull-request-landing-and-ci-gate.md)
+- [POAM-027e main ruleset and direct-push record](../../evidence/change-journals/repository/poam-027e-main-ruleset-and-direct-push-record.md)
 - [Current CI and repository-enforcement boundary](../../operations/ci.md)

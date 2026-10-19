@@ -277,26 +277,45 @@ must remain GitHub-hosted.
 
 ## Repository enforcement
 
-Public visibility exposes this control on the current hosting tier. Protect
-`main` with these invariants:
+Public visibility exposes this control on the current hosting tier. `main`
+is protected with these invariants:
 
 - pull requests and the stable `pipeline / ci-gate` check are required;
 - merge queue or an up-to-date branch is required;
 - force pushes and deletion are denied; and
-- Actions must require immutable full-SHA references.
+- Actions must require immutable full-SHA references (enforced in this
+  checkout by `scripts/ci/check_workflow.py`; the hosted repository setting is
+  still open, see below).
 
 This is an external control and needs external evidence. On 2026-09-11,
 read-only GitHub API requests for both repository rulesets and `main` branch
 protection on the then-private `rrflow/rrflow-development` returned HTTP 403
-with the message that GitHub Pro or public visibility is required. The
-repository owner confirmed public visibility on 2026-10-16, so rulesets are
-available; no ruleset is recorded here yet. Therefore the checkout does
-**not** currently claim that `pipeline / ci-gate`, pull requests, reviews,
-deletion denial, or force-push denial is enforced. Do not compensate with a
-local hook or push to the official promotion repository. Create the `main`
-ruleset, then record the exact repository, rule identity, required check name,
-protected ref, API response, and verification attempt in this record and one
-linked package journal.
+with the message that GitHub Pro or public visibility is required. After the
+repository became public, ruleset `25439032` ("main: pull requests with passing
+candidate CI") was created on 2026-10-19 and is `active` on the default branch
+`main`:
+
+| Rule | Configuration |
+|---|---|
+| `pull_request` | required; 0 approving reviews (a sole maintainer cannot approve their own pull request); stale approvals dismissed; review threads must be resolved; merge, squash, and rebase allowed |
+| `required_status_checks` | `pipeline / ci-gate` from GitHub Actions (integration `15368`), with the branch up to date before merge |
+| `non_fast_forward` | force pushes denied |
+| `deletion` | branch deletion denied |
+| bypass | repository administrators, `pull_request` mode only: an administrator may override a rule while merging a pull request, but cannot push directly to `main` |
+
+`GET /repos/rrflow/rrflow-development/rules/branches/main` reports all four
+rules from that ruleset. A direct push of an empty probe commit to `main` with
+administrator credentials was rejected with "Changes must be made through a
+pull request" and "Required status check `pipeline / ci-gate` is expected",
+and `main` was unchanged. Switching the bypass to `always` is one ruleset
+update, but it would also let any tool holding administrator credentials push
+directly to `main`.
+
+The repository-level Actions setting that requires full-SHA action references
+(`sha_pinning_required`) is still `false`. Every workflow already pins full
+SHAs and `scripts/ci/check_workflow.py` enforces that in this checkout; enabling
+the hosted setting remains open. Do not compensate with a local hook or push to
+the official promotion repository.
 
 The repository CI-policy check rejects candidate trigger duplication, unsafe
 fork routing, unpinned actions, service or runner images, persisted checkout
