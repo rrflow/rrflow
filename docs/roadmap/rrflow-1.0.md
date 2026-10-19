@@ -151,6 +151,9 @@
 | [ ] | H-05 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | H-06 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | H-07 | [Gate H](rrflow-1.0/gate-h.md) |
+| [ ] | H-08 | [Gate H](rrflow-1.0/gate-h.md) |
+| [ ] | H-09 | [Gate H](rrflow-1.0/gate-h.md) |
+| [ ] | H-10 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | I-01 | [Gate I](rrflow-1.0/gate-i.md) |
 | [ ] | I-02 | [Gate I](rrflow-1.0/gate-i.md) |
 | [ ] | I-03 | [Gate I](rrflow-1.0/gate-i.md) |
