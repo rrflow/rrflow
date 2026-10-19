@@ -42,11 +42,13 @@ git submodule status -- connectome
 ```
 
 The Connectome development repository is currently private, so acquisition
-requires access to it. Engine-only clones and candidate engine CI do not
-initialize the submodule and require no Connectome credentials. The default
-engine build and installed distribution cannot read source or assets from the
-UI checkout. A UI distribution must package its required assets; installed
-startup cannot fetch this repository.
+requires access to it. Engine-only local clones can omit initialization. The
+repository's current CI policy requires recursive submodule checkout, so
+anonymous source acquisition must be resolved before candidate CI can pass;
+registration does not publish the UI repository or supply credentials. The
+default engine build and installed distribution cannot read source or assets
+from the UI checkout. A UI distribution must package its required assets;
+installed startup cannot fetch this repository.
 
 The parent inventory records the gitlink revision without traversing child
 files. Local UI edits remain owned by the child repository. Never replace its

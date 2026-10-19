@@ -49,15 +49,17 @@ package and become current inventory records when created. Regenerate the
 inventory with `python3 scripts/ci/build_execution_inventory.py` after an
 accepted path or content change.
 
-The optional Connectome UI submodule is not initialized by engine candidate
-CI; its private repository credentials are unnecessary for engine checks.
-The architecture suite permits only the declared Connectome source URL and
-path and denies engine dependencies or targets inside it. The inventory
-records the parent gitlink revision without traversing the child repository.
-`python3 scripts/ci/test_execution_inventory.py` proves identical inventory
-with absent, populated, and locally edited child files, changed identity when
-the pin changes, and rejection of unresolved index conflicts. UI builds and
-real-engine conformance remain separate H-06 evidence.
+The Connectome UI is optional for engine operation, while candidate CI follows
+repository policy and recursively materializes every declared submodule. The
+private Connectome development repository currently blocks anonymous source
+acquisition; no credential or visibility change is supplied by registration.
+The source-access prerequisite must be resolved before candidate CI can pass.
+The architecture suite checks the exact Connectome source identity and denies
+engine dependencies or targets inside it, alongside the general pinned-source
+validator. The inventory records the parent gitlink without traversing child
+files. `python3 scripts/ci/test_execution_inventory.py` proves parity across
+absent/populated/edited child files, pin-sensitive identity, and conflict
+rejection. UI builds and real-engine conformance remain separate H-06 evidence.
 
 Marked documentation indexes are derived from their immediate coordinated
 children. Run `python3 scripts/knowledge/render_navigation.py` after adding,
@@ -138,11 +140,20 @@ supply-chain checks. It requires:
 
 - every external action to use a full 40-character commit SHA;
 - every workflow service image to use a SHA-256 digest;
-- every checkout step to set `persist-credentials: false`;
+- every checkout step to set `persist-credentials: false`, and to set
+  `submodules: recursive` whenever `.gitmodules` exists;
 - top-level read-only contents permission and no `pull_request_target` in any
   workflow; and
 - complete candidate-suite/default-feature/optional-feature coverage, bounded
   candidate jobs, safe fork routing, and exact final-gate reduction.
+
+A Git submodule is a pinned source input, not an install-time fetch. The
+workspace architecture test accepts a gitlink only when `.gitmodules` declares
+it exactly once at a normalized repository-relative path with a
+credential-free `https://` URL, so an anonymous clean clone and candidate CI
+reproduce the same tree. Cargo workspace members remain tracked in this
+repository, and the signed default distribution must still contain every byte
+it needs after acquisition.
 
 Workflow ownership is directory-wide in `.github/CODEOWNERS`, so adding a new
 workflow does not bypass the existing workflow review boundary. Repository or
