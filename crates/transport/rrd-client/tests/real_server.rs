@@ -9,13 +9,15 @@ use rrd_contract::{
     transaction_operation_sha256, AbortTransaction, AssembleContext, BeginTransaction, CanonicalId,
     CloseSubscription, CommitTransaction, ContextEvidenceKind, CreateSession,
     DeploymentConformanceCorpus, DeploymentForm, EndpointPresentation, ErrorCode, ExecuteQuery,
-    ExportAudit, InstallationManagedPathKind, InstallationTargetKind, OpenSubscription,
-    PreviewTransaction, QueryBudget, ReadAccessPath, ReadAudit, ReadChangefeed,
-    ReadDiagnosticSnapshot, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
-    ResourcePath, SessionLimits, StorageProfileKind, SubscriptionAcknowledgement,
-    SubscriptionDelivery, SubscriptionResume, SubscriptionStream, TransactionMutation,
-    WebSocketCancel, WebSocketCancellationDisposition, WebSocketErrorTarget, WebSocketFrame,
-    WebSocketPayload, WebSocketRequest, PROTOCOL, PROTOCOL_VERSION,
+    ExportAudit, InstallationManagedPathKind, InstallationTargetKind, LaunchPromptFlight,
+    ListPromptFlights, OpenSubscription, PreviewTransaction, PromptFlightContextMode,
+    PromptFlightContextRequest, PromptFlightProvider, PromptFlightStage, QueryBudget,
+    ReadAccessPath, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot, ReadPromptFlight,
+    RequestContext, RequestEnvelope, ResourceId, ResourceKind, ResourcePath, SessionLimits,
+    StorageProfileKind, SubscriptionAcknowledgement, SubscriptionDelivery, SubscriptionResume,
+    SubscriptionStream, TransactionMutation, WebSocketCancel, WebSocketCancellationDisposition,
+    WebSocketErrorTarget, WebSocketFrame, WebSocketPayload, WebSocketRequest, PROTOCOL,
+    PROTOCOL_VERSION,
 };
 use rrd_core::{
     digest, RuntimeCommit, RuntimeLogicalModel, RuntimeProperties, RuntimePropertySchema,
@@ -362,6 +364,8 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
             Action::MemoryContextRead,
             Action::ServiceInspect,
             Action::DiagnosticsRead,
+            Action::FlightLaunch,
+            Action::FlightRead,
         ]
         .into_iter()
         .map(|action| ResourceGrant {
@@ -1079,7 +1083,7 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         .read_diagnostic_snapshot(
             &session,
             ReadDiagnosticSnapshot {
-                scope,
+                scope: scope.clone(),
                 graph_valid_at_unix_ms: 1_100,
                 graph_known_at_cursor: Some(runtime_head.saturating_add(1)),
                 graph_compare_cursor: 0,
@@ -1147,6 +1151,138 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
     }));
     assert!(audit.records.iter().any(|record| {
         record.action == rrd_contract::SecurityAction::SubscriptionAck
+            && record.phase == rrd_contract::AuditPhase::Completed
+            && record.decision == rrd_contract::AuditDecision::Allowed
+    }));
+
+    let launch = LaunchPromptFlight {
+        scope: scope.clone(),
+        prompt: "Alpha".into(),
+        provider: PromptFlightProvider::Observe,
+        context_mode: PromptFlightContextMode::Pruned,
+        context: PromptFlightContextRequest {
+            valid_at: 100,
+            seeds: Vec::new(),
+            max_graph_depth: 2,
+            max_items: 16,
+            max_output_bytes: 16_384,
+            max_storage_keys: 1_024,
+        },
+        acceptance_marker: None,
+    };
+    let flight = client
+        .launch_prompt_flight(
+            &session,
+            launch.clone(),
+            RequestOptions::mutation("request-flight", "operation-flight", "flight-key").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!flight.idempotent_replay);
+    let record = &flight.flight.record;
+    assert_eq!(record.metrics.context_items, context.items.len() as u64);
+    assert_eq!(record.metrics.context_output_bytes, context.output_bytes);
+    // The flight is the first runtime write of this session: one schema
+    // mutation installing both flight tables precedes the row.
+    assert_eq!(record.read.runtime_cursor, runtime_head);
+    assert_eq!(record.flight_cursor, runtime_head + 2);
+    assert_eq!(
+        flight
+            .flight
+            .events
+            .iter()
+            .map(|event| event.stage)
+            .collect::<Vec<_>>(),
+        vec![
+            PromptFlightStage::Prompt,
+            PromptFlightStage::Context,
+            PromptFlightStage::Outcome
+        ]
+    );
+    let replay = client
+        .launch_prompt_flight(
+            &session,
+            launch,
+            RequestOptions::mutation(
+                "request-flight-again",
+                "operation-flight-again",
+                "flight-key",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(replay.idempotent_replay);
+    assert_eq!(replay.flight, flight.flight);
+    let flights = client
+        .list_prompt_flights(
+            &session,
+            ListPromptFlights {
+                scope: scope.clone(),
+                after_cursor: 0,
+                limit: 8,
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-flight-list", "operation-flight-list").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(flights.flights, vec![record.clone()]);
+    assert!(!flights.truncated);
+    let read = client
+        .read_prompt_flight(
+            &session,
+            ReadPromptFlight {
+                scope: scope.clone(),
+                flight_id: record.flight_id.clone(),
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-flight-read", "operation-flight-read").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(read.flight, flight.flight);
+    assert!(read
+        .read_evidence
+        .paths
+        .iter()
+        .any(|path| path.path == ReadAccessPath::EventVersions));
+    let after_flight = client
+        .read_changefeed(
+            &session,
+            ReadChangefeed {
+                scope: scope.clone(),
+                after_cursor: runtime_head,
+                limit: 64,
+            },
+            RequestOptions::read("request-changes-flight", "operation-changes-flight").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(after_flight.through_cursor, runtime_head + 5);
+    assert_eq!(
+        after_flight.changes.len(),
+        5,
+        "schema, row, and three events"
+    );
+    let flight_audit = client
+        .read_audit(
+            &session,
+            ReadAudit {
+                after_sequence: 0,
+                limit: 256,
+            },
+            RequestOptions::read("request-audit-flight", "operation-audit-flight").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(flight_audit.records.iter().any(|record| {
+        record.action == rrd_contract::SecurityAction::FlightLaunch
+            && record.phase == rrd_contract::AuditPhase::Completed
+            && record.decision == rrd_contract::AuditDecision::Allowed
+    }));
+    assert!(flight_audit.records.iter().any(|record| {
+        record.action == rrd_contract::SecurityAction::FlightRead
             && record.phase == rrd_contract::AuditPhase::Completed
             && record.decision == rrd_contract::AuditDecision::Allowed
     }));

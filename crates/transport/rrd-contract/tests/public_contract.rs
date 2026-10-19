@@ -323,7 +323,7 @@ fn supported_sdks_share_one_strict_semantic_corpus() {
     .unwrap();
     corpus.validate().unwrap();
     assert_eq!(corpus.required_domains.len(), 13);
-    assert_eq!(corpus.expected.endpoint_count, 33);
+    assert_eq!(corpus.expected.endpoint_count, 36);
     assert_eq!(
         rrd_contract::transaction_operation_sha256(&corpus.transaction.commit.mutations),
         corpus.transaction.commit.operation_sha256
@@ -1347,7 +1347,7 @@ fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();
     catalogue.validate().unwrap();
-    assert_eq!(catalogue.endpoints.len(), 33);
+    assert_eq!(catalogue.endpoints.len(), 36);
     assert_eq!(catalogue.endpoints[0].operation.as_str(), "audit-export");
     let create = catalogue
         .endpoints
@@ -1971,4 +1971,250 @@ fn public_embedding_contract_is_bounded_strict_and_collection_addressed() {
     let mut invalid = request;
     invalid.input.bytes.clear();
     assert!(invalid.validate().is_err());
+}
+
+fn flight_context_request() -> rrd_contract::PromptFlightContextRequest {
+    rrd_contract::PromptFlightContextRequest {
+        valid_at: 1_000,
+        seeds: Vec::new(),
+        max_graph_depth: 2,
+        max_items: 16,
+        max_output_bytes: 65_536,
+        max_storage_keys: 4_096,
+    }
+}
+
+fn flight_read_stamp(runtime_cursor: u64) -> rrd_contract::ContextReadStamp {
+    rrd_contract::ContextReadStamp {
+        runtime_manifest_sha256: "a".repeat(64),
+        runtime_cursor,
+        schema_revision: Some(3),
+        catalogue_revision: 1,
+    }
+}
+
+fn flight_event(
+    ordinal: u64,
+    elapsed_ms: u64,
+    stage: rrd_contract::PromptFlightStage,
+) -> rrd_contract::PromptFlightEvent {
+    rrd_contract::PromptFlightEvent {
+        ordinal,
+        at_unix_ms: 2_000 + elapsed_ms,
+        elapsed_ms,
+        stage,
+        kind: CanonicalId::new("prompt_received").unwrap(),
+        label: "Prompt entered the runtime boundary".into(),
+        detail: String::new(),
+        data: BTreeMap::from([("bytes".into(), rrd_contract::QueryValue::Unsigned(16))]),
+    }
+}
+
+fn flight_record() -> rrd_contract::PromptFlightRecord {
+    let prompt = "  inspect runtime ";
+    rrd_contract::PromptFlightRecord {
+        format_version: rrd_contract::PROMPT_FLIGHT_FORMAT_VERSION,
+        flight_id: CanonicalId::new(format!("flight-{}", "b".repeat(64))).unwrap(),
+        scope: "instance:alpha".into(),
+        cohort_sha256: rrd_contract::prompt_cohort_sha256(prompt),
+        prompt: prompt.into(),
+        provider: rrd_contract::PromptFlightProvider::Observe,
+        context_mode: rrd_contract::PromptFlightContextMode::Fresh,
+        context_request: flight_context_request(),
+        acceptance_marker: Some("all checks passed".into()),
+        status: rrd_contract::PromptFlightStatus::Prepared,
+        created_at_unix_ms: 2_000,
+        idempotency_key: CorrelationId::new("idem-flight-1").unwrap(),
+        operation_sha256: "c".repeat(64),
+        read: flight_read_stamp(40),
+        context: None,
+        metrics: rrd_contract::PromptFlightMetrics {
+            context_items: 0,
+            context_output_bytes: 0,
+            elapsed_ms: 7,
+        },
+        flight_cursor: 41,
+        known_at_cursor: 41,
+        event_count: 3,
+    }
+}
+
+#[test]
+fn prompt_flight_contract_is_bounded_strict_and_separately_authorized() {
+    let launch = rrd_contract::LaunchPromptFlight {
+        scope: "instance:alpha".into(),
+        prompt: "inspect runtime".into(),
+        provider: rrd_contract::PromptFlightProvider::Observe,
+        context_mode: rrd_contract::PromptFlightContextMode::Pruned,
+        context: flight_context_request(),
+        acceptance_marker: None,
+    };
+    launch.validate().unwrap();
+    assert_eq!(
+        launch.cohort_sha256(),
+        rrd_contract::prompt_cohort_sha256("  inspect runtime\n")
+    );
+    let mut empty_prompt = launch.clone();
+    empty_prompt.prompt = "   ".into();
+    assert!(empty_prompt.validate().is_err());
+    let mut oversized_prompt = launch.clone();
+    oversized_prompt.prompt = "x".repeat(rrd_contract::MAX_PROMPT_FLIGHT_PROMPT_BYTES + 1);
+    assert!(oversized_prompt.validate().is_err());
+    let mut bad_budget = launch.clone();
+    bad_budget.context.max_items = rrd_contract::MAX_CONTEXT_ITEMS + 1;
+    assert!(bad_budget.validate().is_err());
+    let mut empty_marker = launch.clone();
+    empty_marker.acceptance_marker = Some(" ".into());
+    assert!(empty_marker.validate().is_err());
+    assert!(serde_json::from_value::<rrd_contract::LaunchPromptFlight>(serde_json::json!({
+        "scope": "instance:alpha",
+        "prompt": "inspect runtime",
+        "provider": "codex",
+        "context_mode": "pruned",
+        "context": {"valid_at": 1000, "max_graph_depth": 2, "max_items": 16, "max_output_bytes": 65536, "max_storage_keys": 4096}
+    }))
+    .is_err());
+    assert!(serde_json::from_value::<rrd_contract::LaunchPromptFlight>(serde_json::json!({
+        "scope": "instance:alpha",
+        "prompt": "inspect runtime",
+        "provider": "observe",
+        "context_mode": "pruned",
+        "context": {"valid_at": 1000, "max_graph_depth": 2, "max_items": 16, "max_output_bytes": 65536, "max_storage_keys": 4096},
+        "reasoning_profile": "ultra"
+    }))
+    .is_err());
+    assert_eq!(
+        serde_json::to_value(rrd_contract::PromptFlightStage::Outcome).unwrap(),
+        "outcome"
+    );
+
+    let record = flight_record();
+    record.validate().unwrap();
+    let mut wrong_cohort = record.clone();
+    wrong_cohort.cohort_sha256 = "d".repeat(64);
+    assert!(wrong_cohort.validate().is_err());
+    let mut fresh_with_context = record.clone();
+    fresh_with_context.metrics.context_items = 1;
+    assert!(fresh_with_context.validate().is_err());
+    let mut committed_before_read = record.clone();
+    committed_before_read.flight_cursor = 40;
+    committed_before_read.known_at_cursor = 40;
+    assert!(committed_before_read.validate().is_err());
+    let mut pruned_without_summary = record.clone();
+    pruned_without_summary.context_mode = rrd_contract::PromptFlightContextMode::Pruned;
+    assert!(pruned_without_summary.validate().is_err());
+    pruned_without_summary.context = Some(rrd_contract::PromptFlightContextSummary {
+        request_sha256: "e".repeat(64),
+        plan_sha256: "e".repeat(64),
+        packet_sha256: "e".repeat(64),
+        items: 2,
+        output_bytes: 300,
+        truncated: false,
+        selected_versions: 9,
+    });
+    assert!(pruned_without_summary.validate().is_err());
+    pruned_without_summary.metrics.context_items = 2;
+    pruned_without_summary.metrics.context_output_bytes = 300;
+    pruned_without_summary.validate().unwrap();
+
+    let flight = rrd_contract::PromptFlight {
+        record: record.clone(),
+        events: vec![
+            flight_event(0, 0, rrd_contract::PromptFlightStage::Prompt),
+            flight_event(1, 3, rrd_contract::PromptFlightStage::Context),
+            flight_event(2, 7, rrd_contract::PromptFlightStage::Outcome),
+        ],
+    };
+    flight.validate().unwrap();
+    let mut gapped = flight.clone();
+    gapped.events[1].ordinal = 5;
+    assert!(gapped.validate().is_err());
+    let mut backwards = flight.clone();
+    backwards.events[2].elapsed_ms = 1;
+    assert!(backwards.validate().is_err());
+    let mut too_long = flight.clone();
+    too_long.record.metrics.elapsed_ms = 6;
+    assert!(too_long.validate().is_err());
+    let mut miscounted = flight.clone();
+    miscounted.events.pop();
+    assert!(miscounted.validate().is_err());
+    let encoded = serde_json::to_value(&flight).unwrap();
+    assert_eq!(
+        serde_json::from_value::<rrd_contract::PromptFlight>(encoded).unwrap(),
+        flight
+    );
+
+    rrd_contract::ListPromptFlights {
+        scope: "instance:alpha".into(),
+        after_cursor: 0,
+        limit: rrd_contract::MAX_PROMPT_FLIGHT_PAGE,
+        max_storage_keys: 1,
+    }
+    .validate()
+    .unwrap();
+    assert!(rrd_contract::ListPromptFlights {
+        scope: "instance:alpha".into(),
+        after_cursor: 0,
+        limit: 0,
+        max_storage_keys: 1,
+    }
+    .validate()
+    .is_err());
+    assert!(rrd_contract::ReadPromptFlight {
+        scope: "instance:alpha".into(),
+        flight_id: record.flight_id.clone(),
+        max_storage_keys: rrd_contract::MAX_PROMPT_FLIGHT_STORAGE_KEYS + 1,
+    }
+    .validate()
+    .is_err());
+    let mut later = record.clone();
+    later.flight_id = CanonicalId::new("flight-later").unwrap();
+    later.flight_cursor = 45;
+    later.known_at_cursor = 45;
+    let page = rrd_contract::PromptFlightPage {
+        scope: "instance:alpha".into(),
+        read: flight_read_stamp(50),
+        requested_after_cursor: 40,
+        flights: vec![record.clone(), later.clone()],
+        truncated: false,
+        selected_versions: 2,
+        read_evidence: read_evidence(),
+    };
+    page.validate().unwrap();
+    let mut unordered = page.clone();
+    unordered.flights.swap(0, 1);
+    assert!(unordered.validate().is_err());
+    let mut beyond_stamp = page.clone();
+    beyond_stamp.read = flight_read_stamp(44);
+    assert!(beyond_stamp.validate().is_err());
+
+    let catalogue = rrd_contract::endpoint_catalogue();
+    let launch_descriptor = catalogue
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.operation.as_str() == "flight-launch")
+        .unwrap();
+    assert_eq!(launch_descriptor.path, "/v1/flights");
+    assert!(launch_descriptor.mutation);
+    assert_eq!(
+        launch_descriptor.action.fixed_action(),
+        Some(rrd_contract::SecurityAction::FlightLaunch)
+    );
+    for (operation, path) in [
+        ("flight-list", "/v1/flights/list"),
+        ("flight-read", "/v1/flights/read"),
+    ] {
+        let descriptor = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == operation)
+            .unwrap();
+        assert_eq!(descriptor.path, path);
+        assert!(!descriptor.mutation);
+        assert_eq!(
+            descriptor.action.fixed_action(),
+            Some(rrd_contract::SecurityAction::FlightRead)
+        );
+    }
+    assert_eq!(rrd_contract::SecurityAction::ALL.len(), 49);
 }

@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+# OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[
@@ -14,6 +14,9 @@ OperationId = Literal[
     "diagnostics-read",
     "endpoint-catalogue",
     "estate-read",
+    "flight-launch",
+    "flight-list",
+    "flight-read",
     "health-live",
     "health-ready",
     "openapi-read",
@@ -112,6 +115,24 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/estates/{estate}/read",
+    },
+    "flight-launch": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/flights",
+    },
+    "flight-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/flights/list",
+    },
+    "flight-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/flights/read",
     },
     "health-live": {
         "authentication": "public",

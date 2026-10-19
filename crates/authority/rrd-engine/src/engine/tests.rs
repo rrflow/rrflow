@@ -85,6 +85,7 @@ mod context;
 mod data_crud;
 mod deployment_conformance;
 mod estate_control;
+mod flight;
 mod function;
 mod index_foundation;
 mod installation;

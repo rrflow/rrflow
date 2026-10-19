@@ -10,6 +10,7 @@ mod capability_surface;
 mod deployment;
 mod diagnostic;
 mod endpoint_binding;
+mod flight;
 mod function;
 #[path = "generated/signal_catalogue.rs"]
 mod generated_signal_catalogue;
@@ -74,6 +75,17 @@ pub use endpoint_binding::{
     MAX_BINDING_CONCURRENCY, MAX_BINDING_INPUT_BYTES, MAX_BINDING_TIMEOUT_MS,
     MAX_CREDENTIAL_NAME_BYTES, MAX_DECLARED_BYTES, MAX_ENDPOINT_URL_BYTES, MAX_INVENTORY_MACHINES,
     MAX_PROFILE_BINDINGS,
+};
+pub use flight::{
+    prompt_cohort_sha256, LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights,
+    PromptFlight, PromptFlightContextMode, PromptFlightContextRequest, PromptFlightContextSummary,
+    PromptFlightEvent, PromptFlightMetrics, PromptFlightPage, PromptFlightProvider,
+    PromptFlightReadResult, PromptFlightRecord, PromptFlightStage, PromptFlightStatus,
+    ReadPromptFlight, MAX_PROMPT_FLIGHT_ACCEPTANCE_MARKER_BYTES, MAX_PROMPT_FLIGHT_EVENTS,
+    MAX_PROMPT_FLIGHT_EVENT_DATA_BYTES, MAX_PROMPT_FLIGHT_EVENT_DETAIL_BYTES,
+    MAX_PROMPT_FLIGHT_EVENT_KIND_BYTES, MAX_PROMPT_FLIGHT_EVENT_LABEL_BYTES,
+    MAX_PROMPT_FLIGHT_PAGE, MAX_PROMPT_FLIGHT_PROMPT_BYTES, MAX_PROMPT_FLIGHT_STORAGE_KEYS,
+    PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_FORMAT_VERSION, PROMPT_FLIGHT_KIND,
 };
 pub use function::{
     validate_function_value, ExecuteFunction, FunctionArtifact, FunctionArtifactMediaType,
@@ -189,7 +201,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f";
+    "0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -2966,6 +2978,8 @@ pub enum SecurityAction {
     FunctionCatalogueWrite,
     FunctionExecute,
     DiagnosticsRead,
+    FlightLaunch,
+    FlightRead,
     SecurityAdmin,
     MemoryContextRead,
     ReasoningRead,
@@ -2975,7 +2989,7 @@ pub enum SecurityAction {
 impl SecurityAction {
     /// Canonical policy-action catalogue. Installation profiles and other
     /// projections consume this list instead of maintaining parallel copies.
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 49] = [
         Self::ServiceInspect,
         Self::UnknownRequest,
         Self::SessionCreate,
@@ -3019,6 +3033,8 @@ impl SecurityAction {
         Self::FunctionCatalogueWrite,
         Self::FunctionExecute,
         Self::DiagnosticsRead,
+        Self::FlightLaunch,
+        Self::FlightRead,
         Self::SecurityAdmin,
         Self::MemoryContextRead,
         Self::ReasoningRead,
@@ -3508,6 +3524,36 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::DiagnosticsRead,
             "ReadDiagnosticSnapshot",
             "DiagnosticSnapshot",
+        ),
+        endpoint(
+            "flight-launch",
+            HttpMethod::Post,
+            "/v1/flights",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::FlightLaunch,
+            "LaunchPromptFlight",
+            "LaunchPromptFlightResult",
+        ),
+        endpoint(
+            "flight-list",
+            HttpMethod::Post,
+            "/v1/flights/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::FlightRead,
+            "ListPromptFlights",
+            "PromptFlightPage",
+        ),
+        endpoint(
+            "flight-read",
+            HttpMethod::Post,
+            "/v1/flights/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::FlightRead,
+            "ReadPromptFlight",
+            "PromptFlightReadResult",
         ),
         endpoint(
             "estate-read",
@@ -4077,6 +4123,9 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
+        "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
+        "ReadPromptFlight" => schema_json::<RequestEnvelope<ReadPromptFlight>>(),
         "ReadEstate" => schema_json::<RequestEnvelope<ReadEstate>>(),
         "RenewSession" => schema_json::<RequestEnvelope<RenewSession>>(),
         "RestoreInstanceBackup" => schema_json::<RequestEnvelope<RestoreInstanceBackup>>(),
@@ -4102,6 +4151,9 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
+        "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),
+        "PromptFlightReadResult" => schema_json::<ResponseEnvelope<PromptFlightReadResult>>(),
         "EndpointCatalogue" => schema_json::<ResponseEnvelope<EndpointCatalogue>>(),
         "EstateSnapshot" => schema_json::<ResponseEnvelope<EstateSnapshot>>(),
         "InstanceBackupCatalogueSnapshot" => {
