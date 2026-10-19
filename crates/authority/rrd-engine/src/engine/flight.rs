@@ -3,8 +3,10 @@
 //!
 //! A flight is one `rrflow-prompt-flight` record, one
 //! `rrflow-prompt-flight-used` edge to each canonical record its context
-//! used, and append-only `rrflow-prompt-flight-event` events in the canonical
-//! runtime log, so every prompt is a graph neighbourhood rrflowQL traverses.
+//! used, append-only `rrflow-prompt-flight-event` events in the canonical
+//! runtime log, and, when the flight joins a named task, one
+//! `rrflow-task-includes` edge from that task, so every prompt is a graph
+//! neighbourhood rrflowQL traverses.
 //! The engine prepares the flight at one authenticated read stamp, assembles
 //! any injected context through the same `context-assemble` path every client
 //! uses, and commits record, edges, and events in one cursor-CAS runtime
@@ -14,6 +16,7 @@
 //! A flight records only externally observable runtime events. It never
 //! requests, infers, or persists hidden chain-of-thought.
 
+use super::task::{register_task_includes_schema, task_includes_reference};
 use super::*;
 use rrd_contract::{
     context_request_sha256, prompt_cohort_sha256, ContextEvidenceKind, ContextPacket,
@@ -104,6 +107,12 @@ impl RrdEngine {
                     idempotent_replay: true,
                 });
             }
+            // A flight joins only a task that is open at its own stamp.
+            let task = request
+                .task_id
+                .as_ref()
+                .map(|task_id| self.open_task_at(&read, &request.scope, task_id))
+                .transpose()?;
 
             let mut events = Vec::with_capacity(3);
             let elapsed = |started: &Instant| {
@@ -175,7 +184,7 @@ impl RrdEngine {
             let event_count = u64::try_from(events.len())
                 .map_err(|_| ServiceError::Contract("flight event count exceeds u64".into()))?;
 
-            let mut mutations = Vec::with_capacity(events.len() + uses.len() + 2);
+            let mut mutations = Vec::with_capacity(events.len() + uses.len() + 3);
             let mut registry = current_schema
                 .clone()
                 .unwrap_or_else(|| RuntimeSchemaRegistry::empty(1, "install prompt flight tables"));
@@ -183,7 +192,10 @@ impl RrdEngine {
                 .iter()
                 .map(|(target, _)| target.kind.clone())
                 .collect::<BTreeSet<_>>();
-            if register_flight_schema(&mut registry, &used_kinds)? {
+            let flight_tables_changed = register_flight_schema(&mut registry, &used_kinds)?;
+            let task_tables_changed =
+                task.is_some() && register_task_includes_schema(&mut registry)?;
+            if flight_tables_changed || task_tables_changed {
                 if let Some(current) = &current_schema {
                     registry.revision = current.revision.checked_add(1).ok_or_else(|| {
                         ServiceError::Contract("runtime schema revision overflowed".into())
@@ -204,6 +216,7 @@ impl RrdEngine {
                 context_mode: request.context_mode,
                 context_request: request.context.clone(),
                 acceptance_marker: request.acceptance_marker.clone(),
+                task_id: request.task_id.clone(),
                 status: PromptFlightStatus::Prepared,
                 created_at_unix_ms: now,
                 idempotency_key: idempotency_key.clone(),
@@ -248,6 +261,20 @@ impl RrdEngine {
                         kind: event_kind()?,
                         subject: Some(reference.clone()),
                         properties: event_properties(event)?,
+                    },
+                });
+            }
+            // The task edge follows the events, so the event cursors stay
+            // computable from the record alone.
+            if let Some(task) = &task {
+                mutations.push(RuntimeMutation::Relation {
+                    relation: RuntimeRelation {
+                        reference: task_includes_reference(&reference)?,
+                        from: task.clone(),
+                        to: reference.clone(),
+                        valid_from: now,
+                        valid_to: None,
+                        properties: RuntimeProperties::new(),
                     },
                 });
             }
@@ -818,7 +845,7 @@ fn merge_read_evidence(
     Ok(evidence)
 }
 
-fn read_budget(max_storage_keys: u64) -> Result<RuntimeReadBudget> {
+pub(super) fn read_budget(max_storage_keys: u64) -> Result<RuntimeReadBudget> {
     RuntimeReadBudget::new(max_storage_keys)
         .map_err(|error| ServiceError::Contract(error.to_string()))
 }
@@ -828,7 +855,7 @@ fn version_count(count: usize) -> Result<u64> {
         .map_err(|_| ServiceError::Storage("selected prompt flight versions exceed u64".into()))
 }
 
-fn public_read_stamp(read: &ReadStamp) -> ContextReadStamp {
+pub(super) fn public_read_stamp(read: &ReadStamp) -> ContextReadStamp {
     ContextReadStamp {
         runtime_manifest_sha256: read.manifest_id.clone(),
         runtime_cursor: read.commit_cursor,
@@ -1012,6 +1039,7 @@ fn register_flight_schema(
                 "acceptance_marker".into(),
                 optional(RuntimeValueType::String),
             ),
+            ("task_id".into(), optional(RuntimeValueType::String)),
             ("status".into(), required(RuntimeValueType::String)),
             (
                 "created_at_unix_ms".into(),
@@ -1271,6 +1299,12 @@ fn record_properties(record: &PromptFlightRecord) -> Result<RuntimeProperties> {
             RuntimeValue::String(marker.clone()),
         );
     }
+    if let Some(task_id) = &record.task_id {
+        properties.insert(
+            "task_id".into(),
+            RuntimeValue::String(task_id.as_str().into()),
+        );
+    }
     if let Some(revision) = record.read.schema_revision {
         properties.insert(
             "read_schema_revision".into(),
@@ -1358,6 +1392,10 @@ fn public_record(
             max_storage_keys: unsigned(properties, "context_max_storage_keys")?,
         },
         acceptance_marker: optional_text(properties, "acceptance_marker")?,
+        task_id: optional_text(properties, "task_id")?
+            .map(CanonicalId::new)
+            .transpose()
+            .map_err(|error| flight_storage(&error.to_string()))?,
         status: PromptFlightStatus::parse(&text(properties, "status")?)
             .map_err(|error| flight_storage(&error.to_string()))?,
         created_at_unix_ms: unsigned(properties, "created_at_unix_ms")?,
