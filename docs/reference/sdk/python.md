@@ -110,11 +110,11 @@ file byte for byte in check mode.
 
 The current generated projection contains:
 
-- 36 HTTP operations;
+- 37 HTTP operations;
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956`.
+  `7dc64c487dd6930cf99751cbca84e8fc1debc7ad43c9c4b22e847b5138077ede`.
 
 It does not generate request models, response models, error-code constraints,
 path-parameter sets, security actions, exact success statuses, media types,

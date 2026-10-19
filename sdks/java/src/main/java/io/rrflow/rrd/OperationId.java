@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
+// OpenAPI SHA-256: 7dc64c487dd6930cf99751cbca84e8fc1debc7ad43c9c4b22e847b5138077ede
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -11,6 +11,7 @@ public enum OperationId {
     CHANGEFEED_FOLLOW("changefeed-follow", "POST", "/v1/changes/follow", Authentication.SESSION_BEARER, false),
     CHANGEFEED_READ("changefeed-read", "POST", "/v1/changes/read", Authentication.SESSION_BEARER, false),
     CONTEXT_ASSEMBLE("context-assemble", "POST", "/v1/context/assemble", Authentication.SESSION_BEARER, false),
+    DATA_SCHEMA_READ("data-schema-read", "POST", "/v1/data/schema", Authentication.SESSION_BEARER, false),
     DIAGNOSTICS_READ("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SESSION_BEARER, false),
     ENDPOINT_CATALOGUE("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.PUBLIC, false),
     ESTATE_READ("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SESSION_BEARER, false),

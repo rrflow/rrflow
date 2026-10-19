@@ -39,6 +39,13 @@ authorized catalogue discovery, bulk transfer, vector SQL, source-exit import
 and installed-profile qualification remain open. No required profile case is
 currently accepted as a PostgreSQL compatibility pass.
 
+The requested DevPulse/shippin.cloud account synchronization path is absent:
+repository inspection finds no account binding, consent activation or
+cross-instance reconciliation implementation. Native changefeeds and local
+persistence are prerequisites, not sync proof. The [integration contract](../../reference/client/devpulse-cloud.md)
+defines local independence, opt-in, replay/conflict/revocation requirements and
+real-account acceptance under D-06/H-04/H-07. This gap remains sequenced.
+
 ## Current-detail owners
 
 - [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)

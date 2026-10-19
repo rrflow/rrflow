@@ -18,6 +18,13 @@ either independently.
 | [ ] | H-06 | Implement the separate [Connectome client contract](../../reference/client/connectome.md) completely on catalogue-derived public RRD operations. The client validates exact endpoint, transport, protocol, instance, deployment, catalogue, session, resource, stamp, cursor, evidence, completeness, and receipt coordinates; renders only engine-issued state/plans/traces/trees/context/deltas/proposals; and contains no alternate storage, query, retrieval, reasoning, attunement, automation, diagnostics, control, provider, or presentation authority. | separate Connectome repository | A clean Connectome artifact consumes the generated public-contract/SDK digest and runs against D-01-installed rrflowMX and rrflowKV processes. HTTP bootstrap, authenticated session, multiplexed WebSocket resume/ACK/backpressure, graph/BM25/vector/RRF/Arrow/DataFusion/context/reasoning evidence, previewed mutations, denial/uncertainty/cancellation, restart, multi-instance isolation, credential redaction, bounded rendering, and accessibility pass with correlated identities/stamps/digests/traces. Mocks, screenshots, builds, and open ports remain non-qualifying. |
 | [ ] | H-07 | Resolve loopback or Zuul Zero/shippin.ai mesh-reached network endpoint candidates through an outward transport adapter, carrying the expected RRD instance and transport-security identities independently of reachability. Re-negotiate liveness, readiness, protocol, instance, catalogue digest, and authentication after rotation; no resolver initializes RRFlow or selects storage. | `rrd-client`, mesh adapter | Laptop/phone/devspace fixture proves bounded resolution, TLS identity, exact instance/capability negotiation, endpoint rotation, stale/foreign/offline denial, and no mesh-owned database, authorization, installation, or lifecycle state. |
 
+H-07 also owns the explicit [DevPulse/shippin.cloud account and sync integration](../../reference/client/devpulse-cloud.md),
+after D-06 authorized adapter bindings and H-04 public-operation prerequisites.
+Local operation must remain account-independent. Account linking, explicit data
+selection/consent, durable transfer checkpoints, duplicate/replay handling,
+conflict and revocation behavior require the real-service acceptance in that
+contract; endpoint reachability alone cannot qualify synchronization.
+
 ## H-08 PostgreSQL compatibility packages
 
 | Done | ID | Required change | Owning boundary | Acceptance evidence |

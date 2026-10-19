@@ -30,6 +30,12 @@ release-ready.
 
 ## Enter RRFlow
 
+Start with the [runnable local rrflowDB integration](docs/reference/sdk/rrflowdb-local.md):
+build the native engine, create related records, query them with rrflowQL and
+reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
+defines local operation without an account and the explicit cloud opt-in boundary.
+Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
+
 | Need | Single owning record |
 |---|---|
 | Understand the product, components, and boundaries | [RRFlow system overview](docs/architecture/system-overview.md) |

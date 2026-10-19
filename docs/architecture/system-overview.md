@@ -170,6 +170,11 @@ rrflowDB. Moving state from rrflowMX to rrflowDB requires an explicit,
 authorized `RrdEngine` transaction whose result is subject to the ordinary
 schema, policy, audit, and durability rules.
 
+The [local database integration](../reference/sdk/rrflowdb-local.md) contains
+component and relational diagrams plus runnable Rust client operations.
+[DevPulse and optional cloud sync](../reference/client/devpulse-cloud.md) keeps
+local installation independent of shippin.cloud account creation and transfer.
+
 ## Native multi-model boundary
 
 Temporal records, claims, relations, reasoning trees, project-tree snapshots,

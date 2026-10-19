@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
+# OpenAPI SHA-256: 7dc64c487dd6930cf99751cbca84e8fc1debc7ad43c9c4b22e847b5138077ede
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[
@@ -11,6 +11,7 @@ OperationId = Literal[
     "changefeed-follow",
     "changefeed-read",
     "context-assemble",
+    "data-schema-read",
     "diagnostics-read",
     "endpoint-catalogue",
     "estate-read",
@@ -97,6 +98,12 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/context/assemble",
+    },
+    "data-schema-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/data/schema",
     },
     "diagnostics-read": {
         "authentication": "session_bearer",
