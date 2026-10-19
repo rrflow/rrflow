@@ -50,6 +50,12 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "bounded cluster artifact-transfer replay",
     },
     AllowedUse {
+        path: "crates/compute/rrd-query/tests/graph_traversal.rs",
+        kind: SensitiveReadUse::CausalLogPage,
+        count: 2,
+        operation: "exact breadth-first graph traversal oracle",
+    },
+    AllowedUse {
         path: "crates/compute/rrd-query/tests/query.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 1,
@@ -138,6 +144,12 @@ const ALLOWED_USES: &[AllowedUse] = &[
         kind: SensitiveReadUse::DataSnapshotReducer,
         count: 1,
         operation: "exact all-model data reducer oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/adjacency_reads.rs",
+        kind: SensitiveReadUse::CausalLogPage,
+        count: 2,
+        operation: "exact commit-path adjacency index oracle",
     },
     AllowedUse {
         path: "crates/persistence/rrd-store/tests/catalog_revision.rs",

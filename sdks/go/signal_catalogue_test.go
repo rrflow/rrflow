@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const expectedOpenAPISHA256 = "07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f"
+const expectedOpenAPISHA256 = "617822f343220b219edc8febdccadaa43c414f9a781285987560e75c630379db"
 const expectedSignalCatalogueSHA256 = "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
 
 func TestGeneratedSignalCatalogueIsPublicExactAndInert(t *testing.T) {

@@ -7,7 +7,7 @@ import {
   SIGNAL_CATALOGUE_SHA256,
 } from "../src/index.js";
 
-const EXPECTED_OPENAPI_SHA256 = "07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f";
+const EXPECTED_OPENAPI_SHA256 = "617822f343220b219edc8febdccadaa43c414f9a781285987560e75c630379db";
 const EXPECTED_SIGNAL_SHA256 = "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07";
 
 test("generated signal catalogue is public, exact, and inert", () => {

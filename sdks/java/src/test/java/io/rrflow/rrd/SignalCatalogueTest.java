@@ -10,7 +10,7 @@ import tools.jackson.databind.json.JsonMapper;
 final class SignalCatalogueTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String EXPECTED_OPENAPI_SHA256 =
-            "07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f";
+            "617822f343220b219edc8febdccadaa43c414f9a781285987560e75c630379db";
     private static final String EXPECTED_SIGNAL_SHA256 =
             "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07";
 

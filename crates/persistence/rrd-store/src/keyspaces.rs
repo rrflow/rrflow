@@ -638,6 +638,68 @@ pub(crate) fn runtime_adjacency_version_key(
     )
 }
 
+/// Temporal adjacency range for one node and relation type. Every version
+/// whose relation had `node` at the space's near endpoint, plus every
+/// retirement of such a relation, sorts under this prefix.
+pub(crate) fn runtime_adjacency_prefix(
+    space: Space,
+    scope: &ScopeId,
+    node: &RuntimeRef,
+    relation_kind: &rrd_core::RuntimeType,
+) -> Vec<u8> {
+    debug_assert!(matches!(
+        space,
+        Space::RuntimeOutgoingEdgeVersions | Space::RuntimeIncomingEdgeVersions
+    ));
+    encode(
+        space,
+        &[
+            KeyPart::Text(scope.as_str()),
+            KeyPart::Text(node.kind.as_str()),
+            KeyPart::Text(node.id.as_str()),
+            KeyPart::Text(relation_kind.as_str()),
+        ],
+    )
+}
+
+/// Strictly decoded temporal adjacency key. `node` is the space's near
+/// endpoint and `other` the far endpoint recorded when the version was written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RuntimeAdjacencyVersionKey {
+    pub(crate) scope: ScopeId,
+    pub(crate) node: RuntimeRef,
+    pub(crate) relation: RuntimeRef,
+    pub(crate) other: RuntimeRef,
+    pub(crate) effective_at: Millis,
+    pub(crate) cursor: u64,
+}
+
+pub(crate) fn parse_runtime_adjacency_version_key(
+    codec: KeyCodec,
+    space: Space,
+    stored: &[u8],
+) -> Result<RuntimeAdjacencyVersionKey> {
+    debug_assert!(matches!(
+        space,
+        Space::RuntimeOutgoingEdgeVersions | Space::RuntimeIncomingEdgeVersions
+    ));
+    let [DecodedKeyPart::Text(scope), DecodedKeyPart::Text(node_kind), DecodedKeyPart::Text(node_id), DecodedKeyPart::Text(relation_kind), DecodedKeyPart::Text(other_kind), DecodedKeyPart::Text(other_id), DecodedKeyPart::Text(relation_id), DecodedKeyPart::DescU64(effective_at), DecodedKeyPart::DescU64(cursor)] =
+        expect_parts(codec, space, stored)?
+    else {
+        return Err(Error::Codec(
+            "runtime adjacency version key has invalid field types".into(),
+        ));
+    };
+    Ok(RuntimeAdjacencyVersionKey {
+        scope: ScopeId::new(scope)?,
+        node: RuntimeRef::new(node_kind, node_id)?,
+        relation: RuntimeRef::new(relation_kind, relation_id)?,
+        other: RuntimeRef::new(other_kind, other_id)?,
+        effective_at,
+        cursor,
+    })
+}
+
 fn adjacency_endpoints(space: Space, relation: &RuntimeRelation) -> (&RuntimeRef, &RuntimeRef) {
     match space {
         Space::RuntimeOutgoingEdges | Space::RuntimeOutgoingEdgeVersions => {
@@ -1256,6 +1318,71 @@ mod tests {
                 8,
             )
         );
+    }
+
+    #[test]
+    fn adjacency_prefixes_isolate_node_and_relation_type_and_keys_round_trip() {
+        let codec = KeyCodec;
+        let scope = ScopeId::new("project:adjacency-prefix").unwrap();
+        let relation = RuntimeRelation {
+            reference: RuntimeRef::new("imports", "a-b").unwrap(),
+            from: RuntimeRef::new("file", "a").unwrap(),
+            to: RuntimeRef::new("module", "b").unwrap(),
+            valid_from: 100,
+            valid_to: None,
+            properties: Default::default(),
+        };
+        let imports = rrd_core::RuntimeType::new("imports").unwrap();
+        for (space, near, far) in [
+            (RUNTIME_OUTGOING_EDGE_VERSIONS, &relation.from, &relation.to),
+            (RUNTIME_INCOMING_EDGE_VERSIONS, &relation.to, &relation.from),
+        ] {
+            let key = runtime_adjacency_version_key(space, &scope, &relation, 100, 7);
+            let prefix = runtime_adjacency_prefix(space, &scope, near, &imports);
+            let end = prefix_end(&prefix).unwrap();
+            assert!(key >= prefix && key < end);
+            for (node_id, kind) in [
+                (format!("{}x", near.id), "imports"),
+                (format!("{}-b", near.id), "imports"),
+                (near.id.to_string(), "importsx"),
+                (near.id.to_string(), "import"),
+            ] {
+                let mut neighbour = relation.clone();
+                neighbour.reference = RuntimeRef::new(kind, "a-b").unwrap();
+                let endpoint = RuntimeRef::new(near.kind.as_str(), node_id.as_str()).unwrap();
+                if space == RUNTIME_OUTGOING_EDGE_VERSIONS {
+                    neighbour.from = endpoint;
+                } else {
+                    neighbour.to = endpoint;
+                }
+                let neighbour = runtime_adjacency_version_key(space, &scope, &neighbour, 100, 7);
+                assert!(neighbour < prefix || neighbour >= end, "{node_id} {kind}");
+            }
+            assert_eq!(
+                parse_runtime_adjacency_version_key(codec, space, &key).unwrap(),
+                RuntimeAdjacencyVersionKey {
+                    scope: scope.clone(),
+                    node: near.clone(),
+                    relation: relation.reference.clone(),
+                    other: far.clone(),
+                    effective_at: 100,
+                    cursor: 7,
+                }
+            );
+            assert!(parse_runtime_adjacency_version_key(codec, space, &prefix).is_err());
+        }
+        assert!(parse_runtime_adjacency_version_key(
+            codec,
+            RUNTIME_INCOMING_EDGE_VERSIONS,
+            &runtime_adjacency_version_key(
+                RUNTIME_OUTGOING_EDGE_VERSIONS,
+                &scope,
+                &relation,
+                100,
+                7
+            ),
+        )
+        .is_err());
     }
 
     #[test]
