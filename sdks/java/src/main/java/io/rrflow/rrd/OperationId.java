@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d
+// OpenAPI SHA-256: ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -30,6 +30,10 @@ public enum OperationId {
     SESSION_RENEW("session-renew", "POST", "/v1/sessions/{session}/renew", Authentication.SESSION_BEARER, true),
     SUBSCRIPTION_CLOSE("subscription-close", "POST", "/v1/subscriptions/close", Authentication.SESSION_BEARER, true),
     SUBSCRIPTION_OPEN("subscription-open", "POST", "/v1/subscriptions/open", Authentication.SESSION_BEARER, true),
+    TASK_CLOSE("task-close", "POST", "/v1/tasks/close", Authentication.SESSION_BEARER, true),
+    TASK_LIST("task-list", "POST", "/v1/tasks/list", Authentication.SESSION_BEARER, false),
+    TASK_OPEN("task-open", "POST", "/v1/tasks", Authentication.SESSION_BEARER, true),
+    TASK_READ("task-read", "POST", "/v1/tasks/read", Authentication.SESSION_BEARER, false),
     TRANSACTION_ABORT("transaction-abort", "DELETE", "/v1/transactions/{transaction}", Authentication.SESSION_BEARER, true),
     TRANSACTION_BEGIN("transaction-begin", "POST", "/v1/transactions", Authentication.SESSION_BEARER, true),
     TRANSACTION_COMMIT("transaction-commit", "POST", "/v1/transactions/{transaction}/commit", Authentication.SESSION_BEARER, true),

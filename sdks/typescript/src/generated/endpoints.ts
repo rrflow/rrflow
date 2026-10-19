@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d
+// OpenAPI SHA-256: ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -162,6 +162,30 @@ export const endpoints = {
     "path": "/v1/subscriptions/open",
     "authentication": "session_bearer",
     "mutation": true
+  },
+  "task-open": {
+    "method": "POST",
+    "path": "/v1/tasks",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-close": {
+    "method": "POST",
+    "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-list": {
+    "method": "POST",
+    "path": "/v1/tasks/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-read": {
+    "method": "POST",
+    "path": "/v1/tasks/read",
+    "authentication": "session_bearer",
+    "mutation": false
   },
   "transaction-begin": {
     "method": "POST",

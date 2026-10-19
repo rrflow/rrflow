@@ -63,7 +63,7 @@ version, which remains frozen at `1.0.0` by the
 [version policy](../release/version-policy.md).
 
 The deterministic OpenAPI projection is currently bound to SHA-256
-`63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d`.
+`ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against

@@ -114,7 +114,7 @@ The current generated projection contains:
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d`.
+  `ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b`.
 
 It does not generate request models, response models, error-code constraints,
 path-parameter sets, security actions, exact success statuses, media types,

@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d
+# OpenAPI SHA-256: ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[
@@ -30,6 +30,10 @@ OperationId = Literal[
     "session-renew",
     "subscription-close",
     "subscription-open",
+    "task-close",
+    "task-list",
+    "task-open",
+    "task-read",
     "transaction-abort",
     "transaction-begin",
     "transaction-commit",
@@ -211,6 +215,30 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": True,
         "path": "/v1/subscriptions/open",
+    },
+    "task-close": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/close",
+    },
+    "task-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/list",
+    },
+    "task-open": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks",
+    },
+    "task-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/read",
     },
     "transaction-abort": {
         "authentication": "session_bearer",

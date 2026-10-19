@@ -2,7 +2,7 @@
 
 package rrd
 
-// OpenAPI SHA-256: 63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d
+// OpenAPI SHA-256: ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b
 
 type OperationID string
 
@@ -34,6 +34,10 @@ const (
 	OperationSessionRenew           OperationID = "session-renew"
 	OperationSubscriptionClose      OperationID = "subscription-close"
 	OperationSubscriptionOpen       OperationID = "subscription-open"
+	OperationTaskClose              OperationID = "task-close"
+	OperationTaskList               OperationID = "task-list"
+	OperationTaskOpen               OperationID = "task-open"
+	OperationTaskRead               OperationID = "task-read"
 	OperationTransactionAbort       OperationID = "transaction-abort"
 	OperationTransactionBegin       OperationID = "transaction-begin"
 	OperationTransactionCommit      OperationID = "transaction-commit"
@@ -73,6 +77,10 @@ var endpoints = map[OperationID]Endpoint{
 	OperationSessionRenew:           {Method: "POST", Path: "/v1/sessions/{session}/renew", Authentication: "session_bearer", Mutation: true},
 	OperationSubscriptionClose:      {Method: "POST", Path: "/v1/subscriptions/close", Authentication: "session_bearer", Mutation: true},
 	OperationSubscriptionOpen:       {Method: "POST", Path: "/v1/subscriptions/open", Authentication: "session_bearer", Mutation: true},
+	OperationTaskClose:              {Method: "POST", Path: "/v1/tasks/close", Authentication: "session_bearer", Mutation: true},
+	OperationTaskList:               {Method: "POST", Path: "/v1/tasks/list", Authentication: "session_bearer", Mutation: false},
+	OperationTaskOpen:               {Method: "POST", Path: "/v1/tasks", Authentication: "session_bearer", Mutation: true},
+	OperationTaskRead:               {Method: "POST", Path: "/v1/tasks/read", Authentication: "session_bearer", Mutation: false},
 	OperationTransactionAbort:       {Method: "DELETE", Path: "/v1/transactions/{transaction}", Authentication: "session_bearer", Mutation: true},
 	OperationTransactionBegin:       {Method: "POST", Path: "/v1/transactions", Authentication: "session_bearer", Mutation: true},
 	OperationTransactionCommit:      {Method: "POST", Path: "/v1/transactions/{transaction}/commit", Authentication: "session_bearer", Mutation: true},
