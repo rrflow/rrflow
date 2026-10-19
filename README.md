@@ -17,6 +17,28 @@ baseline is established. Current maturity is **pre-alpha**. The version is a
 contract line, not a claim that the complete system is stable, optimized, or
 release-ready.
 
+## Engine, UI, cloud, and desktop
+
+RRFlow is the reasoning engine. **Connectome** is its operator and developer
+UI, maintained in its own repository and pinned here as the optional
+`connectome/` Git submodule. The [Connectome client contract](docs/reference/client/connectome.md#repository-checkout)
+owns checkout instructions and the UI's public-engine boundary.
+
+We plan to offer RRFlow as a cloud service through **shippin.cloud**, with a
+private devspace included. The initial friends-and-family experience will
+demonstrate current AI-assisted development: create projects, run Rust,
+Python, and Go code, load the running project's UI inside the private cloud
+devspace, and launch projects on the web.
+
+**DevPulse** will offer the local RRFlow reasoning engine, with optional
+shippin.cloud account creation and explicitly selected synchronization. Local
+operation remains available independently of a cloud account.
+
+These are delivery targets, not claims of available hosted execution,
+deployment, or synchronization. The [delivery boundaries](docs/architecture/system-overview.md#delivery-experiences)
+define how these experiences share one engine; the existing roadmap and
+pre-alpha status remain authoritative.
+
 ## Enter RRFlow
 
 | Need | Single owning record |

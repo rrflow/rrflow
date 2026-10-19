@@ -29,6 +29,28 @@ operation/model/reference/conformance copies can therefore still drift.
 
 ## Current-detail owners
 
+The Connectome source is now pinned through the optional `connectome/`
+submodule, but source registration does not close the client-conformance gap.
+The repository previously rejected all gitlinks and attempted to read a
+gitlink directory as a file during inventory generation; the
+[source-integration journal](../../evidence/change-journals/gate-h/h-06-connectome-submodule-and-delivery-positioning.md)
+records the bounded correction and its checks. Current main subsequently
+required recursive checkout in every CI job.
+The [policy-integration receipt](../../evidence/change-journals/gate-h/h-06-connectome-submodule-policy-integration.md)
+records reconciliation with that owner-approved source policy. The owner then
+explicitly authorized making Connectome public. The
+[publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records anonymous source access and successful recursive candidate checkouts.
+That acquisition blocker is resolved; full candidate CI and client qualification
+remain separate requirements, and POAM-011 remains open.
+
+The [delivery targets](../../architecture/system-overview.md#delivery-experiences)
+also lack qualified end-to-end evidence here for shippin.cloud private
+devspaces, Rust/Python/Go execution and UI previews, web deployment, and
+DevPulse account creation and synchronization. Their contracts and acceptance
+packages must be established before implementation or readiness claims; H-06
+source registration alone cannot close those delivery gaps.
+
 - [Executable public contract](../../reference/protocol/public-contract.md)
 - [Generated-surface design](../../roadmap/rrflow-1.0-execution/generated-surfaces.md)
 - [SDK index](../../reference/sdk/README.md):
