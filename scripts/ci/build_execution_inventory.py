@@ -1634,6 +1634,7 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
     "docs/reference/operations/README.md": ("KB-05", "KB-08"),
     "docs/reference/operations/estate-control.md": ("KB-05",),
     "docs/reference/protocol/README.md": ("KB-05", "KB-08"),
+    "docs/reference/protocol/postgresql.md": ("H-08", "J-02", "J-03", "J-05"),
     "docs/reference/protocol/public-contract.md": ("KB-05",),
     "docs/reference/protocol/server.md": ("KB-05",),
     "docs/reference/protocol/subscriptions.md": ("KB-05",),

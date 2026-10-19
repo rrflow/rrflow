@@ -11,6 +11,10 @@ as a product requirement.** It stores the knowledge, memory, reasoning state,
 and evidence of each project estate. The [database identity and compatibility
 boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary)
 separates that target from current implementation and compatibility evidence.
+The [PostgreSQL compatibility and independent database contract](docs/reference/protocol/postgresql.md)
+defines the first SQL/client profile, native-engine integration, Turso exit,
+data portability and qualification. [H-08](docs/roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+owns its implementation packages; compatibility is not yet implemented.
 
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;

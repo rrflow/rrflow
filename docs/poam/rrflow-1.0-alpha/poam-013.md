@@ -17,6 +17,14 @@ and `rrflow-mcp`; no native Windows `rrflow.exe` was built or run, no single art
 the default lifecycle, and no platform candidate carries complete checksum, SBOM,
 provenance, signature, runtime-dependency, or installed-byte evidence.
 
+At planning baseline `9bcc6154`, `Cargo.toml` declares `MIT OR Apache-2.0`,
+but the inspected tracked tree contains no LICENSE/NOTICE-named files.
+The declared licence expression is not the complete licence/notice material
+required for a self-contained official distribution. J-05 must verify the
+actual first-party texts, upstream notices and retained source inputs alongside
+the [independent database release criteria](../../reference/protocol/postgresql.md#qualification-and-first-official-release).
+No licence selection or change is authorized by this observation.
+
 ## Impact
 
 The checkout source graph is guarded, but RRFlow can still omit required assets, depend on
