@@ -45,6 +45,8 @@ pub enum RrdOperation {
     FunctionCatalogueWrite,
     FunctionExecute,
     DiagnosticsRead,
+    FlightLaunch,
+    FlightRead,
     MemoryContextRead,
     ReasoningRead,
     ReasoningWrite,
@@ -74,6 +76,7 @@ impl RrdOperation {
                 | Self::VectorCollectionDelete
                 | Self::VectorPayloadIndexEnsure
                 | Self::VectorPayloadIndexDelete
+                | Self::FlightLaunch
                 | Self::ReasoningWrite
         )
     }
@@ -120,6 +123,8 @@ impl RrdOperation {
             Self::FunctionCatalogueWrite => SecurityAction::FunctionCatalogueWrite,
             Self::FunctionExecute => SecurityAction::FunctionExecute,
             Self::DiagnosticsRead => SecurityAction::DiagnosticsRead,
+            Self::FlightLaunch => SecurityAction::FlightLaunch,
+            Self::FlightRead => SecurityAction::FlightRead,
             Self::MemoryContextRead => SecurityAction::MemoryContextRead,
             Self::ReasoningRead => SecurityAction::ReasoningRead,
             Self::ReasoningWrite => SecurityAction::ReasoningWrite,

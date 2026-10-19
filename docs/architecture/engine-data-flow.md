@@ -473,6 +473,47 @@ BFS, and reciprocal-rank fusion. Roadmap Gates E, F, and H replace their
 whole-snapshot costs with native incremental access paths without changing the
 public operation or its single-stamp semantics.
 
+## Prompt-flight flow
+
+A prompt flight is the durable, comparable record of one prompt crossing the
+runtime boundary. `rrd-contract` owns `LaunchPromptFlight`, `PromptFlight`,
+and the list/read types; `RrdEngine::launch_prompt_flight`,
+`list_prompt_flights`, and `read_prompt_flight` own the implementation behind
+`flight-launch` (`POST /v1/flights`, `flight_launch` grant, mutating) and
+`flight-list`/`flight-read` (`POST /v1/flights/list` and `/v1/flights/read`,
+`flight_read` grant). Clients render flights; none keeps a flight ledger,
+runner, or diagnostics protocol of its own.
+
+One launch runs inside one authenticated read stamp:
+
+1. Authorize `flight_launch` and enforce the estate recall ceilings on the
+   flight's declared context budget.
+2. Derive the flight identity from instance, session, and idempotency key.
+   A stamped identity read returns an existing flight as an exact replay; the
+   same key with a different operation digest conflicts.
+3. `fresh` injects no context. `pruned` calls the same engine
+   `context-assemble` path every client uses; a packet whose stamp differs
+   from the flight stamp restarts the attempt rather than mixing two stamps.
+4. Append ordered stage events (`prompt`, `context`, `outcome`). The context
+   event carries the five plan-stage decisions and the plan/packet digests,
+   not a second copy of the packet items.
+5. Commit one cursor-CAS runtime commit: the strict table schema on first
+   use, one `rrflow-prompt-flight` lifecycle record, and its
+   `rrflow-prompt-flight-event` lifecycle events. A lost cursor race retries
+   at most three times, then reports a retryable conflict.
+
+The `observe` provider prepares the packet inside the engine and launches
+nothing, so the flight completes as `prepared`. Model-provider arms are
+explicit opt-in adapters; each enters the closed provider, stage, and status
+vocabularies only together with its governed adapter, budget, and audit
+evidence.
+
+List and read are stamped direct reads of the flight record kind and, for a
+read, the flight event kind; neither replays the runtime log. Flight rows and
+events are ordinary temporal data, visible to data snapshots, changefeeds,
+and the diagnostic graph lens. A flight records only externally observable
+runtime events and never hidden chain-of-thought.
+
 ## Trace and observability flow
 
 RRFlow has one causal operation graph with two representations. Durable trace

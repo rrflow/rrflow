@@ -2,7 +2,7 @@
 
 package rrd
 
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
 
 type OperationID string
 
@@ -18,6 +18,9 @@ const (
 	OperationDiagnosticsRead        OperationID = "diagnostics-read"
 	OperationEndpointCatalogue      OperationID = "endpoint-catalogue"
 	OperationEstateRead             OperationID = "estate-read"
+	OperationFlightLaunch           OperationID = "flight-launch"
+	OperationFlightList             OperationID = "flight-list"
+	OperationFlightRead             OperationID = "flight-read"
 	OperationHealthLive             OperationID = "health-live"
 	OperationHealthReady            OperationID = "health-ready"
 	OperationOpenapiRead            OperationID = "openapi-read"
@@ -54,6 +57,9 @@ var endpoints = map[OperationID]Endpoint{
 	OperationDiagnosticsRead:        {Method: "POST", Path: "/v1/diagnostics/read", Authentication: "session_bearer", Mutation: false},
 	OperationEndpointCatalogue:      {Method: "GET", Path: "/v1/schema/endpoints", Authentication: "public", Mutation: false},
 	OperationEstateRead:             {Method: "POST", Path: "/v1/estates/{estate}/read", Authentication: "session_bearer", Mutation: false},
+	OperationFlightLaunch:           {Method: "POST", Path: "/v1/flights", Authentication: "session_bearer", Mutation: true},
+	OperationFlightList:             {Method: "POST", Path: "/v1/flights/list", Authentication: "session_bearer", Mutation: false},
+	OperationFlightRead:             {Method: "POST", Path: "/v1/flights/read", Authentication: "session_bearer", Mutation: false},
 	OperationHealthLive:             {Method: "GET", Path: "/v1/health/live", Authentication: "public", Mutation: false},
 	OperationHealthReady:            {Method: "GET", Path: "/v1/health/ready", Authentication: "public", Mutation: false},
 	OperationOpenapiRead:            {Method: "GET", Path: "/v1/schema/openapi", Authentication: "public", Mutation: false},

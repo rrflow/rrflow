@@ -8,13 +8,14 @@ use rrd_contract::{
     ChangefeedFollowResult, ChangefeedPage, CommitReceipt, CommitTransaction, ContextPacket,
     CorrelationId, CreateInstanceBackup, CreateInstanceBackupResult, DiagnosticSnapshot,
     EnsureVectorCollection, EnsureVectorCollectionResult, EstateSnapshot, ExecuteQuery,
-    ExportAudit, FollowChangefeed, InstanceBackupCatalogueSnapshot, ListInstanceBackups,
-    ListVectorCollections, PreviewTransaction, QueryResult, ReadAudit, ReadChangefeed,
-    ReadDiagnosticSnapshot, ReadEstate, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
-    ResourcePath, ResponseEnvelope, ResponseOutcome, RestoreInstanceBackup,
-    RestoreInstanceBackupResult, RetrieveVectorPoints, ScrollVectorPoints, SearchVectors,
-    TransactionLease, TransactionPreview, VectorCollectionCatalogueSnapshot, VectorPointBatch,
-    VectorPointPage, VectorSearchResult, PROTOCOL, PROTOCOL_VERSION,
+    ExportAudit, FollowChangefeed, InstanceBackupCatalogueSnapshot, LaunchPromptFlight,
+    LaunchPromptFlightResult, ListInstanceBackups, ListPromptFlights, ListVectorCollections,
+    PreviewTransaction, PromptFlightPage, PromptFlightReadResult, QueryResult, ReadAudit,
+    ReadChangefeed, ReadDiagnosticSnapshot, ReadEstate, ReadPromptFlight, RequestContext,
+    RequestEnvelope, ResourceId, ResourceKind, ResourcePath, ResponseEnvelope, ResponseOutcome,
+    RestoreInstanceBackup, RestoreInstanceBackupResult, RetrieveVectorPoints, ScrollVectorPoints,
+    SearchVectors, TransactionLease, TransactionPreview, VectorCollectionCatalogueSnapshot,
+    VectorPointBatch, VectorPointPage, VectorSearchResult, PROTOCOL, PROTOCOL_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -415,6 +416,59 @@ impl RrdClient {
             .await?;
         packet.validate().map_err(contract)?;
         Ok(packet)
+    }
+
+    pub async fn launch_prompt_flight(
+        &self,
+        session: &Session,
+        request: LaunchPromptFlight,
+        options: RequestOptions,
+    ) -> Result<LaunchPromptFlightResult> {
+        let result: LaunchPromptFlightResult = self
+            .session_call(Method::POST, "/v1/flights", session, request, options, true)
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
+    pub async fn list_prompt_flights(
+        &self,
+        session: &Session,
+        request: ListPromptFlights,
+        options: RequestOptions,
+    ) -> Result<PromptFlightPage> {
+        let page: PromptFlightPage = self
+            .session_call(
+                Method::POST,
+                "/v1/flights/list",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        page.validate().map_err(contract)?;
+        Ok(page)
+    }
+
+    pub async fn read_prompt_flight(
+        &self,
+        session: &Session,
+        request: ReadPromptFlight,
+        options: RequestOptions,
+    ) -> Result<PromptFlightReadResult> {
+        let result: PromptFlightReadResult = self
+            .session_call(
+                Method::POST,
+                "/v1/flights/read",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
     }
 
     pub(crate) async fn session_call<T, O>(

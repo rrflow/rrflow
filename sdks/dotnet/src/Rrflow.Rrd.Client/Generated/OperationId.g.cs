@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -15,6 +15,9 @@ public enum OperationId
     DiagnosticsRead,
     EndpointCatalogue,
     EstateRead,
+    FlightLaunch,
+    FlightList,
+    FlightRead,
     HealthLive,
     HealthReady,
     OpenapiRead,
@@ -55,7 +58,7 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const int Count = 33;
+    public const int Count = 36;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -70,6 +73,9 @@ public static class EndpointCatalog
         OperationId.DiagnosticsRead => new("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SessionBearer, false),
         OperationId.EndpointCatalogue => new("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.Public, false),
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),
+        OperationId.FlightLaunch => new("flight-launch", "POST", "/v1/flights", Authentication.SessionBearer, true),
+        OperationId.FlightList => new("flight-list", "POST", "/v1/flights/list", Authentication.SessionBearer, false),
+        OperationId.FlightRead => new("flight-read", "POST", "/v1/flights/read", Authentication.SessionBearer, false),
         OperationId.HealthLive => new("health-live", "GET", "/v1/health/live", Authentication.Public, false),
         OperationId.HealthReady => new("health-ready", "GET", "/v1/health/ready", Authentication.Public, false),
         OperationId.OpenapiRead => new("openapi-read", "GET", "/v1/schema/openapi", Authentication.Public, false),

@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -58,6 +58,24 @@ export const endpoints = {
   "estate-read": {
     "method": "POST",
     "path": "/v1/estates/{estate}/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-launch": {
+    "method": "POST",
+    "path": "/v1/flights",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "flight-list": {
+    "method": "POST",
+    "path": "/v1/flights/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-read": {
+    "method": "POST",
+    "path": "/v1/flights/read",
     "authentication": "session_bearer",
     "mutation": false
   },
