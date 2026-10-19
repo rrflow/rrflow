@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
+// OpenAPI SHA-256: 63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -13865,7 +13865,10 @@ export interface operations {
                         operation_id: string;
                         outcome: {
                             payload: {
-                                /** @description One complete flight: its record and every event in ordinal order. */
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
                                 flight: {
                                     events: {
                                         /** Format: uint64 */
@@ -14066,7 +14069,44 @@ export interface operations {
                                          * @enum {string}
                                          */
                                         status: "prepared";
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
                                     };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
                                 };
                                 idempotent_replay: boolean;
                             };
@@ -14102,7 +14142,10 @@ export interface operations {
                         operation_id: string;
                         outcome: {
                             payload: {
-                                /** @description One complete flight: its record and every event in ordinal order. */
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
                                 flight: {
                                     events: {
                                         /** Format: uint64 */
@@ -14303,7 +14346,44 @@ export interface operations {
                                          * @enum {string}
                                          */
                                         status: "prepared";
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
                                     };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
                                 };
                                 idempotent_replay: boolean;
                             };
@@ -14526,6 +14606,13 @@ export interface operations {
                                      * @enum {string}
                                      */
                                     status: "prepared";
+                                    /**
+                                     * Format: uint64
+                                     * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                     *     one per context item that is a canonical record. Claims are not graph
+                                     *     nodes and are counted only in the context summary.
+                                     */
+                                    use_count: number;
                                 }[];
                                 read: {
                                     /** Format: uint64 */
@@ -14754,6 +14841,13 @@ export interface operations {
                                      * @enum {string}
                                      */
                                     status: "prepared";
+                                    /**
+                                     * Format: uint64
+                                     * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                     *     one per context item that is a canonical record. Claims are not graph
+                                     *     nodes and are counted only in the context summary.
+                                     */
+                                    use_count: number;
                                 }[];
                                 read: {
                                     /** Format: uint64 */
@@ -14910,7 +15004,10 @@ export interface operations {
                         operation_id: string;
                         outcome: {
                             payload: {
-                                /** @description One complete flight: its record and every event in ordinal order. */
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
                                 flight: {
                                     events: {
                                         /** Format: uint64 */
@@ -15111,7 +15208,44 @@ export interface operations {
                                          * @enum {string}
                                          */
                                         status: "prepared";
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
                                     };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
                                 };
                                 read: {
                                     /** Format: uint64 */
@@ -15206,7 +15340,10 @@ export interface operations {
                         operation_id: string;
                         outcome: {
                             payload: {
-                                /** @description One complete flight: its record and every event in ordinal order. */
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
                                 flight: {
                                     events: {
                                         /** Format: uint64 */
@@ -15407,7 +15544,44 @@ export interface operations {
                                          * @enum {string}
                                          */
                                         status: "prepared";
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
                                     };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
                                 };
                                 read: {
                                     /** Format: uint64 */

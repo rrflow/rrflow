@@ -1,11 +1,12 @@
 use super::*;
 use rrd_contract::{
     DataLogicalModel, DataReference, DataSchemaMode, DataSchemaRegistry, DataTableSchema,
-    DataTarget, LaunchPromptFlight, ListPromptFlights, PromptFlightContextMode,
+    DataTarget, ExecuteQuery, LaunchPromptFlight, ListPromptFlights, PromptFlightContextMode,
     PromptFlightContextRequest, PromptFlightProvider, PromptFlightStage, PromptFlightStatus,
-    QueryValue, ReadDataSnapshot, ReadPromptFlight, PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_KIND,
+    QueryBudget, QueryValue, ReadAccessPath, ReadDataSnapshot, ReadPromptFlight,
+    PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_KIND, PROMPT_FLIGHT_USE_KIND,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const INSTANCE_SCOPE: &str = "instance:test-instance";
 
@@ -162,6 +163,8 @@ fn fresh_and_pruned_flights_share_a_cohort_commit_at_one_stamp_and_replay_exactl
     assert_eq!(fresh_record.provider, PromptFlightProvider::Observe);
     assert!(fresh_record.context.is_none());
     assert_eq!(fresh_record.metrics.context_items, 0);
+    assert_eq!(fresh_record.use_count, 0);
+    assert!(fresh.flight.uses.is_empty());
     assert_eq!(fresh_record.read.runtime_cursor, seeded_cursor);
     // One schema mutation installs both flight tables ahead of the first row.
     assert_eq!(fresh_record.flight_cursor, seeded_cursor + 2);
@@ -210,10 +213,26 @@ fn fresh_and_pruned_flights_share_a_cohort_commit_at_one_stamp_and_replay_exactl
         pruned_record.metrics.context_output_bytes,
         context.output_bytes
     );
-    // The second launch installs no schema: the row follows the stamp directly.
+    // The first flight that uses records installs the edge table, so one
+    // schema mutation precedes the row; the edges follow it in rank order.
     assert_eq!(
         pruned_record.flight_cursor,
-        pruned_record.read.runtime_cursor + 1
+        pruned_record.read.runtime_cursor + 2
+    );
+    assert!(pruned_record.use_count > 0);
+    assert_eq!(pruned.flight.uses.len() as u64, pruned_record.use_count);
+    assert!(pruned
+        .flight
+        .uses
+        .iter()
+        .enumerate()
+        .all(|(position, used)| used.rank == position as u64 + 1
+            && used.reference.kind.as_str() == "note"
+            && !used.evidence.is_empty()));
+    assert_eq!(
+        engine.storage.runtime().cursor().unwrap(),
+        pruned_record.flight_cursor + pruned_record.use_count + pruned_record.event_count,
+        "schema, record, edges, and events are one commit"
     );
     let context_event = &pruned.flight.events[1];
     assert_eq!(context_event.kind.as_str(), "context_assembled");
@@ -598,4 +617,141 @@ fn the_first_flight_on_an_empty_estate_installs_the_flight_tables() {
     assert!(schema
         .events
         .contains_key(&rrd_core::RuntimeType::new(PROMPT_FLIGHT_EVENT_KIND).unwrap()));
+}
+
+#[test]
+fn each_prompt_is_a_graph_that_rrflowql_traverses_and_reads_cost_only_the_flight() {
+    let (_root, engine) = isolated_engine();
+    let lease = session(&engine, "flight-graph-session");
+    seed_notes(&engine, &lease);
+    let launched = engine
+        .launch_prompt_flight(
+            &lease.session_id,
+            &lease.token,
+            &id("flight-graph"),
+            &launch_request("session recovery", PromptFlightContextMode::Pruned),
+            1_300,
+            "request-flight-graph",
+            "operation-flight-graph",
+        )
+        .unwrap();
+    let flight = &launched.flight;
+    assert!(
+        flight.record.use_count >= 2,
+        "two seeded notes match the prompt"
+    );
+    let used = flight
+        .uses
+        .iter()
+        .map(|used| used.reference.id.as_str().to_owned())
+        .collect::<BTreeSet<_>>();
+
+    // rrflowQL walks prompt -> the records its context used.
+    let traversal = engine
+        .execute_query(
+            &lease.session_id,
+            &lease.token,
+            &ExecuteQuery {
+                scope: INSTANCE_SCOPE.into(),
+                query: format!(
+                    "FROM traverse:{PROMPT_FLIGHT_USE_KIND} START {PROMPT_FLIGHT_KIND}:{} DIRECTION OUTGOING DEPTH 1 AT VALID 1300 KNOWN HEAD PROJECT node_id, depth, path",
+                    flight.record.flight_id
+                ),
+                parameters: BTreeMap::new(),
+                budget: QueryBudget::default(),
+            },
+            1_350,
+            "request-flight-traverse",
+            "operation-flight-traverse",
+        )
+        .unwrap();
+    let reached = traversal
+        .rows
+        .iter()
+        .map(|row| match row.values.get("node_id") {
+            Some(QueryValue::String(id)) => id.clone(),
+            other => panic!("traversal row names its node: {other:?}"),
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(reached, used);
+    // And back: from a record to every prompt that used it.
+    let first = &flight.uses[0].reference;
+    let reverse = engine
+        .execute_query(
+            &lease.session_id,
+            &lease.token,
+            &ExecuteQuery {
+                scope: INSTANCE_SCOPE.into(),
+                query: format!(
+                    "FROM traverse:{PROMPT_FLIGHT_USE_KIND} START {}:{} DIRECTION INCOMING DEPTH 1 AT VALID 1300 KNOWN HEAD PROJECT node_id",
+                    first.kind, first.id
+                ),
+                parameters: BTreeMap::new(),
+                budget: QueryBudget::default(),
+            },
+            1_360,
+            "request-flight-reverse",
+            "operation-flight-reverse",
+        )
+        .unwrap();
+    assert_eq!(reverse.rows.len(), 1);
+    assert_eq!(
+        reverse.rows[0].values.get("node_id"),
+        Some(&QueryValue::String(flight.record.flight_id.as_str().into()))
+    );
+
+    // A flight read names its record, edges, and events by identity: the
+    // keys it examines do not grow when the estate gains unrelated flights.
+    let read = |name: &str| {
+        engine
+            .read_prompt_flight(
+                &lease.session_id,
+                &lease.token,
+                &ReadPromptFlight {
+                    scope: INSTANCE_SCOPE.into(),
+                    flight_id: flight.record.flight_id.clone(),
+                    max_storage_keys: 4_096,
+                },
+                1_400,
+                &format!("request-{name}"),
+                &format!("operation-{name}"),
+            )
+            .unwrap()
+    };
+    let before = read("flight-read-before");
+    assert_eq!(before.flight, *flight);
+    for index in 0..8 {
+        engine
+            .launch_prompt_flight(
+                &lease.session_id,
+                &lease.token,
+                &id(&format!("flight-noise-{index}")),
+                &launch_request("session recovery", PromptFlightContextMode::Pruned),
+                1_500 + index,
+                &format!("request-flight-noise-{index}"),
+                &format!("operation-flight-noise-{index}"),
+            )
+            .unwrap();
+    }
+    let after = read("flight-read-after");
+    assert_eq!(after.flight, *flight);
+    assert!(after.read.runtime_cursor > before.read.runtime_cursor);
+    let event_path = |result: &rrd_contract::PromptFlightReadResult| {
+        result
+            .read_evidence
+            .paths
+            .iter()
+            .find(|path| path.path == ReadAccessPath::EventVersions)
+            .map(|path| path.keys_examined)
+    };
+    assert_eq!(event_path(&before), event_path(&after));
+    let relation_path = |result: &rrd_contract::PromptFlightReadResult| {
+        result
+            .read_evidence
+            .paths
+            .iter()
+            .find(|path| path.path == ReadAccessPath::RelationVersions)
+            .map(|path| path.keys_examined)
+    };
+    assert_eq!(relation_path(&before), relation_path(&after));
 }
