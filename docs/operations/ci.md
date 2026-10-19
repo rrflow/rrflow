@@ -51,9 +51,10 @@ accepted path or content change.
 
 The Connectome UI is optional for engine operation, while candidate CI follows
 repository policy and recursively materializes every declared submodule. The
-private Connectome development repository currently blocks anonymous source
-acquisition; no credential or visibility change is supplied by registration.
-The source-access prerequisite must be resolved before candidate CI can pass.
+Connectome development repository is public and can be acquired anonymously.
+The [publication receipt](../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records successful recursive checkout after the visibility change; the full
+candidate pipeline remains required before merge.
 The architecture suite checks the exact Connectome source identity and denies
 engine dependencies or targets inside it, alongside the general pinned-source
 validator. The inventory records the parent gitlink without traversing child

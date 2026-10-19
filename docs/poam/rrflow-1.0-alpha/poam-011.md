@@ -34,14 +34,15 @@ submodule, but source registration does not close the client-conformance gap.
 The repository previously rejected all gitlinks and attempted to read a
 gitlink directory as a file during inventory generation; the
 [source-integration journal](../../evidence/change-journals/gate-h/h-06-connectome-submodule-and-delivery-positioning.md)
-records the bounded correction and its checks. The private UI source requires
-separate access for UI work. Current main subsequently required recursive
-checkout in every CI job. Anonymous acquisition of this private source is now
-a candidate-CI blocker, even though engine runtime is independent of the UI.
+records the bounded correction and its checks. Current main subsequently
+required recursive checkout in every CI job.
 The [policy-integration receipt](../../evidence/change-journals/gate-h/h-06-connectome-submodule-policy-integration.md)
-records reconciliation with that owner-approved source policy. Resolve source
-access through the repository owner's review before qualification; do not
-publish private source or add credentials implicitly.
+records reconciliation with that owner-approved source policy. The owner then
+explicitly authorized making Connectome public. The
+[publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records anonymous source access and successful recursive candidate checkouts.
+That acquisition blocker is resolved; full candidate CI and client qualification
+remain separate requirements, and POAM-011 remains open.
 
 The [delivery targets](../../architecture/system-overview.md#delivery-experiences)
 also lack qualified end-to-end evidence here for shippin.cloud private

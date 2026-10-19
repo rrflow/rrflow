@@ -41,11 +41,11 @@ git submodule update --init -- connectome
 git submodule status -- connectome
 ```
 
-The Connectome development repository is currently private, so acquisition
-requires access to it. Engine-only local clones can omit initialization. The
-repository's current CI policy requires recursive submodule checkout, so
-anonymous source acquisition must be resolved before candidate CI can pass;
-registration does not publish the UI repository or supply credentials. The
+The Connectome development repository is public and supports anonymous
+acquisition. Engine-only local clones can omit initialization. Candidate CI
+recursively checks out the pinned UI source under the repository source policy.
+The [publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records the authorized visibility change and anonymous-access verification. The
 default engine build and installed distribution cannot read source or assets
 from the UI checkout. A UI distribution must package its required assets;
 installed startup cannot fetch this repository.
