@@ -201,7 +201,7 @@ conflated:
 
 | Boundary | Must contain | Must not require |
 |---|---|---|
-| First-party source | Every RRFlow engine, persistence, query, vector, inference-adapter, transport, install, attunement, release, verification, backup, and recovery implementation; all schemas, templates, fixtures, and generated-source inputs | A sibling checkout, local path outside the repository, Git submodule, untracked generator, or host-specific absolute path |
+| First-party source | Every RRFlow engine, persistence, query, vector, inference-adapter, transport, install, attunement, release, verification, backup, and recovery implementation; all schemas, templates, fixtures, and generated-source inputs | A sibling checkout, local path outside the repository, undeclared or unpinned Git submodule, untracked generator, or host-specific absolute path |
 | Signed default distribution | RRD and operator executables; linked rrflowKV, rrflowQL, Arrow/DataFusion, graph, BM25, vector, security, and engine code; public schemas/goldens; bootstrap and attunement templates; default configuration; runtime/model assets required by the declared default profile; verifier; licenses/SBOM; recovery material and runbook | A compiler, Cargo/npm cache, package registry, source checkout, external database/query/vector service, Connectome, mesh, or provider connection |
 
 The source build may resolve content-locked third-party packages through the
