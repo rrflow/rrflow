@@ -526,6 +526,42 @@ DIRECTION OUTGOING DEPTH 1 …` returns the records a prompt used, and
 record. A flight records only externally observable
 runtime events and never hidden chain-of-thought.
 
+## Task flow
+
+A task is a named, durable record of one unit of intended work: a title, a
+goal, and a status that prompt flights join. `rrd-contract` owns `OpenTask`,
+`CloseTask`, `TaskRecord`, and the list/read types; `RrdEngine::open_task`,
+`close_task`, `list_tasks`, and `read_task` own the implementation behind
+`task-open` and `task-close` (`POST /v1/tasks` and `/v1/tasks/close`,
+`task_write` grant, mutating) and `task-list`/`task-read`
+(`POST /v1/tasks/list` and `/v1/tasks/read`, `task_read` grant). A task
+orchestrates nothing; it is not a routine.
+
+1. `task-open` derives the task identity from instance, session, and
+   idempotency key. A stamped identity read returns an existing task as an
+   exact replay; the same key with a different operation digest conflicts.
+   One cursor-CAS commit installs the strict `rrflow-task` table on first use
+   and writes the task's single open version.
+2. `task-close` writes the second and final version, `completed` or
+   `abandoned`, with its close time and optional outcome. Closing again with
+   the same status and outcome replays; any other close of a closed task fails
+   as a failed precondition.
+3. A flight launched with `task_id` checks, at its own stamp, that the task
+   exists and is open, then writes one `rrflow-task-includes` edge from the
+   task to the flight in the flight's own commit, after its events. The edge
+   identity is the flight identity, so a flight joins at most one task; the
+   edge table declares no pair or degree constraint
+   ([POAM-033](../poam/rrflow-1.0-alpha/poam-033.md)).
+
+A task read names the row by identity and costs its one or two versions. Its
+flights are graph neighbours rather than a second list:
+`FROM traverse:rrflow-task-includes START rrflow-task:<id> DIRECTION OUTGOING
+DEPTH 1 …` returns them, and each flight's `rrflow-prompt-flight-used` edges
+return the records it used. The task list is a stamped read of the task
+record kind and grows with the number of tasks until a cursor-ordered access
+path exists (Gate E); traversal reconstructs the graph from relations until
+E-01.
+
 ## Trace and observability flow
 
 RRFlow has one causal operation graph with two representations. Durable trace
