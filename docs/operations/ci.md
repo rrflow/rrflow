@@ -128,11 +128,20 @@ supply-chain checks. It requires:
 
 - every external action to use a full 40-character commit SHA;
 - every workflow service image to use a SHA-256 digest;
-- every checkout step to set `persist-credentials: false`;
+- every checkout step to set `persist-credentials: false`, and to set
+  `submodules: recursive` whenever `.gitmodules` exists;
 - top-level read-only contents permission and no `pull_request_target` in any
   workflow; and
 - complete candidate-suite/default-feature/optional-feature coverage, bounded
   candidate jobs, safe fork routing, and exact final-gate reduction.
+
+A Git submodule is a pinned source input, not an install-time fetch. The
+workspace architecture test accepts a gitlink only when `.gitmodules` declares
+it exactly once at a normalized repository-relative path with a
+credential-free `https://` URL, so an anonymous clean clone and candidate CI
+reproduce the same tree. Cargo workspace members remain tracked in this
+repository, and the signed default distribution must still contain every byte
+it needs after acquisition.
 
 Workflow ownership is directory-wide in `.github/CODEOWNERS`, so adding a new
 workflow does not bypass the existing workflow review boundary. Repository or

@@ -104,6 +104,13 @@ def verify_workflow_security(workflows: dict[Path, str]) -> None:
                 "persist-credentials: false" in body,
                 f"checkout credentials must not persist: {relative}:{line_number}",
             )
+            # A declared submodule is a pinned source input, so every checkout
+            # must materialize it rather than build an incomplete tree.
+            require(
+                not (ROOT / ".gitmodules").is_file()
+                or "submodules: recursive" in body,
+                f"checkout must fetch declared submodules recursively: {relative}:{line_number}",
+            )
 
 
 def verify_action_pins(workflows: dict[Path, str]) -> None:

@@ -38,10 +38,15 @@ All first-party code that implements the RRFlow engine or a bundled RRFlow
 adapter, plus its schemas, bootstrap templates, default configuration,
 installation logic, release assembly, verification, and recovery tooling, must
 live in this repository.
-Do not add a sibling-checkout dependency, escaping local path, Git submodule,
-undeclared generator, or install-time/runtime fetch. Locked third-party source
-dependencies are permitted build inputs, but the signed default distribution
-must contain every linked binary and runtime asset needed to install, start,
+Do not add a sibling-checkout dependency, escaping local path, undeclared
+generator, or install-time/runtime fetch. Locked third-party source
+dependencies are permitted build inputs. A Git submodule is a permitted pinned
+source input for a separately versioned component such as Connectome when
+`.gitmodules` declares it once with a credential-free `https://` URL that a
+clean clone and candidate CI can fetch, its committed gitlink pins the exact
+revision, and every CI checkout fetches submodules recursively; Cargo workspace
+members stay tracked in this repository. The signed default distribution must
+contain every linked binary and runtime asset needed to install, start,
 persist, recover, and verify RRFlow after the bundle has been acquired.
 Connectome, project databases, mesh services, providers, and other external
 systems remain optional public-contract integrations and cannot be required
