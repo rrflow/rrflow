@@ -43,13 +43,13 @@ Until the desktop bundle includes the engine, add the built `rrflow` executable
 to PATH or select its absolute path in **Settings → Serving**. On Windows the
 debug build is `target/debug/rrflow.exe` under the engine checkout; on macOS
 and Linux it is `target/debug/rrflow`. Use the engine revision pinned by
-Connectome's native contract dependencies, currently `4705941`; the product
+Connectome's native contract dependencies, currently `e5672ec1`; the product
 version alone does not establish protocol compatibility.
 
 Click **Start serving**. The serving console should show `[install] …`,
 `[serve] Listening at http://127.0.0.1:<port> as instance-…`, then
 `[ready] The estate answered an authenticated readiness check`. Acceptance is
-the Records lens with all three handshake cards green. Report the actual
+the Records lens with all three checks verified in **Engine details**. Report the actual
 error text if the sequence fails; an open port or compiled UI is insufficient.
 
 The cloud version is a planned browser delivery of the same Connectome UI
