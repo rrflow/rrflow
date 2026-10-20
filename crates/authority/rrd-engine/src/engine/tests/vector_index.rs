@@ -19,6 +19,8 @@ use rrd_contract::{
 };
 use std::collections::BTreeMap;
 
+mod catalogue_reads;
+
 fn assert_direct_read_evidence(
     selected_versions: u64,
     evidence: &ReadEvidence,

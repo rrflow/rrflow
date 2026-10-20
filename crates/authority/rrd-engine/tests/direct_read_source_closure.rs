@@ -312,29 +312,13 @@ struct KnownDeficientUse {
 /// The POA&M ledger statuses of a deficiency that is still present.
 const PRESENT_DEFICIENCY_STATUSES: [&str; 3] = ["Open", "Sequenced", "Verifying"];
 
-const KNOWN_DEFICIENT_USES: &[KnownDeficientUse] = &[
-    KnownDeficientUse {
-        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
-        kind: SensitiveReadUse::UnstampedCausalLogPage,
-        count: 1,
-        operation: "vector artifact catalogue rebuilt from cursor 0 on every vector search",
-        poam: "POAM-028",
-    },
-    KnownDeficientUse {
-        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
-        kind: SensitiveReadUse::CausalLogPage,
-        count: 1,
-        operation: "quantization catalogue rebuilt from cursor 0 on every vector search",
-        poam: "POAM-028",
-    },
-    KnownDeficientUse {
-        path: "crates/operations/rrd-maintenance/src/lib.rs",
-        kind: SensitiveReadUse::UnstampedCausalLogPage,
-        count: 1,
-        operation: "maintenance-run state rebuilt from cursor 0; the crate has no in-tree caller",
-        poam: "POAM-028",
-    },
-];
+const KNOWN_DEFICIENT_USES: &[KnownDeficientUse] = &[KnownDeficientUse {
+    path: "crates/operations/rrd-maintenance/src/lib.rs",
+    kind: SensitiveReadUse::UnstampedCausalLogPage,
+    count: 1,
+    operation: "maintenance-run state rebuilt from cursor 0; the crate has no in-tree caller",
+    poam: "POAM-028",
+}];
 
 #[test]
 fn causal_log_and_snapshot_reducer_uses_match_the_explicit_allowlist() {

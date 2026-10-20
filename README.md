@@ -198,9 +198,12 @@ receipt closes a lost acknowledgement without guest re-execution. C-04 is
 reopened: current and temporal state is selected through authenticated,
 budgeted semantic-version point/range reads at one `ReadStamp`, and normal
 query, retrieval, context, memory, inference, and vector-candidate paths no
-longer reconstruct state from the runtime change log, but every vector search
-still rebuilds the vector artifact and quantization catalogues from cursor 0
-([POAM-028](docs/poam/rrflow-1.0-alpha/poam-028.md)). Exact
+longer reconstruct state from the runtime change log. Vector search now reads
+artifact and quantization catalogues with its candidates at one authenticated
+stamp and within one request key budget. A retained-stamp regression and a
+1,024-unrelated-record growth corpus pass through rrflowKV reopen; this is
+bounded evidence, not massive-codebase qualification. C-04 remains open for
+the remaining [POAM-028](docs/poam/rrflow-1.0-alpha/poam-028.md) closure work. Exact
 rrflowMX/rrflowKV, rrflowKV reopen, and physical-counter evidence passes for
 the direct reads. C-05 is complete
 for the single-node alpha composition: retired physical readers are absent;

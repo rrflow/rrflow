@@ -13,7 +13,10 @@ use rrd_core::{
     RuntimeTableSchema, RuntimeType, RuntimeValue, RuntimeValueType, ScopeId, TraceBoundary,
     TraceDataClass, TraceLink, TraceOutcome,
 };
-use rrd_store::{DataRuntimeAccess, Error as StoreError, ImmutableObjectStore, StorageEngine};
+use rrd_store::{
+    DataRuntimeAccess, Error as StoreError, ImmutableObjectStore, RuntimeReadBudget,
+    RuntimeVersionedRead, RuntimeVersionedSource, StorageEngine,
+};
 use rrd_vector::{
     QuantizationArtifactCatalogue, QuantizationArtifactEntry, QuantizationArtifactState,
     QuantizationLifecycleAction, QuantizationLifecycleEvent, VectorArtifact,
@@ -23,8 +26,71 @@ use rrd_vector::{
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-const REPLAY_PAGE: usize = 4_096;
+// Control-plane inspection/publication has a finite ceiling. Search uses its
+// caller-supplied budget, shared with candidates and object authentication.
+const CATALOGUE_MAX_KEYS: u64 = 100_000;
 const PUBLICATION_RETRIES: usize = 16;
+
+/// Select only catalogue records and their exact immutable-object identities.
+/// Optional candidate sources participate in the same physical transaction,
+/// read-stamp validation, accumulator authentication and key budget.
+pub(crate) fn read_vector_catalogue_versions<E: StorageEngine>(
+    engine: &E,
+    read: &ReadStamp,
+    additional_sources: &[RuntimeVersionedSource],
+    budget: RuntimeReadBudget,
+) -> rrd_store::Result<RuntimeVersionedRead> {
+    let mut sources = additional_sources.to_vec();
+    for name in [
+        VECTOR_ARTIFACT_RECORD_TYPE,
+        QUANTIZATION_ARTIFACT_RECORD_TYPE,
+        QUANTIZATION_LIFECYCLE_RECORD_TYPE,
+    ] {
+        sources.push(RuntimeVersionedSource::Records {
+            kind: Some(RuntimeType::new(name)?),
+        });
+    }
+    let mut malformed = None;
+    let direct =
+        engine
+            .runtime()
+            .read_versioned_expanding(read, &sources, budget, &mut |changes| {
+                let mut references = BTreeSet::new();
+                for change in changes {
+                    let RuntimeMutation::Record { record } = &change.mutation else {
+                        continue;
+                    };
+                    let object = match record.reference.kind.as_str() {
+                        VECTOR_ARTIFACT_RECORD_TYPE => {
+                            entry_from_record(record).map(|entry| entry.object.reference)
+                        }
+                        QUANTIZATION_ARTIFACT_RECORD_TYPE => quantization_entry_from_record(record)
+                            .map(|entry| entry.object.reference),
+                        _ => continue,
+                    };
+                    match object {
+                        Ok(reference) => {
+                            references.insert(reference);
+                        }
+                        Err(error) => {
+                            malformed = Some(error.to_string());
+                            return Vec::new();
+                        }
+                    }
+                }
+                references
+                    .into_iter()
+                    .map(|reference| RuntimeVersionedSource::Identity {
+                        model: RuntimeLogicalModel::Object,
+                        reference,
+                    })
+                    .collect()
+            })?;
+    if let Some(error) = malformed {
+        return Err(StoreError::Substrate(error));
+    }
+    Ok(direct)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VectorArtifactPublication {
@@ -316,7 +382,24 @@ pub fn reopen_vector_runtime_metadata<D>(
 where
     D: DataRuntimeAccess,
 {
-    let entries = vector_artifact_catalog_entries(data.engine(), scope)?;
+    let read = data.engine().runtime().read_stamp(scope)?;
+    let direct = read_vector_catalogue_versions(
+        data.engine(),
+        &read,
+        &[],
+        RuntimeReadBudget::new(CATALOGUE_MAX_KEYS)?,
+    )?;
+    vector_runtime_metadata_from_changes(&direct.changes, scope, canonical)
+}
+
+/// Builds the serving view from the same authenticated versions as the
+/// request's candidates. It performs no independent storage read.
+pub(crate) fn vector_runtime_metadata_from_changes(
+    changes: &[RuntimeChange],
+    scope: &ScopeId,
+    canonical: impl IntoIterator<Item = VectorCandidate>,
+) -> Result<VectorRuntimeManifest, Box<dyn std::error::Error>> {
+    let entries = vector_artifact_catalog_entries_from_changes(changes, scope)?;
     let mut runtime = VectorRuntime::new(canonical)?;
     let mut bindings = BTreeMap::new();
     for entry in entries {
@@ -349,7 +432,7 @@ where
             active == &binding.descriptor && active.stamp().generation == *generation
         })
     });
-    let quantization = quantization_artifact_catalogue(data.engine(), scope)?;
+    let quantization = quantization_artifact_catalogue_from_changes(changes, scope)?;
     for entry in quantization.active_entries() {
         runtime.restore_quantization_lifecycle_active_descriptor(entry.descriptor.clone())?;
         let key = (
@@ -618,26 +701,13 @@ where
     E: StorageEngine,
 {
     let read = engine.runtime().read_stamp(scope)?;
-    let mut cursor = 0;
-    let mut changes = Vec::new();
-    loop {
-        let page = engine.runtime().read_changes(&read, cursor, REPLAY_PAGE)?;
-        let has_more = page.has_more();
-        let through_cursor = page.through_cursor;
-        changes.extend(page.changes);
-        if !has_more {
-            cursor = through_cursor;
-            break;
-        }
-        if through_cursor <= cursor {
-            return Err("quantization catalogue replay did not advance its cursor".into());
-        }
-        cursor = through_cursor;
-    }
-    if cursor != read.commit_cursor && read.commit_cursor != 0 {
-        return Err("quantization catalogue replay did not reach its stamped cursor".into());
-    }
-    let catalogue = quantization_artifact_catalogue_from_changes(&changes, scope)?;
+    let direct = read_vector_catalogue_versions(
+        engine,
+        &read,
+        &[],
+        RuntimeReadBudget::new(CATALOGUE_MAX_KEYS)?,
+    )?;
+    let catalogue = quantization_artifact_catalogue_from_changes(&direct.changes, scope)?;
     Ok((read, catalogue))
 }
 
@@ -1020,25 +1090,14 @@ pub fn vector_artifact_catalog_entries<E>(
 where
     E: StorageEngine,
 {
-    let mut cursor = 0;
-    let mut changes = Vec::new();
-    loop {
-        let page = engine
-            .runtime()
-            .changes_since(cursor, REPLAY_PAGE, Some(scope))?;
-        let has_more = page.has_more();
-        let through_cursor = page.through_cursor;
-        changes.extend(page.changes);
-        if !has_more {
-            break;
-        }
-        if through_cursor <= cursor {
-            return Err("vector catalog replay did not advance its cursor".into());
-        }
-        cursor = through_cursor;
-    }
-
-    vector_artifact_catalog_entries_from_changes(&changes, scope)
+    let read = engine.runtime().read_stamp(scope)?;
+    let direct = read_vector_catalogue_versions(
+        engine,
+        &read,
+        &[],
+        RuntimeReadBudget::new(CATALOGUE_MAX_KEYS)?,
+    )?;
+    vector_artifact_catalog_entries_from_changes(&direct.changes, scope)
 }
 
 /// Reconstructs the exact vector-artifact catalogue from a caller-owned,
