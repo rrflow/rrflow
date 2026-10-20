@@ -5,6 +5,17 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
+**rrflowDB is the database within RRFlow: a pure Rust, PostgreSQL-inspired
+database dedicated to AI and designed for AI use, with PostgreSQL compatibility
+as a product requirement.** It stores the knowledge, memory, reasoning state,
+and evidence of each project estate. The [database identity and compatibility
+boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary)
+separates that target from current implementation and compatibility evidence.
+The [PostgreSQL compatibility and independent database contract](docs/reference/protocol/postgresql.md)
+defines the first SQL/client profile, native-engine integration, Turso exit,
+data portability and qualification. [H-08](docs/roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+owns its implementation packages; compatibility is not yet implemented.
+
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;
 it delegates each detailed subject to exactly one linked memory record. The
@@ -17,11 +28,53 @@ baseline is established. Current maturity is **pre-alpha**. The version is a
 contract line, not a claim that the complete system is stable, optimized, or
 release-ready.
 
+## Engine, UI, cloud, and desktop
+
+RRFlow is the reasoning engine. **Connectome** is its operator and developer
+UI, maintained in its own repository and pinned here as the optional
+`connectome/` Git submodule. The [Connectome client contract](docs/reference/client/connectome.md#repository-checkout)
+owns checkout instructions and the UI's public-engine boundary.
+
+We plan to offer RRFlow as a cloud service through **shippin.cloud**, with a
+private devspace included. The initial friends-and-family experience will
+demonstrate current AI-assisted development: create projects, run Rust,
+Python, and Go code, load the running project's UI inside the private cloud
+devspace, and launch projects on the web.
+
+**DevPulse** is the project development application. Its RRFlow integration
+must provision local project VMs/containers, run their toolchains and UIs, and
+support explicitly selected **bidirectional synchronization** with either
+**shippin.cloud or an operator-controlled homelab**. Local and homelab operation
+must remain available without a hosted account. Database synchronization,
+project-file transfer and environment provisioning have distinct receipts and
+failure states; the [integration contract](docs/reference/client/devpulse-cloud.md)
+owns those requirements.
+
+These are delivery targets, not claims of available hosted execution,
+deployment, or synchronization. The [delivery boundaries](docs/architecture/system-overview.md#delivery-experiences)
+define how these experiences share one engine; the existing roadmap and
+pre-alpha status remain authoritative.
+
 ## Enter RRFlow
+
+For a local desktop workflow, use the [native Connectome workbench](docs/reference/client/connectome.md#native-local-workbench):
+start the bundled RRFlow engine after an explicit installation preview, explore
+the authenticated schema and data models, query records, and navigate their
+relationships. This is a development build with real-engine evidence; full
+client qualification remains open.
+
+Start with the [runnable local rrflowDB integration](docs/reference/sdk/rrflowdb-local.md):
+build the native engine, create related records, query them with rrflowQL and
+reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
+defines local operation without an account and the explicit cloud opt-in boundary.
+Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
 
 | Need | Single owning record |
 |---|---|
 | Understand the product, components, and boundaries | [RRFlow system overview](docs/architecture/system-overview.md) |
+| Follow researched scale, bounded execution, input/schema and signal decisions into their owning implementation packages | [RRFlow scale and contract rationale](docs/architecture/engine-scale-and-contracts.md) |
+| Configure CPU analysis, System One model selection and scoped inference caches | [LFG and SWAG target contract](docs/reference/inference/lfg-swag.md) |
+| Discover connector requirements and build source-grounded knowledge trees | [Knowledge connectors and Parquet target contract](docs/reference/data/knowledge-connectors.md) |
 | Understand project, estate, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
 | Select and prove deployment form, storage profile, and endpoint presentation independently | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
 | Install, serve, verify, repair, restore, and remove one project estate through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |
@@ -44,8 +97,8 @@ definition; this portal does not reproduce those bodies.
 
 | Invariant | Owning section |
 |---|---|
-| Canonical names for RRFlow, RRD, `RrdEngine`, rrflowDB, rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, vectors, inference, LFG, and Connectome | [Canonical component terminology](docs/architecture/system-overview.md#canonical-component-terminology) |
-| One project ↔ one estate/rrflowDB ↔ one RRD instance; deployment form, storage profile, endpoint presentation, security, and physical placement remain distinct | [Locked alpha topology](docs/architecture/instance-topology.md#locked-alpha-topology) and [deployment profiles](docs/reference/deployment/modes.md#independent-profile-coordinates) |
+| Canonical names for RRFlow, RRD, `RrdEngine`, rrflowDB, rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, vectors, inference, RRO, RROFLOW, LFG, SWAG, Governance, workspace, and Connectome | [Canonical component terminology](docs/architecture/system-overview.md#canonical-component-terminology) |
+| One project ↔ one estate/rrflowDB ↔ one RRD instance; an account may own many estates and a workspace groups estates above the engine; deployment form, storage profile, endpoint presentation, security, and physical placement remain distinct | [Locked alpha topology](docs/architecture/instance-topology.md#locked-alpha-topology) and [deployment profiles](docs/reference/deployment/modes.md#independent-profile-coordinates) |
 | One semantic, security, transaction, mutation, and context authority | [ADR-0001 decision](docs/decisions/0001-single-engine-authority.md#decision) |
 | Adaptive exploration and model reasoning; closed contracts at durable state, external effect, replay, and evidence boundaries | [ADR-0002 decision](docs/decisions/0002-adaptive-reasoning-governed-effects.md#decision) |
 | No parallel product line: one current pre-release implementation with requirement-to-code/test traceability before direct convergence | [Pre-release convergence boundary](docs/architecture/system-overview.md#pre-release-convergence-boundary) and [implementation-requirements traceability](docs/roadmap/rrflow-1.0-execution-map.md#implementation-requirements-traceability) |
@@ -132,11 +185,14 @@ proves all-or-none recovery at prepared, WAL-appended, WAL-synced, and visible-
 before-acknowledgement boundaries; public function-catalogue limits fit one
 physical batch; corrupt runtime-build substitution fails closed; and a durable
 receipt closes a lost acknowledgement without guest re-execution. C-04 is
-also complete: current and temporal state is selected through authenticated,
-budgeted semantic-version point/range reads at one `ReadStamp`; normal query,
-vector, retrieval, context, memory, and inference paths no longer reconstruct
-state from the runtime change log; and exact rrflowMX/rrflowKV, rrflowKV
-reopen, physical-counter, and source-closure evidence passes. C-05 is complete
+reopened: current and temporal state is selected through authenticated,
+budgeted semantic-version point/range reads at one `ReadStamp`, and normal
+query, retrieval, context, memory, inference, and vector-candidate paths no
+longer reconstruct state from the runtime change log, but every vector search
+still rebuilds the vector artifact and quantization catalogues from cursor 0
+([POAM-028](docs/poam/rrflow-1.0-alpha/poam-028.md)). Exact
+rrflowMX/rrflowKV, rrflowKV reopen, and physical-counter evidence passes for
+the direct reads. C-05 is complete
 for the single-node alpha composition: retired physical readers are absent;
 `rrd-store` is the only required production owner of `rrd-lsm`; schemas require
 one explicit logical table map; and every persisted vector requires its
@@ -230,14 +286,18 @@ distribution, or persistent reasoning/recall proof.
 
 The source-built walking product is not yet a releasable installed
 distribution. The primary executable now composes `version`, `install plan`,
-`install apply`, `serve`, authenticated `ready`, and read-only
-`verify --level quick`; its help and parser reject the removed raw-database and
-development commands. Repair, restore, uninstall, durable attunement execution,
-and release service management remain absent. The retained internal server and
+`install apply`, `serve`, authenticated `ready`, read-only
+`verify --level quick`, and offline `restore plan` and `restore apply`, which
+publish a staged restore into the storage root's own name with the previous
+root quarantined; its help and parser reject the removed raw-database and
+development commands. Repair, uninstall, durable attunement execution, and
+release service management remain absent. The retained internal server and
 adapter binaries open only an already-installed estate, but they are not a
-second supported operator command tree. No signed/offline-complete platform
-bundle or native Windows
-`rrflow.exe` has been built and run. D-01 owns the remaining single-executable
+second supported operator command tree. Native primary-executable lifecycle
+tests now pass on Windows, Linux and macOS; the
+[native lifecycle journal](docs/evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
+records their bounded scope. No signed/offline-complete platform bundle has
+been qualified. D-01 owns the remaining single-executable
 walking lifecycle, D-11 owns complete repair/restore/uninstall, and Gate J owns
 native signed platform distributions. See the
 [installed lifecycle](docs/reference/deployment/installed-lifecycle.md) and

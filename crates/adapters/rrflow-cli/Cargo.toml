@@ -28,6 +28,10 @@ rrd-store = { path = "../../persistence/rrd-store" }
 rrd-security = { path = "../../authority/rrd-security" }
 rrd-estate = { path = "../../authority/rrd-estate" }
 
+[build-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
 [[bin]]
 name = "rrflow"
 path = "src/main.rs"

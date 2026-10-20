@@ -47,21 +47,21 @@ layout is:
 
 ```text
 sdks/go/
-├── go.mod
-├── doc.go
-├── config.go
-├── client.go
-├── endpoint.go
-├── errors.go
-├── operation.go
-├── retry.go
-├── session.go
-├── transport.go
-├── endpoints_gen.go
-├── client_test.go
-└── cmd/
-    ├── generate/main.go
-    └── conformance/main.go
+â”œâ”€â”€ go.mod
+â”œâ”€â”€ doc.go
+â”œâ”€â”€ config.go
+â”œâ”€â”€ client.go
+â”œâ”€â”€ endpoint.go
+â”œâ”€â”€ errors.go
+â”œâ”€â”€ operation.go
+â”œâ”€â”€ retry.go
+â”œâ”€â”€ session.go
+â”œâ”€â”€ transport.go
+â”œâ”€â”€ endpoints_gen.go
+â”œâ”€â”€ client_test.go
+â””â”€â”€ cmd/
+    â”œâ”€â”€ generate/main.go
+    â””â”€â”€ conformance/main.go
 ```
 
 A-07.1e directly produced this layout from the former 498-line `client.go`
@@ -71,7 +71,7 @@ This is source topology, not qualification of the incomplete behaviors below.
 
 `Client` is a synchronous API whose methods accept `context.Context`. It has
 helpers for capabilities, endpoint catalogue, OpenAPI, and session creation,
-plus one generic `Call`. That generic call can address all 33 current HTTP
+plus one generic `Call`. That generic call can address all 40 current HTTP
 operation identifiers. This is route coverage, not operation-semantic
 coverage. The module has no WebSocket implementation; subscription
 administration and changefeed follow are ordinary HTTP calls.
@@ -106,11 +106,11 @@ source with `go/format`, and supports an exact byte-for-byte drift check.
 
 The current `endpoints_gen.go` contains:
 
-- 33 `OperationID` constants;
+- 40 `OperationID` constants;
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `3c016e8f0b49623aa091254a37c19cb064efa6773a1fa19ce64edb179824fec0`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
 It does not generate request/result/error types, path-parameter sets, security
 actions, exact success statuses, media types, causal identity rules,
@@ -361,7 +361,7 @@ Current evidence is deliberately bounded:
 | generator, `gofmt`, `go vet`, `go mod tidy -diff` | all passed | Source/generation/module hygiene only; descriptors still omit operation semantics. |
 | conformance command without `RRD_SDK_CONFORMANCE_MANIFEST` | exited nonzero with the required-manifest panic | Fail-closed configuration only; no scenario executed. |
 | conformance command against the live example harness | passes with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2` | Real HTTP against a direct-seeded rrflowKV fixture; not installation, rrflowMX parity, or full labelled behavior. |
-| generated-surface parity | 33 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
+| generated-surface parity | 40 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
 | injected transport probe | replayed an unpinned query, accepted `201 text/plain` and invalid payload, and exposed the bearer through JSON and formatting | Reproducible open H-04 correctness/security defects. |
 | network-disabled local-toolchain test | passed with no module dependencies | Existing-checkout/current-toolchain evidence only; not a clean external consumer or signed artifact. |
 
@@ -392,21 +392,21 @@ current source tree:
 
 ```text
 sdks/go/
-├── go.mod
-├── doc.go                         # package contract and canonical links
-├── config.go                      # validated public construction inputs
-├── client.go                      # narrow concurrent public facade
-├── endpoint.go                    # current loopback endpoint policy
-├── errors.go                      # current API-error representation
-├── operation.go                   # current generic operation construction
-├── retry.go                       # current broad attempt/deadline behavior
-├── session.go                     # current plain secret-bearing values
-├── transport.go                   # current bounded HTTP response decoding
-├── endpoints_gen.go               # catalogue-derived descriptor projection
-├── client_test.go                 # existing mock characterization
-└── cmd/
-    ├── generate/main.go
-    └── conformance/main.go
+â”œâ”€â”€ go.mod
+â”œâ”€â”€ doc.go                         # package contract and canonical links
+â”œâ”€â”€ config.go                      # validated public construction inputs
+â”œâ”€â”€ client.go                      # narrow concurrent public facade
+â”œâ”€â”€ endpoint.go                    # current loopback endpoint policy
+â”œâ”€â”€ errors.go                      # current API-error representation
+â”œâ”€â”€ operation.go                   # current generic operation construction
+â”œâ”€â”€ retry.go                       # current broad attempt/deadline behavior
+â”œâ”€â”€ session.go                     # current plain secret-bearing values
+â”œâ”€â”€ transport.go                   # current bounded HTTP response decoding
+â”œâ”€â”€ endpoints_gen.go               # catalogue-derived descriptor projection
+â”œâ”€â”€ client_test.go                 # existing mock characterization
+â””â”€â”€ cmd/
+    â”œâ”€â”€ generate/main.go
+    â””â”€â”€ conformance/main.go
 ```
 
 The following files remain deliberately absent until their assigned gate adds

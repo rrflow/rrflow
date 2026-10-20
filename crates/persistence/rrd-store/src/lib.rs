@@ -33,27 +33,30 @@ pub use access::{
     FunctionArtifactMediaTypeRecord, FunctionArtifactRecord, FunctionCatalogueHeadRecord,
     FunctionCatalogueMembershipRecord, FunctionCataloguePublication, FunctionCatalogueSnapshot,
     FunctionDefinitionRecord, FunctionInvocationReceiptRecord, IndexCommitBindingDefinition,
-    IndexCommitBindingKind, IndexSourceDelta, IndexSourceRow, RuntimeReadAccessPath,
-    RuntimeReadBudget, RuntimeReadEvidence, RuntimeReadPathEvidence, RuntimeVersionedRead,
-    RuntimeVersionedSource, SemanticCommitPlan, TransactionFunctionBindingRecord,
-    VectorSourceAddress, VectorSourceDelta, VectorSourceVersion,
+    IndexCommitBindingKind, IndexSourceDelta, IndexSourceRow, RuntimeAdjacencyDirection,
+    RuntimeReadAccessPath, RuntimeReadBudget, RuntimeReadEvidence, RuntimeReadPathEvidence,
+    RuntimeVersionedRead, RuntimeVersionedSource, SemanticCommitPlan,
+    TransactionFunctionBindingRecord, VectorSourceAddress, VectorSourceDelta, VectorSourceVersion,
     FUNCTION_CATALOGUE_STATE_FORMAT_VERSION, FUNCTION_INVOCATION_RECEIPT_FORMAT_VERSION,
     INDEX_COMMIT_BINDING_CONTRACT_VERSION, INDEX_SOURCE_DELTA_CONTRACT_VERSION,
     RUNTIME_VERSIONED_READ_CONTRACT_VERSION, VECTOR_SOURCE_DELTA_CONTRACT_VERSION,
 };
 pub use archive::{
-    export_logical_archive, export_logical_archive_with_progress, inspect_logical_archive,
-    restore_logical_archive_to_new_root, restore_logical_archive_to_new_root_with,
-    restore_logical_archive_to_new_root_with_progress, LogicalArchiveCheckpoint,
+    control_family_covers, control_family_of, export_logical_archive,
+    export_logical_archive_with_progress, inspect_control_archive, inspect_logical_archive,
+    read_control_archive, restore_logical_archive_to_new_root,
+    restore_logical_archive_to_new_root_with, restore_logical_archive_to_new_root_with_progress,
+    validate_control_families, ControlArchiveInventory, LogicalArchiveCheckpoint,
     LogicalArchiveInventory, LogicalArchiveOperation, LogicalArchiveProgress, LogicalRestoreReport,
-    LOGICAL_ARCHIVE_VERSION,
+    CONTROL_ARCHIVE_VERSION, LOGICAL_ARCHIVE_VERSION,
 };
 pub use backup::{
-    create_application_backup, create_logical_backup, load_backup_catalogue,
-    prune_backup_catalogue, restore_catalogued_backup, verify_backup_catalogue,
-    verify_restored_backup_objects, BackupCatalogue, BackupCoverage, BackupEntry,
-    BackupPruneOutcome, BackupPrunePlan, BackupPruneReceipt, CatalogueManifestInventory,
-    ObjectPayloadManifestInventory, BACKUP_CATALOGUE_VERSION, MAX_BACKUP_PRUNE_RECEIPTS,
+    control_restore_progress, create_application_backup, create_logical_backup,
+    load_backup_catalogue, prune_backup_catalogue, restore_catalogued_backup,
+    verify_backup_catalogue, verify_restored_backup_objects, BackupCatalogue, BackupCoverage,
+    BackupEntry, BackupPruneOutcome, BackupPrunePlan, BackupPruneReceipt,
+    CatalogueManifestInventory, ControlRestoreProgress, ObjectPayloadManifestInventory,
+    BACKUP_CATALOGUE_VERSION, CONTROL_RESTORE_PROGRESS_FORMAT, MAX_BACKUP_PRUNE_RECEIPTS,
 };
 pub use control::{ControlJournalEntry, ControlTransition};
 pub use ds::{DataRuntime, DataRuntimeAccess, DataRuntimeRef, DataRuntimeStep};

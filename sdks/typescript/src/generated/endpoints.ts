@@ -1,6 +1,6 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c
-export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c" as const;
+// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69" as const;
 
 export const endpoints = {
   "audit-export": {
@@ -51,6 +51,12 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": false
   },
+  "data-schema-read": {
+    "method": "POST",
+    "path": "/v1/data/schema",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
   "diagnostics-read": {
     "method": "POST",
     "path": "/v1/diagnostics/read",
@@ -60,6 +66,24 @@ export const endpoints = {
   "estate-read": {
     "method": "POST",
     "path": "/v1/estates/{estate}/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-launch": {
+    "method": "POST",
+    "path": "/v1/flights",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "flight-list": {
+    "method": "POST",
+    "path": "/v1/flights/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-read": {
+    "method": "POST",
+    "path": "/v1/flights/read",
     "authentication": "session_bearer",
     "mutation": false
   },
@@ -146,6 +170,30 @@ export const endpoints = {
     "path": "/v1/subscriptions/open",
     "authentication": "session_bearer",
     "mutation": true
+  },
+  "task-open": {
+    "method": "POST",
+    "path": "/v1/tasks",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-close": {
+    "method": "POST",
+    "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-list": {
+    "method": "POST",
+    "path": "/v1/tasks/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-read": {
+    "method": "POST",
+    "path": "/v1/tasks/read",
+    "authentication": "session_bearer",
+    "mutation": false
   },
   "transaction-begin": {
     "method": "POST",

@@ -1,8 +1,10 @@
 //! Canonical RRFlow platform terminology.
 //!
-//! The root `README.md` owns current product meaning. This machine-readable
-//! inventory and its historical source table remain subject to A-07's direct
-//! vocabulary audit; public surfaces may not maintain another term list.
+//! `docs/architecture/system-overview.md` owns component terminology and
+//! `docs/architecture/instance-topology.md` owns topology terms. This
+//! machine-readable inventory mirrors a superseded historical table and is a
+//! tracked deficiency (POAM-020) until operation-specific resource contracts
+//! replace it; public surfaces may not maintain another term list.
 
 use crate::ResourceKind;
 
@@ -15,7 +17,9 @@ pub enum PlatformTermRole {
     WorkloadIdentity,
     InstanceAttribute,
     DeploymentAuthority,
-    BuildTopology,
+    /// A grouping of estates kept by an account or client above the engine;
+    /// never an engine scope or resource.
+    ClientGrouping,
     LogicalResource,
     SecurityIdentity,
     DataValue,
@@ -55,7 +59,7 @@ pub const PLATFORM_TERMS: [PlatformTermDefinition; 25] = [
         PlatformTermRole::DeploymentAuthority,
         Some(ResourceKind::Instance),
     ),
-    term("workspace", PlatformTermRole::BuildTopology, None),
+    term("workspace", PlatformTermRole::ClientGrouping, None),
     term(
         "namespace",
         PlatformTermRole::LogicalResource,

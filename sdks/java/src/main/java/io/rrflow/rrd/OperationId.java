@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c
+// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -11,9 +11,13 @@ public enum OperationId {
     CHANGEFEED_FOLLOW("changefeed-follow", "POST", "/v1/changes/follow", Authentication.SESSION_BEARER, false),
     CHANGEFEED_READ("changefeed-read", "POST", "/v1/changes/read", Authentication.SESSION_BEARER, false),
     CONTEXT_ASSEMBLE("context-assemble", "POST", "/v1/context/assemble", Authentication.SESSION_BEARER, false),
+    DATA_SCHEMA_READ("data-schema-read", "POST", "/v1/data/schema", Authentication.SESSION_BEARER, false),
     DIAGNOSTICS_READ("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SESSION_BEARER, false),
     ENDPOINT_CATALOGUE("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.PUBLIC, false),
     ESTATE_READ("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SESSION_BEARER, false),
+    FLIGHT_LAUNCH("flight-launch", "POST", "/v1/flights", Authentication.SESSION_BEARER, true),
+    FLIGHT_LIST("flight-list", "POST", "/v1/flights/list", Authentication.SESSION_BEARER, false),
+    FLIGHT_READ("flight-read", "POST", "/v1/flights/read", Authentication.SESSION_BEARER, false),
     HEALTH_LIVE("health-live", "GET", "/v1/health/live", Authentication.PUBLIC, false),
     HEALTH_READY("health-ready", "GET", "/v1/health/ready", Authentication.PUBLIC, false),
     OPENAPI_READ("openapi-read", "GET", "/v1/schema/openapi", Authentication.PUBLIC, false),
@@ -27,6 +31,10 @@ public enum OperationId {
     SESSION_RENEW("session-renew", "POST", "/v1/sessions/{session}/renew", Authentication.SESSION_BEARER, true),
     SUBSCRIPTION_CLOSE("subscription-close", "POST", "/v1/subscriptions/close", Authentication.SESSION_BEARER, true),
     SUBSCRIPTION_OPEN("subscription-open", "POST", "/v1/subscriptions/open", Authentication.SESSION_BEARER, true),
+    TASK_CLOSE("task-close", "POST", "/v1/tasks/close", Authentication.SESSION_BEARER, true),
+    TASK_LIST("task-list", "POST", "/v1/tasks/list", Authentication.SESSION_BEARER, false),
+    TASK_OPEN("task-open", "POST", "/v1/tasks", Authentication.SESSION_BEARER, true),
+    TASK_READ("task-read", "POST", "/v1/tasks/read", Authentication.SESSION_BEARER, false),
     TRANSACTION_ABORT("transaction-abort", "DELETE", "/v1/transactions/{transaction}", Authentication.SESSION_BEARER, true),
     TRANSACTION_BEGIN("transaction-begin", "POST", "/v1/transactions", Authentication.SESSION_BEARER, true),
     TRANSACTION_COMMIT("transaction-commit", "POST", "/v1/transactions/{transaction}/commit", Authentication.SESSION_BEARER, true),
@@ -37,7 +45,7 @@ public enum OperationId {
     VECTOR_POINT_SCROLL("vector-point-scroll", "POST", "/v1/vector/points/scroll", Authentication.SESSION_BEARER, false),
     VECTOR_SEARCH("vector-search", "POST", "/v1/vector/search", Authentication.SESSION_BEARER, false);
 
-    static final String OPENAPI_DOCUMENT_SHA256 = "c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c";
+    static final String OPENAPI_DOCUMENT_SHA256 = "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69";
 
     public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }
 

@@ -1,11 +1,12 @@
-use rrd_contract::CanonicalId;
+use rrd_contract::{CanonicalId, InstallationTargetKind};
+use rrd_engine::RrdEngine;
 use rrd_estate::{
     BackupJobState, BackupReconcileOutcome, DesiredPhase, DesiredTarget, EstateRepository,
     LeaseRequest, MutationContext, ObservationRequest, ObservedPhase, ReceiptBoundary,
     ReceiptRequest, ScheduleBackup, SetDesired,
 };
 use rrd_store::{verify_backup_catalogue, RrflowKvStore};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -23,7 +24,42 @@ fn context(at: u64, request: &str, operation: &str) -> MutationContext {
     }
 }
 
-fn prepare(database: &Path, state_root: &Path) {
+/// The distribution the estate is bound to. The binding is the file's
+/// SHA-256, so the fixture the lifecycle tests also use stands in for the
+/// primary executable; hashing a debug build on every step would only slow
+/// the matrix down.
+fn distribution_executable() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
+}
+
+/// Installs the managed instance canonically under `instances/instance-a` and
+/// returns the backup catalogue root inside its `.rrflow/rrd` container.
+fn install_instance(state_root: &Path) -> PathBuf {
+    let project = state_root.join("instances/instance-a");
+    std::fs::create_dir_all(&project).unwrap();
+    let executable = distribution_executable();
+    let preview = RrdEngine::plan_installation(
+        &project,
+        InstallationTargetKind::ExistingProject,
+        "default",
+        None,
+        &executable,
+    )
+    .unwrap();
+    RrdEngine::apply_installation(
+        &project,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        &executable,
+    )
+    .unwrap();
+    project
+        .join(".rrflow/rrd/backups")
+        .join(preview.installation.target.instance_id.as_str())
+}
+
+fn prepare(database: &Path, state_root: &Path) -> PathBuf {
     let engine = RrflowKvStore::open(database).unwrap();
     let repository = EstateRepository::new(&engine, id("estate-a"));
     repository
@@ -94,12 +130,8 @@ fn prepare(database: &Path, state_root: &Path) {
             label: "daily.0001".into(),
         })
         .unwrap();
-    let source = state_root.join("instances/instance-a/.rrflow/rrd");
-    std::fs::create_dir_all(source.parent().unwrap()).unwrap();
-    drop(
-        rrd_engine::RrdEngine::create_new(&source, id("instance-a"), [0_u8; 32])
-            .expect("component backup fixture must be a complete engine root"),
-    );
+    drop(engine);
+    install_instance(state_root)
 }
 
 fn command(database: &Path, state_root: &Path, at: u64) -> Command {
@@ -111,6 +143,8 @@ fn command(database: &Path, state_root: &Path, at: u64) -> Command {
         "estate-control-instance",
         "--state-root",
         state_root.to_str().unwrap(),
+        "--distribution-executable",
+        distribution_executable().to_str().unwrap(),
         "--estate",
         "estate-a",
         "--worker",
@@ -188,7 +222,7 @@ fn backup_controller_kill_matrix_converges_after_the_archive_effect_gap() {
     std::fs::create_dir(state_root.join("processes")).unwrap();
     let state_root = std::fs::canonicalize(state_root).unwrap();
     let marker = temporary.path().join("backup-controller");
-    prepare(&database, &state_root);
+    let catalogue_root = prepare(&database, &state_root);
 
     run_and_kill(&database, &state_root, &marker, 90, false);
     assert_eq!(job_state(&database), (BackupJobState::Leased, 9));
@@ -196,8 +230,11 @@ fn backup_controller_kill_matrix_converges_after_the_archive_effect_gap() {
     assert_eq!(job_state(&database), (BackupJobState::Prepared, 10));
     run_and_kill(&database, &state_root, &marker, 110, true);
     assert_eq!(job_state(&database), (BackupJobState::Prepared, 10));
-    let catalogue_root = state_root.join("backups/instance-a");
     let after_effect = verify_backup_catalogue(&catalogue_root).unwrap();
+    assert!(
+        !state_root.join("backups").exists(),
+        "the backup lands only in the instance's own catalogue"
+    );
     assert_eq!(after_effect.revision, 1);
     assert_eq!(after_effect.backups.len(), 1);
 

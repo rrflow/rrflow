@@ -55,10 +55,10 @@ make paths, policy, storage, and multi-project aggregation ambiguous.
 | **estate** | The complete project-scoped RRFlow semantic boundary: governed knowledge, temporal graph, memories, reasoning state, indexes, evidence, automation, and operations. It is the logical rrflowDB. | Exactly one estate governs exactly one project in the first alpha. | A fleet of projects, a deployment controller, cluster, storage directory, or JSON aggregate. |
 | **RRD instance** | The stable identity of one installed embedded or daemon runtime serving one estate. | Exactly one instance serves one estate; all public faces resolve to its one logical `RrdEngine`. | A process ID, host, endpoint, project path, node, database namespace, or client session. |
 | **environment** | An explicit named project context such as development, test, staging, production, device, or region, captured with source and observation evidence. | Zero or more environment descriptors belong to the project estate; every environment-scoped fact names one explicitly. | A required ancestor of the estate/instance, an inferred directory name, or a hidden selector for another database. |
-| **workspace** | A derived build/source topology inside the project, including packages, modules, generated boundaries, and harnesses discovered by attunement. | A committed project-tree snapshot owns its observed root-relative membership. | A project, estate, deployment, authorization scope, storage profile, or tenancy boundary. |
-| **organization/account/entitlement** | Optional external operator, billing, or policy-provider references. | They may be linked through an explicitly configured adapter and policy. | A mandatory local RRFlow parent hierarchy or an authority that can bypass `RrdEngine`. |
+| **workspace** | A set of estates that an account or client groups above the engine, for example every project one developer works across. The grouping is a client or account record. | Each member estate keeps its own instance, authentication, and authority; a workspace never spans an estate's scope. Cross-estate context is an explicit client-side or federated read across an opt-in [project link](../reference/data/rrflowdb-capability.md#project-links). | A project, estate, deployment, authorization scope, storage profile, tenancy boundary, or an engine resource of any kind. The source topology inside one project (packages, modules, generated boundaries, harnesses) is owned by the committed project-tree snapshot, not by this term. |
+| **organization/account/entitlement** | Optional external operator, billing, or policy-provider references. An account may own many estates. | They may be linked through an explicitly configured adapter and policy; the account → estates relation lives at the identity or control provider, never inside an estate. | A mandatory local RRFlow parent hierarchy or an authority that can bypass `RrdEngine`. |
 | **tenant** | An optional security or data-partition subject whose semantics must be defined by a later schema/policy contract. | If used, policy and every affected operation name the exact tenant scope. | An implicit container between the instance and estate or a synonym for project. |
-| **namespace/database** | Reserved logical catalogue concepts only if a later accepted schema contract proves a need for them. | No first-alpha topology path requires either term; rrflowDB is the project estate. | Mandatory SurrealDB-style containers, deployment identities, or additional persistence authorities. |
+| **namespace/database** | Reserved logical catalogue concepts only if a later accepted schema contract proves a need for them. The [schema catalogue](../reference/data/schema-catalogue.md) carries both as registry fields that default to `default`. | No first-alpha topology path depends on either value; rrflowDB is the project estate. | Mandatory SurrealDB-style containers, deployment identities, or additional persistence authorities. |
 
 Stable IDs are canonical values independent of display names, paths, endpoints,
 processes, and provider identifiers. Human labels can change without changing
@@ -89,9 +89,11 @@ estate. They do not introduce another database engine. Schema and policy decide
 which families exist and how they are authorized; topology never chooses an
 alternate graph, vector, search, or analytical authority.
 
-Every canonical fact and every derived projection is estate-scoped. A derived
-index additionally binds its source cursor and relevant schema, model, and
-configuration revisions. Cross-estate reads are explicit client-side or
+Every canonical fact and every derived projection is estate-scoped. The engine
+spells that scope as `instance:{instance_id}`, the identity of the one instance
+serving the estate, so instance scope and estate scope are the same boundary. A
+derived index additionally binds its source cursor and relevant schema, model,
+and configuration revisions. Cross-estate reads are explicit client-side or
 authorized federation operations; they are never a local prefix accident or a
 claim of cross-instance ACID.
 

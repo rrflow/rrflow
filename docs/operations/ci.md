@@ -22,7 +22,7 @@ dispatches. Its concurrency key cancels stale executions for the same pull
 request or ref. The reusable workflow reduces every partition into one stable
 `ci-gate` check for branch protection:
 
-- supervised RRD daemon smoke on the standard Linux runner;
+- installed primary-executable lifecycle on the standard Linux runner;
 - repository policy, formatting, architecture, evaluation, dependency, and
   binary-budget gates on a heavy Linux runner;
 - five default-feature engine suites on isolated heavy Linux runners:
@@ -30,16 +30,36 @@ request or ref. The reusable workflow reduces every partition into one stable
   and `product-operations`;
 - one current shared SDK harness, isolated optional-feature checks, and a real
   PostgreSQL/pgvector integration;
-- daemon portability on GitHub-hosted Windows and macOS runners; and
+- installed lifecycle and daemon portability on GitHub-hosted Windows and
+  macOS runners; and
 - one always-evaluated gate which fails unless every partition succeeded.
 
-The topology job starts one local RRD daemon and checks readiness and
-capabilities. It does not start Connectome or prove installation, rrflowMX and
-rrflowKV semantic equivalence, native graph/BM25/vector projections, streamed
-Arrow/DataFusion execution, persistent reasoning/context, or restart recovery.
+The topology and native portability jobs run `installed_lifecycle` against the
+actual primary executable, without a surrogate executable-identity fixture.
+Those jobs omit dev/test debug symbols and log executable size; executable
+identity still binds the actual tested bytes. Startup retains a 60-second
+bound. The backup/restore lifecycle client uses an explicit 60-second request
+timeout; this does not qualify the default short-request timeout for heavy
+physical verification or generic uncertain-outcome recovery.
+Fresh and existing projects cover no-write deterministic plan, exact apply,
+authenticated discovery, commit/query, backup, termination, restarted query,
+offline verification, and restore publication/readback. Unix checks graceful
+SIGINT; Windows checks termination of the owned child after acknowledged work.
+This bounded corpus does not prove graceful Windows shutdown, a complete
+crash matrix, clean-machine distribution, rrflowMX/rrflowKV equivalence, native
+graph/BM25/vector projections, streamed Arrow/DataFusion, or model reasoning.
 The shared SDK harness is also current characterization: the deficiencies and
 real-process corpus required for H-04 remain open. Neither job may be cited as
 complete-engine evidence.
+
+The Linux installed-lifecycle job also runs the
+[primary build-provenance helper](../reference/release/build-identity.md) on
+clean candidate source. It observes Cargo's actual first-party compilation
+units, embeds their declared provenance, rebuilds, and rejects changed source,
+feature/semantic-profile closure or executable identity. Repository verification
+runs the helper's dirty-source, drift, environment-digest and diagnostic-profile
+policy tests. These are build-provenance checks; actual release/diagnostic
+semantic parity remains open under H-05a.
 
 The repository-policy partition also verifies the generated
 `docs/roadmap/rrflow-1.0-file-plan.jsonl`. That inventory must match every
@@ -48,6 +68,19 @@ generator. Newly created paths become current inventory records; the pull
 request description binds their intended scope. Regenerate the inventory with
 `python3 scripts/ci/build_execution_inventory.py` after an accepted path or
 content change.
+
+The Connectome UI is optional for engine operation, while candidate CI follows
+repository policy and recursively materializes every declared submodule. The
+Connectome development repository is public and can be acquired anonymously.
+The [publication receipt](../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records successful recursive checkout after the visibility change; the full
+candidate pipeline remains required before merge.
+The architecture suite checks the exact Connectome source identity and denies
+engine dependencies or targets inside it, alongside the general pinned-source
+validator. The inventory records the parent gitlink without traversing child
+files. `python3 scripts/ci/test_execution_inventory.py` proves parity across
+absent/populated/edited child files, pin-sensitive identity, and conflict
+rejection. UI builds and real-engine conformance remain separate H-06 evidence.
 
 Marked documentation indexes are derived from their immediate coordinated
 children. Run `python3 scripts/knowledge/render_navigation.py` after adding,
@@ -191,13 +224,22 @@ supply-chain checks. It requires:
 
 - every external action to use a full 40-character commit SHA;
 - every workflow service image to use a SHA-256 digest;
-- every checkout step to set `persist-credentials: false`;
+- every checkout step to set `persist-credentials: false`, and to set
+  `submodules: recursive` whenever `.gitmodules` exists;
 - top-level read-only contents permission and no `pull_request_target` in any
   workflow; and
 - complete candidate-suite/default-feature/optional-feature coverage, bounded
   candidate jobs, safe fork routing, and exact final-gate reduction; and
 - development-container toolchain, checksum, image, and pgvector parity with
   candidate CI, strict download verification, and no editor lifecycle command.
+
+A Git submodule is a pinned source input, not an install-time fetch. The
+workspace architecture test accepts a gitlink only when `.gitmodules` declares
+it exactly once at a normalized repository-relative path with a
+credential-free `https://` URL, so an anonymous clean clone and candidate CI
+reproduce the same tree. Cargo workspace members remain tracked in this
+repository, and the signed default distribution must still contain every byte
+it needs after acquisition.
 
 Workflow ownership is directory-wide in `.github/CODEOWNERS`, so adding a new
 workflow does not bypass the existing workflow review boundary. Repository or

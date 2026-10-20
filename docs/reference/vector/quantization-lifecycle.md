@@ -68,10 +68,12 @@ reranking produces final results.
 Artifact records, object references, and lifecycle events persist through the
 same `RrdEngine`/rrflowKV authority, and the engine integration test proves
 ready isolation, activation, search, close/reopen, retirement, update, rebuild,
-and reactivation. However, each build currently scans retained runtime changes
-from cursor zero and reconstructs all collection candidates before encoding a
-new full artifact. There is no native changed-vector input or incremental
-quantized-segment maintenance yet.
+and reactivation. However, each build currently reads every vector version in
+the scope at one read stamp (`read_vector_versions`) and reconstructs all
+collection candidates before encoding a new full artifact, and the quantization
+catalogue it publishes into is rebuilt by replaying retained changes from
+cursor zero ([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). There is no
+native changed-vector input or incremental quantized-segment maintenance yet.
 
 The generic vector-index request now configures HNSW only. Scalar, product,
 binary, and TurboQuant artifacts can be constructed only through the explicit
@@ -93,7 +95,9 @@ debug-host observation is
 it is not a release SLO or Qdrant-equivalence claim.
 
 Gate C-04 provides bounded direct canonical vector reads, and C-05 leaves one
-quantization authority. Gate E-04
+quantization authority; the lifecycle catalogue itself is still rebuilt from
+cursor 0 by every search and lifecycle operation
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). Gate E-04
 must make index deltas atomic with point commits and prove rebuild/reopen under
 failure. Gate F-03 must execute quantized candidate generation and exact
 reranking inside the stamped Arrow operator pipeline. H-04 must prove every

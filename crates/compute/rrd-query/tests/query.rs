@@ -1113,3 +1113,84 @@ fn event_queries_honor_cursor_typed_retirement_at_valid_time() {
     assert_eq!(before.returned_rows, 1);
     assert_eq!(after.returned_rows, 0);
 }
+
+#[test]
+fn a_schemaless_record_table_can_start_a_traversal() {
+    // A strict relation may point into a schemaless record table; that table's
+    // records are graph nodes and must be traversal starts like strict ones.
+    let mut registry = RuntimeSchemaRegistry::empty(1, "schemaless traversal fixture");
+    let note = RuntimeType::new("note").unwrap();
+    let cites = RuntimeType::new("cites").unwrap();
+    registry.tables.insert(
+        note.clone(),
+        RuntimeTableSchema::schemaless(RuntimeLogicalModel::Document),
+    );
+    registry
+        .define_relation_table(
+            cites.clone(),
+            RuntimeRelationSchema {
+                from: BTreeSet::from([note.clone()]),
+                to: BTreeSet::from([note.clone()]),
+                ..RuntimeRelationSchema::default()
+            },
+        )
+        .unwrap();
+    let first = RuntimeRef::new("note", "a").unwrap();
+    let second = RuntimeRef::new("note", "b").unwrap();
+    let record = |reference: &RuntimeRef| RuntimeMutation::Record {
+        record: RuntimeRecord {
+            reference: reference.clone(),
+            valid_from: 10,
+            valid_to: None,
+            properties: properties(&[("title", "note")]),
+        },
+    };
+    let scope = ScopeId::new("instance:test").unwrap();
+    let engine = RrflowMxStore::new();
+    engine
+        .runtime()
+        .commit(&RuntimeCommit {
+            scope: scope.clone(),
+            at: 100,
+            actor: "agent:test".into(),
+            expected_cursor: 0,
+            mutations: vec![
+                RuntimeMutation::Schema { registry },
+                record(&first),
+                record(&second),
+                RuntimeMutation::Relation {
+                    relation: RuntimeRelation {
+                        reference: RuntimeRef::new("cites", "a-b").unwrap(),
+                        from: first,
+                        to: second.clone(),
+                        valid_from: 10,
+                        valid_to: None,
+                        properties: RuntimeProperties::new(),
+                    },
+                },
+            ],
+        })
+        .unwrap();
+    let text = "FROM traverse:cites START note:b DIRECTION INCOMING DEPTH 1 AT VALID 100 KNOWN HEAD PROJECT node_id";
+    let query = parse(text).unwrap();
+    let catalog = Catalog::capture_for_sources(
+        &engine,
+        &scope,
+        &[Source::Traversal {
+            relation: cites,
+            start: second,
+            direction: rrd_query::TraversalDirection::Incoming,
+            max_depth: 1,
+        }],
+        read_budget(),
+    )
+    .unwrap();
+    let execution = execute(
+        &engine,
+        &plan(&bind(&query, &Parameters::new(), &catalog).unwrap()).unwrap(),
+        &ExecutionBudget::default(),
+    )
+    .unwrap();
+    assert_eq!(execution.returned_rows, 1);
+    assert_eq!(execution.batches[0].rows[0].values["node_id"], value("a"));
+}

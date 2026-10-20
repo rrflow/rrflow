@@ -1,10 +1,20 @@
-//! Authenticated local backup catalogue over retained logical archives.
+//! Digest-verified local backup catalogue over retained logical archives.
+//!
+//! Every digest here detects changed bytes. None authenticates a producer:
+//! the catalogue shares the estate's filesystem trust domain, so a keyed
+//! authenticator would be stored beside the key it protects. Operations that
+//! read a catalogue say "verify", never "authenticate".
 
+use crate::access::runtime_state::{checked_key, get};
+use crate::archive::{ControlArchiveWriter, CATALOGUE_CONTROL_FAMILIES};
+use crate::keyspaces::{self, Durability};
+use crate::repository::prepare_control_batch;
 use crate::{
-    export_logical_archive, inspect_logical_archive, restore_logical_archive_to_new_root,
-    restore_logical_archive_to_new_root_with, ControlTransition, Error, ImmutableObjectStore,
-    LocalObjectStore, LogicalArchiveInventory, LogicalRestoreReport, Result, RrflowKvStore,
-    StorageEngine,
+    control_family_covers, control_family_of, export_logical_archive, inspect_control_archive,
+    inspect_logical_archive, read_control_archive, restore_logical_archive_to_new_root,
+    restore_logical_archive_to_new_root_with, validate_control_families, ControlArchiveInventory,
+    ControlTransition, Error, ImmutableObjectStore, LocalObjectStore, LogicalArchiveInventory,
+    LogicalRestoreReport, Result, RrflowKvStore, StorageEngine, CONTROL_ARCHIVE_VERSION,
 };
 use rrd_core::digest;
 use rrd_core::{ObjectReference, RuntimeMutation, ScopeId};
@@ -15,11 +25,17 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-pub const BACKUP_CATALOGUE_VERSION: u16 = 1;
+/// Version 2 adds the control-journal archive: an application-complete backup
+/// carries the estate's control state (installed record, configuration,
+/// security policy and audit chain, attunement) as replayable journal entries.
+/// A version 1 catalogue is refused rather than read as complete.
+pub const BACKUP_CATALOGUE_VERSION: u16 = 2;
+pub const CONTROL_RESTORE_PROGRESS_FORMAT: u16 = 1;
 const CATALOGUE_FILE: &str = "catalogue.json";
 const ARCHIVE_DIRECTORY: &str = "archives";
 const OBJECT_MANIFEST_DIRECTORY: &str = "object-manifests";
 const CATALOGUE_MANIFEST_DIRECTORY: &str = "catalogue-manifests";
+const CONTROL_ARCHIVE_DIRECTORY: &str = "control-archives";
 const OBJECT_PAYLOAD_DIRECTORY: &str = "payloads";
 const OBJECT_MANIFEST_VERSION: u16 = 1;
 const PAGE_SIZE: usize = 1_024;
@@ -55,14 +71,39 @@ pub struct BackupEntry {
     pub catalogue_manifest_file: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalogue_manifest: Option<CatalogueManifestInventory>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_archive_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_archive: Option<ControlArchiveInventory>,
     pub claims: BackupCoverage,
     pub typed_runtime: BackupCoverage,
     pub catalogues: BackupCoverage,
+    /// The estate's control state outside the catalogues: installed record and
+    /// checkpoint, active configuration, security policy and audit chain, and
+    /// attunement plan and job state, carried as replayable journal entries.
+    pub installed_control: BackupCoverage,
     pub object_payloads: BackupCoverage,
     pub projections: BackupCoverage,
     pub invocation_telemetry: BackupCoverage,
     pub snapshot_leases: BackupCoverage,
     pub application_complete: bool,
+}
+
+/// Durable progress of one control-journal archive replay into a restored
+/// root. It is written in the same physical transaction as each replayed
+/// transition and stays in the root as restore provenance once complete.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ControlRestoreProgress {
+    pub format_version: u16,
+    pub archive_sha256: String,
+    pub entry_count: u64,
+    pub applied: u64,
+    pub complete: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_restored_sequence: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_restored_sequence: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -198,6 +239,7 @@ pub fn create_logical_backup<E: StorageEngine>(
     created_at: u64,
 ) -> Result<BackupEntry> {
     validate_label(label)?;
+    initialize_catalogue(catalogue_root)?;
     let archives = catalogue_root.join(ARCHIVE_DIRECTORY);
     fs::create_dir_all(&archives).map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -235,9 +277,12 @@ pub fn create_logical_backup<E: StorageEngine>(
         object_manifest: None,
         catalogue_manifest_file: None,
         catalogue_manifest: None,
+        control_archive_file: None,
+        control_archive: None,
         claims: BackupCoverage::Included,
         typed_runtime: BackupCoverage::Included,
         catalogues: BackupCoverage::Excluded,
+        installed_control: BackupCoverage::Excluded,
         object_payloads: BackupCoverage::ReferencedOnly,
         projections: BackupCoverage::RebuildRequired,
         invocation_telemetry: BackupCoverage::Excluded,
@@ -270,19 +315,29 @@ pub fn create_logical_backup<E: StorageEngine>(
 }
 
 /// Creates an application-complete logical backup by retaining the exact
-/// immutable-object closure referenced by the exported runtime cut.
+/// immutable-object closure referenced by the exported runtime cut, the
+/// catalogue control state, and the control-journal entries of the declared
+/// `control_families`.
 ///
-/// Logical replay and object bytes remain separate physical artifacts, but
-/// one authenticated catalogue entry binds their content identities. A
-/// concurrent source mutation rejects the backup before it is catalogued.
+/// The caller owns the control-key layout and declares which families are
+/// estate control state. Secrets never live in control values (the token key
+/// and operator credential are files outside every family), and transient
+/// families such as sessions, subscriptions, and operation receipts stay out
+/// of the scope. Logical replay, object bytes, catalogues, and control entries
+/// remain separate physical artifacts, but one digest-verified catalogue entry
+/// binds their content identities. A concurrent source mutation rejects the
+/// backup before it is catalogued.
 pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     engine: &E,
     objects: &O,
     catalogue_root: &Path,
     label: &str,
     created_at: u64,
+    control_families: &[String],
 ) -> Result<BackupEntry> {
     validate_label(label)?;
+    validate_control_families(control_families)?;
+    initialize_catalogue(catalogue_root)?;
     let control_sequence = engine.control().sequence()?;
     let archives = catalogue_root.join(ARCHIVE_DIRECTORY);
     fs::create_dir_all(&archives).map_err(backup_io)?;
@@ -305,10 +360,13 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     let (manifest_file, manifest_inventory) =
         retain_object_payloads(objects, catalogue_root, &references)?;
     let (catalogue_manifest_file, catalogue_manifest) = retain_catalogues(engine, catalogue_root)?;
+    let (control_archive_file, control_archive) =
+        retain_control_journal(engine, catalogue_root, control_sequence, control_families)?;
     if engine.claims().sequence()? != inventory.claim_sequence
         || engine.runtime().cursor()? != inventory.runtime_cursor
         || engine.control().sequence()? != control_sequence
         || catalogue_manifest.source_control_sequence != control_sequence
+        || control_archive.source_control_sequence != control_sequence
     {
         return Err(Error::Archive(
             "source data or control watermarks changed before application-complete backup publication; retry"
@@ -318,10 +376,11 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
 
     let backup_id = digest::sha256_hex(
         format!(
-            "rrd-application-backup-v1\0{label}\0{created_at}\0{}\0{}\0{}",
+            "rrd-application-backup-v2\0{label}\0{created_at}\0{}\0{}\0{}\0{}",
             inventory.archive_sha256,
             manifest_inventory.manifest_sha256,
-            catalogue_manifest.manifest_sha256
+            catalogue_manifest.manifest_sha256,
+            control_archive.archive_sha256
         )
         .as_bytes(),
     );
@@ -335,9 +394,12 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
         object_manifest: Some(manifest_inventory),
         catalogue_manifest_file: Some(catalogue_manifest_file),
         catalogue_manifest: Some(catalogue_manifest),
+        control_archive_file: Some(control_archive_file),
+        control_archive: Some(control_archive),
         claims: BackupCoverage::Included,
         typed_runtime: BackupCoverage::Included,
         catalogues: BackupCoverage::Included,
+        installed_control: BackupCoverage::Included,
         object_payloads: BackupCoverage::Included,
         projections: BackupCoverage::RebuildRequired,
         invocation_telemetry: BackupCoverage::Excluded,
@@ -347,17 +409,18 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     retain_catalogue_entry(catalogue_root, entry)
 }
 
-/// Loads and authenticates the catalogue payload. Archive bytes are verified
-/// separately by `verify_backup_catalogue` so listing remains bounded.
+/// Loads the catalogue and verifies its payload digest. Archive bytes are
+/// verified separately by `verify_backup_catalogue` so listing remains bounded.
+///
+/// A catalogue that was never written reads as empty. A catalogue file that
+/// is absent while retained artifacts exist beside it fails closed: those
+/// artifacts belonged to entries, and reading them as "no backups" would hide
+/// the loss.
 pub fn load_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
     let path = catalogue_root.join(CATALOGUE_FILE);
     if !path.exists() {
-        return catalogue_from_payload(CataloguePayload {
-            format_version: BACKUP_CATALOGUE_VERSION,
-            revision: 0,
-            backups: Vec::new(),
-            prune_receipts: Vec::new(),
-        });
+        require_no_orphan_artifacts(catalogue_root)?;
+        return catalogue_from_payload(empty_catalogue_payload());
     }
     let bytes = fs::read(&path).map_err(backup_io)?;
     let stored: StoredCatalogue = serde_json::from_slice(&bytes)?;
@@ -384,7 +447,9 @@ pub fn load_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
     })
 }
 
-/// Authenticates the catalogue and every retained archive it references.
+/// Verifies the digests of the catalogue and of every retained artifact it
+/// references, reading only: nothing is created or repaired. The digests
+/// detect changed bytes; they do not authenticate a producer.
 pub fn verify_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
     let catalogue = load_backup_catalogue(catalogue_root)?;
     for entry in &catalogue.backups {
@@ -398,16 +463,17 @@ pub fn verify_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue>
         }
         if entry.application_complete {
             load_catalogue_manifest_for_entry(catalogue_root, entry)?;
+            load_control_archive_for_entry(catalogue_root, entry)?;
             verify_object_payloads(catalogue_root, entry)?;
         }
     }
     Ok(catalogue)
 }
 
-/// Publishes one authenticated successor catalogue for a complete retention
+/// Publishes one digest-verified successor catalogue for a complete retention
 /// partition, then reclaims only artifacts that no retained entry references.
 /// Exact replay is recovered from the bounded receipt embedded in the
-/// authenticated catalogue.
+/// catalogue.
 pub fn prune_backup_catalogue(
     catalogue_root: &Path,
     plan: &BackupPrunePlan,
@@ -515,17 +581,21 @@ pub fn restore_catalogued_backup(
     if entry.application_complete {
         let object_manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
         let catalogue_manifest = load_catalogue_manifest_for_entry(catalogue_root, entry)?;
+        let (control_archive, control_inventory) =
+            load_control_archive_for_entry(catalogue_root, entry)?;
         restore_logical_archive_to_new_root_with(&archive, target, at, |staging| {
             restore_catalogues(&catalogue_manifest, staging)?;
-            restore_object_payloads(catalogue_root, &object_manifest, staging)
+            restore_object_payloads(catalogue_root, &object_manifest, staging)?;
+            restore_control_journal(&control_archive, &control_inventory, staging)
         })
     } else {
         restore_logical_archive_to_new_root(&archive, target, at)
     }
 }
 
-/// Verifies that an already published restore still contains the complete,
-/// authenticated immutable payload closure for a catalogued backup.
+/// Verifies, reading only, that an already published restore still contains
+/// the complete immutable payload closure, catalogue state, and replayed
+/// control journal of a catalogued backup.
 pub fn verify_restored_backup_objects(
     catalogue_root: &Path,
     backup_id: &str,
@@ -543,7 +613,7 @@ pub fn verify_restored_backup_objects(
         ));
     }
     let manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
-    let restored = LocalObjectStore::open(restored_root.join("immutable"))?;
+    let restored = LocalObjectStore::open_existing(restored_root.join("immutable"))?;
     for object in &manifest.objects {
         let verified = restored.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -555,7 +625,331 @@ pub fn verify_restored_backup_objects(
     }
     let catalogues = load_catalogue_manifest_for_entry(catalogue_root, entry)?;
     verify_restored_catalogues(&catalogues, restored_root)?;
+    let (control_archive, control_inventory) =
+        load_control_archive_for_entry(catalogue_root, entry)?;
+    verify_restored_control_journal(&control_archive, &control_inventory, restored_root)
+}
+
+/// Reads the control-journal replay progress a restore left in a root, if any.
+pub fn control_restore_progress(store: &RrflowKvStore) -> Result<Option<ControlRestoreProgress>> {
+    let transaction = store.begin_transaction()?;
+    read_control_restore_progress(&*transaction)
+}
+
+fn read_control_restore_progress(
+    transaction: &dyn crate::StorageTransaction,
+) -> Result<Option<ControlRestoreProgress>> {
+    get(
+        transaction,
+        keyspaces::META,
+        &keyspaces::control_restore_progress_key(),
+    )?
+    .map(|bytes| {
+        let progress: ControlRestoreProgress = serde_json::from_slice(&bytes)?;
+        if progress.format_version != CONTROL_RESTORE_PROGRESS_FORMAT {
+            return Err(Error::Archive(format!(
+                "unsupported control restore progress version {}",
+                progress.format_version
+            )));
+        }
+        Ok(progress)
+    })
+    .transpose()
+}
+
+/// Replays the archived control-journal entries into the staging root, in
+/// order, each as one control transition committed together with the replay
+/// progress marker. An interrupted replay resumes after the last committed
+/// entry; a target whose control state diverges from an entry's recorded
+/// before-state fails closed before any further mutation.
+fn restore_control_journal(
+    archive: &Path,
+    expected: &ControlArchiveInventory,
+    staging_root: &Path,
+) -> Result<()> {
+    let inspected = inspect_control_archive(archive)?;
+    if &inspected != expected {
+        return Err(Error::Archive(
+            "control-journal archive inventory does not match its catalogue entry".into(),
+        ));
+    }
+    let engine = RrflowKvStore::open_existing(staging_root)?;
+    replay_control_entries(archive, expected, &engine, None)?;
+    drop(engine);
+    verify_restored_control_journal(archive, expected, staging_root)
+}
+
+/// Applies the archived entries after the recorded progress. `stop_after`
+/// ends the replay early without the completion marker; it exists so a test
+/// can interrupt a replay the way a crash would and resume it.
+fn replay_control_entries(
+    archive: &Path,
+    expected: &ControlArchiveInventory,
+    engine: &RrflowKvStore,
+    stop_after: Option<u64>,
+) -> Result<()> {
+    let mut progress = match control_restore_progress(engine)? {
+        Some(progress) => {
+            if progress.archive_sha256 != expected.archive_sha256
+                || progress.entry_count != expected.entry_count
+                || progress.applied > progress.entry_count
+            {
+                return Err(Error::Archive(
+                    "restore target carries another control-journal replay".into(),
+                ));
+            }
+            progress
+        }
+        None => ControlRestoreProgress {
+            format_version: CONTROL_RESTORE_PROGRESS_FORMAT,
+            archive_sha256: expected.archive_sha256.clone(),
+            entry_count: expected.entry_count,
+            applied: 0,
+            complete: false,
+            first_restored_sequence: None,
+            last_restored_sequence: None,
+        },
+    };
+    if progress.complete {
+        return Ok(());
+    }
+    let resume_after = progress.applied;
+    let mut ordinal = 0u64;
+    read_control_archive(archive, |entry| {
+        ordinal += 1;
+        if ordinal <= resume_after || stop_after.is_some_and(|stop| ordinal > stop) {
+            return Ok(());
+        }
+        let mut transaction = engine.begin_transaction()?;
+        let record_key = keyspaces::control_record_key(&entry.key);
+        let current = get(&*transaction, keyspaces::META, &record_key)?;
+        if current.as_deref().map(digest::sha256_hex) != entry.before_sha256 {
+            return Err(Error::Archive(format!(
+                "control-journal replay diverged at source sequence {}: {} does not hold its recorded before-state",
+                entry.sequence, entry.key
+            )));
+        }
+        let transition = ControlTransition {
+            key: entry.key.clone(),
+            expected: current,
+            replacement: entry.replacement.clone(),
+            at: entry.at,
+            actor: entry.actor.clone(),
+            action: entry.action.clone(),
+            request_id: entry.request_id.clone(),
+            operation_id: entry.operation_id.clone(),
+        };
+        let committed =
+            prepare_control_batch(&mut *transaction, std::slice::from_ref(&transition))?;
+        let restored_sequence = committed
+            .first()
+            .map(|entry| entry.sequence)
+            .ok_or_else(|| Error::Archive("control replay committed no entry".into()))?;
+        progress.applied = ordinal;
+        progress.complete = ordinal == expected.entry_count;
+        progress
+            .first_restored_sequence
+            .get_or_insert(restored_sequence);
+        progress.last_restored_sequence = Some(restored_sequence);
+        transaction.put(
+            checked_key(keyspaces::META, &keyspaces::control_restore_progress_key())?,
+            serde_json::to_vec(&progress)?,
+        )?;
+        transaction.commit(Durability::Authoritative)?;
+        Ok(())
+    })?;
+    if ordinal != expected.entry_count {
+        return Err(Error::Archive(
+            "control-journal archive entry count changed between inspection and replay".into(),
+        ));
+    }
+    if stop_after.is_some_and(|stop| stop < expected.entry_count) {
+        return Ok(());
+    }
+    if !progress.complete {
+        // An empty scope replays nothing; the marker still records that the
+        // archive was applied.
+        progress.complete = true;
+        let mut transaction = engine.begin_transaction()?;
+        transaction.put(
+            checked_key(keyspaces::META, &keyspaces::control_restore_progress_key())?,
+            serde_json::to_vec(&progress)?,
+        )?;
+        transaction.commit(Durability::Authoritative)?;
+    }
     Ok(())
+}
+
+/// Verifies that a restored root's control journal carries every archived
+/// entry, contiguously and in order, with the same key, before-state, value,
+/// time, actor, action, and identities. Nothing but the replay writes control
+/// state into a staged root, so contiguity holds until publication.
+fn verify_restored_control_journal(
+    archive: &Path,
+    expected: &ControlArchiveInventory,
+    restored_root: &Path,
+) -> Result<()> {
+    let engine = RrflowKvStore::open_existing(restored_root)?;
+    let progress = control_restore_progress(&engine)?.ok_or_else(|| {
+        Error::Archive("restored root carries no control-journal replay marker".into())
+    })?;
+    if progress.archive_sha256 != expected.archive_sha256
+        || progress.entry_count != expected.entry_count
+        || progress.applied != expected.entry_count
+        || !progress.complete
+    {
+        return Err(Error::Archive(
+            "restored root's control-journal replay is incomplete or belongs to another archive"
+                .into(),
+        ));
+    }
+    if expected.entry_count == 0 {
+        if progress.first_restored_sequence.is_some() || progress.last_restored_sequence.is_some() {
+            return Err(Error::Archive(
+                "control-journal replay marker is inconsistent".into(),
+            ));
+        }
+        return Ok(());
+    }
+    let first = progress
+        .first_restored_sequence
+        .ok_or_else(|| Error::Archive("control-journal replay marker is inconsistent".into()))?;
+    if first == 0 || progress.last_restored_sequence != first.checked_add(expected.entry_count - 1)
+    {
+        return Err(Error::Archive(
+            "control-journal replay marker is inconsistent".into(),
+        ));
+    }
+    let mut page = Vec::new().into_iter();
+    let mut cursor = first - 1;
+    let mut ordinal = 0u64;
+    read_control_archive(archive, |entry| {
+        let restored = match page.next() {
+            Some(restored) => restored,
+            None => {
+                page = engine
+                    .control()
+                    .journal_since(cursor, PAGE_SIZE)?
+                    .into_iter();
+                page.next().ok_or_else(|| {
+                    Error::Archive("restored control journal ends before the archive".into())
+                })?
+            }
+        };
+        cursor = restored.sequence;
+        ordinal += 1;
+        if restored.sequence != first + ordinal - 1
+            || restored.key != entry.key
+            || restored.before_sha256 != entry.before_sha256
+            || restored.replacement != entry.replacement
+            || restored.at != entry.at
+            || restored.actor != entry.actor
+            || restored.action != entry.action
+            || restored.request_id != entry.request_id
+            || restored.operation_id != entry.operation_id
+        {
+            return Err(Error::Archive(format!(
+                "restored control journal differs from the archive at source sequence {}",
+                entry.sequence
+            )));
+        }
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Streams the control-journal entries of the declared families from the
+/// start of the journal to `source_control_sequence` into a content-addressed
+/// archive.
+fn retain_control_journal(
+    engine: &impl StorageEngine,
+    catalogue_root: &Path,
+    source_control_sequence: u64,
+    families: &[String],
+) -> Result<(String, ControlArchiveInventory)> {
+    let archives = catalogue_root.join(CONTROL_ARCHIVE_DIRECTORY);
+    fs::create_dir_all(&archives).map_err(backup_io)?;
+    let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+    let staging = archives.join(format!(".control-archive-{}-{id}.tmp", std::process::id()));
+    let result = (|| {
+        let mut writer = ControlArchiveWriter::create(&staging, source_control_sequence, families)?;
+        let mut after = 0u64;
+        while after < source_control_sequence {
+            let page = engine.control().journal_since(after, PAGE_SIZE)?;
+            if page.is_empty() {
+                return Err(Error::Archive(
+                    "control journal ended before the captured backup watermark".into(),
+                ));
+            }
+            for entry in page {
+                if entry.sequence != after + 1 || entry.sequence > source_control_sequence {
+                    return Err(Error::Archive(
+                        "control journal changed or became discontinuous during control capture"
+                            .into(),
+                    ));
+                }
+                after = entry.sequence;
+                if control_family_of(families, &entry.key).is_some() {
+                    writer.entry(&entry)?;
+                }
+            }
+        }
+        if engine.control().sequence()? != source_control_sequence {
+            return Err(Error::Archive(
+                "control journal changed while capturing control state".into(),
+            ));
+        }
+        writer.finish()
+    })();
+    let inventory = match result {
+        Ok(inventory) => inventory,
+        Err(error) => {
+            let _ = fs::remove_file(&staging);
+            return Err(error);
+        }
+    };
+    let file_name = format!("{}.rrd-control-archive", inventory.archive_sha256);
+    let retained_path = archives.join(&file_name);
+    if retained_path.exists() {
+        let actual = inspect_control_archive(&retained_path)?;
+        if actual != inventory {
+            let _ = fs::remove_file(&staging);
+            return Err(Error::Archive(
+                "content-addressed control-journal archive conflicts with retained inventory"
+                    .into(),
+            ));
+        }
+        fs::remove_file(&staging).map_err(backup_io)?;
+    } else {
+        rrd_lsm::publish_rename(&archives, &staging, &retained_path).map_err(backup_io)?;
+    }
+    Ok((
+        format!("{CONTROL_ARCHIVE_DIRECTORY}/{file_name}"),
+        inventory,
+    ))
+}
+
+fn load_control_archive_for_entry(
+    catalogue_root: &Path,
+    entry: &BackupEntry,
+) -> Result<(PathBuf, ControlArchiveInventory)> {
+    let file = entry.control_archive_file.as_deref().ok_or_else(|| {
+        Error::Archive("application-complete backup has no control-journal archive path".into())
+    })?;
+    let expected = entry.control_archive.as_ref().ok_or_else(|| {
+        Error::Archive(
+            "application-complete backup has no control-journal archive inventory".into(),
+        )
+    })?;
+    let path = resolve_control_archive(catalogue_root, file)?;
+    let actual = inspect_control_archive(&path)?;
+    if &actual != expected {
+        return Err(Error::Archive(format!(
+            "backup {} control-journal archive inventory does not match catalogue",
+            entry.backup_id
+        )));
+    }
+    Ok((path, actual))
 }
 
 fn retain_content_addressed_file(
@@ -758,12 +1152,11 @@ fn retain_catalogues(
 }
 
 fn catalogue_scope(key: &str) -> Result<Option<ScopeId>> {
-    for prefix in [
-        "server/state/vector-collection-catalogue/",
-        "server/state/index-catalogue/",
-    ] {
-        if let Some(scope) = key.strip_prefix(prefix) {
-            return ScopeId::new(scope).map(Some).map_err(Error::from);
+    for family in CATALOGUE_CONTROL_FAMILIES {
+        if key.len() > family.len() && control_family_covers(family, key) {
+            return ScopeId::new(&key[family.len() + 1..])
+                .map(Some)
+                .map_err(Error::from);
         }
     }
     Ok(None)
@@ -887,7 +1280,7 @@ fn validate_catalogue_manifest(manifest: &CatalogueManifest) -> Result<()> {
 
 fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &Path) -> Result<()> {
     validate_catalogue_manifest(manifest)?;
-    let engine = RrflowKvStore::open(staging_root)?;
+    let engine = RrflowKvStore::open_existing(staging_root)?;
     for scope in &manifest.scopes {
         let records = manifest
             .records
@@ -958,7 +1351,7 @@ fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &Path) -> Resu
 }
 
 fn verify_restored_catalogues(manifest: &CatalogueManifest, restored_root: &Path) -> Result<()> {
-    let engine = RrflowKvStore::open(restored_root)?;
+    let engine = RrflowKvStore::open_existing(restored_root)?;
     for record in &manifest.records {
         if engine.control().get(&record.key)?.as_deref() != Some(record.value.as_slice()) {
             return Err(Error::Archive(format!(
@@ -1058,7 +1451,7 @@ fn retain_object_payloads(
 
 fn verify_object_payloads(catalogue_root: &Path, entry: &BackupEntry) -> Result<()> {
     let manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
-    let payloads = LocalObjectStore::open(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let payloads = LocalObjectStore::open_existing(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
     for object in manifest.objects {
         let verified = payloads.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -1076,7 +1469,7 @@ fn restore_object_payloads(
     manifest: &ObjectPayloadManifest,
     staging_root: &Path,
 ) -> Result<()> {
-    let source = LocalObjectStore::open(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let source = LocalObjectStore::open_existing(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
     let target = LocalObjectStore::open(staging_root.join("immutable"))?;
     for object in &manifest.objects {
         let verified = source.verify(&object.sha256)?;
@@ -1179,6 +1572,50 @@ fn validate_object_manifest(manifest: &ObjectPayloadManifest) -> Result<()> {
         previous = Some(&object.sha256);
     }
     Ok(())
+}
+
+fn empty_catalogue_payload() -> CataloguePayload {
+    CataloguePayload {
+        format_version: BACKUP_CATALOGUE_VERSION,
+        revision: 0,
+        backups: Vec::new(),
+        prune_receipts: Vec::new(),
+    }
+}
+
+/// Retained artifacts exist only for catalogued entries, so a catalogue file
+/// that is absent beside them was lost; reading it as empty would hide that.
+fn require_no_orphan_artifacts(catalogue_root: &Path) -> Result<()> {
+    if let Some(directory) = [
+        ARCHIVE_DIRECTORY,
+        OBJECT_MANIFEST_DIRECTORY,
+        CATALOGUE_MANIFEST_DIRECTORY,
+        CONTROL_ARCHIVE_DIRECTORY,
+        OBJECT_PAYLOAD_DIRECTORY,
+    ]
+    .into_iter()
+    .find(|directory| catalogue_root.join(directory).exists())
+    {
+        return Err(Error::Archive(format!(
+            "backup catalogue is absent while retained {directory} exist beside it"
+        )));
+    }
+    Ok(())
+}
+
+/// Publishes the empty catalogue before the first artifact is retained, so
+/// every retained artifact is younger than the catalogue that owns it and an
+/// absent catalogue beside artifacts is always a loss.
+fn initialize_catalogue(catalogue_root: &Path) -> Result<()> {
+    if catalogue_root.join(CATALOGUE_FILE).exists() {
+        return Ok(());
+    }
+    require_no_orphan_artifacts(catalogue_root)?;
+    fs::create_dir_all(catalogue_root).map_err(backup_io)?;
+    write_catalogue(
+        catalogue_root,
+        catalogue_from_payload(empty_catalogue_payload())?,
+    )
 }
 
 fn catalogue_from_payload(payload: CataloguePayload) -> Result<BackupCatalogue> {
@@ -1350,6 +1787,9 @@ fn cleanup_pruned_artifacts(
         if let Some(path) = &entry.catalogue_manifest_file {
             retained_files.insert(path.clone());
         }
+        if let Some(path) = &entry.control_archive_file {
+            retained_files.insert(path.clone());
+        }
     }
     let mut removed_files = BTreeSet::new();
     let mut removed_objects = BTreeSet::new();
@@ -1370,6 +1810,9 @@ fn cleanup_pruned_artifacts(
         if let Some(path) = &entry.catalogue_manifest_file {
             removed_files.insert(path.clone());
         }
+        if let Some(path) = &entry.control_archive_file {
+            removed_files.insert(path.clone());
+        }
     }
     let unreachable_objects = removed_objects
         .difference(&retained_objects)
@@ -1382,6 +1825,8 @@ fn cleanup_pruned_artifacts(
             resolve_archive(catalogue_root, relative)?
         } else if relative.starts_with(&format!("{OBJECT_MANIFEST_DIRECTORY}/")) {
             resolve_object_manifest(catalogue_root, relative)?
+        } else if relative.starts_with(&format!("{CONTROL_ARCHIVE_DIRECTORY}/")) {
+            resolve_control_archive(catalogue_root, relative)?
         } else {
             resolve_catalogue_manifest(catalogue_root, relative)?
         };
@@ -1395,6 +1840,7 @@ fn cleanup_pruned_artifacts(
         ARCHIVE_DIRECTORY,
         OBJECT_MANIFEST_DIRECTORY,
         CATALOGUE_MANIFEST_DIRECTORY,
+        CONTROL_ARCHIVE_DIRECTORY,
         OBJECT_PAYLOAD_DIRECTORY,
     ] {
         let path = catalogue_root.join(directory);
@@ -1436,21 +1882,27 @@ fn validate_entries(entries: &[BackupEntry]) -> Result<()> {
             && entry.snapshot_leases == BackupCoverage::Excluded;
         let logical_only = entry.object_payloads == BackupCoverage::ReferencedOnly
             && entry.catalogues == BackupCoverage::Excluded
+            && entry.installed_control == BackupCoverage::Excluded
             && !entry.application_complete
             && entry.object_manifest_file.is_none()
             && entry.object_manifest.is_none()
             && entry.catalogue_manifest_file.is_none()
-            && entry.catalogue_manifest.is_none();
+            && entry.catalogue_manifest.is_none()
+            && entry.control_archive_file.is_none()
+            && entry.control_archive.is_none();
         let application_complete = entry.object_payloads == BackupCoverage::Included
             && entry.catalogues == BackupCoverage::Included
+            && entry.installed_control == BackupCoverage::Included
             && entry.application_complete
             && entry.object_manifest_file.is_some()
             && entry.object_manifest.is_some()
             && entry.catalogue_manifest_file.is_some()
-            && entry.catalogue_manifest.is_some();
+            && entry.catalogue_manifest.is_some()
+            && entry.control_archive_file.is_some()
+            && entry.control_archive.is_some();
         if !common_coverage || (!logical_only && !application_complete) {
             return Err(Error::Archive(
-                "backup v1 coverage declaration is not canonical".into(),
+                "backup v2 coverage declaration is not canonical".into(),
             ));
         }
         if let (Some(file), Some(inventory)) = (&entry.object_manifest_file, &entry.object_manifest)
@@ -1508,6 +1960,43 @@ fn validate_entries(entries: &[BackupEntry]) -> Result<()> {
         } else if entry.catalogue_manifest_file.is_some() || entry.catalogue_manifest.is_some() {
             return Err(Error::Archive(
                 "backup catalogue manifest path and inventory must be present together".into(),
+            ));
+        }
+        if let (Some(file), Some(inventory)) = (&entry.control_archive_file, &entry.control_archive)
+        {
+            validate_relative_control_archive(file)?;
+            if inventory.format_version != CONTROL_ARCHIVE_VERSION {
+                return Err(Error::Archive(
+                    "backup control-journal archive inventory is invalid".into(),
+                ));
+            }
+            validate_sha256_text(&inventory.archive_sha256, "backup control-journal archive")?;
+            validate_control_families(&inventory.families)?;
+            let empty_inventory_consistent = inventory.entry_count != 0
+                || (inventory.first_sequence.is_none() && inventory.last_sequence.is_none());
+            let populated_inventory_consistent = inventory.entry_count == 0
+                || (inventory.first_sequence.is_some()
+                    && inventory.last_sequence.is_some()
+                    && inventory.last_sequence <= Some(inventory.source_control_sequence)
+                    && inventory.first_sequence <= inventory.last_sequence);
+            if !empty_inventory_consistent || !populated_inventory_consistent {
+                return Err(Error::Archive(
+                    "backup control-journal archive inventory is invalid".into(),
+                ));
+            }
+            let expected = format!(
+                "{CONTROL_ARCHIVE_DIRECTORY}/{}.rrd-control-archive",
+                inventory.archive_sha256
+            );
+            if file != &expected {
+                return Err(Error::Archive(
+                    "backup control-journal archive path does not match its content identity"
+                        .into(),
+                ));
+            }
+        } else if entry.control_archive_file.is_some() || entry.control_archive.is_some() {
+            return Err(Error::Archive(
+                "backup control-journal archive path and inventory must be present together".into(),
             ));
         }
         if entry.claims != BackupCoverage::Included
@@ -1584,8 +2073,28 @@ fn validate_relative_catalogue_manifest(value: &str) -> Result<()> {
     Ok(())
 }
 
+fn validate_relative_control_archive(value: &str) -> Result<()> {
+    let path = Path::new(value);
+    let components: Vec<_> = path.components().collect();
+    if components.len() != 2
+        || components[0] != Component::Normal(CONTROL_ARCHIVE_DIRECTORY.as_ref())
+        || !matches!(components[1], Component::Normal(_))
+        || !value.ends_with(".rrd-control-archive")
+    {
+        return Err(Error::Archive(
+            "backup control-journal archive path is not canonical".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn resolve_archive(root: &Path, value: &str) -> Result<PathBuf> {
     validate_relative_archive(value)?;
+    Ok(root.join(value))
+}
+
+fn resolve_control_archive(root: &Path, value: &str) -> Result<PathBuf> {
+    validate_relative_control_archive(value)?;
     Ok(root.join(value))
 }
 
@@ -1601,4 +2110,196 @@ fn resolve_catalogue_manifest(root: &Path, value: &str) -> Result<PathBuf> {
 
 fn backup_io(error: std::io::Error) -> Error {
     Error::Archive(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transition(
+        key: &str,
+        expected: Option<&[u8]>,
+        replacement: Option<&[u8]>,
+        at: u64,
+    ) -> ControlTransition {
+        ControlTransition {
+            key: key.into(),
+            expected: expected.map(<[u8]>::to_vec),
+            replacement: replacement.map(<[u8]>::to_vec),
+            at,
+            actor: "replay-test".into(),
+            action: "test.transition".into(),
+            request_id: format!("request-{at}"),
+            operation_id: format!("operation-{at}"),
+        }
+    }
+
+    fn families() -> Vec<String> {
+        vec![
+            "server/state/install".into(),
+            "server/state/one/audit".into(),
+        ]
+    }
+
+    /// A source with a key that moves three times and another that is created
+    /// and deleted, archived under the declared families.
+    fn archived_source(root: &Path) -> (PathBuf, ControlArchiveInventory) {
+        let source = RrflowKvStore::create_new(&root.join("source")).unwrap();
+        let control = source.control();
+        control
+            .commit(&transition(
+                "server/state/install/record",
+                None,
+                Some(b"v1"),
+                1,
+            ))
+            .unwrap();
+        control
+            .commit(&transition(
+                "server/state/one/audit/a",
+                None,
+                Some(b"a1"),
+                2,
+            ))
+            .unwrap();
+        control
+            .commit(&transition(
+                "server/state/install/record",
+                Some(b"v1"),
+                Some(b"v2"),
+                3,
+            ))
+            .unwrap();
+        control
+            .commit(&transition(
+                "server/state/one/session/s",
+                None,
+                Some(b"lease"),
+                4,
+            ))
+            .unwrap();
+        control
+            .commit(&transition(
+                "server/state/one/audit/a",
+                Some(b"a1"),
+                None,
+                5,
+            ))
+            .unwrap();
+        control
+            .commit(&transition(
+                "server/state/install/record",
+                Some(b"v2"),
+                Some(b"v3"),
+                6,
+            ))
+            .unwrap();
+        let catalogue_root = root.join("catalogue");
+        fs::create_dir_all(&catalogue_root).unwrap();
+        let (file, inventory) =
+            retain_control_journal(&source, &catalogue_root, 6, &families()).unwrap();
+        assert_eq!(inventory.entry_count, 5);
+        (catalogue_root.join(file), inventory)
+    }
+
+    #[test]
+    fn an_interrupted_replay_resumes_after_its_last_committed_entry() {
+        let root = tempfile::tempdir().unwrap();
+        let (archive, inventory) = archived_source(root.path());
+        let target_root = root.path().join("target");
+        let target = RrflowKvStore::create_new(&target_root).unwrap();
+
+        replay_control_entries(&archive, &inventory, &target, Some(3)).unwrap();
+        let partial = control_restore_progress(&target).unwrap().unwrap();
+        assert_eq!(partial.applied, 3);
+        assert!(!partial.complete);
+        assert_eq!(partial.first_restored_sequence, Some(1));
+        assert_eq!(partial.last_restored_sequence, Some(3));
+        assert_eq!(
+            target.control().get("server/state/install/record").unwrap(),
+            Some(b"v2".to_vec())
+        );
+        drop(target);
+        assert!(
+            verify_restored_control_journal(&archive, &inventory, &target_root)
+                .unwrap_err()
+                .to_string()
+                .contains("incomplete"),
+            "an interrupted replay does not verify"
+        );
+
+        restore_control_journal(&archive, &inventory, &target_root).unwrap();
+        let target = RrflowKvStore::open_existing(&target_root).unwrap();
+        let progress = control_restore_progress(&target).unwrap().unwrap();
+        assert!(progress.complete);
+        assert_eq!(progress.applied, 5);
+        assert_eq!(progress.last_restored_sequence, Some(5));
+        assert_eq!(
+            target.control().sequence().unwrap(),
+            5,
+            "no entry is replayed twice"
+        );
+        assert_eq!(
+            target.control().get("server/state/install/record").unwrap(),
+            Some(b"v3".to_vec())
+        );
+        assert_eq!(
+            target.control().get("server/state/one/audit/a").unwrap(),
+            None
+        );
+        assert_eq!(
+            target.control().get("server/state/one/session/s").unwrap(),
+            None
+        );
+        drop(target);
+
+        // A completed replay is idempotent.
+        restore_control_journal(&archive, &inventory, &target_root).unwrap();
+        let target = RrflowKvStore::open_existing(&target_root).unwrap();
+        assert_eq!(target.control().sequence().unwrap(), 5);
+    }
+
+    #[test]
+    fn a_target_whose_control_state_diverges_fails_closed() {
+        let root = tempfile::tempdir().unwrap();
+        let (archive, inventory) = archived_source(root.path());
+        let target_root = root.path().join("target");
+        let target = RrflowKvStore::create_new(&target_root).unwrap();
+        target
+            .control()
+            .commit(&transition(
+                "server/state/install/record",
+                None,
+                Some(b"foreign"),
+                9,
+            ))
+            .unwrap();
+        drop(target);
+        let error = restore_control_journal(&archive, &inventory, &target_root).unwrap_err();
+        assert!(error.to_string().contains("diverged at source sequence 1"));
+        let target = RrflowKvStore::open_existing(&target_root).unwrap();
+        assert_eq!(
+            target.control().sequence().unwrap(),
+            1,
+            "nothing was applied"
+        );
+        assert!(control_restore_progress(&target).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_marker_from_another_archive_is_refused() {
+        let root = tempfile::tempdir().unwrap();
+        let (archive, inventory) = archived_source(root.path());
+        let target_root = root.path().join("target");
+        let target = RrflowKvStore::create_new(&target_root).unwrap();
+        replay_control_entries(&archive, &inventory, &target, Some(2)).unwrap();
+        drop(target);
+        let mut other = inventory.clone();
+        other.archive_sha256 = "0".repeat(64);
+        let target = RrflowKvStore::open_existing(&target_root).unwrap();
+        assert!(replay_control_entries(&archive, &other, &target, None)
+            .unwrap_err()
+            .to_string()
+            .contains("another control-journal replay"));
+    }
 }

@@ -20,6 +20,7 @@ struct Args {
     db: PathBuf,
     authority_instance: CanonicalId,
     state_root: PathBuf,
+    distribution_executable: PathBuf,
     policy: PathBuf,
     key: PathBuf,
     estate: CanonicalId,
@@ -45,6 +46,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 &args.db,
                 args.authority_instance,
                 &args.state_root,
+                &args.distribution_executable,
                 &args.policy,
                 &args.key,
                 args.estate,
@@ -64,6 +66,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             &args.db,
             args.authority_instance,
             &args.state_root,
+            &args.distribution_executable,
             &args.policy,
             &args.key,
             args.estate,
@@ -86,6 +89,7 @@ fn parse_args(mut arguments: impl Iterator<Item = String>) -> Result<Args, Strin
     let mut db = None;
     let mut authority_instance = None;
     let mut state_root = None;
+    let mut distribution_executable = None;
     let mut policy = None;
     let mut key = None;
     let mut estate = None;
@@ -108,6 +112,7 @@ fn parse_args(mut arguments: impl Iterator<Item = String>) -> Result<Args, Strin
                 authority_instance = Some(canonical(value, "--authority-instance")?)
             }
             "--state-root" => state_root = Some(PathBuf::from(value)),
+            "--distribution-executable" => distribution_executable = Some(PathBuf::from(value)),
             "--policy" => policy = Some(PathBuf::from(value)),
             "--key" => key = Some(PathBuf::from(value)),
             "--estate" => estate = Some(canonical(value, "--estate")?),
@@ -149,6 +154,8 @@ fn parse_args(mut arguments: impl Iterator<Item = String>) -> Result<Args, Strin
         db: db.ok_or("--db is required")?,
         authority_instance: authority_instance.ok_or("--authority-instance is required")?,
         state_root: state_root.ok_or("--state-root is required")?,
+        distribution_executable: distribution_executable
+            .ok_or("--distribution-executable is required")?,
         policy: policy.ok_or("--policy is required")?,
         key: key.ok_or("--key is required")?,
         estate: estate.ok_or("--estate is required")?,
@@ -169,7 +176,7 @@ fn canonical(value: String, option: &str) -> Result<CanonicalId, String> {
 }
 
 fn usage() -> &'static str {
-    "usage: rrd-recovery-controller <prune|restore> --db PATH --authority-instance ID --state-root PATH --policy PATH --key PATH --estate ID --instance ID --at UNIX_MS --request ID --operation ID --idempotency KEY [--evaluated-at UNIX_MS] [--backup-sha256 SHA256 --restore ID --started-at UNIX_MS]"
+    "usage: rrd-recovery-controller <prune|restore> --db PATH --authority-instance ID --state-root PATH --distribution-executable RRFLOW --policy PATH --key PATH --estate ID --instance ID --at UNIX_MS --request ID --operation ID --idempotency KEY [--evaluated-at UNIX_MS] [--backup-sha256 SHA256 --restore ID --started-at UNIX_MS]"
 }
 
 #[cfg(test)]
@@ -185,6 +192,8 @@ mod tests {
             "estate-control",
             "--state-root",
             "/state",
+            "--distribution-executable",
+            "/opt/rrflow/bin/rrflow",
             "--policy",
             "/policy",
             "--key",

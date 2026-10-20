@@ -22,13 +22,13 @@ repair, restore, ownership-safe uninstall, service installation, and a signed of
 platform distribution. Public apply no longer accepts installation time: the engine
 seals one versioned `host_system_time` / `unverified` observation, exact retry preserves
 it, recovery/replay/open enforce the format-2 rollback policy, and read-only verification
-reports typed current/tolerated/exceeded/unavailable evidence. The same bounded abrupt
-kill/reopen proof is scheduled on Linux, macOS, and Windows, but only the local Linux run
-is evidence in the current change. Authenticated time, OS synchronization diagnosis and
-authorized correction, runtime-wide temporal high-water rules, and native platform
-qualification still do not exist. The retained application-backup component is
-fail-closed open-existing code: it no longer creates a database at the pre-canonical
-parent, but it does not yet accept the installed locator and distribution binding.
+reports typed current/tolerated/exceeded/unavailable evidence. Authenticated time, OS synchronization diagnosis and
+authorized correction and runtime-wide temporal high-water rules remain open.
+The estate-controller
+backup, prune, and restore paths resolve a managed instance through its installed locator
+and distribution binding and act on the instance's own catalogue and staging roots; the
+estate cannot yet register backups the served engine created, so a retention decision over
+such a catalogue is refused.
 
 ## Impact
 
@@ -55,3 +55,27 @@ abrupt-kill/reopen journey are a bounded prerequisite, not closure. D-02 through
 prove durable attunement and inventory/index work; D-11 proves safe
 repair/restore/uninstall; native clock, filesystem, packaging, and signed release
 qualification pass in J.
+
+## Native installed-process coverage
+
+The [native lifecycle qualification receipt](../../evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
+records a verified test gap: the primary installed-process case was compiled
+only on Unix and substituted a manifest file for the distribution executable.
+Windows ran only three CLI argument tests. The replacement corpus binds the
+actual executable and tests fresh and existing project installation, durable
+commit, authenticated readback from a restarted process, and published-backup
+readback. It preserves deterministic preview, configured ceilings, exact-plan
+denials, live-writer exclusion and credential-redaction assertions.
+Platform CI now runs that corpus explicitly. Windows owned-process
+termination is not graceful shutdown qualification; signed offline bundles,
+hostile-path/ACL proof and the broader D-01/C-07 matrix remain open.
+
+The first native candidate exposed an overlapping-invocation defect: rejected
+admission replaced the active thread owner, and completion identified work only
+by caller coordinates. A stale completion could therefore clear newer work.
+The [invocation correction receipt](../../evidence/change-journals/gate-d/d-01-native-invocation-correction.md)
+records deterministic failures and their replacement evidence. Admission now
+preserves the occupied reservation, reports a retryable in-progress conflict
+with a completed audit, and binds completion to a private per-admission token.
+This does not close durable reasoning, generic uncertain-outcome recovery,
+or the wider installed-product qualification item.

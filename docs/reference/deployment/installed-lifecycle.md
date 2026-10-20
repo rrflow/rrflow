@@ -333,7 +333,7 @@ These operations are deliberately distinct:
 | Verify | No | read-only inspector | digest-bound report |
 | Repair plan | No | engine coordinator over physical/semantic inspectors | digest-bound proposed actions |
 | Repair apply | Publication only; never edits the live root in place | `RrdEngine` maintenance coordinator with exclusive lease | verified replacement candidate plus atomic publication receipt |
-| Restore | Creates absent target | authenticated backup plus engine installer | verified replacement candidate |
+| Restore | Creates absent target | digest-verified backup plus engine installer | verified replacement candidate |
 | Salvage | Writes separate output only | best-effort reader | explicitly incomplete, non-authoritative export |
 
 The first repair classes are:
@@ -345,7 +345,7 @@ The first repair classes are:
    from canonical committed semantic state and exact source cursors;
 4. resume or reconcile install/attunement actions from durable checkpoints and
    exact effect receipts; and
-5. restore an authenticated backup into an absent staging target, verify it,
+5. restore a digest-verified backup into an absent staging target, verify it,
    then require an explicit publication plan.
 
 Every `repair apply` is offline. It first preserves an authenticated,
@@ -366,9 +366,70 @@ be "fixed" by guessed values.
 
 Backup creation is an authenticated engine operation at one snapshot boundary.
 The application-complete form includes logical semantic commits, catalogues,
-immutable objects, configuration/schema identities, projection source
-coordinates, and the receipts needed to prove completeness. Backup verification
-is read-only and authenticates the whole catalogue closure.
+immutable objects, the estate's control state, configuration/schema
+identities, projection source coordinates, and the receipts needed to prove
+completeness. Backup verification is read-only and verifies the digests of the
+whole catalogue closure. A digest detects changed bytes; it does not
+authenticate a producer, because the catalogue shares the estate's filesystem
+trust domain and a keyed authenticator would sit beside the key it protects.
+Verification creates nothing: object stores and restored roots are opened as
+existing, and a catalogue file that is absent while retained artifacts exist
+beside it is reported as a loss rather than read as an empty catalogue.
+
+The control state travels as a content-addressed control-journal archive
+(`control-archives/<sha256>.rrd-control-archive`, format `RRDCJA01`), not as
+materialized values: readers such as the security audit chain derive state from
+the control journal's actions and order, so a restore replays the same
+transitions in the same order. The engine declares the families it carries,
+and the archive records them:
+
+| Family | Content |
+|---|---|
+| `server/state/install` | installed record and install checkpoint |
+| `server/state/<instance>/configuration` | active estate configuration |
+| `server/state/<instance>/security` | security policy (principals, roles, bindings, issuers; credentials as digests) |
+| `server/state/<instance>/audit`, `server/state/<instance>/audit-head` | the hash-chained audit records and their durable head |
+| `server/state/<instance>/attunement` | attunement plan and job state |
+| `server/state/estate` | estate documents |
+
+Every value in these families is non-secret. The token key (`RRD.TOKEN`) and
+the operator credential are files outside the store and are never part of a
+backup; a restored root has no token key until publication supplies one. Not
+carried: session leases, subscriptions, backup and restore operation receipts,
+and estate-recovery receipts, which are transient or belong to the instance
+that performed the operation. The two catalogue families travel in the
+catalogue manifest. A backup whose scope would overlap the catalogue families,
+or whose families overlap each other, is refused before any artifact is
+written.
+
+The backup catalogue is format version 2. Version 1 catalogues, whose
+application-complete entries omitted the control state, are refused rather
+than read as complete: `application_complete` is true only when the logical
+archive, object payloads, catalogue manifest, and control-journal archive are
+all present and digest-verified. The public `InstanceBackupSnapshot` projects
+the control state as its own coverage dimension, `installed_control`, beside
+`claims`, `catalogues`, and `object_payloads`, so a client reads what a backup
+carries rather than inferring it from `application_complete`.
+
+Restore replays the archive after the catalogue and object payloads, one
+control transition per archived entry, each committed in the same physical
+transaction as a replay-progress marker in the restored root's system space.
+An interrupted replay resumes after its last committed entry; a target whose
+control state does not hold an entry's recorded before-state fails closed
+before any further mutation. The marker stays in the root as restore
+provenance, and restore verification checks that the restored journal carries
+every archived entry contiguously and in order with the same key, before-state,
+value, time, actor, action, and request identities.
+
+On an installed estate the backup catalogue lives at
+`.rrflow/rrd/backups/<instance-id>/` and restore staging roots at
+`.rrflow/rrd/restores/<instance-id>/<restore-id>/`, both inside the managed
+persistent container beside `roots/` and never below it: `roots/` holds only
+storage roots the locator can select, and install recovery rejects any other
+entry there. Both directories are created on first use, not by installation,
+and uninstall retains them with the rrflowDB data. A component or test root
+opened outside an installation keeps its sibling `rrd-service/<instance>` tree;
+that tree is not an installed-estate location.
 
 Restore never overlays the live data root. It writes an absent staging root,
 validates format and application identity before replay, restores canonical
@@ -376,6 +437,30 @@ semantic state, validates every object, rebuilds or authenticates projections,
 opens it through the same installed engine path, and emits a publication plan.
 Publication requires the operator to choose the retained/quarantined old root
 and accept the exact digest.
+
+Publication is offline and takes the plan/apply shape of installation.
+`rrflow restore plan --restore <id> --backup <sha256>` emits a deterministic,
+digest-bound plan that binds the staged candidate, the active storage root it
+replaces, the backup that produced the candidate, and read-only evidence of
+both roots (physical digest, runtime manifest, runtime cursor, claim sequence,
+control sequence); the candidate's installed record must equal the active
+record and its configuration must match the locator, and the plan refuses a
+served estate because the read-only inspector cannot take its shared lock under
+a running writer. `rrflow restore apply --plan <file> --expect <sha256>`
+executes only that plan: it holds an exclusive publication lease for the
+instance, re-verifies both roots and the candidate's backup closure, carries the
+token key into the candidate (a backup never contains it), renames the active
+root to `.rrflow/rrd/restores/<instance-id>/<restore-id>.quarantined-<storage-root-id>/`,
+renames the candidate into the storage root's own name, opens the result
+through `open_installed`, records the publication receipt in its control
+journal, and passes quick verification. Because the candidate takes the
+storage root's own name, the locator, the installed record, and the single-root
+install-recovery rule are unchanged; the quarantined root is never overwritten.
+Every stage is durable in a private intent beside the candidate, so a rerun
+after a crash at any stage completes the same publication once, and a rerun
+after completion returns the recorded receipt as a replay. A candidate whose
+configuration revision differs from the active locator is refused; locator
+replacement for that case is D-11 work.
 
 ## Uninstall and data destruction
 
@@ -450,16 +535,47 @@ supported target:
   installed project plus the exact distribution executable and call
   `RrdEngine::open_installed`; neither can initialize absent state. They remain
   internal/adapter artifacts rather than additional operator lifecycle roots.
-- `RrflowKvStore::open` is split into explicit create-new and open-existing
-  operations; inspection is separate and read-only.
+- `RrflowKvStore` has explicit `create_new` and `open_existing` constructors
+  beside the retained create-or-open `open`. Every restore path, including the
+  local estate authority's, checks a restored target with `open_existing`, so
+  an empty or foreign target fails closed; `open` remains for component roots
+  and tests that do not claim installation. Inspection is separate and
+  read-only.
 - `rrflow-cli::dev::supervisor`, its private files, the standalone security
   initializer, `rrd-server initialize`, and create-on-start product paths are
   absent after the D-01 replacement tests passed.
-- the retained application-backup component now opens only an existing complete
-  component root. It intentionally cannot resolve the canonical installed
-  `roots/<install-id>` estate yet and cannot create a second store at the old
-  `.rrflow/rrd` parent. Installed backup/restore commands and
-  locator/distribution-bound controller inputs remain D-11/POA&M work.
+- the estate controller's backup, prune, and restore paths resolve a managed
+  instance as the installed project `instances/<instance>` under the estate
+  state root: they read its locator, require the controller's
+  `--distribution-executable` to be the installed distribution, and act on the
+  instance's own `.rrflow/rrd/backups/<id>` catalogue and
+  `.rrflow/rrd/restores/<id>/` staging roots — the catalogue the served engine
+  lists, and the staging roots `restore plan|apply` publishes from.
+  The backup driver opens the instance through `open_installed` with its real
+  token key; a project that is not an installed estate, a pre-canonical
+  `.rrflow/rrd` component store, or a different distribution is refused
+  permanently without creating anything. The former `<state-root>/backups` and
+  `<state-root>/restores` lane is gone. A retention decision applies only when
+  the estate's recovery points are exactly the instance's catalogue; a
+  catalogue that also holds backups created through the served engine's
+  `backup-create` is refused until the estate can register them (open D-11
+  work).
+- the engine's `backup-create`, `backup-list`, and `restore-create` operations
+  on an installed estate (opened through `open_installed` by `serve`) write to
+  `.rrflow/rrd/backups/<instance-id>/` and `.rrflow/rrd/restores/<instance-id>/`.
+  Before that correction they wrote below `roots/`, where install recovery
+  rejects any entry but the storage root. Restore stages; publication is the
+  offline `restore plan|apply` described above. A restore into an already
+  staged target is recovered by opening it as an existing store and verifying
+  it, never by creating a database there.
+- a backup of an installed estate carries the installed control state as the
+  control-journal archive above, and `rrflow restore plan|apply` publishes a
+  staged restore into the storage root's own name with the previous root
+  quarantined, so a restored estate opens through `open_installed` and reaches
+  authenticated readiness ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md),
+  closed). Still D-11 work: locator replacement for a candidate whose
+  configuration revision differs from the active locator, and the remaining
+  restore and salvage items under POAM-025.
 - current WAL torn-tail repair is retained only as a physical primitive invoked
   by an exact engine repair plan.
 

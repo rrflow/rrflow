@@ -57,9 +57,13 @@ canonical corpus. The result is a new immutable generation; configuration
 changes intentionally use a full build.
 
 `RrdEngine::ensure_vector_index` currently obtains canonical candidates by
-scanning retained runtime changes from cursor zero, reopens the active artifact,
-builds or advances a generation, stages its content-addressed object, and
-publishes the descriptor through the engine-owned vector artifact transaction.
+reading every vector version in the scope at one read stamp
+(`read_vector_versions`, a whole-family read rather than a cursor-zero replay),
+rebuilds the vector artifact catalogue by replaying retained changes from
+cursor zero ([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)), reopens the
+active artifact, builds or advances a generation, stages its content-addressed
+object, and publishes the descriptor through the engine-owned vector artifact
+transaction.
 Point commits never wait for the rebuild. An unchanged source/configuration
 can return the already-published generation idempotently.
 
@@ -84,7 +88,9 @@ edges or bitmaps, bounded native delta reads, compaction/reclamation under
 pinned snapshots, distributed placement, and qualified GPU construction are
 not complete.
 
-Gate C-04 must replace whole-log candidate discovery. Gate E-04 must commit
+Gate C-04 replaced whole-log candidate discovery with direct stamped reads and
+must still serve the artifact catalogue without replay
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). Gate E-04 must commit
 canonical vectors with atomic index deltas and prove immutable graph plus exact
 overlay through crash/reopen and corruption scenarios. Gate F-03 must expose
 HNSW candidate generation as a stamped native operator exchanging bounded

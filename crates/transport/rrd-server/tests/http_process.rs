@@ -1290,6 +1290,10 @@ fn managed_backup_and_restore_are_authenticated_replay_safe_and_path_closed() {
     );
     assert_eq!(payload(&backed_up)["backup"]["object_payloads"], "included");
     assert_eq!(payload(&backed_up)["backup"]["catalogues"], "included");
+    assert_eq!(
+        payload(&backed_up)["backup"]["installed_control"],
+        "included"
+    );
     assert_eq!(payload(&backed_up)["backup"]["application_complete"], true);
     let backup_id = payload(&backed_up)["backup"]["backup_sha256"]
         .as_str()

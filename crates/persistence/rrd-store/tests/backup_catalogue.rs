@@ -4,13 +4,44 @@ use rrd_core::{
     RuntimeSchemaRegistry, RuntimeTableSchema, RuntimeType, ScopeId, Subject,
 };
 use rrd_store::{
-    create_application_backup, create_logical_backup, load_backup_catalogue,
-    prune_backup_catalogue, restore_catalogued_backup, verify_backup_catalogue, BackupCoverage,
-    BackupPrunePlan, ControlTransition, DataRuntime, LocalObjectStore, RrflowKvStore,
-    StorageEngine,
+    control_restore_progress, create_application_backup, create_logical_backup,
+    load_backup_catalogue, prune_backup_catalogue, restore_catalogued_backup,
+    verify_backup_catalogue, verify_restored_backup_objects, BackupCoverage, BackupPrunePlan,
+    ControlTransition, DataRuntime, LocalObjectStore, RrflowKvStore, StorageEngine,
+    BACKUP_CATALOGUE_VERSION,
 };
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
+
+/// The control families a test estate declares as its estate control state.
+fn control_families() -> Vec<String> {
+    vec![
+        "server/state/install".into(),
+        "server/state/test/attunement".into(),
+        "server/state/test/audit".into(),
+        "server/state/test/audit-head".into(),
+        "server/state/test/security".into(),
+    ]
+}
+
+fn transition(
+    key: &str,
+    expected: Option<&[u8]>,
+    replacement: Option<&[u8]>,
+    at: u64,
+    action: &str,
+) -> ControlTransition {
+    ControlTransition {
+        key: key.into(),
+        expected: expected.map(<[u8]>::to_vec),
+        replacement: replacement.map(<[u8]>::to_vec),
+        at,
+        actor: "backup-test".into(),
+        action: action.into(),
+        request_id: format!("request-{at}"),
+        operation_id: format!("operation-{at}"),
+    }
+}
 
 fn claim(name: &str, at: u64) -> Claim {
     Claim::new(
@@ -74,10 +105,24 @@ fn authenticated_prune_is_partition_bound_replayable_and_preserves_shared_artifa
     let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
     let objects = LocalObjectStore::open(root.path().join("source-objects")).unwrap();
     let catalogue_root = root.path().join("catalogue");
-    let first =
-        create_application_backup(&engine, &objects, &catalogue_root, "first", 100).unwrap();
-    let second =
-        create_application_backup(&engine, &objects, &catalogue_root, "second", 200).unwrap();
+    let first = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "first",
+        100,
+        &control_families(),
+    )
+    .unwrap();
+    let second = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "second",
+        200,
+        &control_families(),
+    )
+    .unwrap();
     assert_eq!(first.archive_file, second.archive_file);
     assert_eq!(first.object_manifest_file, second.object_manifest_file);
     assert_eq!(
@@ -119,12 +164,17 @@ fn authenticated_prune_is_partition_bound_replayable_and_preserves_shared_artifa
         .unwrap_err()
         .to_string()
         .contains("stale"));
-    assert!(
-        create_application_backup(&engine, &objects, &catalogue_root, "first", 100)
-            .unwrap_err()
-            .to_string()
-            .contains("cannot be resurrected")
-    );
+    assert!(create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "first",
+        100,
+        &control_families(),
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("cannot be resurrected"));
 }
 
 #[test]
@@ -264,6 +314,7 @@ fn application_backup_payload_corruption_fails_before_restore_publication() {
         &catalogue_root,
         "complete",
         100,
+        &control_families(),
     )
     .unwrap();
     assert_eq!(entry.object_payloads, BackupCoverage::Included);
@@ -379,6 +430,7 @@ fn application_backup_restores_object_catalogue_and_audit_closure() {
         &catalogue_root,
         "closure",
         100,
+        &control_families(),
     )
     .unwrap();
     assert_eq!(
@@ -422,4 +474,311 @@ fn application_backup_restores_object_catalogue_and_audit_closure() {
         restored_objects.get(&object).unwrap(),
         b"portable object closure"
     );
+}
+
+#[test]
+fn application_backup_carries_and_replays_the_declared_control_journal() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
+    let objects = LocalObjectStore::open(root.path().join("source-objects")).unwrap();
+    engine.claims().append_batch(&[claim("one", 10)]).unwrap();
+    let scope = ScopeId::new("instance:control").unwrap();
+    let catalogue_key = format!("server/state/index-catalogue/{}", scope.as_str());
+
+    // Installed control state: a record that is later replaced, a policy, an
+    // audit chain whose head moves, and an attunement job that is deleted.
+    let record_v1 = br#"{"installed":1}"#;
+    let record_v2 = br#"{"installed":2}"#;
+    let audit_one = br#"{"audit":"one"}"#;
+    let audit_two = br#"{"audit":"two"}"#;
+    let head_one = br#"{"head":"one"}"#;
+    let head_two = br#"{"head":"two"}"#;
+    let control = engine.control();
+    control
+        .commit(&transition(
+            "server/state/install/record",
+            None,
+            Some(record_v1),
+            100,
+            "install.record",
+        ))
+        .unwrap();
+    control
+        .commit(&transition(
+            "server/state/test/security/policy",
+            None,
+            Some(br#"{"policy":true}"#),
+            101,
+            "security.initialized",
+        ))
+        .unwrap();
+    control
+        .commit_batch(&[
+            transition(
+                "server/state/test/audit/one",
+                None,
+                Some(audit_one),
+                102,
+                "security.audit",
+            ),
+            transition(
+                "server/state/test/audit-head",
+                None,
+                Some(head_one),
+                102,
+                "security.audit.head",
+            ),
+        ])
+        .unwrap();
+    // Excluded families: a session lease and the catalogue, which travels in
+    // the catalogue manifest instead.
+    control
+        .commit(&transition(
+            "server/state/test/session/lease",
+            None,
+            Some(br#"{"session":true}"#),
+            103,
+            "session.created",
+        ))
+        .unwrap();
+    control
+        .commit_catalog(
+            &scope,
+            &transition(
+                &catalogue_key,
+                None,
+                Some(br#"{"indexes":[]}"#),
+                104,
+                "index_catalogue.created",
+            ),
+        )
+        .unwrap();
+    control
+        .commit(&transition(
+            "server/state/test/attunement/job/j",
+            None,
+            Some(br#"{"job":"pending"}"#),
+            105,
+            "attunement.job.created",
+        ))
+        .unwrap();
+    control
+        .commit(&transition(
+            "server/state/install/record",
+            Some(record_v1),
+            Some(record_v2),
+            106,
+            "install.record.replaced",
+        ))
+        .unwrap();
+    control
+        .commit_batch(&[
+            transition(
+                "server/state/test/audit/two",
+                None,
+                Some(audit_two),
+                107,
+                "security.audit",
+            ),
+            transition(
+                "server/state/test/audit-head",
+                Some(head_one),
+                Some(head_two),
+                107,
+                "security.audit.head",
+            ),
+        ])
+        .unwrap();
+    control
+        .commit(&transition(
+            "server/state/test/attunement/job/j",
+            Some(br#"{"job":"pending"}"#),
+            None,
+            108,
+            "attunement.job.removed",
+        ))
+        .unwrap();
+    assert_eq!(control.sequence().unwrap(), 11);
+
+    let catalogue_root = root.path().join("catalogue");
+    let entry = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "control",
+        200,
+        &control_families(),
+    )
+    .unwrap();
+    assert_eq!(entry.installed_control, BackupCoverage::Included);
+    assert!(entry.application_complete);
+    let inventory = entry.control_archive.as_ref().unwrap();
+    assert_eq!(inventory.families, control_families());
+    assert_eq!(inventory.source_control_sequence, 11);
+    assert_eq!(inventory.entry_count, 9, "two excluded entries stay out");
+    assert_eq!(inventory.first_sequence, Some(1));
+    assert_eq!(inventory.last_sequence, Some(11));
+    assert!(catalogue_root
+        .join(entry.control_archive_file.as_ref().unwrap())
+        .is_file());
+    let catalogue = verify_backup_catalogue(&catalogue_root).unwrap();
+    assert_eq!(catalogue.format_version, BACKUP_CATALOGUE_VERSION);
+
+    let target = root.path().join("restored");
+    restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 300).unwrap();
+    let restored = RrflowKvStore::open_existing(&target).unwrap();
+    for (key, expected) in [
+        ("server/state/install/record", Some(record_v2.to_vec())),
+        (
+            "server/state/test/security/policy",
+            Some(br#"{"policy":true}"#.to_vec()),
+        ),
+        ("server/state/test/audit/one", Some(audit_one.to_vec())),
+        ("server/state/test/audit/two", Some(audit_two.to_vec())),
+        ("server/state/test/audit-head", Some(head_two.to_vec())),
+        ("server/state/test/attunement/job/j", None),
+        ("server/state/test/session/lease", None),
+    ] {
+        assert_eq!(
+            restored.control().get(key).unwrap(),
+            expected,
+            "restored control value for {key}"
+        );
+    }
+    assert_eq!(
+        restored.control().get(&catalogue_key).unwrap(),
+        Some(br#"{"indexes":[]}"#.to_vec()),
+        "the catalogue still arrives through the catalogue manifest"
+    );
+
+    // The audit chain is derived from the control journal's actions and
+    // order, so the restored journal must carry the same transitions in the
+    // same order after the catalogue restore's own entries.
+    let journal = restored.control().journal_since(0, 64).unwrap();
+    let replayed = journal
+        .iter()
+        .filter(|entry| !entry.key.starts_with("server/state/index-catalogue/"))
+        .collect::<Vec<_>>();
+    let source = engine
+        .control()
+        .journal_since(0, 64)
+        .unwrap()
+        .into_iter()
+        .filter(|entry| {
+            !entry.key.starts_with("server/state/index-catalogue/")
+                && !entry.key.starts_with("server/state/test/session/")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(replayed.len(), source.len());
+    for (restored_entry, source_entry) in replayed.iter().zip(&source) {
+        assert_eq!(restored_entry.key, source_entry.key);
+        assert_eq!(restored_entry.before_sha256, source_entry.before_sha256);
+        assert_eq!(restored_entry.replacement, source_entry.replacement);
+        assert_eq!(restored_entry.at, source_entry.at);
+        assert_eq!(restored_entry.actor, source_entry.actor);
+        assert_eq!(restored_entry.action, source_entry.action);
+        assert_eq!(restored_entry.request_id, source_entry.request_id);
+        assert_eq!(restored_entry.operation_id, source_entry.operation_id);
+    }
+    assert_eq!(
+        journal
+            .iter()
+            .filter(|entry| entry.action == "security.audit")
+            .map(|entry| entry.replacement.clone().unwrap())
+            .collect::<Vec<_>>(),
+        vec![audit_one.to_vec(), audit_two.to_vec()]
+    );
+    let progress = control_restore_progress(&restored).unwrap().unwrap();
+    assert!(progress.complete);
+    assert_eq!(progress.applied, 9);
+    assert_eq!(progress.archive_sha256, inventory.archive_sha256);
+    drop(restored);
+    verify_restored_backup_objects(&catalogue_root, &entry.backup_id, &target).unwrap();
+}
+
+#[test]
+fn version_one_catalogues_are_refused_rather_than_read_as_complete() {
+    let root = tempfile::tempdir().unwrap();
+    let catalogue_root = root.path().join("catalogue");
+    std::fs::create_dir_all(&catalogue_root).unwrap();
+    std::fs::write(
+        catalogue_root.join("catalogue.json"),
+        br#"{"payload":{"format_version":1,"revision":0,"backups":[]},"payload_sha256":"0000000000000000000000000000000000000000000000000000000000000000"}"#,
+    )
+    .unwrap();
+    assert!(load_backup_catalogue(&catalogue_root)
+        .unwrap_err()
+        .to_string()
+        .contains("unsupported backup catalogue version 1"));
+}
+
+#[test]
+fn a_control_scope_overlapping_the_catalogue_families_is_refused() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
+    let objects = LocalObjectStore::open(root.path().join("source-objects")).unwrap();
+    let catalogue_root = root.path().join("catalogue");
+    let error = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "overlap",
+        100,
+        &["server/state/index-catalogue".to_owned()],
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("catalogue manifest scope"));
+    assert!(!catalogue_root.exists(), "a refused scope writes nothing");
+}
+
+#[test]
+fn verification_reads_only_and_a_lost_catalogue_is_not_an_empty_one() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
+    let objects = LocalObjectStore::open(root.path().join("source-objects")).unwrap();
+    let catalogue_root = root.path().join("catalogue");
+    let entry = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue_root,
+        "complete",
+        100,
+        &control_families(),
+    )
+    .unwrap();
+    verify_backup_catalogue(&catalogue_root).unwrap();
+
+    // A missing payload store fails verification without being recreated.
+    let payloads = catalogue_root.join("payloads");
+    let kept = root.path().join("payloads-kept");
+    std::fs::rename(&payloads, &kept).unwrap();
+    assert!(verify_backup_catalogue(&catalogue_root).is_err());
+    assert!(
+        !payloads.exists(),
+        "verification must not create the payload store it failed to find"
+    );
+    std::fs::rename(&kept, &payloads).unwrap();
+    verify_backup_catalogue(&catalogue_root).unwrap();
+
+    // Restore verification of a target that lost its object store fails
+    // without creating one.
+    let target = root.path().join("restored");
+    restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 200).unwrap();
+    verify_restored_backup_objects(&catalogue_root, &entry.backup_id, &target).unwrap();
+    let immutable = target.join("immutable");
+    let kept = root.path().join("immutable-kept");
+    std::fs::rename(&immutable, &kept).unwrap();
+    assert!(verify_restored_backup_objects(&catalogue_root, &entry.backup_id, &target).is_err());
+    assert!(!immutable.exists());
+    std::fs::rename(&kept, &immutable).unwrap();
+
+    // A catalogue file lost beside its retained artifacts is a loss, not an
+    // empty catalogue; an untouched root still reads as empty.
+    std::fs::remove_file(catalogue_root.join("catalogue.json")).unwrap();
+    let lost = load_backup_catalogue(&catalogue_root).unwrap_err();
+    assert!(lost.to_string().contains("absent while retained"));
+    assert!(verify_backup_catalogue(&catalogue_root).is_err());
+    let untouched = load_backup_catalogue(&root.path().join("never-used")).unwrap();
+    assert!(untouched.backups.is_empty());
+    assert_eq!(untouched.revision, 0);
 }

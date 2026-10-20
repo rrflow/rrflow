@@ -24,22 +24,31 @@ jobs:
     name: installed RRFlow lifecycle
     runs-on: ${{ fromJSON(inputs.linux-standard-runner) }}
     timeout-minutes: 15
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: linux-topology
           cache-on-failure: true
-      - name: Test the real install, serve, authenticate, kill, reopen lifecycle
+      - name: Test the real install, serve, authenticate, stop, reopen lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Capture clean primary build provenance
+        run: python3 scripts/build_rrflow.py --profile dev --output "$RUNNER_TEMP/rrflow-build-receipt.json"
 
   estate-portability:
     name: estate process (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +59,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
         with:
           components: clippy
@@ -61,12 +71,14 @@ jobs:
         run: cargo test -p rrd-estate --all-targets --locked
       - name: Test RRD daemon process contract
         run: cargo test -p rrd-server --bin rrd-server --locked
+      - name: Test native installed primary lifecycle
+        run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Deny installed lifecycle test warnings
+        run: cargo clippy -p rrflow-cli --test installed_lifecycle --locked -- -D warnings
       - name: Build cross-package controller fixture
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test process fault injection (not product-readiness evidence)
         run: cargo test -p rrd-server --test local_estate_driver --locked -- --nocapture
-      - name: Test the real install, serve, authenticate, kill, reopen lifecycle
-        run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
       - name: Deny process-boundary warnings
         run: cargo clippy -p rrd-estate -p rrd-server --all-targets --locked -- -D warnings
 
@@ -85,6 +97,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
         with:
           components: clippy
@@ -96,6 +109,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Enforce owner-controlled release version
         run: python3 scripts/check_version.py
+      - name: Test build provenance and diagnostic profile policy
+        run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
         run: python3 scripts/ci/check_workflow.py
       - name: Enforce documentation authority and local links
@@ -111,7 +126,9 @@ jobs:
           cmp --silent "$first" "$second"
           python3 scripts/knowledge/test_export.py
       - name: Enforce exhaustive RRFlow 1.0 file planning
-        run: python3 scripts/ci/build_execution_inventory.py --check
+        run: |
+          python3 scripts/ci/test_execution_inventory.py
+          python3 scripts/ci/build_execution_inventory.py --check
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership
@@ -163,6 +180,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
         with:
           components: clippy
@@ -190,6 +208,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -268,6 +287,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
         with:
           components: clippy
@@ -306,6 +326,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          submodules: recursive
       - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
         with:
           components: clippy

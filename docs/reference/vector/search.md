@@ -101,10 +101,13 @@ The retained 10,000-by-128 local observation remains raw evidence at
 It is not a cross-system or production performance claim.
 
 Gate C-04 has replaced normal whole-log candidate reconstruction with direct
-versioned reads. Gate C-05 has removed the older artifact-catalogue reader and
-separate digest branch, requires the canonical collection plus named-vector
-address on every persisted candidate, and removes the duplicate generic
-quantized/TurboQuant publication, request, and suppression paths. Gate E-04
+versioned reads, but every search still rebuilds the vector artifact and
+quantization catalogues from cursor 0, so C-04 is reopened
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). Gate C-05 has removed
+the older artifact-catalogue reader and separate digest branch, requires the
+canonical collection plus named-vector address on every persisted candidate,
+and removes the duplicate generic quantized/TurboQuant publication, request,
+and suppression paths. Gate E-04
 must atomically maintain canonical vectors and index deltas, prove immutable
 HNSW plus exact overlay after crash/reopen, and satisfy fixed recall and
 filtering gates. Gate F-03 must make vector candidate generation and RRF native

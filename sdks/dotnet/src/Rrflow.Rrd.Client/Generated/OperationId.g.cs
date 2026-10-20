@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c
+// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -12,9 +12,13 @@ public enum OperationId
     ChangefeedFollow,
     ChangefeedRead,
     ContextAssemble,
+    DataSchemaRead,
     DiagnosticsRead,
     EndpointCatalogue,
     EstateRead,
+    FlightLaunch,
+    FlightList,
+    FlightRead,
     HealthLive,
     HealthReady,
     OpenapiRead,
@@ -28,6 +32,10 @@ public enum OperationId
     SessionRenew,
     SubscriptionClose,
     SubscriptionOpen,
+    TaskClose,
+    TaskList,
+    TaskOpen,
+    TaskRead,
     TransactionAbort,
     TransactionBegin,
     TransactionCommit,
@@ -55,8 +63,8 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const string OpenApiDocumentSha256 = "c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c";
-    public const int Count = 33;
+    public const string OpenApiDocumentSha256 = "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69";
+    public const int Count = 41;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -68,9 +76,13 @@ public static class EndpointCatalog
         OperationId.ChangefeedFollow => new("changefeed-follow", "POST", "/v1/changes/follow", Authentication.SessionBearer, false),
         OperationId.ChangefeedRead => new("changefeed-read", "POST", "/v1/changes/read", Authentication.SessionBearer, false),
         OperationId.ContextAssemble => new("context-assemble", "POST", "/v1/context/assemble", Authentication.SessionBearer, false),
+        OperationId.DataSchemaRead => new("data-schema-read", "POST", "/v1/data/schema", Authentication.SessionBearer, false),
         OperationId.DiagnosticsRead => new("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SessionBearer, false),
         OperationId.EndpointCatalogue => new("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.Public, false),
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),
+        OperationId.FlightLaunch => new("flight-launch", "POST", "/v1/flights", Authentication.SessionBearer, true),
+        OperationId.FlightList => new("flight-list", "POST", "/v1/flights/list", Authentication.SessionBearer, false),
+        OperationId.FlightRead => new("flight-read", "POST", "/v1/flights/read", Authentication.SessionBearer, false),
         OperationId.HealthLive => new("health-live", "GET", "/v1/health/live", Authentication.Public, false),
         OperationId.HealthReady => new("health-ready", "GET", "/v1/health/ready", Authentication.Public, false),
         OperationId.OpenapiRead => new("openapi-read", "GET", "/v1/schema/openapi", Authentication.Public, false),
@@ -84,6 +96,10 @@ public static class EndpointCatalog
         OperationId.SessionRenew => new("session-renew", "POST", "/v1/sessions/{session}/renew", Authentication.SessionBearer, true),
         OperationId.SubscriptionClose => new("subscription-close", "POST", "/v1/subscriptions/close", Authentication.SessionBearer, true),
         OperationId.SubscriptionOpen => new("subscription-open", "POST", "/v1/subscriptions/open", Authentication.SessionBearer, true),
+        OperationId.TaskClose => new("task-close", "POST", "/v1/tasks/close", Authentication.SessionBearer, true),
+        OperationId.TaskList => new("task-list", "POST", "/v1/tasks/list", Authentication.SessionBearer, false),
+        OperationId.TaskOpen => new("task-open", "POST", "/v1/tasks", Authentication.SessionBearer, true),
+        OperationId.TaskRead => new("task-read", "POST", "/v1/tasks/read", Authentication.SessionBearer, false),
         OperationId.TransactionAbort => new("transaction-abort", "DELETE", "/v1/transactions/{transaction}", Authentication.SessionBearer, true),
         OperationId.TransactionBegin => new("transaction-begin", "POST", "/v1/transactions", Authentication.SessionBearer, true),
         OperationId.TransactionCommit => new("transaction-commit", "POST", "/v1/transactions/{transaction}/commit", Authentication.SessionBearer, true),

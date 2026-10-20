@@ -9,6 +9,8 @@ mod attunement;
 mod capability_surface;
 mod deployment;
 mod diagnostic;
+mod endpoint_binding;
+mod flight;
 mod function;
 #[path = "generated/signal_catalogue.rs"]
 mod generated_signal_catalogue;
@@ -20,8 +22,10 @@ mod model_manifest;
 mod platform;
 mod read;
 mod reasoning_tree;
+mod restore_publication;
 mod router;
 mod sdk_conformance;
+mod task;
 mod websocket;
 
 pub use attunement::{
@@ -63,6 +67,27 @@ pub use diagnostic::{
     DiagnosticVectorArtifactSnapshot, DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot,
     DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
     MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
+};
+pub use endpoint_binding::{
+    endpoint_profile_sha256, BindingKind, BindingLimits, CredentialReference, DeclaredFootprint,
+    EndpointBinding, EndpointLocator, EndpointProfile, EndpointProfileInput, GpuCapacity,
+    GpuRequirement, HardwareInventory, MachineCapacity, MachineLoad, WorkloadClass,
+    ENDPOINT_PROFILE_CONTRACT_VERSION, HARDWARE_INVENTORY_CONTRACT_VERSION, MAX_BINDINGS_PER_CLASS,
+    MAX_BINDING_CONCURRENCY, MAX_BINDING_INPUT_BYTES, MAX_BINDING_TIMEOUT_MS,
+    MAX_CREDENTIAL_NAME_BYTES, MAX_DECLARED_BYTES, MAX_ENDPOINT_URL_BYTES, MAX_INVENTORY_MACHINES,
+    MAX_PROFILE_BINDINGS,
+};
+pub use flight::{
+    prompt_cohort_sha256, LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights,
+    PromptFlight, PromptFlightContextMode, PromptFlightContextRequest, PromptFlightContextSummary,
+    PromptFlightEvent, PromptFlightMetrics, PromptFlightPage, PromptFlightProvider,
+    PromptFlightReadResult, PromptFlightRecord, PromptFlightStage, PromptFlightStatus,
+    PromptFlightUse, ReadPromptFlight, MAX_PROMPT_FLIGHT_ACCEPTANCE_MARKER_BYTES,
+    MAX_PROMPT_FLIGHT_EVENTS, MAX_PROMPT_FLIGHT_EVENT_DATA_BYTES,
+    MAX_PROMPT_FLIGHT_EVENT_DETAIL_BYTES, MAX_PROMPT_FLIGHT_EVENT_KIND_BYTES,
+    MAX_PROMPT_FLIGHT_EVENT_LABEL_BYTES, MAX_PROMPT_FLIGHT_PAGE, MAX_PROMPT_FLIGHT_PROMPT_BYTES,
+    MAX_PROMPT_FLIGHT_STORAGE_KEYS, PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_FORMAT_VERSION,
+    PROMPT_FLIGHT_KIND, PROMPT_FLIGHT_USE_KIND,
 };
 pub use function::{
     validate_function_value, ExecuteFunction, FunctionArtifact, FunctionArtifactMediaType,
@@ -130,6 +155,12 @@ pub use reasoning_tree::{
     MAX_REASONING_TREE_EDGES, MAX_REASONING_TREE_NODES, MAX_REASONING_TREE_RECIPES,
     REASONING_TREE_CONTRACT_VERSION,
 };
+pub use restore_publication::{
+    restore_publication_plan_sha256, restore_publication_result_sha256, RestorePublicationAction,
+    RestorePublicationActionKind, RestorePublicationActionResult, RestorePublicationPlan,
+    RestorePublicationResult, RestoreRootEvidence, MAX_RESTORE_PUBLICATION_ACTIONS,
+    RESTORE_PUBLICATION_ACTIONS,
+};
 pub use router::{
     route_step_decision_schema_sha256, route_step_decision_sha256, route_step_request_sha256,
     router_backend_descriptor_sha256, RouteContextAllowance, RouteContextBudget, RouteDecisionKind,
@@ -144,6 +175,11 @@ pub use sdk_conformance::{
     SdkConformanceBackup, SdkConformanceChangefeed, SdkConformanceCorpus, SdkConformanceExpected,
     SdkConformanceIdentity, SdkConformanceSession, SdkConformanceTransaction, SdkConformanceVector,
     SDK_CONFORMANCE_FORMAT_VERSION,
+};
+pub use task::{
+    CloseTask, ListTasks, OpenTask, ReadTask, TaskPage, TaskReadResult, TaskRecord, TaskResult,
+    TaskStatus, MAX_TASK_GOAL_BYTES, MAX_TASK_OUTCOME_BYTES, MAX_TASK_PAGE, MAX_TASK_STORAGE_KEYS,
+    MAX_TASK_TITLE_BYTES, TASK_FORMAT_VERSION, TASK_INCLUDES_KIND, TASK_KIND,
 };
 pub use websocket::{
     decode_websocket_frame, encode_websocket_frame, validate_subscription_snapshot,
@@ -172,7 +208,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "c36969467fa04b235fa6b0a1312f10deb373fd9424733262e6a3216312d7f91c";
+    "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -2806,6 +2842,12 @@ pub struct InstanceBackupSnapshot {
     pub claims: BackupCoverageSnapshot,
     pub typed_runtime: BackupCoverageSnapshot,
     pub catalogues: BackupCoverageSnapshot,
+    /// The estate's control state outside the catalogues: installed record
+    /// and checkpoint, active configuration, security policy and audit chain,
+    /// attunement plan and job state, and estate documents. `included` means
+    /// the backup carries them as a replayable control-journal archive; the
+    /// token key and operator credential are never carried.
+    pub installed_control: BackupCoverageSnapshot,
     pub object_payloads: BackupCoverageSnapshot,
     pub projections: BackupCoverageSnapshot,
     pub invocation_telemetry: BackupCoverageSnapshot,
@@ -2943,6 +2985,10 @@ pub enum SecurityAction {
     FunctionCatalogueWrite,
     FunctionExecute,
     DiagnosticsRead,
+    FlightLaunch,
+    FlightRead,
+    TaskWrite,
+    TaskRead,
     SecurityAdmin,
     MemoryContextRead,
     ReasoningRead,
@@ -2952,7 +2998,7 @@ pub enum SecurityAction {
 impl SecurityAction {
     /// Canonical policy-action catalogue. Installation profiles and other
     /// projections consume this list instead of maintaining parallel copies.
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 51] = [
         Self::ServiceInspect,
         Self::UnknownRequest,
         Self::SessionCreate,
@@ -2996,6 +3042,10 @@ impl SecurityAction {
         Self::FunctionCatalogueWrite,
         Self::FunctionExecute,
         Self::DiagnosticsRead,
+        Self::FlightLaunch,
+        Self::FlightRead,
+        Self::TaskWrite,
+        Self::TaskRead,
         Self::SecurityAdmin,
         Self::MemoryContextRead,
         Self::ReasoningRead,
@@ -3487,6 +3537,36 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "DiagnosticSnapshot",
         ),
         endpoint(
+            "flight-launch",
+            HttpMethod::Post,
+            "/v1/flights",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::FlightLaunch,
+            "LaunchPromptFlight",
+            "LaunchPromptFlightResult",
+        ),
+        endpoint(
+            "flight-list",
+            HttpMethod::Post,
+            "/v1/flights/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::FlightRead,
+            "ListPromptFlights",
+            "PromptFlightPage",
+        ),
+        endpoint(
+            "flight-read",
+            HttpMethod::Post,
+            "/v1/flights/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::FlightRead,
+            "ReadPromptFlight",
+            "PromptFlightReadResult",
+        ),
+        endpoint(
             "estate-read",
             HttpMethod::Post,
             "/v1/estates/{estate}/read",
@@ -3535,6 +3615,16 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::ServiceInspect,
             "Empty",
             "OpenApiDocument",
+        ),
+        endpoint(
+            "data-schema-read",
+            HttpMethod::Post,
+            "/v1/data/schema",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "ReadDataSchema",
+            "DataSchemaSnapshot",
         ),
         endpoint(
             "query-execute",
@@ -3635,6 +3725,46 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::SubscriptionOpen,
             "OpenSubscription",
             "OpenSubscriptionResult",
+        ),
+        endpoint(
+            "task-close",
+            HttpMethod::Post,
+            "/v1/tasks/close",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::TaskWrite,
+            "CloseTask",
+            "TaskResult",
+        ),
+        endpoint(
+            "task-list",
+            HttpMethod::Post,
+            "/v1/tasks/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::TaskRead,
+            "ListTasks",
+            "TaskPage",
+        ),
+        endpoint(
+            "task-open",
+            HttpMethod::Post,
+            "/v1/tasks",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::TaskWrite,
+            "OpenTask",
+            "TaskResult",
+        ),
+        endpoint(
+            "task-read",
+            HttpMethod::Post,
+            "/v1/tasks/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::TaskRead,
+            "ReadTask",
+            "TaskReadResult",
         ),
         endpoint(
             "transaction-abort",
@@ -4054,6 +4184,14 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "ReadDataSchema" => schema_json::<RequestEnvelope<ReadDataSchema>>(),
+        "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
+        "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
+        "ReadPromptFlight" => schema_json::<RequestEnvelope<ReadPromptFlight>>(),
+        "OpenTask" => schema_json::<RequestEnvelope<OpenTask>>(),
+        "CloseTask" => schema_json::<RequestEnvelope<CloseTask>>(),
+        "ListTasks" => schema_json::<RequestEnvelope<ListTasks>>(),
+        "ReadTask" => schema_json::<RequestEnvelope<ReadTask>>(),
         "ReadEstate" => schema_json::<RequestEnvelope<ReadEstate>>(),
         "RenewSession" => schema_json::<RequestEnvelope<RenewSession>>(),
         "RestoreInstanceBackup" => schema_json::<RequestEnvelope<RestoreInstanceBackup>>(),
@@ -4079,6 +4217,13 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "DataSchemaSnapshot" => schema_json::<ResponseEnvelope<DataSchemaSnapshot>>(),
+        "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
+        "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),
+        "PromptFlightReadResult" => schema_json::<ResponseEnvelope<PromptFlightReadResult>>(),
+        "TaskResult" => schema_json::<ResponseEnvelope<TaskResult>>(),
+        "TaskPage" => schema_json::<ResponseEnvelope<TaskPage>>(),
+        "TaskReadResult" => schema_json::<ResponseEnvelope<TaskReadResult>>(),
         "EndpointCatalogue" => schema_json::<ResponseEnvelope<EndpointCatalogue>>(),
         "EstateSnapshot" => schema_json::<ResponseEnvelope<EstateSnapshot>>(),
         "InstanceBackupCatalogueSnapshot" => {
@@ -5467,6 +5612,58 @@ pub struct DataSchemaRegistry {
     pub relations: BTreeMap<CanonicalId, DataRelationSchema>,
     #[serde(default)]
     pub events: BTreeMap<CanonicalId, DataEventSchema>,
+}
+
+/// Bounded, authenticated catalogue discovery for database administration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadDataSchema {
+    pub scope: String,
+    pub max_storage_keys: u32,
+}
+
+impl ReadDataSchema {
+    pub fn validate(&self) -> Result<()> {
+        if self.scope.is_empty() || self.scope.len() > MAX_ID_BYTES || self.scope.contains('\0') {
+            return invalid("data schema scope is invalid");
+        }
+        if self.max_storage_keys == 0 || self.max_storage_keys > MAX_DATA_SNAPSHOT_STORAGE_KEYS {
+            return invalid("data schema storage key budget is out of bounds");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DataSchemaSnapshot {
+    pub scope: String,
+    pub known_at_cursor: u64,
+    pub read_manifest_sha256: String,
+    pub schema: Option<DataSchemaRegistry>,
+    pub read_evidence: ReadEvidence,
+}
+
+impl DataSchemaSnapshot {
+    pub fn validate(&self) -> Result<()> {
+        ReadDataSchema {
+            scope: self.scope.clone(),
+            max_storage_keys: 1,
+        }
+        .validate()?;
+        validate_sha256(&self.read_manifest_sha256, "schema read manifest")?;
+        self.read_evidence.validate()?;
+        if let Some(schema) = &self.schema {
+            if schema.revision == 0 {
+                return invalid("schema revision must be non-zero");
+            }
+            TransactionMutation::PutSchema {
+                registry: schema.clone(),
+            }
+            .validate()?;
+        }
+        Ok(())
+    }
 }
 
 /// Bounded request for one all-model snapshot at the engine's current

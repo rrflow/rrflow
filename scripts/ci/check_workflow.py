@@ -139,6 +139,13 @@ def verify_workflow_security(workflows: dict[Path, str]) -> None:
                 "persist-credentials: false" in body,
                 f"checkout credentials must not persist: {relative}:{line_number}",
             )
+            # A declared submodule is a pinned source input, so every checkout
+            # must materialize it rather than build an incomplete tree.
+            require(
+                not (ROOT / ".gitmodules").is_file()
+                or "submodules: recursive" in body,
+                f"checkout must fetch declared submodules recursively: {relative}:{line_number}",
+            )
 
 
 def verify_action_pins(workflows: dict[Path, str]) -> None:
@@ -526,6 +533,18 @@ def main() -> None:
         require(
             "timeout-minutes:" in block, f"CI job {job} must have an explicit timeout"
         )
+
+    for job in ["topology-smoke", "estate-portability"]:
+        require(
+            "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
+            in jobs[job],
+            f"{job} must exercise the installed primary executable lifecycle",
+        )
+    require(
+        "cargo clippy -p rrflow-cli --test installed_lifecycle --locked -- -D warnings"
+        in jobs["estate-portability"],
+        "native installed lifecycle tests must not hide platform warnings",
+    )
 
     gate = jobs["ci-gate"]
     needs_match = re.search(

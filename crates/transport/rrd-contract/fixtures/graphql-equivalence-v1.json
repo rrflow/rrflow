@@ -44,7 +44,7 @@
       },
       "rrflowql": "FROM traverse:depends_on START document:a DIRECTION OUTGOING DEPTH 4 AT VALID 100 KNOWN HEAD PROJECT node_id, depth, path",
       "expected_schema_digest": "ef3c0f82ddff2bdea704bb0b0719205512bdad440ad000c9a207e0ac533c3575",
-      "expected_bound_digest": "a02fda9ee92ea39cbfe07d23abd3d0330583f6fa9721a00a6251f82e07b9e152"
+      "expected_bound_digest": "2e2e5c28e6174a7fa9db4723f223e3aea0fab95920416302317a828842e89945"
     },
     {
       "name": "record_relation_join",

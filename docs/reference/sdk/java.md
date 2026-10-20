@@ -58,29 +58,29 @@ The complete reviewed source layout is:
 
 ```text
 sdks/java/
-├── pom.xml
-├── scripts/
-│   └── generate.py
-└── src/
-    ├── main/java/io/rrflow/rrd/
-    │   ├── package-info.java
-    │   ├── ClientConfig.java
-    │   ├── EndpointResolver.java
-    │   ├── HttpTransport.java
-    │   ├── OperationBinding.java
-    │   ├── OperationExecutor.java
-    │   ├── OperationId.java
-    │   ├── ProtocolCodec.java
-    │   ├── RequestOptions.java
-    │   ├── ResourceSegment.java
-    │   ├── RetryPolicy.java
-    │   ├── RrdApiException.java
-    │   ├── RrdClient.java
-    │   ├── RrdClientException.java
-    │   └── Session.java
-    └── test/java/io/rrflow/rrd/
-        ├── RrdClientTest.java
-        └── SdkConformanceTest.java
+â”œâ”€â”€ pom.xml
+â”œâ”€â”€ scripts/
+â”‚   â””â”€â”€ generate.py
+â””â”€â”€ src/
+    â”œâ”€â”€ main/java/io/rrflow/rrd/
+    â”‚   â”œâ”€â”€ package-info.java
+    â”‚   â”œâ”€â”€ ClientConfig.java
+    â”‚   â”œâ”€â”€ EndpointResolver.java
+    â”‚   â”œâ”€â”€ HttpTransport.java
+    â”‚   â”œâ”€â”€ OperationBinding.java
+    â”‚   â”œâ”€â”€ OperationExecutor.java
+    â”‚   â”œâ”€â”€ OperationId.java
+    â”‚   â”œâ”€â”€ ProtocolCodec.java
+    â”‚   â”œâ”€â”€ RequestOptions.java
+    â”‚   â”œâ”€â”€ ResourceSegment.java
+    â”‚   â”œâ”€â”€ RetryPolicy.java
+    â”‚   â”œâ”€â”€ RrdApiException.java
+    â”‚   â”œâ”€â”€ RrdClient.java
+    â”‚   â”œâ”€â”€ RrdClientException.java
+    â”‚   â””â”€â”€ Session.java
+    â””â”€â”€ test/java/io/rrflow/rrd/
+        â”œâ”€â”€ RrdClientTest.java
+        â””â”€â”€ SdkConformanceTest.java
 ```
 
 A-07.1f directly produced this layout from the former 390-line
@@ -91,7 +91,7 @@ behaviors below.
 
 `RrdClient` is a synchronous generic HTTP facade. It has helpers for
 capabilities, endpoint catalogue, OpenAPI, and session creation; `call` can
-address all 33 current HTTP operation identifiers. That is route reachability,
+address all 40 current HTTP operation identifiers. That is route reachability,
 not complete operation semantics. There is no Java WebSocket, async call,
 remote-TLS profile, server-cancellation path, installed endpoint resolver, or
 release-qualified artifact.
@@ -125,16 +125,18 @@ binary as an argument vector without a shell, reads the complete OpenAPI 3.1
 document, sorts operations, and supports a byte-for-byte drift check. The
 checked-in `OperationId.java` contains:
 
-- 33 enum constants;
+- 40 enum constants;
 - wire operation name, HTTP method, route template, first authentication
   scheme, and mutation flag for each constant; and
 - OpenAPI SHA-256
-  `3c016e8f0b49623aa091254a37c19cb064efa6773a1fa19ce64edb179824fec0`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
-The removed flat record incorrectly said 34 routes even though the generator,
-enum, unit assertion, public catalogue, and OpenAPI projection contain 33.
-This reference records 33 and does not treat that correction as a capability
-change.
+An earlier flat record incorrectly said 34 routes when the generator, enum,
+unit assertion, public catalogue, and OpenAPI projection contained 33. The
+prompt-flight family (`flight-launch`, `flight-list`, `flight-read`) then
+raised every projection to 36, and the task family (`task-open`,
+`task-close`, `task-list`, `task-read`) to 40; this reference records 40.
+None of these changes is a language-binding capability claim.
 
 The generator does not emit request/result/error types, allowed route
 parameters, security actions, exact success statuses, media types, causal
@@ -403,7 +405,7 @@ Current evidence is deliberately bounded:
 | Command or probe | Observed result | Honest boundary |
 |---|---|---|
 | `mvn --batch-mode -f sdks/java/pom.xml test` | Three loopback unit tests passed; the manifest-gated test was reported as one skip. | Compilation plus selected retry/auth/envelope/error checks; no configured engine corpus. |
-| `python3 sdks/java/scripts/generate.py --check` | Checked-in enum matched 33 operations and the OpenAPI digest. | Method/path/auth/mutation projection only. |
+| `python3 sdks/java/scripts/generate.py --check` | Checked-in enum matched 40 operations and the OpenAPI digest. | Method/path/auth/mutation projection only. |
 | full shared conformance runner | Java's configured test passed with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2`. | Real HTTP against one direct-seeded rrflowKV daemon fixture; not installation, rrflowMX parity, or complete labelled behavior. |
 | temporary adversarial test | Replayed an unpinned invalid query, accepted `201 text/plain` plus invalid payload, and exposed the bearer through record formatting and Jackson. | Reproducible open H-04 correctness/security defects. |
 | two clean Maven packages | Both built, but their JAR SHA-256 values differed. | Current artifact is not byte-reproducible. |
@@ -438,29 +440,29 @@ contract:
 
 ```text
 sdks/java/
-├── pom.xml
-├── scripts/
-│   └── generate.py
-└── src/
-    ├── main/java/io/rrflow/rrd/
-    │   ├── package-info.java            # public boundary and canonical links
-    │   ├── ClientConfig.java            # current validated construction
-    │   ├── EndpointResolver.java        # current loopback route resolution
-    │   ├── HttpTransport.java           # current bounded response carriage
-    │   ├── OperationBinding.java        # current common request binding
-    │   ├── OperationExecutor.java       # current synchronous coordination
-    │   ├── OperationId.java             # catalogue-derived identifier map
-    │   ├── ProtocolCodec.java            # current partial envelope codec
-    │   ├── RequestOptions.java          # per-call semantic coordinates
-    │   ├── ResourceSegment.java         # typed public resource component
-    │   ├── RetryPolicy.java             # current broad replay/deadline rule
-    │   ├── RrdApiException.java         # typed engine denial
-    │   ├── RrdClient.java               # narrow synchronous public facade
-    │   ├── RrdClientException.java      # closed redacted error root
-    │   └── Session.java                 # current plain secret-bearing record
-    └── test/java/io/rrflow/rrd/
-        ├── RrdClientTest.java
-        └── SdkConformanceTest.java
+â”œâ”€â”€ pom.xml
+â”œâ”€â”€ scripts/
+â”‚   â””â”€â”€ generate.py
+â””â”€â”€ src/
+    â”œâ”€â”€ main/java/io/rrflow/rrd/
+    â”‚   â”œâ”€â”€ package-info.java            # public boundary and canonical links
+    â”‚   â”œâ”€â”€ ClientConfig.java            # current validated construction
+    â”‚   â”œâ”€â”€ EndpointResolver.java        # current loopback route resolution
+    â”‚   â”œâ”€â”€ HttpTransport.java           # current bounded response carriage
+    â”‚   â”œâ”€â”€ OperationBinding.java        # current common request binding
+    â”‚   â”œâ”€â”€ OperationExecutor.java       # current synchronous coordination
+    â”‚   â”œâ”€â”€ OperationId.java             # catalogue-derived identifier map
+    â”‚   â”œâ”€â”€ ProtocolCodec.java            # current partial envelope codec
+    â”‚   â”œâ”€â”€ RequestOptions.java          # per-call semantic coordinates
+    â”‚   â”œâ”€â”€ ResourceSegment.java         # typed public resource component
+    â”‚   â”œâ”€â”€ RetryPolicy.java             # current broad replay/deadline rule
+    â”‚   â”œâ”€â”€ RrdApiException.java         # typed engine denial
+    â”‚   â”œâ”€â”€ RrdClient.java               # narrow synchronous public facade
+    â”‚   â”œâ”€â”€ RrdClientException.java      # closed redacted error root
+    â”‚   â””â”€â”€ Session.java                 # current plain secret-bearing record
+    â””â”€â”€ test/java/io/rrflow/rrd/
+        â”œâ”€â”€ RrdClientTest.java
+        â””â”€â”€ SdkConformanceTest.java
 ```
 
 The following files remain deliberately absent until their assigned gate adds

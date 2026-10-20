@@ -5,6 +5,7 @@ use super::*;
 use crate::engine::estate_layout::{
     create_estate_directories, reject_existing_estate, reject_existing_symlink_path, safe_join,
     validate_managed_relative, validate_recovery_estate, EstateLayout, LOCATOR_RELATIVE_PATH,
+    STORAGE_DIRECTORY,
 };
 use crate::engine::memory_estate::build_memory_estate_plan;
 use crate::engine::token_key::{read_api_key_document, read_token_key, ApiKeyDocument};
@@ -32,9 +33,9 @@ const INSTALL_PROFILE_FORMAT: u16 = 1;
 const LOCATOR_FORMAT: u16 = 1;
 const INSTALLED_RECORD_FORMAT: u16 = 2;
 const INSTALL_CHECKPOINT_FORMAT: u16 = 2;
-const INSTALLED_RECORD_KEY: &str = "server/state/install/record";
+pub(super) const INSTALLED_RECORD_KEY: &str = "server/state/install/record";
 const INSTALL_CHECKPOINT_KEY: &str = "server/state/install/checkpoint";
-const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
+pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
 const MAX_CONFIGURATION_BYTES: u64 = 64 * 1024;
 
 pub(super) mod recovery;
@@ -73,7 +74,7 @@ pub struct DefaultAttunementPhase {
 }
 
 impl DefaultInstallProfile {
-    fn load(requested: &str) -> Result<(Self, String)> {
+    pub(super) fn load(requested: &str) -> Result<(Self, String)> {
         if requested != "default" {
             return Err(ServiceError::Contract(format!(
                 "unsupported installation profile {requested:?}"
@@ -246,7 +247,7 @@ pub struct InstalledEstateRecord {
 }
 
 impl InstalledEstateRecord {
-    fn validate(&self) -> Result<()> {
+    pub(super) fn validate(&self) -> Result<()> {
         self.installation
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
@@ -1061,6 +1062,7 @@ impl RrdEngine {
             locator.identity.clone(),
             installed.installation.deployment.clone(),
             configuration,
+            safe_join(&project, STORAGE_DIRECTORY)?,
         )?;
         if !engine.security_enforced()? {
             return Err(ServiceError::Storage(
@@ -1627,7 +1629,7 @@ fn collect_project_entries(
     Ok(())
 }
 
-fn sha256_file(path: &Path) -> Result<String> {
+pub(super) fn sha256_file(path: &Path) -> Result<String> {
     let metadata = std::fs::symlink_metadata(path)
         .map_err(|error| ServiceError::Storage(error.to_string()))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
@@ -1648,7 +1650,7 @@ fn sha256_file(path: &Path) -> Result<String> {
     Ok(hasher.finalize_hex())
 }
 
-fn read_locator(project: &Path) -> Result<(PathBuf, ProjectLocator, Vec<u8>)> {
+pub(super) fn read_locator(project: &Path) -> Result<(PathBuf, ProjectLocator, Vec<u8>)> {
     let project = canonical_project(project, InstallationTargetKind::ExistingProject)?;
     let path = project.join(LOCATOR_RELATIVE_PATH);
     reject_existing_symlink_path(&project, &path)?;
@@ -1761,7 +1763,7 @@ fn cleanup_pending_file(path: &Path, expected: &[u8]) -> Result<()> {
     }
 }
 
-fn read_regular_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>> {
+pub(super) fn read_regular_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>> {
     let metadata = std::fs::symlink_metadata(path)
         .map_err(|error| ServiceError::Storage(error.to_string()))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > maximum {
@@ -1894,7 +1896,7 @@ fn control_create<T: Serialize>(
     Ok(transition)
 }
 
-fn decode_control<T: DeserializeOwned>(
+pub(super) fn decode_control<T: DeserializeOwned>(
     inspector: &RrflowKvInspector,
     key: &str,
     label: &str,
@@ -1910,7 +1912,7 @@ fn decode_json<T: DeserializeOwned>(bytes: &[u8], label: &str) -> Result<T> {
         .map_err(|error| ServiceError::Storage(format!("{label} is invalid: {error}")))
 }
 
-fn require_locator_record_match(
+pub(super) fn require_locator_record_match(
     locator: &ProjectLocator,
     installed: &InstalledEstateRecord,
 ) -> Result<()> {
@@ -1951,11 +1953,11 @@ fn attunement_job_key(instance: &CanonicalId, job: &CanonicalId) -> String {
     format!("server/state/{instance}/attunement/job/{job}")
 }
 
-fn estate_configuration_key(instance: &CanonicalId) -> String {
+pub(super) fn estate_configuration_key(instance: &CanonicalId) -> String {
     format!("server/state/{instance}/configuration/active")
 }
 
-fn runtime_manifest_from_inspection(
+pub(super) fn runtime_manifest_from_inspection(
     inspector: &RrflowKvInspector,
     locator: &ProjectLocator,
 ) -> Result<String> {
@@ -1996,13 +1998,13 @@ fn installation_checkpoint_sha256(checkpoint: &InstallationCheckpoint) -> Result
     ))
 }
 
-fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String> {
+pub(super) fn json_sha256<T: Serialize + ?Sized>(value: &T) -> Result<String> {
     serde_json::to_vec(value)
         .map(|bytes| digest::sha256_hex(&bytes))
         .map_err(contract_json)
 }
 
-fn canonical_prefixed(prefix: &str, sha256: &str) -> Result<CanonicalId> {
+pub(super) fn canonical_prefixed(prefix: &str, sha256: &str) -> Result<CanonicalId> {
     if !is_sha256(sha256) {
         return Err(ServiceError::Contract(
             "identity seed is not SHA-256".into(),

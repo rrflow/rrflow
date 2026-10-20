@@ -17,6 +17,7 @@ pub enum ServiceError {
     TransactionQuota,
     RenewalQuota,
     IdempotencyConflict,
+    InvocationInProgress,
     CommitInProgress,
     WrongScope,
     OperationDigestMismatch,
@@ -43,6 +44,9 @@ pub enum ServiceError {
     FunctionNotFound,
     FunctionCatalogueRevisionNotFound,
     MemoryTargetNotFound,
+    FlightNotFound,
+    TaskNotFound,
+    TaskClosed,
     SeatNotRepresented,
     Runtime(String),
     PermissionDenied,
@@ -86,10 +90,12 @@ impl ServiceError {
             | Self::TransactionNotFound
             | Self::SubscriptionNotFound
             | Self::FunctionNotFound
-            | Self::MemoryTargetNotFound => ServiceErrorKind::NotFound,
+            | Self::MemoryTargetNotFound
+            | Self::FlightNotFound
+            | Self::TaskNotFound => ServiceErrorKind::NotFound,
             Self::Unauthenticated => ServiceErrorKind::Unauthenticated,
             Self::PermissionDenied => ServiceErrorKind::PermissionDenied,
-            Self::IdempotencyConflict => ServiceErrorKind::Conflict,
+            Self::IdempotencyConflict | Self::InvocationInProgress => ServiceErrorKind::Conflict,
             Self::SessionExpired
             | Self::TransactionExpired
             | Self::TransactionClosed
@@ -97,6 +103,7 @@ impl ServiceError {
             | Self::SubscriptionExpired { .. }
             | Self::SubscriptionLeaseExpired
             | Self::SubscriptionClosed
+            | Self::TaskClosed
             | Self::SubscriptionConnectionReplaced
             | Self::FunctionCatalogueRevisionNotFound
             | Self::SeatNotRepresented
@@ -116,7 +123,7 @@ impl ServiceError {
     }
 
     pub fn retryable(&self) -> bool {
-        matches!(self, Self::StorageConflict(_))
+        matches!(self, Self::StorageConflict(_) | Self::InvocationInProgress)
     }
 }
 

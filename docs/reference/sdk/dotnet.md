@@ -62,35 +62,35 @@ The complete reviewed source layout is:
 
 ```text
 sdks/dotnet/
-├── Directory.Build.props
-├── Directory.Packages.props
-├── README.md
-├── Rrflow.Rrd.slnx
-├── global.json
-├── scripts/
-│   └── generate.py
-├── src/Rrflow.Rrd.Client/
-│   ├── ClientOptions.cs
-│   ├── EndpointResolver.cs
-│   ├── Errors.cs
-│   ├── Generated/
-│   │   └── OperationId.g.cs
-│   ├── HttpTransport.cs
-│   ├── OperationBinding.cs
-│   ├── OperationExecutor.cs
-│   ├── ProtocolCodec.cs
-│   ├── RequestOptions.cs
-│   ├── ResourcePath.cs
-│   ├── RetryPolicy.cs
-│   ├── RrdClient.cs
-│   ├── Rrflow.Rrd.Client.csproj
-│   ├── Session.cs
-│   └── packages.lock.json
-└── tests/Rrflow.Rrd.Client.Tests/
-    ├── RrdClientTests.cs
-    ├── Rrflow.Rrd.Client.Tests.csproj
-    ├── SdkConformanceTests.cs
-    └── packages.lock.json
+â”œâ”€â”€ Directory.Build.props
+â”œâ”€â”€ Directory.Packages.props
+â”œâ”€â”€ README.md
+â”œâ”€â”€ Rrflow.Rrd.slnx
+â”œâ”€â”€ global.json
+â”œâ”€â”€ scripts/
+â”‚   â””â”€â”€ generate.py
+â”œâ”€â”€ src/Rrflow.Rrd.Client/
+â”‚   â”œâ”€â”€ ClientOptions.cs
+â”‚   â”œâ”€â”€ EndpointResolver.cs
+â”‚   â”œâ”€â”€ Errors.cs
+â”‚   â”œâ”€â”€ Generated/
+â”‚   â”‚   â””â”€â”€ OperationId.g.cs
+â”‚   â”œâ”€â”€ HttpTransport.cs
+â”‚   â”œâ”€â”€ OperationBinding.cs
+â”‚   â”œâ”€â”€ OperationExecutor.cs
+â”‚   â”œâ”€â”€ ProtocolCodec.cs
+â”‚   â”œâ”€â”€ RequestOptions.cs
+â”‚   â”œâ”€â”€ ResourcePath.cs
+â”‚   â”œâ”€â”€ RetryPolicy.cs
+â”‚   â”œâ”€â”€ RrdClient.cs
+â”‚   â”œâ”€â”€ Rrflow.Rrd.Client.csproj
+â”‚   â”œâ”€â”€ Session.cs
+â”‚   â””â”€â”€ packages.lock.json
+â””â”€â”€ tests/Rrflow.Rrd.Client.Tests/
+    â”œâ”€â”€ RrdClientTests.cs
+    â”œâ”€â”€ Rrflow.Rrd.Client.Tests.csproj
+    â”œâ”€â”€ SdkConformanceTests.cs
+    â””â”€â”€ packages.lock.json
 ```
 
 `RrdClient` is now the narrow asynchronous generic HTTP facade implementing
@@ -99,7 +99,7 @@ endpoint/route resolution, HTTP carriage, common operation binding/execution,
 partial protocol coding, and broad retry/deadline behavior. Public value types
 have one responsibility file, and the generated operation projection has one
 path. Helpers cover capabilities, endpoint catalogue, OpenAPI, and session
-creation; `CallAsync` can address all 33 current HTTP operation identifiers.
+creation; `CallAsync` can address all 40 current HTTP operation identifiers.
 That is structural source convergence and route reachability, not complete
 operation semantics. There is no .NET WebSocket, D-01-installed endpoint
 binding, authenticated remote resolver/TLS profile, server-cancellation path,
@@ -135,16 +135,18 @@ binary as an argument vector without a shell, reads the complete OpenAPI 3.1
 document, sorts operations, and supports a byte-for-byte drift check. The
 checked-in `Generated/OperationId.g.cs` contains:
 
-- 33 enum members;
+- 40 enum members;
 - wire operation name, HTTP method, route template, first authentication
   scheme, and mutation flag for each member; and
 - OpenAPI SHA-256
-  `3c016e8f0b49623aa091254a37c19cb064efa6773a1fa19ce64edb179824fec0`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
-The removed flat record incorrectly said 34 routes even though the generator,
-enum, unit assertion, public catalogue, and OpenAPI projection contain 33.
-This reference records 33 and does not treat that correction as a capability
-change.
+An earlier flat record incorrectly said 34 routes when the generator, enum,
+unit assertion, public catalogue, and OpenAPI projection contained 33. The
+prompt-flight family (`flight-launch`, `flight-list`, `flight-read`) then
+raised every projection to 36, and the task family (`task-open`,
+`task-close`, `task-list`, `task-read`) to 40; this reference records 40.
+None of these changes is a language-binding capability claim.
 
 The generator does not emit request/result/error models, allowed route
 parameters, security actions, exact success statuses, media types, causal
@@ -412,7 +414,7 @@ The remaining qualification target:
 - treats the tracked SDK pin and shared build/dependency files as reviewed
   inputs, then qualifies their exact bytes rather than assuming the pin makes
   the toolchain or dependency closure reproducible;
-- targets only supported modern TFMs that pass the full matrix—initially
+- targets only supported modern TFMs that pass the full matrixâ€”initially
   `net10.0`; it adds no older compatibility target or conditional shim merely
   to increase a badge count;
 - enables warning-clean XML documentation, package validation, trimming and
@@ -447,7 +449,7 @@ Current evidence is deliberately bounded:
 | `dotnet restore ... --locked-mode` plus `dotnet build ... --no-restore` | Before and after the split, the solution restored and built with zero warnings under pinned SDK 10.0.111 on Linux x64. | One installed SDK/cache; no toolchain/platform/offline closure. |
 | `dotnet run --project ...Tests.csproj --no-restore` | xUnit reported four tests passed, but the manifest-absent conformance method returned before executing a scenario and was not reported skipped. | Three mock-focused tests plus one false pass; no configured engine corpus. |
 | temporary baseline/candidate assembly reflection audit | All 140 exported type/member signatures matched: zero removed and zero added. | Public assembly shape only; it does not prove behavior or packaging compatibility. |
-| `python3 sdks/dotnet/scripts/generate.py --check` | The sole enum at `Generated/OperationId.g.cs` matched 33 operations and the OpenAPI digest. | Method/path/auth/mutation projection only. |
+| `python3 sdks/dotnet/scripts/generate.py --check` | The sole enum at `Generated/OperationId.g.cs` matched 40 operations and the OpenAPI digest. | Method/path/auth/mutation projection only. |
 | `dotnet format ... --verify-no-changes` and Release `dotnet pack` | Formatting passed; both package observations resolved the moved root README and emitted six entries, but their sizes were 24,983 and 24,982 bytes. | Source style and package topology pass; byte reproducibility, signature, and consumer proof fail or remain absent. |
 | full shared conformance runner | The configured .NET entry passed with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2`. | Real HTTP against one direct-seeded rrflowKV daemon fixture; not installation, rrflowMX parity, or complete labelled behavior. |
 | temporary adversarial test | Replayed an unpinned invalid query, accepted `201 text/plain` plus invalid payload, and exposed the bearer through record formatting and JSON. | Reproducible open H-04 correctness/security defects. |
@@ -482,35 +484,35 @@ subordinate to the executable public contract.
 
 ```text
 sdks/dotnet/
-├── Directory.Build.props               # one compiler/build/package policy
-├── Directory.Packages.props            # one dependency-version authority
-├── README.md                            # narrow SDK workspace/package entrance
-├── Rrflow.Rrd.slnx
-├── global.json                         # exact accepted SDK selection
-├── scripts/
-│   └── generate.py                     # sole catalogue projection generator
-├── src/Rrflow.Rrd.Client/
-│   ├── ClientOptions.cs                # public options + validated internal copy
-│   ├── EndpointResolver.cs             # current loopback URI/path validation
-│   ├── Errors.cs                       # current public client/API errors
-│   ├── Generated/
-│   │   └── OperationId.g.cs            # sole catalogue-derived projection
-│   ├── HttpTransport.cs                # current response-bounded HTTP carriage
-│   ├── OperationBinding.cs             # current envelope/resource/auth binding
-│   ├── OperationExecutor.cs            # current encode/send/decode coordination
-│   ├── ProtocolCodec.cs                # current partial envelope codec
-│   ├── RequestOptions.cs               # current public per-call values
-│   ├── ResourcePath.cs                 # current public resource component
-│   ├── RetryPolicy.cs                  # current broad retry/deadline behavior
-│   ├── RrdClient.cs                    # narrow public facade
-│   ├── Rrflow.Rrd.Client.csproj
-│   ├── Session.cs                      # current public credential records
-│   └── packages.lock.json
-└── tests/Rrflow.Rrd.Client.Tests/
-    ├── RrdClientTests.cs
-    ├── SdkConformanceTests.cs
-    ├── Rrflow.Rrd.Client.Tests.csproj
-    └── packages.lock.json
+â”œâ”€â”€ Directory.Build.props               # one compiler/build/package policy
+â”œâ”€â”€ Directory.Packages.props            # one dependency-version authority
+â”œâ”€â”€ README.md                            # narrow SDK workspace/package entrance
+â”œâ”€â”€ Rrflow.Rrd.slnx
+â”œâ”€â”€ global.json                         # exact accepted SDK selection
+â”œâ”€â”€ scripts/
+â”‚   â””â”€â”€ generate.py                     # sole catalogue projection generator
+â”œâ”€â”€ src/Rrflow.Rrd.Client/
+â”‚   â”œâ”€â”€ ClientOptions.cs                # public options + validated internal copy
+â”‚   â”œâ”€â”€ EndpointResolver.cs             # current loopback URI/path validation
+â”‚   â”œâ”€â”€ Errors.cs                       # current public client/API errors
+â”‚   â”œâ”€â”€ Generated/
+â”‚   â”‚   â””â”€â”€ OperationId.g.cs            # sole catalogue-derived projection
+â”‚   â”œâ”€â”€ HttpTransport.cs                # current response-bounded HTTP carriage
+â”‚   â”œâ”€â”€ OperationBinding.cs             # current envelope/resource/auth binding
+â”‚   â”œâ”€â”€ OperationExecutor.cs            # current encode/send/decode coordination
+â”‚   â”œâ”€â”€ ProtocolCodec.cs                # current partial envelope codec
+â”‚   â”œâ”€â”€ RequestOptions.cs               # current public per-call values
+â”‚   â”œâ”€â”€ ResourcePath.cs                 # current public resource component
+â”‚   â”œâ”€â”€ RetryPolicy.cs                  # current broad retry/deadline behavior
+â”‚   â”œâ”€â”€ RrdClient.cs                    # narrow public facade
+â”‚   â”œâ”€â”€ Rrflow.Rrd.Client.csproj
+â”‚   â”œâ”€â”€ Session.cs                      # current public credential records
+â”‚   â””â”€â”€ packages.lock.json
+â””â”€â”€ tests/Rrflow.Rrd.Client.Tests/
+    â”œâ”€â”€ RrdClientTests.cs
+    â”œâ”€â”€ SdkConformanceTests.cs
+    â”œâ”€â”€ Rrflow.Rrd.Client.Tests.csproj
+    â””â”€â”€ packages.lock.json
 ```
 
 `scripts/build_package.py`, `RrdCall`, `Subscription`,

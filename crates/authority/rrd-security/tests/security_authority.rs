@@ -285,6 +285,92 @@ fn audit_read_rejects_a_substituted_durable_head() {
     ));
 }
 
+/// Characterizes POAM-030. `audit_since` marks the control tail as reached
+/// whenever the last journal page it read was partial, even when it stopped
+/// inside that page because the record limit was met. When the limit-th audit
+/// record lies in the final, partial page and is not the head, a valid read of
+/// a valid chain fails. When POAM-030 is fixed, the five-record read must
+/// return the first five records through sequence 11, and this test inverts.
+#[test]
+fn a_record_limit_met_inside_the_final_partial_journal_page_fails_the_audit_read() {
+    let engine = RrflowMxStore::new();
+    let instance = CanonicalId::new("alpha").unwrap();
+    let repository = SecurityRepository::new(&engine, instance.clone());
+    repository
+        .initialize(
+            state(b"partial-page-secret"),
+            1_000,
+            "bootstrap",
+            "request-partial-page-bootstrap",
+            "operation-partial-page-bootstrap",
+        )
+        .unwrap();
+    let audit = |index: u64| AuditEvent {
+        audit_id: CanonicalId::new(format!("audit-partial-page-{index}")).unwrap(),
+        at_unix_ms: 2_000 + index,
+        principal_id: None,
+        action: Action::QueryExecute,
+        resource: path("alpha"),
+        request_id: format!("request-partial-page-{index}"),
+        operation_id: format!("operation-partial-page-{index}"),
+        phase: AuditPhase::Completed,
+        decision: AuditDecision::Allowed,
+        status_code: 200,
+        request_sha256: digest::sha256_hex(format!("request-{index}").as_bytes()),
+        response_sha256: digest::sha256_hex(format!("response-{index}").as_bytes()),
+    };
+    for index in 2..=4 {
+        repository.append_audit(&audit(index)).unwrap();
+    }
+    // Sessions, estate records and other control writes interleave with audit
+    // records in a real journal; one is enough to move the page boundaries.
+    engine
+        .control()
+        .commit(&ControlTransition {
+            key: format!("server/state/{instance}/partial-page-test"),
+            expected: None,
+            replacement: Some(b"{}".to_vec()),
+            at: 2_005,
+            actor: "partial-page-test".into(),
+            action: "test.unrelated-control-entry".into(),
+            request_id: "request-unrelated-control-entry".into(),
+            operation_id: "operation-unrelated-control-entry".into(),
+        })
+        .unwrap();
+    for index in 5..=6 {
+        repository.append_audit(&audit(index)).unwrap();
+    }
+
+    // Security state, then each audit record followed by its head: the fifth
+    // record opens the final page of a five-entry page size, which is partial.
+    let actions = engine
+        .control()
+        .journal_since(0, 64)
+        .unwrap()
+        .into_iter()
+        .map(|entry| entry.action)
+        .collect::<Vec<_>>();
+    assert_eq!(actions.len(), 14);
+    assert_eq!(actions[9], "test.unrelated-control-entry");
+    assert_eq!(
+        actions[10..],
+        ["security.audit", "security.audit.head"].repeat(2)
+    );
+
+    // The chain is valid: a six-record read reaches the head.
+    let six = repository.audit_since(0, 6).unwrap();
+    assert_eq!(six.records.len(), 6);
+    assert_eq!(six.through_sequence, 13);
+
+    assert!(
+        matches!(
+            repository.audit_since(0, 5),
+            Err(Error::Invalid(message)) if message == "audit chain does not reach its durable head"
+        ),
+        "POAM-030: a five-record read of this valid chain must still fail until it is fixed"
+    );
+}
+
 #[test]
 fn roles_jwt_external_identity_rotation_revocation_and_reopen_share_one_authority() {
     let temporary = tempfile::tempdir().unwrap();

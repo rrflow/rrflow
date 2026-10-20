@@ -31,6 +31,54 @@ impl RrdEngine {
         request_id: &str,
         operation_id: &str,
     ) -> Result<DiagnosticSnapshot> {
+        self.read_diagnostic_snapshot_with_observer(
+            session_id,
+            token,
+            request,
+            now,
+            request_id,
+            operation_id,
+            &mut |_| Ok(()),
+        )
+    }
+
+    /// Runs `during_assembly` inside every assembly attempt, after its first
+    /// consistency stamp is captured, so a test can place concurrent work in
+    /// the window that attempt compares.
+    #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn read_diagnostic_snapshot_during_assembly(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &ReadDiagnosticSnapshot,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+        during_assembly: &mut dyn FnMut(u8) -> Result<()>,
+    ) -> Result<DiagnosticSnapshot> {
+        self.read_diagnostic_snapshot_with_observer(
+            session_id,
+            token,
+            request,
+            now,
+            request_id,
+            operation_id,
+            during_assembly,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn read_diagnostic_snapshot_with_observer(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &ReadDiagnosticSnapshot,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+        observer: &mut dyn FnMut(u8) -> Result<()>,
+    ) -> Result<DiagnosticSnapshot> {
         request
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
@@ -46,6 +94,7 @@ impl RrdEngine {
 
         for attempt in 1..=MAX_DIAGNOSTIC_ASSEMBLY_ATTEMPTS {
             let before = capture_diagnostic_stamp(self, &scope, now)?;
+            observer(attempt)?;
             let runtime_changes = match diagnostic_runtime_changes(
                 self,
                 &before.runtime,

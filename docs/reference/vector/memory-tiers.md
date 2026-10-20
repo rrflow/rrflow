@@ -48,10 +48,13 @@ committed runtime + projection metadata + object receipt
 ```
 
 The currently implemented flow is coherent but not yet the Gate C/E target.
-Search still calls `runtime_read_changes` from cursor zero and reconstructs its
-canonical candidate set in memory before using the artifact. C-04 must replace
-that replay path with direct versioned reads; E-04 must provide native
-persistent vector and filter access paths. F-01 then exposes stamped storage
+Search reads its canonical candidates through C-04's direct stamped reader, but
+it selects the scope's whole vector-version family and reduces it in memory,
+and it rebuilds the vector artifact and quantization catalogues by replaying
+the scope's change log from cursor 0
+([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)). C-04 must serve both
+catalogues from direct stamped reads; E-04 must provide native persistent
+vector and filter access paths. F-01 then exposes stamped storage
 batches to DataFusion. Residency cannot be used to disguise any of those open
 requirements.
 

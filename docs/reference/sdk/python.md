@@ -46,31 +46,31 @@ and pytest 9.1.1 for development. The reviewed executable layout is:
 
 ```text
 sdks/python/
-├── pyproject.toml
-├── uv.lock
-├── scripts/generate.py
-├── src/rrd_client/
-│   ├── __init__.py
-│   ├── client.py
-│   ├── endpoint.py
-│   ├── error.py
-│   ├── operation.py
-│   ├── retry.py
-│   ├── session.py
-│   ├── transport.py
-│   ├── py.typed
-│   └── generated/
-│       ├── __init__.py
-│       └── endpoints.py
-└── tests/
-    ├── test_client.py
-    └── sdk_conformance.py
+â”œâ”€â”€ pyproject.toml
+â”œâ”€â”€ uv.lock
+â”œâ”€â”€ scripts/generate.py
+â”œâ”€â”€ src/rrd_client/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ client.py
+â”‚   â”œâ”€â”€ endpoint.py
+â”‚   â”œâ”€â”€ error.py
+â”‚   â”œâ”€â”€ operation.py
+â”‚   â”œâ”€â”€ retry.py
+â”‚   â”œâ”€â”€ session.py
+â”‚   â”œâ”€â”€ transport.py
+â”‚   â”œâ”€â”€ py.typed
+â”‚   â””â”€â”€ generated/
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â””â”€â”€ endpoints.py
+â””â”€â”€ tests/
+    â”œâ”€â”€ test_client.py
+    â””â”€â”€ sdk_conformance.py
 ```
 
 `RrdClient` is a synchronous HTTP client. It exposes ergonomic calls for
 capabilities, endpoint catalogue, OpenAPI, and session creation plus one
 generic `call(OperationId, payload, options)`. That generic call can address
-all 33 current HTTP operation identifiers. This is routing coverage, not
+all 40 current HTTP operation identifiers. This is routing coverage, not
 operation-semantic coverage. There is no asynchronous client and no WebSocket
 implementation; subscription administration and changefeed follow are
 ordinary HTTP calls.
@@ -110,11 +110,11 @@ file byte for byte in check mode.
 
 The current generated projection contains:
 
-- 33 HTTP operations;
+- 41 HTTP operations;
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `3c016e8f0b49623aa091254a37c19cb064efa6773a1fa19ce64edb179824fec0`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
 It does not generate request models, response models, error-code constraints,
 path-parameter sets, security actions, exact success statuses, media types,
@@ -349,7 +349,7 @@ Current evidence is deliberately bounded:
 | generator, Ruff, mypy, and pytest package checks | generation passed; Ruff passed over 13 Python files; strict mypy passed over 10 source files; 4 mock-focused tests passed | Source hygiene and selected mocked HTTP behavior; no async, WebSocket, TLS, installed engine, or fault matrix. |
 | conformance entry without `RRD_SDK_CONFORMANCE_MANIFEST` | exited 1 with the required-manifest error | Correct fail-closed harness configuration; no scenario executed. |
 | conformance entry against the live example harness | passed with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2` | Real HTTP against the present direct-seeded rrflowKV fixture; not installation, rrflowMX parity, or full labelled behavior. |
-| generated-surface parity | 33 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
+| generated-surface parity | 40 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
 | injected HTTPX transport probe | replayed an unpinned query, accepted `201 text/plain` and invalid payload, serialized bearer | Reproducible open H-04 correctness/security defects. |
 | offline package build | 9,294-byte wheel and 48,486-byte sdist built; both contain `py.typed` and omit the removed catch-all module | Artifact creation/content inventory only; no clean consumer, dependency closure, reproducibility, signing, or platform matrix. |
 
@@ -379,22 +379,22 @@ forwarding module. The executable source layout is:
 
 ```text
 sdks/python/src/rrd_client/
-├── __init__.py              # narrow public exports
-├── client.py                # synchronous construction and public calls
-├── endpoint.py              # current loopback endpoint policy
-├── error.py                 # current client and API error types
-├── operation.py             # request coordinates and resource validation
-├── retry.py                 # current broad attempt/deadline rule
-├── session.py               # current public bearer-bearing representation
-├── transport.py             # bounded HTTP response/envelope handling
-├── py.typed
-└── generated/
-    ├── __init__.py
-    └── endpoints.py
+â”œâ”€â”€ __init__.py              # narrow public exports
+â”œâ”€â”€ client.py                # synchronous construction and public calls
+â”œâ”€â”€ endpoint.py              # current loopback endpoint policy
+â”œâ”€â”€ error.py                 # current client and API error types
+â”œâ”€â”€ operation.py             # request coordinates and resource validation
+â”œâ”€â”€ retry.py                 # current broad attempt/deadline rule
+â”œâ”€â”€ session.py               # current public bearer-bearing representation
+â”œâ”€â”€ transport.py             # bounded HTTP response/envelope handling
+â”œâ”€â”€ py.typed
+â””â”€â”€ generated/
+    â”œâ”€â”€ __init__.py
+    â””â”€â”€ endpoints.py
 
 sdks/python/tests/
-├── test_client.py
-└── sdk_conformance.py
+â”œâ”€â”€ test_client.py
+â””â”€â”€ sdk_conformance.py
 ```
 
 `async_client.py`, `subscription.py`, generated `models.py`, and the planned

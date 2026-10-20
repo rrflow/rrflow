@@ -52,7 +52,7 @@ fn canonical_platform_terms_are_unique_complete_and_classified() {
 
     assert!(PLATFORM_TERMS.iter().any(|definition| {
         definition.term == "workspace"
-            && definition.role == PlatformTermRole::BuildTopology
+            && definition.role == PlatformTermRole::ClientGrouping
             && definition.resource_kind.is_none()
     }));
     assert!(PLATFORM_TERMS.iter().any(|definition| {

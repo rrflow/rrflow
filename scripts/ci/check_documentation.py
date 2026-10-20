@@ -245,12 +245,20 @@ def poam_integrity_failures(parent: str) -> list[str]:
     """Keep the POA&M ledger complete while detail stays with linked owners."""
     failures: list[str] = []
     rows = POAM_ROW.findall(parent)
-    expected_ids = [f"POAM-{ordinal:03d}" for ordinal in range(1, 28)]
+    # Every detail record keeps its ledger row for life, closed or not, so the
+    # records on disk fix the contiguous range the ledger must list.
+    record_ids = sorted(
+        record.stem.upper()
+        for record in POAM_RECORDS.glob("poam-[0-9][0-9][0-9].md")
+    )
+    expected_ids = [
+        f"POAM-{ordinal:03d}" for ordinal in range(1, len(record_ids) + 1)
+    ]
     observed_ids = [row[0] for row in rows]
-    if observed_ids != expected_ids:
+    if not expected_ids or record_ids != expected_ids or observed_ids != expected_ids:
         failures.append(
-            "the POA&M ledger must contain POAM-001 through POAM-027 exactly once "
-            "and in order"
+            "the POA&M ledger and its detail records must hold POAM-001 through "
+            f"POAM-{len(record_ids):03d} exactly once and in order"
         )
 
     governance = POAM_GOVERNANCE.read_text(encoding="utf-8")

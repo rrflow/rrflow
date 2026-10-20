@@ -104,6 +104,7 @@ impl RrdEngine {
                 &root,
                 &state.storage_label,
                 request.created_at_unix_ms,
+                &installed_control_families(&self.instance),
             )?,
         };
         let catalogue = rrd_store::verify_backup_catalogue(&root)?;
@@ -229,7 +230,12 @@ impl RrdEngine {
             .ok_or_else(|| ServiceError::Backup("backup is not catalogued".into()))?;
         let target = self.restore_root()?.join(request.restore_id.as_str());
         let (inventory, reopened, recovered) = if target.exists() {
-            let restored = rrd_store::RrflowKvStore::open(&target)?;
+            // An existing target is a root an earlier attempt staged and
+            // published before its result was recorded. It is opened as an
+            // existing store, so an empty or foreign directory fails closed
+            // instead of becoming a new database, and the handle is released
+            // before object verification reopens the root.
+            let restored = rrd_store::RrflowKvStore::open_existing(&target)?;
             if restored.claims().sequence()? != backup.archive.claim_sequence
                 || restored.runtime().cursor()? != backup.archive.runtime_cursor
             {
@@ -237,6 +243,7 @@ impl RrdEngine {
                     "existing restore target watermarks differ from the backup".into(),
                 ));
             }
+            drop(restored);
             rrd_store::verify_restored_backup_objects(
                 &backup_root,
                 &request.backup_sha256,
@@ -276,19 +283,56 @@ impl RrdEngine {
         Ok(result)
     }
 
-    fn operation_root(&self) -> Result<PathBuf> {
+    /// Where backup catalogues and restore staging roots live.
+    ///
+    /// An installed estate keeps them inside its managed persistent container,
+    /// `.rrflow/rrd/<kind>/<instance>`, beside `roots/` and never below it:
+    /// `roots/` holds only storage roots the locator can select, and install
+    /// recovery rejects anything else there. A component or test root opened
+    /// outside an installation keeps the sibling `rrd-service/<instance>` tree.
+    fn operation_root(&self, kind: &str) -> Result<PathBuf> {
         let storage = self.require_persistent_root("backup and restore")?;
+        if let Some(container) = &self.installed_storage_container {
+            return Ok(container.join(kind).join(self.instance.as_str()));
+        }
         let parent = storage.parent().unwrap_or_else(|| Path::new("."));
-        Ok(parent.join("rrd-service").join(self.instance.as_str()))
+        Ok(parent
+            .join("rrd-service")
+            .join(self.instance.as_str())
+            .join(kind))
     }
 
-    fn backup_root(&self) -> Result<PathBuf> {
-        Ok(self.operation_root()?.join("backups"))
+    pub(super) fn backup_root(&self) -> Result<PathBuf> {
+        self.operation_root(super::estate_layout::BACKUPS_DIRECTORY_NAME)
     }
 
     fn restore_root(&self) -> Result<PathBuf> {
-        Ok(self.operation_root()?.join("restores"))
+        self.operation_root(super::estate_layout::RESTORES_DIRECTORY_NAME)
     }
+}
+
+/// The control-journal families an application-complete backup carries as the
+/// estate's control state: the installed record and install checkpoint, the
+/// active configuration, the security policy and audit chain, the attunement
+/// plan and job state, and the estate document.
+///
+/// Every value in these families is non-secret: credentials appear only as
+/// digests, and the token key and operator credential are files outside the
+/// store. Transient and operational families stay out: session leases,
+/// subscriptions, backup and restore operation receipts, and estate-recovery
+/// receipts. The two catalogue families travel in the catalogue manifest.
+pub(in crate::engine) fn installed_control_families(instance: &CanonicalId) -> Vec<String> {
+    let mut families = vec![
+        "server/state/estate".to_owned(),
+        "server/state/install".to_owned(),
+        format!("server/state/{instance}/attunement"),
+        format!("server/state/{instance}/audit"),
+        format!("server/state/{instance}/audit-head"),
+        format!("server/state/{instance}/configuration"),
+        format!("server/state/{instance}/security"),
+    ];
+    families.sort();
+    families
 }
 
 fn backup_operation_key(
@@ -333,6 +377,7 @@ fn public_backup(entry: &rrd_store::BackupEntry) -> InstanceBackupSnapshot {
         claims: public_backup_coverage(entry.claims.clone()),
         typed_runtime: public_backup_coverage(entry.typed_runtime.clone()),
         catalogues: public_backup_coverage(entry.catalogues.clone()),
+        installed_control: public_backup_coverage(entry.installed_control.clone()),
         object_payloads: public_backup_coverage(entry.object_payloads.clone()),
         projections: public_backup_coverage(entry.projections.clone()),
         invocation_telemetry: public_backup_coverage(entry.invocation_telemetry.clone()),

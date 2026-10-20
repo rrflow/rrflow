@@ -43,34 +43,34 @@ Node/TypeScript generation and test toolchain. Its executable layout is:
 
 ```text
 sdks/typescript/
-├── package.json
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml
-├── biome.json
-├── tsconfig.json
-├── scripts/generate.ts
-├── src/
-│   ├── index.ts
-│   ├── client.ts
-│   ├── endpoint.ts
-│   ├── error.ts
-│   ├── operation.ts
-│   ├── retry.ts
-│   ├── session.ts
-│   ├── transport.ts
-│   └── generated/
-│       ├── endpoints.ts
-│       └── rrd-openapi.ts
-├── tests/client.test.ts
-└── tests/sdk-conformance.ts
+â”œâ”€â”€ package.json
+â”œâ”€â”€ pnpm-lock.yaml
+â”œâ”€â”€ pnpm-workspace.yaml
+â”œâ”€â”€ biome.json
+â”œâ”€â”€ tsconfig.json
+â”œâ”€â”€ scripts/generate.ts
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ index.ts
+â”‚   â”œâ”€â”€ client.ts
+â”‚   â”œâ”€â”€ endpoint.ts
+â”‚   â”œâ”€â”€ error.ts
+â”‚   â”œâ”€â”€ operation.ts
+â”‚   â”œâ”€â”€ retry.ts
+â”‚   â”œâ”€â”€ session.ts
+â”‚   â”œâ”€â”€ transport.ts
+â”‚   â””â”€â”€ generated/
+â”‚       â”œâ”€â”€ endpoints.ts
+â”‚       â””â”€â”€ rrd-openapi.ts
+â”œâ”€â”€ tests/client.test.ts
+â””â”€â”€ tests/sdk-conformance.ts
 ```
 
 A-07.1c removed the 394-line implementation body from `src/index.ts`. The root
 now exports the direct client, endpoint, error, operation, retry, session, and
 transport responsibilities; it is not a forwarding copy of the old runtime.
-The client still exposes four ergonomic calls—capabilities, endpoint
-catalogue, OpenAPI, and session creation—and one generic
-`call<K extends OperationId>()`. The generic call can address all 33 current
+The client still exposes four ergonomic callsâ€”capabilities, endpoint
+catalogue, OpenAPI, and session creationâ€”and one generic
+`call<K extends OperationId>()`. The generic call can address all 40 current
 HTTP operation identifiers because `OperationId` is the key set of the
 generated endpoint object. That is compile-time and routing coverage, not
 behavioral coverage. There is no `subscription.ts`, WebSocket implementation,
@@ -98,14 +98,14 @@ the TypeScript 7 API.
 
 The audited projection contains:
 
-- 33 HTTP operations;
+- 41 HTTP operations;
 - only `200` success envelopes plus the default error envelope;
 - `application/json` as the only declared response media type; and
 - OpenAPI SHA-256
-  `3c016e8f0b49623aa091254a37c19cb064efa6773a1fa19ce64edb179824fec0`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
-The generated `rrd-openapi.ts` is 24,523 lines and 1,490,538 bytes. Its
-`paths`, `components`, and `operations` types are valuable compile-time
+The generated `rrd-openapi.ts` is a compile-time projection of roughly 1.6
+MiB. Its `paths`, `components`, and `operations` types are valuable compile-time
 projections. TypeScript erases them at runtime. `RequestPayload<K>` and
 `SuccessPayload<K>` therefore prevent many mistakes during type checking but
 cannot validate an untrusted JavaScript caller, server response, stored value,
@@ -180,7 +180,10 @@ A qualified connection performs these steps explicitly:
    digest, limits, and available capabilities; and
 6. authenticate an application session before protected work.
 
-The current fetch call does not set redirect mode, so Fetch's default `follow`
+The client invokes its Fetch transport as a free function, never as a method
+of the client, because a browser's `fetch` throws "Illegal invocation" when
+called with any other `this`; a unit test injects such a transport. The
+current fetch call does not set redirect mode, so Fetch's default `follow`
 policy applies. The target uses `redirect: "error"` and verifies the final
 response URL/transport identity. Network reachability, CORS success, browser
 origin, TLS, and mesh membership never grant RRFlow authorization or initialize
@@ -316,7 +319,7 @@ The current evidence is bounded:
 | `pnpm --dir sdks/typescript check` | generation check, Biome over 14 files, typecheck, and 4 tests passed | Generator freshness and selected mocked HTTP behavior; no browser, WebSocket, package-consumer, or fault matrix. |
 | Conformance entry with `RRD_SDK_CONFORMANCE_MANIFEST` absent | failed immediately with the required-manifest assertion | Correct fail-closed harness configuration; no scenario executed. |
 | Conformance entry against the live example harness | passed and reported corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2` | Real HTTP against the present direct-seeded rrflowKV fixture; not D-01 installation, rrflowMX parity, browser/HTTPS/WSS, or complete labelled behavior. |
-| Generated-surface parity | 33 HTTP endpoint descriptors matched the OpenAPI digest | Method/path/auth/mutation projection only; not runtime validation or semantic execution. |
+| Generated-surface parity | 40 HTTP endpoint descriptors matched the OpenAPI digest | Method/path/auth/mutation projection only; not runtime validation or semantic execution. |
 | Adversarial injected-fetch probe | retried one unpinned query, accepted `201 text/plain` and invalid payload, serialized synthetic bearer | Reproducible open H-04 security/correctness defects. |
 | `npm pack --dry-run --json` | raw-source/test/generator package, no JS/declarations | Packaging inventory only; not installability or publication. |
 
@@ -343,27 +346,27 @@ success surfaces:
 
 ```text
 sdks/typescript/src/
-├── index.ts                 # narrow public exports
-├── client.ts                # current construction/discovery/generic dispatch
-├── endpoint.ts              # current credential-free loopback profile
-├── error.ts                 # current string-bearing error classes
-├── operation.ts             # current generated typing/request coordinates
-├── retry.ts                 # current broad attempt/deadline calculation
-├── session.ts               # current plain enumerable credential object
-├── transport.ts             # current bounded Fetch/envelope handling
-├── subscription.ts          # planned H-04; absent until behavior exists
-└── generated/
-    ├── endpoints.ts
-    ├── rrd-openapi.ts
-    └── validators.ts        # planned H-04
+â”œâ”€â”€ index.ts                 # narrow public exports
+â”œâ”€â”€ client.ts                # current construction/discovery/generic dispatch
+â”œâ”€â”€ endpoint.ts              # current credential-free loopback profile
+â”œâ”€â”€ error.ts                 # current string-bearing error classes
+â”œâ”€â”€ operation.ts             # current generated typing/request coordinates
+â”œâ”€â”€ retry.ts                 # current broad attempt/deadline calculation
+â”œâ”€â”€ session.ts               # current plain enumerable credential object
+â”œâ”€â”€ transport.ts             # current bounded Fetch/envelope handling
+â”œâ”€â”€ subscription.ts          # planned H-04; absent until behavior exists
+â””â”€â”€ generated/
+    â”œâ”€â”€ endpoints.ts
+    â”œâ”€â”€ rrd-openapi.ts
+    â””â”€â”€ validators.ts        # planned H-04
 
 sdks/typescript/tests/
-├── operation-coverage.test.ts    # planned H-04
-├── protocol-validation.test.ts   # planned H-04/J-02
-├── transport-faults.test.ts      # planned H-04/H-07/J-02
-├── package-consumer.test.ts      # planned J-03/J-05
-├── browser-conformance.test.ts   # planned H-04/H-07/J-03
-└── sdk-conformance.ts
+â”œâ”€â”€ operation-coverage.test.ts    # planned H-04
+â”œâ”€â”€ protocol-validation.test.ts   # planned H-04/J-02
+â”œâ”€â”€ transport-faults.test.ts      # planned H-04/H-07/J-02
+â”œâ”€â”€ package-consumer.test.ts      # planned J-03/J-05
+â”œâ”€â”€ browser-conformance.test.ts   # planned H-04/H-07/J-03
+â””â”€â”€ sdk-conformance.ts
 ```
 
 The execution order is:

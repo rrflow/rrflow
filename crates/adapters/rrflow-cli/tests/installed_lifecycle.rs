@@ -1,29 +1,29 @@
 //! Real-process proof for the installed, UI-discoverable walking product.
 //!
 //! This is one bounded child lifecycle, not a generic process-kill matrix: the
-//! exact installed RRFlow process publishes its address, serves generated
-//! discovery, accepts its generated credential, survives abrupt termination,
-//! reopens, and passes the read-only verifier.
+//! exact primary executable publishes its address, serves generated discovery,
+//! accepts its generated credential, survives restart, and passes the read-only
+//! verifier. The initial process is terminated after acknowledged writes; subsequent
+//! Unix shutdowns use graceful SIGINT. Only test-owned children are affected.
 
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
-    transaction_operation_sha256, BeginTransaction, CanonicalId, CloseSession, CommitTransaction,
-    CreateSession, ErrorCode, ExecuteQuery, QueryBudget, QueryValue, SessionLimits,
+    transaction_operation_sha256, BackupCoverageSnapshot, BeginTransaction, CanonicalId,
+    CloseSession, CommitTransaction, CreateInstanceBackup, CreateSession, ErrorCode, ExecuteQuery,
+    QueryBudget, QueryResult, QueryValue, RestoreInstanceBackup, SessionLimits,
     TransactionMutation,
 };
 use rrd_engine::RrdEngine;
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdout, Command, Output, Stdio};
-use std::time::{Duration, Instant};
+use std::process::{Child, Command, Output, Stdio};
+use std::time::Duration;
+#[cfg(unix)]
+use std::time::Instant;
 
 fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_rrflow")
-}
-
-fn distribution_fixture() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
 }
 
 fn invoke(args: &[&str]) -> Output {
@@ -70,90 +70,235 @@ fn inventory(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     output
 }
 
-fn terminate_abruptly(child: &mut Child) {
-    child.kill().expect("terminate the exact rrflow child");
+#[cfg(unix)]
+fn stop_gracefully(child: &mut Child) {
+    let signal = Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .expect("send SIGINT to the exact rrflow child");
+    assert!(signal.success());
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         if let Some(status) = child.try_wait().unwrap() {
-            assert!(
-                !status.success(),
-                "abruptly killed rrflow exited successfully"
-            );
+            assert!(status.success(), "rrflow serve exited with {status}");
             return;
         }
         if Instant::now() >= deadline {
-            panic!("rrflow serve did not exit after abrupt termination");
+            child.kill().unwrap();
+            panic!("rrflow serve did not complete graceful SIGINT shutdown");
         }
         std::thread::sleep(Duration::from_millis(10));
     }
 }
 
-fn start_installed_service(
-    project: &str,
-    executable: &str,
-    captured: &mut Vec<u8>,
-) -> (Child, BufReader<ChildStdout>, String, String) {
-    let mut child = Command::new(binary())
-        .args([
-            "--json",
-            "serve",
-            "--project",
-            project,
-            "--bind",
-            "127.0.0.1:0",
-            "--test-distribution-executable",
-            executable,
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("start installed rrflow service");
-    let mut stdout = BufReader::new(child.stdout.take().unwrap());
-    let mut announcement = String::new();
-    stdout.read_line(&mut announcement).unwrap();
-    if announcement.is_empty() {
-        let mut error = String::new();
-        child
-            .stderr
-            .take()
+// Test-owned handles are always reaped, including assertion/startup failures.
+// No PID search or process-name kill may affect another installed engine.
+struct RunningEngine {
+    child: Child,
+    output: Vec<std::thread::JoinHandle<Vec<u8>>>,
+}
+
+impl RunningEngine {
+    fn start(project: &Path, captured: &mut Vec<u8>) -> (Self, String) {
+        let mut child = Command::new(binary())
+            .args(["--json", "serve", "--project"])
+            .arg(project)
+            .args(["--bind", "127.0.0.1:0"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("start installed rrflow service");
+        let stdout = child.stdout.take().unwrap();
+        let mut stderr = child.stderr.take().unwrap();
+        let mut process = Self {
+            child,
+            output: Vec::new(),
+        };
+        let (send, receive) = std::sync::mpsc::sync_channel(1);
+        process.output.push(std::thread::spawn(move || {
+            let mut reader = BufReader::new(stdout);
+            let mut announcement = String::new();
+            let result = reader
+                .read_line(&mut announcement)
+                .map(|_| announcement.clone());
+            let _ = send.send(result);
+            let mut bytes = announcement.into_bytes();
+            reader.read_to_end(&mut bytes).unwrap();
+            bytes
+        }));
+        process.output.push(std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            stderr.read_to_end(&mut bytes).unwrap();
+            bytes
+        }));
+        let announcement = receive
+            .recv_timeout(Duration::from_secs(60))
+            .expect("installed engine must announce readiness within 60 seconds")
+            .expect("read installed engine announcement");
+        if announcement.is_empty() {
+            process.stop(captured);
+            panic!("serve exited before its listening announcement");
+        }
+        let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
+        assert_eq!(announcement["status"], "listening");
+        let locator = RrdEngine::read_project_locator(project).unwrap();
+        assert_eq!(
+            announcement["instance_id"],
+            locator.identity.instance_id.as_str()
+        );
+        static BUILD: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+        let build = BUILD.get_or_init(|| {
+            let output = invoke(&["--json", "version"]);
+            assert_success(&output, "build identity");
+            serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["build"].clone()
+        });
+        assert_eq!(
+            &announcement["build"], build,
+            "serve/version identity differs"
+        );
+        let address = announcement["url"]
+            .as_str()
             .unwrap()
-            .read_to_string(&mut error)
-            .unwrap();
-        panic!("serve exited before readiness: {error}");
+            .strip_prefix("http://")
+            .unwrap()
+            .to_owned();
+        (process, address)
     }
-    captured.extend_from_slice(announcement.as_bytes());
-    let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
-    assert_eq!(announcement["status"], "listening");
-    let address = announcement["url"]
-        .as_str()
-        .unwrap()
-        .strip_prefix("http://")
-        .unwrap()
-        .to_owned();
-    let instance_id = announcement["instance_id"].as_str().unwrap().to_owned();
-    (child, stdout, address, instance_id)
+
+    fn terminate(&mut self, captured: &mut Vec<u8>) {
+        self.child.kill().expect("terminate owned rrflow process");
+        self.child.wait().expect("reap owned rrflow process");
+        self.stop(captured);
+    }
+
+    fn stop(&mut self, captured: &mut Vec<u8>) {
+        if self.child.try_wait().unwrap().is_none() {
+            #[cfg(unix)]
+            stop_gracefully(&mut self.child);
+            #[cfg(not(unix))]
+            {
+                self.child.kill().expect("terminate owned rrflow process");
+                self.child.wait().expect("reap owned rrflow process");
+            }
+        }
+        for output in self.output.drain(..) {
+            captured.extend(output.join().expect("capture child output"));
+        }
+    }
 }
 
-fn terminate_and_capture(
-    mut child: Child,
-    mut stdout: BufReader<ChildStdout>,
+impl Drop for RunningEngine {
+    fn drop(&mut self) {
+        if !matches!(self.child.try_wait(), Ok(Some(_))) {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+        for output in self.output.drain(..) {
+            let _ = output.join();
+        }
+    }
+}
+
+fn assert_restarted_status(
+    project: &Path,
+    valid_at: u64,
+    expected: &str,
     captured: &mut Vec<u8>,
-) {
-    terminate_abruptly(&mut child);
-    stdout.read_to_end(captured).unwrap();
-    child.stderr.take().unwrap().read_to_end(captured).unwrap();
-}
-
-fn installed_query_budget() -> QueryBudget {
-    QueryBudget {
-        max_storage_keys: 75_000,
-        max_rows: 768,
-        max_output_bytes: 393_216,
-        max_batch_rows: 192,
-        max_memory_bytes: 33_554_432,
-        max_spill_bytes: 67_108_864,
-        max_elapsed_ms: 20_000,
-    }
+) -> QueryResult {
+    let (mut process, address) = RunningEngine::start(project, captured);
+    let locator = RrdEngine::read_project_locator(project).unwrap();
+    let ready = invoke(&[
+        "--json",
+        "ready",
+        "--project",
+        project.to_str().unwrap(),
+        "--address",
+        &address,
+    ]);
+    capture_output(&ready, captured);
+    assert_success(&ready, "restarted authenticated discovery");
+    let ready: serde_json::Value = serde_json::from_slice(&ready.stdout).unwrap();
+    assert_eq!(ready["status"], "ready");
+    assert_eq!(
+        ready["capabilities"]["instance"]["id"],
+        locator.identity.instance_id.as_str()
+    );
+    assert_eq!(ready["authentication"]["session_closed"], true);
+    let credential = RrdEngine::read_installed_api_key(project).unwrap();
+    let client = RrdClient::connect_local(
+        address.parse().unwrap(),
+        locator.identity.instance_id,
+        ClientConfig::default(),
+    )
+    .unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let result = runtime.block_on(async {
+        let session = client
+            .create_session(
+                credential.principal_id.clone(),
+                credential.credential(),
+                CreateSession {
+                    limits: SessionLimits {
+                        idle_timeout_ms: 60_000,
+                        absolute_timeout_ms: 300_000,
+                        max_open_transactions: 1,
+                    },
+                },
+                RequestOptions::mutation(
+                    "restart-session-request",
+                    "restart-session-operation",
+                    "restart-session-idempotency",
+                ).unwrap(),
+            )
+            .await
+            .unwrap();
+        let query = format!(
+            "FROM claim:status AT VALID {valid_at} KNOWN HEAD WHERE subject = \"installed-walking-product\" PROJECT subject, object EXPLAIN CONTRACT"
+        );
+        let result = client
+            .execute_query(
+                &session,
+                ExecuteQuery {
+                    scope: format!("instance:{}", client.instance_id()),
+                    query,
+                    parameters: BTreeMap::new(),
+                    budget: QueryBudget {
+                        max_storage_keys: 75_000,
+                        max_rows: 768,
+                        max_output_bytes: 393_216,
+                        max_batch_rows: 192,
+                        max_memory_bytes: 33_554_432,
+                        max_spill_bytes: 67_108_864,
+                        max_elapsed_ms: 20_000,
+                    },
+                },
+                RequestOptions::read("restart-query-request", "restart-query-operation").unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].identity, "claim:installed-walking-product:status");
+        assert_eq!(result.rows[0].values.get("object"), Some(&QueryValue::String(expected.into())));
+        client
+            .close_session(
+                &session,
+                CloseSession {},
+                RequestOptions::mutation(
+                    "restart-close-request",
+                    "restart-close-operation",
+                    "restart-close-idempotency",
+                ).unwrap(),
+            )
+            .await
+            .unwrap();
+        result
+    });
+    process.stop(captured);
+    assert!(!String::from_utf8_lossy(captured).contains(credential.credential()));
+    result
 }
 
 #[test]
@@ -161,7 +306,7 @@ fn primary_help_exposes_only_the_installed_product_lifecycle() {
     let output = invoke(&["--help"]);
     assert_success(&output, "primary help");
     let help = String::from_utf8(output.stdout).unwrap();
-    for command in ["version", "install", "serve", "ready", "verify"] {
+    for command in ["version", "install", "serve", "ready", "verify", "restore"] {
         assert!(
             help.contains(command),
             "missing {command} from help:\n{help}"
@@ -246,10 +391,25 @@ fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape() {
 
 #[test]
 fn installed_engine_plans_applies_serves_discovers_authenticates_and_reopens() {
+    installed_lifecycle("existing");
+}
+
+#[test]
+fn fresh_installed_engine_survives_restart_and_restore() {
+    installed_lifecycle("fresh");
+}
+
+fn installed_lifecycle(mode: &str) {
+    eprintln!(
+        "native {mode} lifecycle executable bytes={}",
+        std::fs::metadata(binary()).unwrap().len()
+    );
     let root = tempfile::tempdir().unwrap();
     let project = root.path().join("project");
     std::fs::create_dir(&project).unwrap();
-    std::fs::write(project.join("README.md"), "installed walking product\n").unwrap();
+    if mode == "existing" {
+        std::fs::write(project.join("README.md"), "installed walking product\n").unwrap();
+    }
     let plan_file = root.path().join("install-plan.json");
     let configuration_file = root.path().join("estate-configuration.toml");
     std::fs::write(
@@ -283,8 +443,6 @@ max_elapsed_ms = 20000
     .unwrap();
     let project_arg = project.to_str().unwrap();
     let plan_arg = plan_file.to_str().unwrap();
-    let executable = distribution_fixture();
-    let executable_arg = executable.to_str().unwrap();
     let configuration_arg = configuration_file.to_str().unwrap();
     let mut lifecycle_output = Vec::new();
 
@@ -299,12 +457,12 @@ max_elapsed_ms = 20000
     let plan_arguments = [
         "install",
         "plan",
+        "--mode",
+        mode,
         "--project",
         project_arg,
         "--configuration",
         configuration_arg,
-        "--test-distribution-executable",
-        executable_arg,
     ];
     let first = invoke(&plan_arguments);
     let second = invoke(&plan_arguments);
@@ -322,10 +480,6 @@ max_elapsed_ms = 20000
     assert_eq!(
         preview["installation"]["configuration"]["recall"]["max_items"],
         96
-    );
-    assert_eq!(
-        preview["installation"]["configuration"]["clock"]["maximum_rollback_ms"],
-        0
     );
     assert_eq!(
         preview["installation"]["deployment"]["deployment_form"],
@@ -348,14 +502,14 @@ max_elapsed_ms = 20000
     let rejected = invoke(&[
         "install",
         "apply",
+        "--mode",
+        mode,
         "--project",
         project_arg,
         "--plan",
         plan_arg,
         "--expect",
         &"0".repeat(64),
-        "--test-distribution-executable",
-        executable_arg,
     ]);
     capture_output(&rejected, &mut lifecycle_output);
     assert!(!rejected.status.success());
@@ -365,14 +519,14 @@ max_elapsed_ms = 20000
         "--json",
         "install",
         "apply",
+        "--mode",
+        mode,
         "--project",
         project_arg,
         "--plan",
         plan_arg,
         "--expect",
         &plan_sha256,
-        "--test-distribution-executable",
-        executable_arg,
     ]);
     capture_output(&applied, &mut lifecycle_output);
     assert_success(&applied, "install apply");
@@ -391,8 +545,6 @@ max_elapsed_ms = 20000
         project_arg,
         "--level",
         "quick",
-        "--test-distribution-executable",
-        executable_arg,
     ]);
     capture_output(&verified, &mut lifecycle_output);
     assert_success(&verified, "offline verify");
@@ -412,14 +564,14 @@ max_elapsed_ms = 20000
         "--json",
         "install",
         "apply",
+        "--mode",
+        mode,
         "--project",
         project_arg,
         "--plan",
         plan_arg,
         "--expect",
         &plan_sha256,
-        "--test-distribution-executable",
-        executable_arg,
     ]);
     capture_output(&replay, &mut lifecycle_output);
     assert_success(&replay, "idempotent install replay");
@@ -428,8 +580,8 @@ max_elapsed_ms = 20000
         true
     );
 
-    let (child, stdout, address, installed_instance_id) =
-        start_installed_service(project_arg, executable_arg, &mut lifecycle_output);
+    let (mut child, address) = RunningEngine::start(&project, &mut lifecycle_output);
+    let address = address.as_str();
 
     let ready = invoke(&[
         "--json",
@@ -437,7 +589,7 @@ max_elapsed_ms = 20000
         "--project",
         project_arg,
         "--address",
-        &address,
+        address,
     ]);
     capture_output(&ready, &mut lifecycle_output);
     assert_success(&ready, "live UI discovery");
@@ -471,14 +623,17 @@ max_elapsed_ms = 20000
     let credential = RrdEngine::read_installed_api_key(&project).unwrap();
     let client = RrdClient::connect_local(
         address.parse().unwrap(),
-        locator.identity.instance_id.clone(),
-        ClientConfig::default(),
+        locator.identity.instance_id,
+        // Backup/restore include authenticated physical verification. Their
+        // explicit budget is separate from the default short-request timeout;
+        // overlapping attempts are covered by deterministic engine tests.
+        ClientConfig {
+            request_timeout: Duration::from_secs(60),
+            ..ClientConfig::default()
+        },
     )
     .unwrap();
-    let query_text = format!(
-        "FROM claim:status AT VALID {installed_at} KNOWN HEAD WHERE subject = \"installed-walking-product\" PROJECT subject, object EXPLAIN CONTRACT"
-    );
-    let (committed_claim_sequence, first_query) = tokio::runtime::Builder::new_current_thread()
+    let (backup_sha256, first_query, committed_claim_sequence) = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -548,6 +703,9 @@ max_elapsed_ms = 20000
                 .unwrap();
             assert_eq!(receipt.mutation_count, 1);
 
+            let query_text = format!(
+                "FROM claim:status AT VALID {installed_at} KNOWN HEAD WHERE subject = \"installed-walking-product\" PROJECT subject, object EXPLAIN CONTRACT"
+            );
             let denied = client
                 .execute_query(
                     &session,
@@ -578,9 +736,17 @@ max_elapsed_ms = 20000
                     &session,
                     ExecuteQuery {
                         scope: format!("instance:{}", client.instance_id()),
-                        query: query_text.clone(),
+                        query: query_text,
                         parameters: BTreeMap::new(),
-                        budget: installed_query_budget(),
+                        budget: QueryBudget {
+                            max_storage_keys: 75_000,
+                            max_rows: 768,
+                            max_output_bytes: 393_216,
+                            max_batch_rows: 192,
+                            max_memory_bytes: 33_554_432,
+                            max_spill_bytes: 67_108_864,
+                            max_elapsed_ms: 20_000,
+                        },
                     },
                     RequestOptions::read(
                         "installed-test-query-request",
@@ -590,7 +756,6 @@ max_elapsed_ms = 20000
                 )
                 .await
                 .unwrap();
-            assert!(query.known_at_cursor >= receipt.last_claim_sequence);
             assert_eq!(query.rows.len(), 1);
             assert_eq!(
                 query.rows[0].identity,
@@ -600,6 +765,92 @@ max_elapsed_ms = 20000
                 query.rows[0].values.get("object"),
                 Some(&QueryValue::String("ui-queryable".into()))
             );
+
+            // A backup at runtime cursor 3, a later commit the backup does not
+            // carry, and a staged restore of the backup for offline publication.
+            let backup = client
+                .create_backup(
+                    &session,
+                    CreateInstanceBackup {
+                        label: "cli-publication".into(),
+                        created_at_unix_ms: installed_at + 1_000,
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-backup-request",
+                        "installed-test-backup-operation",
+                        "installed-test-backup-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert!(backup.backup.application_complete);
+            assert_eq!(
+                backup.backup.installed_control,
+                BackupCoverageSnapshot::Included,
+                "the SDK-visible backup names the installed control state it carries"
+            );
+            let later = client
+                .begin_transaction(
+                    &session,
+                    BeginTransaction {
+                        scope: CanonicalId::new("claims").unwrap(),
+                        timeout_ms: 10_000,
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-later-begin-request",
+                        "installed-test-later-begin-operation",
+                        "installed-test-later-begin-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            let later_mutations = vec![TransactionMutation::AssertClaim {
+                subject: CanonicalId::new("installed-walking-product").unwrap(),
+                predicate: CanonicalId::new("status").unwrap(),
+                object: "after-backup".into(),
+                valid_from: installed_at + 2_000,
+                tx_time: installed_at + 2_000,
+                producer: CanonicalId::new("local-operator").unwrap(),
+                confidence: Some(1.0),
+            }];
+            client
+                .commit_transaction(
+                    &session,
+                    &later.transaction_id,
+                    CommitTransaction {
+                        operation_sha256: transaction_operation_sha256(&later_mutations),
+                        mutations: later_mutations,
+                    },
+                    RequestOptions::new(
+                        "installed-test-later-commit-request",
+                        "installed-test-later-commit-operation",
+                        Some("installed-test-later-commit-idempotency"),
+                        Some(u64::MAX),
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            let staged = client
+                .restore_backup(
+                    &session,
+                    RestoreInstanceBackup {
+                        backup_sha256: backup.backup.backup_sha256.clone(),
+                        restore_id: CanonicalId::new("restore-cli").unwrap(),
+                        restored_at_unix_ms: installed_at + 3_000,
+                    },
+                    RequestOptions::mutation(
+                        "installed-test-restore-request",
+                        "installed-test-restore-operation",
+                        "installed-test-restore-idempotency",
+                    )
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(staged.inventory.runtime_cursor, 3);
             client
                 .close_session(
                     &session,
@@ -613,137 +864,23 @@ max_elapsed_ms = 20000
                 )
                 .await
                 .unwrap();
-            (receipt.last_claim_sequence, query)
+            (backup.backup.backup_sha256, query, receipt.last_claim_sequence)
         });
 
-    let live_verify = invoke(&[
-        "verify",
-        "--project",
-        project_arg,
-        "--level",
-        "quick",
-        "--test-distribution-executable",
-        executable_arg,
-    ]);
+    let live_verify = invoke(&["verify", "--project", project_arg, "--level", "quick"]);
     capture_output(&live_verify, &mut lifecycle_output);
     assert!(
         !live_verify.status.success(),
         "offline verifier must not race the live writer"
     );
 
-    terminate_and_capture(child, stdout, &mut lifecycle_output);
-
-    let (restarted_child, restarted_stdout, restarted_address, restarted_instance_id) =
-        start_installed_service(project_arg, executable_arg, &mut lifecycle_output);
-    assert_eq!(restarted_instance_id, installed_instance_id);
-
-    let restarted_ready = invoke(&[
-        "--json",
-        "ready",
-        "--project",
-        project_arg,
-        "--address",
-        &restarted_address,
-    ]);
-    capture_output(&restarted_ready, &mut lifecycle_output);
-    assert_success(&restarted_ready, "post-kill live UI discovery");
-    let restarted_ready: serde_json::Value =
-        serde_json::from_slice(&restarted_ready.stdout).unwrap();
-    assert_eq!(restarted_ready["status"], "ready");
-    assert_eq!(
-        restarted_ready["capabilities"]["instance"]["id"],
-        installed_instance_id
+    child.terminate(&mut lifecycle_output);
+    assert_restarted_status(
+        &project,
+        installed_at + 2_000,
+        "after-backup",
+        &mut lifecycle_output,
     );
-    assert_eq!(restarted_ready["authentication"]["session_closed"], true);
-
-    let restarted_locator = RrdEngine::read_project_locator(&project).unwrap();
-    assert_eq!(
-        restarted_locator.identity.instance_id,
-        locator.identity.instance_id
-    );
-    let restarted_client = RrdClient::connect_local(
-        restarted_address.parse().unwrap(),
-        restarted_locator.identity.instance_id,
-        ClientConfig::default(),
-    )
-    .unwrap();
-    let restarted_query = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
-            let session = restarted_client
-                .create_session(
-                    credential.principal_id.clone(),
-                    credential.credential(),
-                    CreateSession {
-                        limits: SessionLimits {
-                            idle_timeout_ms: 60_000,
-                            absolute_timeout_ms: 300_000,
-                            max_open_transactions: 1,
-                        },
-                    },
-                    RequestOptions::mutation(
-                        "installed-test-restart-session-request",
-                        "installed-test-restart-session-operation",
-                        "installed-test-restart-session-idempotency",
-                    )
-                    .unwrap(),
-                )
-                .await
-                .unwrap();
-            let query = restarted_client
-                .execute_query(
-                    &session,
-                    ExecuteQuery {
-                        scope: format!("instance:{}", restarted_client.instance_id()),
-                        query: query_text,
-                        parameters: BTreeMap::new(),
-                        budget: installed_query_budget(),
-                    },
-                    RequestOptions::read(
-                        "installed-test-restart-query-request",
-                        "installed-test-restart-query-operation",
-                    )
-                    .unwrap(),
-                )
-                .await
-                .unwrap();
-            restarted_client
-                .close_session(
-                    &session,
-                    CloseSession {},
-                    RequestOptions::mutation(
-                        "installed-test-restart-close-request",
-                        "installed-test-restart-close-operation",
-                        "installed-test-restart-close-idempotency",
-                    )
-                    .unwrap(),
-                )
-                .await
-                .unwrap();
-            query
-        });
-    assert!(restarted_query.known_at_cursor >= committed_claim_sequence);
-    assert_eq!(restarted_query.canonical_query, first_query.canonical_query);
-    assert_eq!(restarted_query.scope, first_query.scope);
-    assert_eq!(restarted_query.schema_revision, first_query.schema_revision);
-    assert_eq!(
-        restarted_query.read_manifest_sha256,
-        first_query.read_manifest_sha256
-    );
-    assert_eq!(restarted_query.rows, first_query.rows);
-    assert_eq!(restarted_query.rows.len(), 1);
-    assert_eq!(
-        restarted_query.rows[0].identity,
-        "claim:installed-walking-product:status"
-    );
-    assert_eq!(
-        restarted_query.rows[0].values.get("object"),
-        Some(&QueryValue::String("ui-queryable".into()))
-    );
-
-    terminate_and_capture(restarted_child, restarted_stdout, &mut lifecycle_output);
     let reopened = invoke(&[
         "--json",
         "verify",
@@ -751,14 +888,116 @@ max_elapsed_ms = 20000
         project_arg,
         "--level",
         "quick",
-        "--test-distribution-executable",
-        executable_arg,
     ]);
     capture_output(&reopened, &mut lifecycle_output);
-    assert_success(&reopened, "post-kill reopen and verify");
+    assert_success(&reopened, "post-shutdown reopen and verify");
     let reopened: serde_json::Value = serde_json::from_slice(&reopened.stdout).unwrap();
     assert_eq!(reopened["status"], "passed");
+    assert_eq!(reopened["runtime_cursor"], 4);
     assert!(reopened["control_journal_sequence"].as_u64().unwrap() > 8);
+
+    // Offline publication of the staged restore through the primary command
+    // tree: a deterministic, no-write plan, an exact-digest apply, and a
+    // verified estate at the backup's state with the old root quarantined.
+    let publication_plan_file = root.path().join("restore-plan.json");
+    let publication_plan_arg = publication_plan_file.to_str().unwrap();
+    let plan_arguments = [
+        "restore",
+        "plan",
+        "--project",
+        project_arg,
+        "--restore",
+        "restore-cli",
+        "--backup",
+        &backup_sha256,
+    ];
+    let before_publication = inventory(&project);
+    let first_plan = invoke(&plan_arguments);
+    let second_plan = invoke(&plan_arguments);
+    capture_output(&first_plan, &mut lifecycle_output);
+    assert_success(&first_plan, "restore plan");
+    assert_success(&second_plan, "second restore plan");
+    assert_eq!(
+        first_plan.stdout, second_plan.stdout,
+        "plan must be byte stable"
+    );
+    assert_eq!(
+        inventory(&project),
+        before_publication,
+        "planning mutated the project"
+    );
+    let publication: serde_json::Value = serde_json::from_slice(&first_plan.stdout).unwrap();
+    assert_eq!(publication["active_root"], locator.storage_root);
+    assert_eq!(publication["candidate"]["runtime_cursor"], 3);
+    assert_eq!(publication["active"]["runtime_cursor"], 4);
+    let publication_sha256 = publication["plan_sha256"].as_str().unwrap().to_owned();
+    std::fs::write(&publication_plan_file, &first_plan.stdout).unwrap();
+    let rejected = invoke(&[
+        "restore",
+        "apply",
+        "--project",
+        project_arg,
+        "--plan",
+        publication_plan_arg,
+        "--expect",
+        &"0".repeat(64),
+    ]);
+    capture_output(&rejected, &mut lifecycle_output);
+    assert!(!rejected.status.success());
+    assert_eq!(inventory(&project), before_publication);
+    let published = invoke(&[
+        "--json",
+        "restore",
+        "apply",
+        "--project",
+        project_arg,
+        "--plan",
+        publication_plan_arg,
+        "--expect",
+        &publication_sha256,
+    ]);
+    capture_output(&published, &mut lifecycle_output);
+    assert_success(&published, "restore apply");
+    let published: serde_json::Value = serde_json::from_slice(&published.stdout).unwrap();
+    assert_eq!(published["plan_sha256"], publication_sha256);
+    assert_eq!(published["runtime_cursor"], 3);
+    assert_eq!(published["idempotent_replay"], false);
+    assert!(project
+        .join(published["quarantine_root"].as_str().unwrap())
+        .is_dir());
+    let after_publication = invoke(&[
+        "--json",
+        "verify",
+        "--project",
+        project_arg,
+        "--level",
+        "quick",
+    ]);
+    capture_output(&after_publication, &mut lifecycle_output);
+    assert_success(&after_publication, "post-publication verify");
+    let after_publication: serde_json::Value =
+        serde_json::from_slice(&after_publication.stdout).unwrap();
+    assert_eq!(after_publication["status"], "passed");
+    assert_eq!(after_publication["runtime_cursor"], 3);
+
+    let restored_query = assert_restarted_status(
+        &project,
+        installed_at,
+        "ui-queryable",
+        &mut lifecycle_output,
+    );
+    assert!(restored_query.known_at_cursor >= committed_claim_sequence);
+    assert_eq!(restored_query.canonical_query, first_query.canonical_query);
+    assert_eq!(restored_query.scope, first_query.scope);
+    assert_eq!(restored_query.schema_revision, first_query.schema_revision);
+    assert_eq!(
+        restored_query.read_manifest_sha256,
+        first_query.read_manifest_sha256
+    );
+    assert_eq!(restored_query.rows, first_query.rows);
+    for (relative, bytes) in before {
+        assert_eq!(std::fs::read(project.join(relative)).unwrap(), bytes);
+    }
 
     // Neither successful nor rejected lifecycle stdout/stderr may contain the
     // generated credential.
