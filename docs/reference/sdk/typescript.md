@@ -98,11 +98,11 @@ the TypeScript 7 API.
 
 The audited projection contains:
 
-- 40 HTTP operations;
+- 41 HTTP operations;
 - only `200` success envelopes plus the default error envelope;
 - `application/json` as the only declared response media type; and
 - OpenAPI SHA-256
-  `ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b`.
+  `52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76`.
 
 The generated `rrd-openapi.ts` is a compile-time projection of roughly 1.6
 MiB. Its `paths`, `components`, and `operations` types are valuable compile-time

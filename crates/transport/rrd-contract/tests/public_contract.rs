@@ -323,7 +323,7 @@ fn supported_sdks_share_one_strict_semantic_corpus() {
     .unwrap();
     corpus.validate().unwrap();
     assert_eq!(corpus.required_domains.len(), 13);
-    assert_eq!(corpus.expected.endpoint_count, 40);
+    assert_eq!(corpus.expected.endpoint_count, 41);
     assert_eq!(
         rrd_contract::transaction_operation_sha256(&corpus.transaction.commit.mutations),
         corpus.transaction.commit.operation_sha256
@@ -1347,7 +1347,7 @@ fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();
     catalogue.validate().unwrap();
-    assert_eq!(catalogue.endpoints.len(), 40);
+    assert_eq!(catalogue.endpoints.len(), 41);
     assert_eq!(catalogue.endpoints[0].operation.as_str(), "audit-export");
     let create = catalogue
         .endpoints
@@ -1420,6 +1420,40 @@ fn openapi_is_derived_from_every_catalogue_operation_and_wire_type() {
         rrd_contract::OPENAPI_DOCUMENT_SHA256,
         "OpenAPI drift requires an intentional protocol/schema review"
     );
+}
+
+#[test]
+fn native_schema_discovery_is_bounded_strict_and_administratively_authorized() {
+    let request = rrd_contract::ReadDataSchema {
+        scope: "instance:local".into(),
+        max_storage_keys: 4096,
+    };
+    request.validate().unwrap();
+    for max_storage_keys in [0, u32::MAX] {
+        assert!(rrd_contract::ReadDataSchema {
+            max_storage_keys,
+            ..request.clone()
+        }
+        .validate()
+        .is_err());
+    }
+    assert!(
+        serde_json::from_value::<rrd_contract::ReadDataSchema>(serde_json::json!({
+            "scope": "instance:local", "max_storage_keys": 4096, "cloud_account": "implicit"
+        }))
+        .is_err()
+    );
+    let catalogue = rrd_contract::endpoint_catalogue();
+    let descriptor = catalogue
+        .endpoints
+        .iter()
+        .find(|entry| entry.operation.as_str() == "data-schema-read")
+        .unwrap();
+    assert_eq!(
+        descriptor.action.fixed_action(),
+        Some(rrd_contract::SecurityAction::DiagnosticsRead)
+    );
+    assert!(!descriptor.mutation);
 }
 
 #[test]

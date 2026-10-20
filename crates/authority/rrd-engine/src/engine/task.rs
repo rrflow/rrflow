@@ -511,7 +511,7 @@ fn register_task_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> {
 /// Installs the strict task-to-flight edge table in a flight's schema under
 /// construction. It declares no pair or degree constraint: the edge identity
 /// is the flight identity, and a constraint would make every later commit in
-/// the scope load every relation in it (POAM-033).
+/// the scope load every relation in it (POAM-034).
 pub(super) fn register_task_includes_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> {
     registry
         .define_relation_table(

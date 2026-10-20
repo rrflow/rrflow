@@ -551,7 +551,7 @@ orchestrates nothing; it is not a routine.
    task to the flight in the flight's own commit, after its events. The edge
    identity is the flight identity, so a flight joins at most one task; the
    edge table declares no pair or degree constraint
-   ([POAM-033](../poam/rrflow-1.0-alpha/poam-033.md)).
+   ([POAM-034](../poam/rrflow-1.0-alpha/poam-034.md)).
 
 A task read names the row by identity and costs its one or two versions. Its
 flights are graph neighbours rather than a second list:

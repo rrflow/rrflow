@@ -69,6 +69,44 @@ impl RequestOptions {
 }
 
 impl RrdClient {
+    /// Discover the native catalogue through the authenticated operation
+    /// descriptor. Requires the instance-wide diagnostics-read grant.
+    pub async fn read_data_schema(
+        &self,
+        session: &Session,
+        request: rrd_contract::ReadDataSchema,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::DataSchemaSnapshot> {
+        request.validate().map_err(contract)?;
+        let expected_scope = request.scope.clone();
+        let catalogue = rrd_contract::endpoint_catalogue();
+        let endpoint = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == "data-schema-read")
+            .ok_or_else(|| Error::Contract("data schema operation is unavailable".into()))?;
+        let method = match endpoint.method {
+            rrd_contract::HttpMethod::Get => Method::GET,
+            rrd_contract::HttpMethod::Post => Method::POST,
+            rrd_contract::HttpMethod::Delete => Method::DELETE,
+        };
+        let result: rrd_contract::DataSchemaSnapshot = self
+            .session_call(
+                method,
+                &endpoint.path,
+                session,
+                request,
+                options,
+                endpoint.mutation,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        if result.scope != expected_scope {
+            return Err(Error::ResponseIdentityMismatch);
+        }
+        Ok(result)
+    }
+
     pub async fn execute_query(
         &self,
         session: &Session,

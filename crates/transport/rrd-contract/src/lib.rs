@@ -208,7 +208,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b";
+    "52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3617,6 +3617,16 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "OpenApiDocument",
         ),
         endpoint(
+            "data-schema-read",
+            HttpMethod::Post,
+            "/v1/data/schema",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "ReadDataSchema",
+            "DataSchemaSnapshot",
+        ),
+        endpoint(
             "query-execute",
             HttpMethod::Post,
             "/v1/query",
@@ -4174,6 +4184,7 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "ReadDataSchema" => schema_json::<RequestEnvelope<ReadDataSchema>>(),
         "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
         "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
         "ReadPromptFlight" => schema_json::<RequestEnvelope<ReadPromptFlight>>(),
@@ -4206,6 +4217,7 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "DataSchemaSnapshot" => schema_json::<ResponseEnvelope<DataSchemaSnapshot>>(),
         "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
         "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),
         "PromptFlightReadResult" => schema_json::<ResponseEnvelope<PromptFlightReadResult>>(),
@@ -5600,6 +5612,58 @@ pub struct DataSchemaRegistry {
     pub relations: BTreeMap<CanonicalId, DataRelationSchema>,
     #[serde(default)]
     pub events: BTreeMap<CanonicalId, DataEventSchema>,
+}
+
+/// Bounded, authenticated catalogue discovery for database administration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadDataSchema {
+    pub scope: String,
+    pub max_storage_keys: u32,
+}
+
+impl ReadDataSchema {
+    pub fn validate(&self) -> Result<()> {
+        if self.scope.is_empty() || self.scope.len() > MAX_ID_BYTES || self.scope.contains('\0') {
+            return invalid("data schema scope is invalid");
+        }
+        if self.max_storage_keys == 0 || self.max_storage_keys > MAX_DATA_SNAPSHOT_STORAGE_KEYS {
+            return invalid("data schema storage key budget is out of bounds");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DataSchemaSnapshot {
+    pub scope: String,
+    pub known_at_cursor: u64,
+    pub read_manifest_sha256: String,
+    pub schema: Option<DataSchemaRegistry>,
+    pub read_evidence: ReadEvidence,
+}
+
+impl DataSchemaSnapshot {
+    pub fn validate(&self) -> Result<()> {
+        ReadDataSchema {
+            scope: self.scope.clone(),
+            max_storage_keys: 1,
+        }
+        .validate()?;
+        validate_sha256(&self.read_manifest_sha256, "schema read manifest")?;
+        self.read_evidence.validate()?;
+        if let Some(schema) = &self.schema {
+            if schema.revision == 0 {
+                return invalid("schema revision must be non-zero");
+            }
+            TransactionMutation::PutSchema {
+                registry: schema.clone(),
+            }
+            .validate()?;
+        }
+        Ok(())
+    }
 }
 
 /// Bounded request for one all-model snapshot at the engine's current

@@ -49,6 +49,19 @@ package and become current inventory records when created. Regenerate the
 inventory with `python3 scripts/ci/build_execution_inventory.py` after an
 accepted path or content change.
 
+The Connectome UI is optional for engine operation, while candidate CI follows
+repository policy and recursively materializes every declared submodule. The
+Connectome development repository is public and can be acquired anonymously.
+The [publication receipt](../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records successful recursive checkout after the visibility change; the full
+candidate pipeline remains required before merge.
+The architecture suite checks the exact Connectome source identity and denies
+engine dependencies or targets inside it, alongside the general pinned-source
+validator. The inventory records the parent gitlink without traversing child
+files. `python3 scripts/ci/test_execution_inventory.py` proves parity across
+absent/populated/edited child files, pin-sensitive identity, and conflict
+rejection. UI builds and real-engine conformance remain separate H-06 evidence.
+
 Marked documentation indexes are derived from their immediate coordinated
 children. Run `python3 scripts/knowledge/render_navigation.py` after adding,
 moving, or removing a child record; `--check` is non-mutating and fails on

@@ -27,6 +27,28 @@ decision. A force push or history rewrite is never a release mechanism.
 
 ## Release condition
 
+### rrflowDB compatibility and independent-release evidence
+
+The owner-directed [PostgreSQL core-profile contract](../../reference/protocol/postgresql.md)
+adds the following evidence to the existing release items; it creates no
+separate release authority or version train:
+
+- J-02 includes H-08's locked-reference SQL/type/transaction/wire/client corpus,
+  native-operation equivalence, denial/fuzz/resource/concurrency/crash cases,
+  and synthetic Turso-exit import/export rehearsal. Required skips block release.
+- J-03 exercises PostgreSQL clients against each supported installed native
+  server and reopens/restores its native data with vendor services unavailable.
+  Reference PostgreSQL and source-export tools are isolated test inputs, never
+  default runtime dependencies. The exact supported client/profile report ships
+  with the candidate; unsupported extensions/tools are stated explicitly.
+- J-04 measures mixed SQL and AI workloads, including data larger than memory,
+  alongside the existing correctness/quality and fixed-hardware evidence. There
+  is no throughput or PostgreSQL superiority claim before those results exist.
+- J-05 requires complete first-party licence texts, dependency notices, SBOM,
+  retained reproducible source inputs, provenance, signatures, independent
+  logical export/native recovery documentation, and a verified rebuild without
+  a vendor account. A Cargo licence expression alone does not qualify packaging.
+
 RRFlow 1.0 is releasable only when every Gate J item and every prerequisite is
 checked. Until then the repository may describe implemented and measured
 behavior, but it must not claim the complete target system is production-ready.

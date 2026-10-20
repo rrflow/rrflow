@@ -1634,6 +1634,7 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
     "docs/reference/operations/README.md": ("KB-05", "KB-08"),
     "docs/reference/operations/estate-control.md": ("KB-05",),
     "docs/reference/protocol/README.md": ("KB-05", "KB-08"),
+    "docs/reference/protocol/postgresql.md": ("H-08", "J-02", "J-03", "J-05"),
     "docs/reference/protocol/public-contract.md": ("KB-05",),
     "docs/reference/protocol/server.md": ("KB-05",),
     "docs/reference/protocol/subscriptions.md": ("KB-05",),
@@ -1689,6 +1690,27 @@ def git_files() -> list[str]:
     return sorted(paths)
 
 
+def gitlinks() -> dict[str, str]:
+    """Read parent-pinned object IDs, independent of child checkout state."""
+    result = subprocess.run(
+        ["git", "ls-files", "--stage", "-z"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    links = {}
+    for entry in result.stdout.split(b"\0"):
+        if not entry:
+            continue
+        header, path = entry.decode("utf-8").split("\t", 1)
+        mode, revision, stage = header.split()
+        if stage != "0":
+            raise ValueError(f"unmerged index entry: {path}")
+        if mode == "160000":
+            links[path] = revision
+    return links
+
+
 def file_kind(path: str) -> str:
     suffix = Path(path).suffix.lower()
     if path.endswith("Cargo.toml") or path == "Cargo.toml":
@@ -1720,7 +1742,9 @@ def package_name(path: str) -> str | None:
 
 
 def planned_gates(path: str) -> tuple[str, ...]:
-    if path == ACTIVE_CHANGE_PLAN:
+    if path in {".gitmodules", "connectome"}:
+        gates = ("H-06", "H-07", "J-03")
+    elif path == ACTIVE_CHANGE_PLAN:
         gates = ("J-01", "J-02")
     elif path in FILE_OVERRIDES:
         gates = ("A-07", *FILE_OVERRIDES[path])
@@ -1812,7 +1836,7 @@ def line_count(data: bytes) -> int | None:
     return data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
 
 
-def current_record(path: str) -> dict[str, object]:
+def current_record(path: str, links: dict[str, str]) -> dict[str, object]:
     relative_output = OUTPUT.relative_to(ROOT).as_posix()
     if path == relative_output:
         return {
@@ -1822,6 +1846,21 @@ def current_record(path: str) -> dict[str, object]:
             "coverage": "self-record; content digest and line count intentionally omitted",
             "planned_gates": ["A-06"],
             "action": "regenerate deterministically after repository path or content changes",
+        }
+    if path in links:
+        # Hash the parent Git object identity, never files in the optional child.
+        identity = f"160000 {links[path]}\n".encode("ascii")
+        return {
+            "path": path,
+            "state": "current",
+            "kind": "git-submodule",
+            "git_revision": links[path],
+            "bytes": len(identity),
+            "lines": None,
+            "sha256": hashlib.sha256(identity).hexdigest(),
+            "coverage": "parent gitlink identity only; child source belongs to its separate repository",
+            "planned_gates": list(planned_gates(path)),
+            "action": "pin optional UI source after review; never consume it as engine build or runtime input",
         }
     data = (ROOT / path).read_bytes()
     lines = line_count(data)
@@ -1840,7 +1879,8 @@ def current_record(path: str) -> dict[str, object]:
 
 def records() -> list[dict[str, object]]:
     current_paths = git_files()
-    result = [current_record(path) for path in current_paths]
+    links = gitlinks()
+    result = [current_record(path, links) for path in current_paths]
     current_set = set(current_paths)
     for path, gates in PLANNED_PATHS.items():
         if path in current_set:

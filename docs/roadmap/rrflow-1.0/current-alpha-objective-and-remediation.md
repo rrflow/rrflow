@@ -41,6 +41,6 @@ Roadmap completion currently stands at:
 | E | native graph, scalar, BM25, and vector access paths | 0 / 5 |
 | F | streamed Arrow/DataFusion analytical execution | 0 / 5 |
 | G | LFG routing through the engine | 0 / 6 |
-| H | dynamic context, feedback, delivery, tracing, and Connectome | 0 / 7 |
+| H | dynamic context, feedback, delivery, tracing, Connectome, and PostgreSQL compatibility | 0 / 8 |
 | I | explicit engine events, triggers, routines, host-event adapters, and skills | 0 / 7 |
 | J | self-contained release and real deployment proof | 0 / 5 |

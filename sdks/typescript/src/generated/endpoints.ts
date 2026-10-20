@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: ee6aa4c9f7ac560a6f90eacdad9a457ba4cb7407898ca8431dedf943bf1d0c5b
+// OpenAPI SHA-256: 52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -46,6 +46,12 @@ export const endpoints = {
   "context-assemble": {
     "method": "POST",
     "path": "/v1/context/assemble",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "data-schema-read": {
+    "method": "POST",
+    "path": "/v1/data/schema",
     "authentication": "session_bearer",
     "mutation": false
   },
