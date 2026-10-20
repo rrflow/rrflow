@@ -498,9 +498,13 @@ One launch runs inside one authenticated read stamp:
    event carries the five plan-stage decisions and the plan/packet digests,
    not a second copy of the packet items.
 5. Commit one cursor-CAS runtime commit: the strict table schema on first
-   use, one `rrflow-prompt-flight` lifecycle record, and its
-   `rrflow-prompt-flight-event` lifecycle events. A lost cursor race retries
-   at most three times, then reports a retryable conflict.
+   use (the edge table's target kinds grow with each record kind a flight
+   uses), one `rrflow-prompt-flight` lifecycle record, one
+   `rrflow-prompt-flight-used` edge per context item that is a canonical
+   record (rank, fused score, and contributing avenues; claims are not graph
+   nodes), and its `rrflow-prompt-flight-event` lifecycle events. A lost
+   cursor race retries at most three times, then reports a retryable
+   conflict.
 
 The `observe` provider prepares the packet inside the engine and launches
 nothing, so the flight completes as `prepared`. Model-provider arms are
@@ -508,10 +512,18 @@ explicit opt-in adapters; each enters the closed provider, stage, and status
 vocabularies only together with its governed adapter, budget, and audit
 evidence.
 
-List and read are stamped direct reads of the flight record kind and, for a
-read, the flight event kind; neither replays the runtime log. Flight rows and
-events are ordinary temporal data, visible to data snapshots, changefeeds,
-and the diagnostic graph lens. A flight records only externally observable
+A read names the flight's record by identity, then, at the same stamp, each
+edge by its deterministic identity (`<flight-id>.<rank>`) and each event by
+its log cursor, so it costs the flight's own size and never the estate's.
+The list is a stamped read of the flight record kind and still grows with the
+number of flights until a cursor-ordered access path exists (Gate E). Neither
+replays the runtime log. Flight rows, edges, and events are ordinary temporal
+data, visible to data snapshots, changefeeds, and the diagnostic graph lens,
+and rrflowQL walks them in both directions:
+`FROM traverse:rrflow-prompt-flight-used START rrflow-prompt-flight:<id>
+DIRECTION OUTGOING DEPTH 1 …` returns the records a prompt used, and
+`… START <kind>:<id> DIRECTION INCOMING …` returns every prompt that used a
+record. A flight records only externally observable
 runtime events and never hidden chain-of-thought.
 
 ## Trace and observability flow

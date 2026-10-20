@@ -2069,7 +2069,24 @@ fn flight_record() -> rrd_contract::PromptFlightRecord {
         },
         flight_cursor: 41,
         known_at_cursor: 41,
+        use_count: 0,
         event_count: 3,
+    }
+}
+
+fn flight_use(rank: u64, id: &str) -> rrd_contract::PromptFlightUse {
+    rrd_contract::PromptFlightUse {
+        reference: rrd_contract::DataReference {
+            kind: CanonicalId::new("note").unwrap(),
+            id: CanonicalId::new(id).unwrap(),
+        },
+        rank,
+        score: 0.03,
+        // Deliberately unsorted (text < graph); callers sort it.
+        evidence: vec![
+            rrd_contract::ContextEvidenceKind::Graph,
+            rrd_contract::ContextEvidenceKind::Text,
+        ],
     }
 }
 
@@ -2151,8 +2168,13 @@ fn prompt_flight_contract_is_bounded_strict_and_separately_authorized() {
     pruned_without_summary.metrics.context_output_bytes = 300;
     pruned_without_summary.validate().unwrap();
 
+    let mut fresh_with_uses = record.clone();
+    fresh_with_uses.use_count = 1;
+    assert!(fresh_with_uses.validate().is_err());
+
     let flight = rrd_contract::PromptFlight {
         record: record.clone(),
+        uses: Vec::new(),
         events: vec![
             flight_event(0, 0, rrd_contract::PromptFlightStage::Prompt),
             flight_event(1, 3, rrd_contract::PromptFlightStage::Context),
@@ -2176,6 +2198,54 @@ fn prompt_flight_contract_is_bounded_strict_and_separately_authorized() {
     assert_eq!(
         serde_json::from_value::<rrd_contract::PromptFlight>(encoded).unwrap(),
         flight
+    );
+
+    // A pruned flight's edges: rank order, one per record, sorted evidence.
+    let mut graph = flight.clone();
+    graph.record.context_mode = rrd_contract::PromptFlightContextMode::Pruned;
+    graph.record.context = Some(rrd_contract::PromptFlightContextSummary {
+        request_sha256: "e".repeat(64),
+        plan_sha256: "e".repeat(64),
+        packet_sha256: "e".repeat(64),
+        items: 3,
+        output_bytes: 300,
+        truncated: false,
+        selected_versions: 9,
+    });
+    graph.record.metrics.context_items = 3;
+    graph.record.metrics.context_output_bytes = 300;
+    graph.record.use_count = 2;
+    let mut sorted_evidence = flight_use(1, "alpha");
+    sorted_evidence.evidence.sort();
+    let mut second = flight_use(3, "beta");
+    second.evidence.sort();
+    graph.uses = vec![sorted_evidence.clone(), second.clone()];
+    graph.validate().unwrap();
+    let mut too_many = graph.clone();
+    too_many.record.use_count = 4;
+    assert!(too_many.record.validate().is_err(), "more edges than items");
+    let mut miscounted_uses = graph.clone();
+    miscounted_uses.uses.pop();
+    assert!(miscounted_uses.validate().is_err());
+    let mut unordered_uses = graph.clone();
+    unordered_uses.uses.swap(0, 1);
+    assert!(unordered_uses.validate().is_err());
+    let mut duplicate_record = graph.clone();
+    duplicate_record.uses[1].reference = sorted_evidence.reference.clone();
+    assert!(duplicate_record.validate().is_err());
+    let mut unsorted_evidence = graph.clone();
+    unsorted_evidence.uses[0] = flight_use(1, "alpha");
+    assert!(
+        unsorted_evidence.validate().is_err(),
+        "evidence must be sorted"
+    );
+    let mut zero_score = graph.clone();
+    zero_score.uses[0].score = 0.0;
+    assert!(zero_score.validate().is_err());
+    let encoded = serde_json::to_value(&graph).unwrap();
+    assert_eq!(
+        serde_json::from_value::<rrd_contract::PromptFlight>(encoded).unwrap(),
+        graph
     );
 
     rrd_contract::ListPromptFlights {

@@ -60,6 +60,13 @@ in `rrd-contract`; `RrdEngine` records the `observe` arm with `fresh` and
 runtime commit, with exact replay, conflict, denial, reopen, and real-process
 client evidence.
 
+The [H-06b per-prompt flight graph journal](../../evidence/change-journals/gate-h/h06b-per-prompt-flight-graph-journal.md)
+records the second: each pruned flight writes one strict
+`rrflow-prompt-flight-used` edge per record it used, in the same commit, so
+rrflowQL traverses a prompt to its records and a record back to its prompts;
+`flight-read` reads the record, its edges, and its events by identity, so its
+cost is the flight's own size.
+
 The row closes only when, in addition:
 
 - each model-provider arm runs as an explicit, installed, opt-in adapter with

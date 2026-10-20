@@ -1259,12 +1259,12 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         )
         .await
         .unwrap();
-    assert_eq!(after_flight.through_cursor, runtime_head + 5);
-    assert_eq!(
-        after_flight.changes.len(),
-        5,
-        "schema, row, and three events"
-    );
+    // Schema, row, one edge per record the context used, and three events.
+    assert_eq!(record.use_count, 1, "the flight used document:alpha");
+    assert_eq!(flight.flight.uses[0].reference.id.as_str(), "alpha");
+    let flight_changes = 5 + record.use_count;
+    assert_eq!(after_flight.through_cursor, runtime_head + flight_changes);
+    assert_eq!(after_flight.changes.len() as u64, flight_changes);
     let flight_audit = client
         .read_audit(
             &session,
