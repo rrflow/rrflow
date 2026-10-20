@@ -11,11 +11,15 @@ independently.
 ## Observed deficiency
 
 A-07.1h rejects source/build inputs outside the repository, but a self-contained release
-assembler, signed byte manifest, offline installer proof, and clean-rollout comparison do
-not exist. The current release build emits a Linux ELF `rrflow` plus separate `rrd-server`
-and `rrflow-mcp`; no native Windows `rrflow.exe` was built or run, no single artifact owns
-the default lifecycle, and no platform candidate carries complete checksum, SBOM,
-provenance, signature, runtime-dependency, or installed-byte evidence.
+assembler, signed byte manifest, offline installer proof, and clean-rollout comparison
+remain unqualified. The primary `rrflow`/`rrflow.exe` now owns the installed
+lifecycle, and [PR 32](https://github.com/rrflow/rrflow-development/pull/32)
+passed native fresh/existing install, authenticated commit, restart and restore
+readback on Linux, Windows and macOS. The earlier assertion that no native
+Windows primary binary had run is superseded by that evidence. These are
+source-built development processes, not signed offline release bundles.
+No platform candidate is thereby qualified for complete checksum, SBOM,
+provenance, signature, runtime-dependency or installed-byte release evidence.
 
 At planning baseline `9bcc6154`, `Cargo.toml` declares `MIT OR Apache-2.0`,
 but the inspected tracked tree contains no LICENSE/NOTICE-named files.

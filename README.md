@@ -72,6 +72,7 @@ Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
 | Need | Single owning record |
 |---|---|
 | Understand the product, components, and boundaries | [RRFlow system overview](docs/architecture/system-overview.md) |
+| Follow researched scale, bounded execution, input/schema and signal decisions into their owning implementation packages | [RRFlow scale and contract rationale](docs/architecture/engine-scale-and-contracts.md) |
 | Understand project, estate, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
 | Select and prove deployment form, storage profile, and endpoint presentation independently | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
 | Install, serve, verify, repair, restore, and remove one project estate through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |

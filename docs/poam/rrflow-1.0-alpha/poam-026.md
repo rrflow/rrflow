@@ -17,6 +17,14 @@ closed metric-instrument catalogue, latency boundary/protocol, exporter/cardinal
 policy, self-telemetry, sanitized diagnostic capture, or complete causal coverage across
 storage, graph, lexical, vector, DataFusion, context, reasoning, commit, and delivery.
 
+At `554ce4ccf1cb25aceba036dafaf4c8df79c42701`, the primary CLI's
+`installed.rs::VersionReport` exposes product/protocol versions and release
+stage only. It lacks the source/tree/feature/format/configuration identity
+required by H-05a. The [next executable cut](../../architecture/engine-scale-and-contracts.md#next-executable-cut)
+uses the existing early H-05a prerequisite to D-01 qualification. The new
+[signal-to-action acceptance](../../architecture/engine-data-flow.md#signal-to-action-acceptance)
+defines testable operational behavior; it is a plan, not new instrumentation.
+
 ## Impact
 
 Local logs or scattered elapsed counters can be mistaken for system proof; regressions,
