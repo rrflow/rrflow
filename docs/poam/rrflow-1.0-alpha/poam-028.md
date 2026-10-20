@@ -73,6 +73,14 @@ These numbers are fixture evidence, not a general constant-time claim.
 The [repair journal](../../evidence/change-journals/gate-c/c-04e-stamped-vector-catalogues.md)
 records exact commands and limitations.
 
+Review also verified that `RuntimeReadBudgetExceeded` was converted to an
+internal service error. A request-level regression failed with `Internal`
+instead of `ResourceExhausted`. The existing configuration-limit category now
+carries that typed storage denial without an automatic retry, while ordinary
+storage faults remain internal. The
+[budget-signal correction receipt](../../evidence/change-journals/gate-c/c-04e-vector-budget-signal-correction.md)
+records the additional proof and final candidate requirement.
+
 The two repaired source-closure exceptions are removed. The independent
 `rrd-maintenance` log replay remains the one known exception, so POAM-028
 and C-04 remain open. Catalogue generation/lifecycle history is still read

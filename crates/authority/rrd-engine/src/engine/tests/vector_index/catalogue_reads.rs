@@ -139,6 +139,10 @@ fn catalogue_search_work_excludes_unrelated_history_and_shares_the_request_budge
         .search_vectors_at(&restricted, retained.clone())
         .unwrap_err();
     assert!(error.to_string().contains("budget"), "{error}");
+    assert_eq!(error.kind(), crate::ServiceErrorKind::ResourceExhausted);
+    assert!(!error.retryable());
+    let storage_fault = ServiceError::from(rrd_store::Error::Substrate("I/O failure".into()));
+    assert_eq!(storage_fault.kind(), crate::ServiceErrorKind::Internal);
     // The exact measured allowance succeeds; one fewer key fails closed.
     restricted.max_storage_keys = before.read_evidence.keys_examined;
     assert_eq!(

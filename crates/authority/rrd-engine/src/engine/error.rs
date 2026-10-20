@@ -152,6 +152,7 @@ impl From<rrd_store::Error> for ServiceError {
     fn from(value: rrd_store::Error) -> Self {
         let message = value.to_string();
         match value {
+            rrd_store::Error::RuntimeReadBudgetExceeded { .. } => Self::ConfigurationLimit(message),
             rrd_store::Error::IndexConstraint(_) => Self::Query(message),
             rrd_store::Error::RuntimeConflict { .. }
             | rrd_store::Error::RuntimeSchemaConflict { .. }
