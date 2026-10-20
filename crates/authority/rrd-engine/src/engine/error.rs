@@ -23,6 +23,7 @@ pub enum ServiceError {
     OperationDigestMismatch,
     Query(String),
     Inference(String),
+    InferenceBusy,
     Vector(String),
     VectorPressure(String),
     Changefeed(String),
@@ -111,6 +112,7 @@ impl ServiceError {
             | Self::ClockRollback { .. }
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
+            | Self::InferenceBusy
             | Self::RenewalQuota
             | Self::SubscriptionBackpressure
             | Self::FunctionLimit(_)
@@ -123,7 +125,10 @@ impl ServiceError {
     }
 
     pub fn retryable(&self) -> bool {
-        matches!(self, Self::StorageConflict(_) | Self::InvocationInProgress)
+        matches!(
+            self,
+            Self::StorageConflict(_) | Self::InvocationInProgress | Self::InferenceBusy
+        )
     }
 }
 

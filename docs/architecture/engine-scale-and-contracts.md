@@ -21,7 +21,7 @@ These are bounded design inputs, not a replacement source inventory:
 | Boundary inspected | Preserve | Repair or complete, with existing owner |
 |---|---|---|
 | `rrd-engine/src/engine/invocation.rs` and PR 32 | Per-admission ownership, authorization and audited completion | The process-local reservation is not a durable reasoning lease or resume checkpoint. G-02/G-04 and I-03 must bind durable work separately. |
-| `rrd-engine/src/engine/inference.rs::generate_embeddings_at`; `rrd-inference/src/lib.rs::EmbeddingBackendRegistry::embed_batch` | Model provenance, input/output validation, explicit network policy | The registry mutex remains held through synchronous backend work. Isolate backend execution from registry lookup, bound admission, and prove cancellation/resource reclamation. G-01/G-06; POAM-009. |
+| `rrd-engine/src/engine/inference.rs::generate_embeddings_at`; `rrd-inference/src/lib.rs::EmbeddingBackendRegistry::embed_batch` | Model provenance, input/output validation, explicit network policy | The inspected baseline held the registry mutex through backend work. The current single-slot admission repair below removes that coupling; configurable concurrency, cancellation and complete resource reclamation remain G-01/G-06 and POAM-009 work. |
 | `rrd-contract/src/router.rs`; kernel/public `reasoning_tree.rs` | Existing descriptor, request, three-decision and cursor contracts | Admission and schema validation exist; executable router dispatch and persisted tree execution remain G work. `TaskRecord` open/close is not a reasoning worker. |
 | `rrd-query/src/fusion.rs::RrdSnapshotTableProvider`; `arrow.rs` | Stamped execution, honest unsupported filters and existing budget evidence | Replace eager Arrow snapshots with the accepted storage stream; account for allocations before and after DataFusion. F-01/F-02/F-04; POAM-004. |
 | `rrd-core/src/schema.rs`; public data and generated surfaces | One explicit logical table map, atomic schema/data mutation, generated projections | Add admitted semantic contracts and versioned validation at the owning boundary, not handwritten competing API schemas. H-04/H-08 and the schema catalogue. |
@@ -117,6 +117,21 @@ gets its own bounded worker or permit. A per-backend worker still belongs to
 `RrdEngine` admission; it has no independent durable job state. Avoid replacing
 one global mutex with unbounded spawned work. Preserve descriptor revision and
 credential revocation checks across queueing.
+
+The [embedding admission repair](../evidence/change-journals/gate-g/g-01a-embedding-admission-repair.md)
+applies that separation to the existing synchronous path. It preserves the
+previous one-batch execution ceiling and rejects contention immediately;
+listing and adapter installation use only the short catalogue lock. Selection
+pins the admitted descriptor and registry revision, descriptor drift rejects
+results, and an owned permit remains held through execution and validation.
+There are no spawned workers, waiting queue or claimed cancellation. The
+failure corpus uses controlled channel ordering and simultaneous admission,
+not a throughput benchmark or full deterministic-simulation system. This is a
+bounded POAM-009 repair; G-01a must still qualify configurable parallelism,
+deadlines, revocation, cancellation and late output before raising the ceiling.
+Rust's [mutex semantics](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
+explain why a backend panic is confined to its own adapter lock; poisoning is
+advisory and is not a substitute for descriptor/result validation.
 
 Tokio explicitly documents that a started blocking task cannot be aborted by
 dropping/aborting its handle. Therefore a timeout may stop waiting without
