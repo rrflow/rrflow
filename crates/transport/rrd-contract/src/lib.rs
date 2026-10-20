@@ -25,6 +25,7 @@ mod reasoning_tree;
 mod restore_publication;
 mod router;
 mod sdk_conformance;
+mod task;
 mod websocket;
 
 pub use attunement::{
@@ -175,6 +176,11 @@ pub use sdk_conformance::{
     SdkConformanceIdentity, SdkConformanceSession, SdkConformanceTransaction, SdkConformanceVector,
     SDK_CONFORMANCE_FORMAT_VERSION,
 };
+pub use task::{
+    CloseTask, ListTasks, OpenTask, ReadTask, TaskPage, TaskReadResult, TaskRecord, TaskResult,
+    TaskStatus, MAX_TASK_GOAL_BYTES, MAX_TASK_OUTCOME_BYTES, MAX_TASK_PAGE, MAX_TASK_STORAGE_KEYS,
+    MAX_TASK_TITLE_BYTES, TASK_FORMAT_VERSION, TASK_INCLUDES_KIND, TASK_KIND,
+};
 pub use websocket::{
     decode_websocket_frame, encode_websocket_frame, validate_subscription_snapshot,
     validate_websocket_cancellation_correlation, validate_websocket_response_correlation,
@@ -202,7 +208,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "3f2638dd5705cf3bfbc2393c739a367278c772202decd130b4450467de2551f8";
+    "52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -2981,6 +2987,8 @@ pub enum SecurityAction {
     DiagnosticsRead,
     FlightLaunch,
     FlightRead,
+    TaskWrite,
+    TaskRead,
     SecurityAdmin,
     MemoryContextRead,
     ReasoningRead,
@@ -2990,7 +2998,7 @@ pub enum SecurityAction {
 impl SecurityAction {
     /// Canonical policy-action catalogue. Installation profiles and other
     /// projections consume this list instead of maintaining parallel copies.
-    pub const ALL: [Self; 49] = [
+    pub const ALL: [Self; 51] = [
         Self::ServiceInspect,
         Self::UnknownRequest,
         Self::SessionCreate,
@@ -3036,6 +3044,8 @@ impl SecurityAction {
         Self::DiagnosticsRead,
         Self::FlightLaunch,
         Self::FlightRead,
+        Self::TaskWrite,
+        Self::TaskRead,
         Self::SecurityAdmin,
         Self::MemoryContextRead,
         Self::ReasoningRead,
@@ -3717,6 +3727,46 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "OpenSubscriptionResult",
         ),
         endpoint(
+            "task-close",
+            HttpMethod::Post,
+            "/v1/tasks/close",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::TaskWrite,
+            "CloseTask",
+            "TaskResult",
+        ),
+        endpoint(
+            "task-list",
+            HttpMethod::Post,
+            "/v1/tasks/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::TaskRead,
+            "ListTasks",
+            "TaskPage",
+        ),
+        endpoint(
+            "task-open",
+            HttpMethod::Post,
+            "/v1/tasks",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::TaskWrite,
+            "OpenTask",
+            "TaskResult",
+        ),
+        endpoint(
+            "task-read",
+            HttpMethod::Post,
+            "/v1/tasks/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::TaskRead,
+            "ReadTask",
+            "TaskReadResult",
+        ),
+        endpoint(
             "transaction-abort",
             HttpMethod::Delete,
             "/v1/transactions/{transaction}",
@@ -4138,6 +4188,10 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
         "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
         "ReadPromptFlight" => schema_json::<RequestEnvelope<ReadPromptFlight>>(),
+        "OpenTask" => schema_json::<RequestEnvelope<OpenTask>>(),
+        "CloseTask" => schema_json::<RequestEnvelope<CloseTask>>(),
+        "ListTasks" => schema_json::<RequestEnvelope<ListTasks>>(),
+        "ReadTask" => schema_json::<RequestEnvelope<ReadTask>>(),
         "ReadEstate" => schema_json::<RequestEnvelope<ReadEstate>>(),
         "RenewSession" => schema_json::<RequestEnvelope<RenewSession>>(),
         "RestoreInstanceBackup" => schema_json::<RequestEnvelope<RestoreInstanceBackup>>(),
@@ -4167,6 +4221,9 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
         "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),
         "PromptFlightReadResult" => schema_json::<ResponseEnvelope<PromptFlightReadResult>>(),
+        "TaskResult" => schema_json::<ResponseEnvelope<TaskResult>>(),
+        "TaskPage" => schema_json::<ResponseEnvelope<TaskPage>>(),
+        "TaskReadResult" => schema_json::<ResponseEnvelope<TaskReadResult>>(),
         "EndpointCatalogue" => schema_json::<ResponseEnvelope<EndpointCatalogue>>(),
         "EstateSnapshot" => schema_json::<ResponseEnvelope<EstateSnapshot>>(),
         "InstanceBackupCatalogueSnapshot" => {

@@ -10,7 +10,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const INSTANCE_SCOPE: &str = "instance:test-instance";
 
-fn launch_request(prompt: &str, context_mode: PromptFlightContextMode) -> LaunchPromptFlight {
+pub(super) fn launch_request(
+    prompt: &str,
+    context_mode: PromptFlightContextMode,
+) -> LaunchPromptFlight {
     LaunchPromptFlight {
         scope: INSTANCE_SCOPE.into(),
         prompt: prompt.into(),
@@ -25,12 +28,13 @@ fn launch_request(prompt: &str, context_mode: PromptFlightContextMode) -> Launch
             max_storage_keys: 4_096,
         },
         acceptance_marker: None,
+        task_id: None,
     }
 }
 
 /// Commits three note records so prompt-matched context has something to
 /// recall. Returns the receipt so a test can reason about cursors.
-fn seed_notes(
+pub(super) fn seed_notes(
     engine: &RrdEngine,
     lease: &rrd_contract::SessionLease,
 ) -> rrd_contract::CommitReceipt {
@@ -125,7 +129,7 @@ fn seed_notes(
         .unwrap()
 }
 
-fn session(engine: &RrdEngine, name: &str) -> rrd_contract::SessionLease {
+pub(super) fn session(engine: &RrdEngine, name: &str) -> rrd_contract::SessionLease {
     engine
         .create_session(
             &session_request(5_000, 4),

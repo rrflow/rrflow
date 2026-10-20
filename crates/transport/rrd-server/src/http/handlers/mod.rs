@@ -7,4 +7,5 @@ mod diagnostic;
 mod flight;
 mod session;
 mod subscription;
+mod task;
 mod vector;

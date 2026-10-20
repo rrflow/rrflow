@@ -323,7 +323,7 @@ fn supported_sdks_share_one_strict_semantic_corpus() {
     .unwrap();
     corpus.validate().unwrap();
     assert_eq!(corpus.required_domains.len(), 13);
-    assert_eq!(corpus.expected.endpoint_count, 37);
+    assert_eq!(corpus.expected.endpoint_count, 41);
     assert_eq!(
         rrd_contract::transaction_operation_sha256(&corpus.transaction.commit.mutations),
         corpus.transaction.commit.operation_sha256
@@ -1347,7 +1347,7 @@ fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();
     catalogue.validate().unwrap();
-    assert_eq!(catalogue.endpoints.len(), 37);
+    assert_eq!(catalogue.endpoints.len(), 41);
     assert_eq!(catalogue.endpoints[0].operation.as_str(), "audit-export");
     let create = catalogue
         .endpoints
@@ -2056,6 +2056,7 @@ fn flight_record() -> rrd_contract::PromptFlightRecord {
         context_mode: rrd_contract::PromptFlightContextMode::Fresh,
         context_request: flight_context_request(),
         acceptance_marker: Some("all checks passed".into()),
+        task_id: None,
         status: rrd_contract::PromptFlightStatus::Prepared,
         created_at_unix_ms: 2_000,
         idempotency_key: CorrelationId::new("idem-flight-1").unwrap(),
@@ -2099,6 +2100,7 @@ fn prompt_flight_contract_is_bounded_strict_and_separately_authorized() {
         context_mode: rrd_contract::PromptFlightContextMode::Pruned,
         context: flight_context_request(),
         acceptance_marker: None,
+        task_id: None,
     };
     launch.validate().unwrap();
     assert_eq!(
@@ -2320,5 +2322,192 @@ fn prompt_flight_contract_is_bounded_strict_and_separately_authorized() {
             Some(rrd_contract::SecurityAction::FlightRead)
         );
     }
-    assert_eq!(rrd_contract::SecurityAction::ALL.len(), 49);
+    assert_eq!(rrd_contract::SecurityAction::ALL.len(), 51);
+}
+
+fn task_record() -> rrd_contract::TaskRecord {
+    rrd_contract::TaskRecord {
+        format_version: rrd_contract::TASK_FORMAT_VERSION,
+        task_id: CanonicalId::new(format!("task-{}", "d".repeat(64))).unwrap(),
+        scope: "instance:alpha".into(),
+        title: "Session recovery".into(),
+        goal: "Recover a durable session.".into(),
+        status: rrd_contract::TaskStatus::Open,
+        outcome: None,
+        opened_at_unix_ms: 2_000,
+        closed_at_unix_ms: None,
+        idempotency_key: CorrelationId::new("idem-task-1").unwrap(),
+        operation_sha256: "e".repeat(64),
+        task_cursor: 41,
+        known_at_cursor: 41,
+    }
+}
+
+#[test]
+fn task_contract_is_bounded_strict_and_separately_authorized() {
+    let open = rrd_contract::OpenTask {
+        scope: "instance:alpha".into(),
+        title: "Session recovery".into(),
+        goal: "Recover a durable session.".into(),
+    };
+    open.validate().unwrap();
+    for title in [
+        "   ".to_owned(),
+        "two\nlines".to_owned(),
+        "x".repeat(rrd_contract::MAX_TASK_TITLE_BYTES + 1),
+    ] {
+        let mut invalid = open.clone();
+        invalid.title = title;
+        assert!(invalid.validate().is_err());
+    }
+    let mut no_goal = open.clone();
+    no_goal.goal = " ".into();
+    assert!(no_goal.validate().is_err());
+    let mut long_goal = open.clone();
+    long_goal.goal = "g".repeat(rrd_contract::MAX_TASK_GOAL_BYTES + 1);
+    assert!(long_goal.validate().is_err());
+    assert!(
+        serde_json::from_value::<rrd_contract::OpenTask>(serde_json::json!({
+            "scope": "instance:alpha", "title": "t", "goal": "g", "owner": "someone"
+        }))
+        .is_err()
+    );
+
+    let close = rrd_contract::CloseTask {
+        scope: "instance:alpha".into(),
+        task_id: task_record().task_id,
+        status: rrd_contract::TaskStatus::Completed,
+        outcome: Some("Recovered.".into()),
+    };
+    close.validate().unwrap();
+    let mut reopen = close.clone();
+    reopen.status = rrd_contract::TaskStatus::Open;
+    assert!(reopen.validate().is_err());
+    let mut blank_outcome = close.clone();
+    blank_outcome.outcome = Some("  ".into());
+    assert!(blank_outcome.validate().is_err());
+    assert_eq!(
+        serde_json::to_value(rrd_contract::TaskStatus::Abandoned).unwrap(),
+        serde_json::json!("abandoned")
+    );
+
+    let open_task = task_record();
+    open_task.validate().unwrap();
+    let mut open_with_outcome = open_task.clone();
+    open_with_outcome.outcome = Some("early".into());
+    assert!(open_with_outcome.validate().is_err());
+    let mut open_twice_known = open_task.clone();
+    open_twice_known.known_at_cursor = 42;
+    assert!(open_twice_known.validate().is_err());
+    let mut closed = open_task.clone();
+    closed.status = rrd_contract::TaskStatus::Completed;
+    closed.outcome = Some("Recovered.".into());
+    closed.closed_at_unix_ms = Some(2_500);
+    closed.known_at_cursor = 47;
+    closed.validate().unwrap();
+    let mut closed_without_time = closed.clone();
+    closed_without_time.closed_at_unix_ms = None;
+    assert!(closed_without_time.validate().is_err());
+    let mut closed_before_open = closed.clone();
+    closed_before_open.closed_at_unix_ms = Some(1_999);
+    assert!(closed_before_open.validate().is_err());
+    let mut closed_in_one_version = closed.clone();
+    closed_in_one_version.known_at_cursor = closed.task_cursor;
+    assert!(closed_in_one_version.validate().is_err());
+    let encoded = serde_json::to_value(&closed).unwrap();
+    assert_eq!(
+        serde_json::from_value::<rrd_contract::TaskRecord>(encoded).unwrap(),
+        closed
+    );
+
+    let page = rrd_contract::TaskPage {
+        scope: "instance:alpha".into(),
+        read: flight_read_stamp(50),
+        requested_after_cursor: 0,
+        tasks: vec![open_task.clone(), {
+            let mut later = open_task.clone();
+            later.task_cursor = 45;
+            later.known_at_cursor = 45;
+            later
+        }],
+        truncated: false,
+        selected_versions: 2,
+        read_evidence: read_evidence(),
+    };
+    page.validate().unwrap();
+    let mut unordered = page.clone();
+    unordered.tasks.swap(0, 1);
+    assert!(unordered.validate().is_err());
+    let mut mixed = page.clone();
+    mixed.tasks[1].scope = "instance:beta".into();
+    assert!(mixed.validate().is_err());
+    let read = rrd_contract::TaskReadResult {
+        task: closed.clone(),
+        read: flight_read_stamp(46),
+        selected_versions: 2,
+        read_evidence: read_evidence(),
+    };
+    assert!(read.validate().is_err(), "read beyond its stamp");
+
+    // A flight names the task it joins; without one the field is omitted.
+    let mut joined = rrd_contract::LaunchPromptFlight {
+        scope: "instance:alpha".into(),
+        prompt: "inspect runtime".into(),
+        provider: rrd_contract::PromptFlightProvider::Observe,
+        context_mode: rrd_contract::PromptFlightContextMode::Fresh,
+        context: flight_context_request(),
+        acceptance_marker: None,
+        task_id: None,
+    };
+    assert!(serde_json::to_value(&joined)
+        .unwrap()
+        .get("task_id")
+        .is_none());
+    joined.task_id = Some(open_task.task_id.clone());
+    let encoded = serde_json::to_value(&joined).unwrap();
+    assert_eq!(
+        encoded["task_id"],
+        serde_json::json!(open_task.task_id.as_str())
+    );
+    assert_eq!(
+        serde_json::from_value::<rrd_contract::LaunchPromptFlight>(encoded).unwrap(),
+        joined
+    );
+
+    let catalogue = rrd_contract::endpoint_catalogue();
+    for (operation, path, mutation, action) in [
+        (
+            "task-open",
+            "/v1/tasks",
+            true,
+            rrd_contract::SecurityAction::TaskWrite,
+        ),
+        (
+            "task-close",
+            "/v1/tasks/close",
+            true,
+            rrd_contract::SecurityAction::TaskWrite,
+        ),
+        (
+            "task-list",
+            "/v1/tasks/list",
+            false,
+            rrd_contract::SecurityAction::TaskRead,
+        ),
+        (
+            "task-read",
+            "/v1/tasks/read",
+            false,
+            rrd_contract::SecurityAction::TaskRead,
+        ),
+    ] {
+        let descriptor = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == operation)
+            .unwrap();
+        assert_eq!(descriptor.path, path);
+        assert_eq!(descriptor.mutation, mutation);
+        assert_eq!(descriptor.action.fixed_action(), Some(action));
+    }
 }

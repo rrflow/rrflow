@@ -75,6 +75,10 @@ http_dispatch_catalogue! {
     SessionRenew => ("session-renew", RrdOperation::SessionRenew),
     SubscriptionClose => ("subscription-close", RrdOperation::SubscriptionClose),
     SubscriptionOpen => ("subscription-open", RrdOperation::SubscriptionOpen),
+    TaskClose => ("task-close", RrdOperation::TaskWrite),
+    TaskList => ("task-list", RrdOperation::TaskRead),
+    TaskOpen => ("task-open", RrdOperation::TaskWrite),
+    TaskRead => ("task-read", RrdOperation::TaskRead),
     TransactionAbort => ("transaction-abort", RrdOperation::TransactionAbort),
     TransactionBegin => ("transaction-begin", RrdOperation::TransactionBegin),
     TransactionCommit => ("transaction-commit", RrdOperation::TransactionCommit),
@@ -226,6 +230,10 @@ impl AppState {
             Some(HttpDispatch::FlightLaunch) => self.launch_prompt_flight(&headers, &body, now),
             Some(HttpDispatch::FlightList) => self.list_prompt_flights(&headers, &body, now),
             Some(HttpDispatch::FlightRead) => self.read_prompt_flight(&headers, &body, now),
+            Some(HttpDispatch::TaskOpen) => self.open_task(&headers, &body, now),
+            Some(HttpDispatch::TaskClose) => self.close_task(&headers, &body, now),
+            Some(HttpDispatch::TaskList) => self.list_tasks(&headers, &body, now),
+            Some(HttpDispatch::TaskRead) => self.read_task(&headers, &body, now),
             Some(HttpDispatch::VectorCollectionEnsure) => {
                 self.ensure_vector_collection(&headers, &body, now)
             }

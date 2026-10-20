@@ -70,7 +70,7 @@ sdks/python/
 `RrdClient` is a synchronous HTTP client. It exposes ergonomic calls for
 capabilities, endpoint catalogue, OpenAPI, and session creation plus one
 generic `call(OperationId, payload, options)`. That generic call can address
-all 36 current HTTP operation identifiers. This is routing coverage, not
+all 40 current HTTP operation identifiers. This is routing coverage, not
 operation-semantic coverage. There is no asynchronous client and no WebSocket
 implementation; subscription administration and changefeed follow are
 ordinary HTTP calls.
@@ -110,11 +110,11 @@ file byte for byte in check mode.
 
 The current generated projection contains:
 
-- 37 HTTP operations;
+- 41 HTTP operations;
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `3f2638dd5705cf3bfbc2393c739a367278c772202decd130b4450467de2551f8`.
+  `52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76`.
 
 It does not generate request models, response models, error-code constraints,
 path-parameter sets, security actions, exact success statuses, media types,
@@ -349,7 +349,7 @@ Current evidence is deliberately bounded:
 | generator, Ruff, mypy, and pytest package checks | generation passed; Ruff passed over 13 Python files; strict mypy passed over 10 source files; 4 mock-focused tests passed | Source hygiene and selected mocked HTTP behavior; no async, WebSocket, TLS, installed engine, or fault matrix. |
 | conformance entry without `RRD_SDK_CONFORMANCE_MANIFEST` | exited 1 with the required-manifest error | Correct fail-closed harness configuration; no scenario executed. |
 | conformance entry against the live example harness | passed with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2` | Real HTTP against the present direct-seeded rrflowKV fixture; not installation, rrflowMX parity, or full labelled behavior. |
-| generated-surface parity | 36 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
+| generated-surface parity | 40 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
 | injected HTTPX transport probe | replayed an unpinned query, accepted `201 text/plain` and invalid payload, serialized bearer | Reproducible open H-04 correctness/security defects. |
 | offline package build | 9,294-byte wheel and 48,486-byte sdist built; both contain `py.typed` and omit the removed catch-all module | Artifact creation/content inventory only; no clean consumer, dependency closure, reproducibility, signing, or platform matrix. |
 
