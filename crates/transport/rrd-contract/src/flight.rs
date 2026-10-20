@@ -7,13 +7,13 @@
 //! flights and compares cohorts without maintaining a second flight protocol.
 
 use crate::{
-    invalid, sha256_bytes, validate_sha256, AssembleContext, CanonicalId, ContextReadStamp,
-    CorrelationId, DataReference, QueryValue, ReadEvidence, Result, MAX_CONTEXT_QUERY_BYTES,
-    MAX_CONTEXT_STORAGE_KEYS, MAX_ID_BYTES,
+    invalid, sha256_bytes, validate_sha256, AssembleContext, CanonicalId, ContextEvidenceKind,
+    ContextReadStamp, CorrelationId, DataReference, QueryValue, ReadEvidence, Result,
+    MAX_CONTEXT_ITEMS, MAX_CONTEXT_QUERY_BYTES, MAX_CONTEXT_STORAGE_KEYS, MAX_ID_BYTES,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Wire version of the prompt-flight record. Unknown versions are rejected.
 pub const PROMPT_FLIGHT_FORMAT_VERSION: u16 = 1;
@@ -21,6 +21,10 @@ pub const PROMPT_FLIGHT_FORMAT_VERSION: u16 = 1;
 pub const PROMPT_FLIGHT_KIND: &str = "rrflow-prompt-flight";
 /// Strict engine-owned append-only event table whose subject is a flight.
 pub const PROMPT_FLIGHT_EVENT_KIND: &str = "rrflow-prompt-flight-event";
+/// Strict engine-owned relation from a flight to each canonical record its
+/// injected context used. These edges make every prompt a graph neighbourhood
+/// that rrflowQL traverses and the temporal graph shows.
+pub const PROMPT_FLIGHT_USE_KIND: &str = "rrflow-prompt-flight-used";
 pub const MAX_PROMPT_FLIGHT_PROMPT_BYTES: usize = MAX_CONTEXT_QUERY_BYTES;
 pub const MAX_PROMPT_FLIGHT_ACCEPTANCE_MARKER_BYTES: usize = 1_024;
 pub const MAX_PROMPT_FLIGHT_EVENT_KIND_BYTES: usize = 64;
@@ -327,6 +331,10 @@ pub struct PromptFlightRecord {
     pub flight_cursor: u64,
     /// Cursor of the version this projection was read from.
     pub known_at_cursor: u64,
+    /// Number of `rrflow-prompt-flight-used` edges written with the flight:
+    /// one per context item that is a canonical record. Claims are not graph
+    /// nodes and are counted only in the context summary.
+    pub use_count: u64,
     pub event_count: u64,
 }
 
@@ -354,7 +362,10 @@ impl PromptFlightRecord {
         self.read.validate()?;
         match (self.context_mode, &self.context) {
             (PromptFlightContextMode::Fresh, None) => {
-                if self.metrics.context_items != 0 || self.metrics.context_output_bytes != 0 {
+                if self.metrics.context_items != 0
+                    || self.metrics.context_output_bytes != 0
+                    || self.use_count != 0
+                {
                     return invalid("fresh prompt flight cannot report injected context");
                 }
             }
@@ -364,6 +375,9 @@ impl PromptFlightRecord {
                     || self.metrics.context_output_bytes != context.output_bytes
                 {
                     return invalid("prompt flight metrics disagree with its context summary");
+                }
+                if self.use_count > context.items {
+                    return invalid("prompt flight uses more records than its context returned");
                 }
             }
             _ => {
@@ -388,17 +402,64 @@ impl PromptFlightRecord {
     }
 }
 
-/// One complete flight: its record and every event in ordinal order.
+/// One edge from a flight to a canonical record its context used, in the
+/// order the engine ranked the context items.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PromptFlightUse {
+    pub reference: DataReference,
+    /// One-based position of the item in the flight's context packet.
+    pub rank: u64,
+    /// The fused context score the item carried in the packet.
+    pub score: f64,
+    /// The context avenues that produced the item, sorted and unique.
+    pub evidence: Vec<ContextEvidenceKind>,
+}
+
+impl PromptFlightUse {
+    pub fn validate(&self) -> Result<()> {
+        if self.rank == 0 || self.rank > MAX_CONTEXT_ITEMS {
+            return invalid(format!(
+                "prompt flight use rank must be in 1..={MAX_CONTEXT_ITEMS}"
+            ));
+        }
+        if !self.score.is_finite() || self.score <= 0.0 {
+            return invalid("prompt flight use score must be finite and positive");
+        }
+        if self.evidence.is_empty() || self.evidence.windows(2).any(|pair| pair[0] >= pair[1]) {
+            return invalid("prompt flight use evidence must be non-empty, sorted, and unique");
+        }
+        Ok(())
+    }
+}
+
+/// One complete flight: its record, the records its context used, and every
+/// event in ordinal order.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PromptFlight {
     pub record: PromptFlightRecord,
+    pub uses: Vec<PromptFlightUse>,
     pub events: Vec<PromptFlightEvent>,
 }
 
 impl PromptFlight {
     pub fn validate(&self) -> Result<()> {
         self.record.validate()?;
+        if self.uses.len() as u64 != self.record.use_count {
+            return invalid("prompt flight uses disagree with the recorded use count");
+        }
+        let mut referenced = BTreeSet::new();
+        let mut previous_rank = 0;
+        for used in &self.uses {
+            used.validate()?;
+            if used.rank <= previous_rank || !referenced.insert(&used.reference) {
+                return invalid(
+                    "prompt flight uses must be in rank order and name each record once",
+                );
+            }
+            previous_rank = used.rank;
+        }
         if self.events.len() as u64 != self.record.event_count {
             return invalid("prompt flight events disagree with the recorded event count");
         }

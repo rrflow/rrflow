@@ -1,25 +1,29 @@
 //! Prompt flights: governed, durable records of one prompt's passage through
 //! the runtime boundary.
 //!
-//! A flight is one `rrflow-prompt-flight` record plus append-only
-//! `rrflow-prompt-flight-event` events in the canonical runtime log. The
-//! engine prepares the flight at one authenticated read stamp, assembles any
-//! injected context through the same `context-assemble` path every client
-//! uses, and commits record and events in one cursor-CAS runtime commit.
-//! Reads are stamped, kind-prefixed versioned reads; nothing replays the
-//! whole log, and no client-side flight lifecycle exists.
+//! A flight is one `rrflow-prompt-flight` record, one
+//! `rrflow-prompt-flight-used` edge to each canonical record its context
+//! used, and append-only `rrflow-prompt-flight-event` events in the canonical
+//! runtime log, so every prompt is a graph neighbourhood rrflowQL traverses.
+//! The engine prepares the flight at one authenticated read stamp, assembles
+//! any injected context through the same `context-assemble` path every client
+//! uses, and commits record, edges, and events in one cursor-CAS runtime
+//! commit. A flight read names its record, edges, and events by identity, so
+//! it costs the flight's own size; no client-side flight lifecycle exists.
 //!
 //! A flight records only externally observable runtime events. It never
 //! requests, infers, or persists hidden chain-of-thought.
 
 use super::*;
 use rrd_contract::{
-    context_request_sha256, prompt_cohort_sha256, ContextPacket, ContextReadStamp,
-    LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights, PromptFlight,
-    PromptFlightContextMode, PromptFlightContextRequest, PromptFlightContextSummary,
+    context_request_sha256, prompt_cohort_sha256, ContextEvidenceKind, ContextPacket,
+    ContextReadStamp, LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights,
+    PromptFlight, PromptFlightContextMode, PromptFlightContextRequest, PromptFlightContextSummary,
     PromptFlightEvent, PromptFlightMetrics, PromptFlightPage, PromptFlightProvider,
     PromptFlightReadResult, PromptFlightRecord, PromptFlightStage, PromptFlightStatus,
-    ReadPromptFlight, PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_FORMAT_VERSION, PROMPT_FLIGHT_KIND,
+    PromptFlightUse, ReadAccessPath, ReadEvidence, ReadPathEvidence, ReadPromptFlight,
+    ReadStampValidationEvidence, ReadStampValidationMethod, PROMPT_FLIGHT_EVENT_KIND,
+    PROMPT_FLIGHT_FORMAT_VERSION, PROMPT_FLIGHT_KIND, PROMPT_FLIGHT_USE_KIND,
 };
 use rrd_store::{RuntimeReadBudget, RuntimeVersionedSource};
 use std::collections::BTreeSet;
@@ -118,7 +122,7 @@ impl RrdEngine {
                 )]),
             )?);
 
-            let context = match request.context_mode {
+            let (context, uses) = match request.context_mode {
                 PromptFlightContextMode::Fresh => {
                     events.push(flight_event(
                         now,
@@ -129,7 +133,7 @@ impl RrdEngine {
                         "No canonical context is injected ahead of the prompt. Authoritative history is unchanged and remains readable outside the packet.".into(),
                         BTreeMap::from([("context_items".into(), QueryValue::Unsigned(0))]),
                     )?);
-                    None
+                    (None, Vec::new())
                 }
                 PromptFlightContextMode::Pruned => {
                     let packet = self.assemble_context_at(&assemble, authorization.as_ref())?;
@@ -141,9 +145,14 @@ impl RrdEngine {
                         continue;
                     }
                     events.push(context_assembled_event(now, elapsed(&started), &packet)?);
-                    Some(context_summary(&assemble, &packet)?)
+                    (
+                        Some(context_summary(&assemble, &packet)?),
+                        context_uses(&packet)?,
+                    )
                 }
             };
+            let use_count = u64::try_from(uses.len())
+                .map_err(|_| ServiceError::Contract("flight use count exceeds u64".into()))?;
 
             events.push(flight_event(
                 now,
@@ -166,11 +175,15 @@ impl RrdEngine {
             let event_count = u64::try_from(events.len())
                 .map_err(|_| ServiceError::Contract("flight event count exceeds u64".into()))?;
 
-            let mut mutations = Vec::with_capacity(events.len() + 2);
+            let mut mutations = Vec::with_capacity(events.len() + uses.len() + 2);
             let mut registry = current_schema
                 .clone()
                 .unwrap_or_else(|| RuntimeSchemaRegistry::empty(1, "install prompt flight tables"));
-            if register_flight_schema(&mut registry)? {
+            let used_kinds = uses
+                .iter()
+                .map(|(target, _)| target.kind.clone())
+                .collect::<BTreeSet<_>>();
+            if register_flight_schema(&mut registry, &used_kinds)? {
                 if let Some(current) = &current_schema {
                     registry.revision = current.revision.checked_add(1).ok_or_else(|| {
                         ServiceError::Contract("runtime schema revision overflowed".into())
@@ -206,6 +219,7 @@ impl RrdEngine {
                 context,
                 flight_cursor: record_cursor,
                 known_at_cursor: record_cursor,
+                use_count,
                 event_count,
             };
             mutations.push(RuntimeMutation::Record {
@@ -216,6 +230,18 @@ impl RrdEngine {
                     properties: record_properties(&record)?,
                 },
             });
+            for (target, used) in &uses {
+                mutations.push(RuntimeMutation::Relation {
+                    relation: RuntimeRelation {
+                        reference: use_reference(&flight_id, used.rank)?,
+                        from: reference.clone(),
+                        to: target.clone(),
+                        valid_from: now,
+                        valid_to: None,
+                        properties: use_properties(used),
+                    },
+                });
+            }
             for event in &events {
                 mutations.push(RuntimeMutation::Event {
                     event: RuntimeEvent {
@@ -248,7 +274,11 @@ impl RrdEngine {
                             outcome.first_cursor + schema_offset
                         )));
                     }
-                    let flight = PromptFlight { record, events };
+                    let flight = PromptFlight {
+                        record,
+                        uses: uses.into_iter().map(|(_, used)| used).collect(),
+                        events,
+                    };
                     flight
                         .validate()
                         .map_err(|error| ServiceError::Contract(error.to_string()))?;
@@ -361,7 +391,7 @@ impl RrdEngine {
             true,
         )?;
         let record = versions.record.ok_or(ServiceError::FlightNotFound)?;
-        let flight = assemble_flight(record, versions.events)?;
+        let flight = assemble_flight(record, versions.uses, versions.events)?;
         let result = PromptFlightReadResult {
             flight,
             read: public_read_stamp(&read),
@@ -383,66 +413,134 @@ impl RrdEngine {
     ) -> Result<PromptFlight> {
         let versions = self.read_flight_versions(read, scope, reference, max_storage_keys, true)?;
         let record = versions.record.ok_or(ServiceError::FlightNotFound)?;
-        assemble_flight(record, versions.events)
+        assemble_flight(record, versions.uses, versions.events)
     }
 
-    /// Stamped direct read of one flight's row history and, when requested,
-    /// every flight event in the scope filtered to this subject. Events are
-    /// keyed by their log cursor, so one flight's events are selected from the
-    /// kind prefix rather than through a subject index.
+    /// Stamped direct reads of one flight. The first read is the row's own
+    /// identity history; it fixes the commit cursor and how many edges and
+    /// events that commit wrote. The second read, at the same stamp, names each
+    /// edge by its deterministic identity and each event by its log cursor, so
+    /// the cost is the flight's own size and never the estate's.
     fn read_flight_versions(
         &self,
         read: &ReadStamp,
         scope: &str,
         reference: &RuntimeRef,
         max_storage_keys: u64,
-        with_events: bool,
+        with_body: bool,
     ) -> Result<FlightRead> {
-        let mut sources = vec![RuntimeVersionedSource::Identity {
-            model: RuntimeLogicalModel::LifecycleRecord,
-            reference: reference.clone(),
-        }];
-        if with_events {
-            sources.push(RuntimeVersionedSource::Events {
-                kind: Some(event_kind()?),
-            });
-        }
-        let direct = self.storage.runtime().read_versioned(
+        let head = self.storage.runtime().read_versioned(
             read,
-            &sources,
+            &[RuntimeVersionedSource::Identity {
+                model: RuntimeLogicalModel::LifecycleRecord,
+                reference: reference.clone(),
+            }],
             read_budget(max_storage_keys)?,
         )?;
         let mut versions = FlightVersions::default();
-        let mut events = Vec::new();
-        for change in &direct.changes {
-            match &change.mutation {
-                RuntimeMutation::Record { record } if record.reference == *reference => {
+        for change in &head.changes {
+            if let RuntimeMutation::Record { record } = &change.mutation {
+                if record.reference == *reference {
                     versions.observe(change.cursor, record);
                 }
-                RuntimeMutation::Event { event }
-                    if with_events && event.subject.as_ref() == Some(reference) =>
-                {
-                    events.push(public_event(&event.properties)?);
-                }
-                _ => {}
             }
         }
+        let mut selected_versions = version_count(head.changes.len())?;
+        let mut read_evidence = crate::runtime::public_read_evidence(head.evidence)?;
+        if versions.first_cursor == 0 {
+            return Ok(FlightRead {
+                record: None,
+                uses: Vec::new(),
+                events: Vec::new(),
+                selected_versions,
+                read_evidence,
+            });
+        }
+        let record = versions.record(scope)?;
+        if !with_body {
+            return Ok(FlightRead {
+                record: Some(record),
+                uses: Vec::new(),
+                events: Vec::new(),
+                selected_versions,
+                read_evidence,
+            });
+        }
+
+        let first_event_cursor = record
+            .flight_cursor
+            .checked_add(record.use_count)
+            .and_then(|cursor| cursor.checked_add(1))
+            .ok_or_else(|| flight_storage("event cursor overflows u64"))?;
+        let mut sources = Vec::new();
+        for rank in 1..=record.use_count {
+            sources.push(RuntimeVersionedSource::Identity {
+                model: RuntimeLogicalModel::GraphRelation,
+                reference: use_reference(&record.flight_id, rank)?,
+            });
+        }
+        for offset in 0..record.event_count {
+            sources.push(RuntimeVersionedSource::Identity {
+                model: RuntimeLogicalModel::LifecycleEvent,
+                reference: RuntimeRef::new(
+                    PROMPT_FLIGHT_EVENT_KIND,
+                    format!("cursor:{}", first_event_cursor + offset),
+                )
+                .map_err(core_contract)?,
+            });
+        }
+        let remaining = max_storage_keys.saturating_sub(read_evidence.keys_examined);
+        if remaining == 0 {
+            return Err(rrd_store::Error::RuntimeReadBudgetExceeded {
+                limit: max_storage_keys,
+                observed: read_evidence.keys_examined,
+            }
+            .into());
+        }
+        let body =
+            self.storage
+                .runtime()
+                .read_versioned(read, &sources, read_budget(remaining)?)?;
+        let mut uses = Vec::new();
+        let mut events = Vec::new();
+        for change in &body.changes {
+            match &change.mutation {
+                RuntimeMutation::Relation { relation } if relation.from == *reference => {
+                    uses.push(public_use(relation)?);
+                }
+                RuntimeMutation::Event { event } if event.subject.as_ref() == Some(reference) => {
+                    events.push(public_event(&event.properties)?);
+                }
+                _ => {
+                    return Err(flight_storage(
+                        "a flight identity read returned a version the flight did not write",
+                    ))
+                }
+            }
+        }
+        uses.sort_by_key(|used| used.rank);
         events.sort_by_key(|event| event.ordinal);
+        selected_versions = selected_versions
+            .checked_add(version_count(body.changes.len())?)
+            .ok_or_else(|| flight_storage("selected versions overflow u64"))?;
+        read_evidence = merge_read_evidence(
+            max_storage_keys,
+            read_evidence,
+            crate::runtime::public_read_evidence(body.evidence)?,
+        )?;
         Ok(FlightRead {
-            record: if versions.first_cursor == 0 {
-                None
-            } else {
-                Some(versions.record(scope)?)
-            },
+            record: Some(record),
+            uses,
             events,
-            selected_versions: version_count(direct.changes.len())?,
-            read_evidence: crate::runtime::public_read_evidence(direct.evidence)?,
+            selected_versions,
+            read_evidence,
         })
     }
 }
 
 struct FlightRead {
     record: Option<PromptFlightRecord>,
+    uses: Vec<PromptFlightUse>,
     events: Vec<PromptFlightEvent>,
     selected_versions: u64,
     read_evidence: rrd_contract::ReadEvidence,
@@ -478,8 +576,17 @@ impl FlightVersions {
 
 fn assemble_flight(
     record: PromptFlightRecord,
+    uses: Vec<PromptFlightUse>,
     events: Vec<PromptFlightEvent>,
 ) -> Result<PromptFlight> {
+    if uses.len() as u64 != record.use_count {
+        return Err(ServiceError::Storage(format!(
+            "prompt flight {} has {} edges at this stamp but records {}",
+            record.flight_id,
+            uses.len(),
+            record.use_count
+        )));
+    }
     if events.len() as u64 != record.event_count {
         return Err(ServiceError::Storage(format!(
             "prompt flight {} has {} events at this stamp but records {}",
@@ -488,7 +595,11 @@ fn assemble_flight(
             record.event_count
         )));
     }
-    let flight = PromptFlight { record, events };
+    let flight = PromptFlight {
+        record,
+        uses,
+        events,
+    };
     flight
         .validate()
         .map_err(|error| ServiceError::Storage(error.to_string()))?;
@@ -526,6 +637,185 @@ fn record_kind() -> Result<RuntimeType> {
 
 fn event_kind() -> Result<RuntimeType> {
     RuntimeType::new(PROMPT_FLIGHT_EVENT_KIND).map_err(core_contract)
+}
+
+fn use_kind() -> Result<RuntimeType> {
+    RuntimeType::new(PROMPT_FLIGHT_USE_KIND).map_err(core_contract)
+}
+
+/// Edge identity: the flight identity and the item's packet rank. It is
+/// canonical, unique within the flight, and computable from the record alone.
+fn use_reference(flight_id: &CanonicalId, rank: u64) -> Result<RuntimeRef> {
+    RuntimeRef::new(PROMPT_FLIGHT_USE_KIND, format!("{flight_id}.{rank}")).map_err(core_contract)
+}
+
+/// One edge per context item that is a canonical record, in packet order.
+/// Claim items are not graph nodes and get no edge.
+fn context_uses(packet: &ContextPacket) -> Result<Vec<(RuntimeRef, PromptFlightUse)>> {
+    let mut uses = Vec::new();
+    for (position, item) in packet.items.iter().enumerate() {
+        let Some(rest) = item.identity.strip_prefix("record:") else {
+            continue;
+        };
+        let (kind, id) = rest.split_once(':').ok_or_else(|| {
+            ServiceError::Storage(format!(
+                "context item identity {} is not record:<kind>:<id>",
+                item.identity
+            ))
+        })?;
+        let canonical = |value: &str| {
+            CanonicalId::new(value).map_err(|error| ServiceError::Storage(error.to_string()))
+        };
+        let used = PromptFlightUse {
+            reference: DataReference {
+                kind: canonical(kind)?,
+                id: canonical(id)?,
+            },
+            rank: u64::try_from(position + 1)
+                .map_err(|_| ServiceError::Contract("context rank exceeds u64".into()))?,
+            score: item.score,
+            evidence: item
+                .evidence
+                .iter()
+                .map(|evidence| evidence.kind)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        };
+        used.validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        uses.push((runtime_ref(&used.reference)?, used));
+    }
+    Ok(uses)
+}
+
+fn use_properties(used: &PromptFlightUse) -> RuntimeProperties {
+    RuntimeProperties::from([
+        ("rank".to_owned(), RuntimeValue::Unsigned(used.rank)),
+        (
+            "score".to_owned(),
+            RuntimeValue::Decimal(used.score.to_string()),
+        ),
+        (
+            "evidence".to_owned(),
+            RuntimeValue::List(
+                used.evidence
+                    .iter()
+                    .map(|kind| RuntimeValue::String(evidence_text(*kind).into()))
+                    .collect(),
+            ),
+        ),
+    ])
+}
+
+fn public_use(relation: &RuntimeRelation) -> Result<PromptFlightUse> {
+    let properties = &relation.properties;
+    let score = match properties.get("score") {
+        Some(RuntimeValue::Decimal(value)) => value
+            .parse::<f64>()
+            .map_err(|_| flight_storage("use score is not a decimal"))?,
+        _ => return Err(flight_storage("use score is missing or not a decimal")),
+    };
+    let evidence = match properties.get("evidence") {
+        Some(RuntimeValue::List(values)) => values
+            .iter()
+            .map(|value| match value {
+                RuntimeValue::String(text) => parse_evidence(text),
+                _ => Err(flight_storage("use evidence entry is not text")),
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(flight_storage("use evidence is missing or not a list")),
+    };
+    let used = PromptFlightUse {
+        reference: public_change_ref(&relation.to)?,
+        rank: unsigned(properties, "rank")?,
+        score,
+        evidence,
+    };
+    used.validate()
+        .map_err(|error| flight_storage(&error.to_string()))?;
+    Ok(used)
+}
+
+fn evidence_text(kind: ContextEvidenceKind) -> &'static str {
+    match kind {
+        ContextEvidenceKind::Seed => "seed",
+        ContextEvidenceKind::Text => "text",
+        ContextEvidenceKind::Graph => "graph",
+        ContextEvidenceKind::Vector => "vector",
+    }
+}
+
+fn parse_evidence(text: &str) -> Result<ContextEvidenceKind> {
+    match text {
+        "seed" => Ok(ContextEvidenceKind::Seed),
+        "text" => Ok(ContextEvidenceKind::Text),
+        "graph" => Ok(ContextEvidenceKind::Graph),
+        "vector" => Ok(ContextEvidenceKind::Vector),
+        other => Err(flight_storage(&format!(
+            "unknown use evidence kind {other:?}"
+        ))),
+    }
+}
+
+/// Combines the logical I/O of the flight's two stamped reads into the one
+/// evidence the response reports, under the caller's single key budget.
+fn merge_read_evidence(
+    key_budget: u64,
+    first: ReadEvidence,
+    second: ReadEvidence,
+) -> Result<ReadEvidence> {
+    fn sum(left: u64, right: u64) -> Result<u64> {
+        left.checked_add(right)
+            .ok_or_else(|| flight_storage("read evidence counter overflowed"))
+    }
+    let mut paths = BTreeMap::<ReadAccessPath, ReadPathEvidence>::new();
+    for path in first.paths.into_iter().chain(second.paths) {
+        match paths.get_mut(&path.path) {
+            Some(total) => {
+                total.point_reads = sum(total.point_reads, path.point_reads)?;
+                total.range_scans = sum(total.range_scans, path.range_scans)?;
+                total.keys_examined = sum(total.keys_examined, path.keys_examined)?;
+                total.values_decoded = sum(total.values_decoded, path.values_decoded)?;
+                total.decoded_bytes = sum(total.decoded_bytes, path.decoded_bytes)?;
+            }
+            None => {
+                paths.insert(path.path, path);
+            }
+        }
+    }
+    let current = ReadStampValidationMethod::AuthenticatedCurrentHead;
+    let stamp_validation =
+        if first.stamp_validation.method == current && second.stamp_validation.method == current {
+            first.stamp_validation
+        } else {
+            ReadStampValidationEvidence {
+                method: ReadStampValidationMethod::Rfc9162DirectVersions,
+                change_reads: sum(
+                    first.stamp_validation.change_reads,
+                    second.stamp_validation.change_reads,
+                )?,
+                proof_nodes: first
+                    .stamp_validation
+                    .proof_nodes
+                    .saturating_add(second.stamp_validation.proof_nodes),
+            }
+        };
+    let evidence = ReadEvidence {
+        contract_version: first.contract_version,
+        key_budget,
+        point_reads: sum(first.point_reads, second.point_reads)?,
+        range_scans: sum(first.range_scans, second.range_scans)?,
+        keys_examined: sum(first.keys_examined, second.keys_examined)?,
+        values_decoded: sum(first.values_decoded, second.values_decoded)?,
+        decoded_bytes: sum(first.decoded_bytes, second.decoded_bytes)?,
+        stamp_validation,
+        paths: paths.into_values().collect(),
+    };
+    evidence
+        .validate()
+        .map_err(|error| flight_storage(&error.to_string()))?;
+    Ok(evidence)
 }
 
 fn read_budget(max_storage_keys: u64) -> Result<RuntimeReadBudget> {
@@ -679,7 +969,10 @@ fn context_summary(
 /// Installs or repairs the canonical flight tables in a schema under
 /// construction. The caller owns the revision bump because that
 /// compare-and-swap belongs to its exact read stamp.
-fn register_flight_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> {
+fn register_flight_schema(
+    registry: &mut RuntimeSchemaRegistry,
+    used_kinds: &BTreeSet<RuntimeType>,
+) -> Result<bool> {
     let record_kind = record_kind()?;
     let event_kind = event_kind()?;
     let required = |value_type: RuntimeValueType| RuntimePropertySchema::required(value_type);
@@ -768,6 +1061,7 @@ fn register_flight_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> 
                 required(RuntimeValueType::Unsigned),
             ),
             ("elapsed_ms".into(), required(RuntimeValueType::Unsigned)),
+            ("use_count".into(), required(RuntimeValueType::Unsigned)),
             ("event_count".into(), required(RuntimeValueType::Unsigned)),
         ]),
         allow_additional_properties: false,
@@ -790,7 +1084,7 @@ fn register_flight_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> 
     };
     let record_changed = registry
         .define_record_table(
-            record_kind,
+            record_kind.clone(),
             RuntimeLogicalModel::LifecycleRecord,
             record_schema,
         )
@@ -802,7 +1096,42 @@ fn register_flight_schema(registry: &mut RuntimeSchemaRegistry) -> Result<bool> 
             event_schema,
         )
         .map_err(core_contract)?;
-    Ok(record_changed || event_changed)
+    // The edge table's target set grows with every record kind a flight has
+    // used, so an edge is never written to an undeclared endpoint kind.
+    let use_kind = use_kind()?;
+    let mut targets = registry
+        .relations
+        .get(&use_kind)
+        .map(|schema| schema.to.clone())
+        .unwrap_or_default();
+    targets.extend(used_kinds.iter().cloned());
+    let use_changed = if targets.is_empty() {
+        false
+    } else {
+        registry
+            .define_relation_table(
+                use_kind,
+                RuntimeRelationSchema {
+                    from: BTreeSet::from([record_kind]),
+                    to: targets,
+                    properties: BTreeMap::from([
+                        ("rank".into(), required(RuntimeValueType::Unsigned)),
+                        ("score".into(), required(RuntimeValueType::Decimal)),
+                        ("evidence".into(), required(RuntimeValueType::List)),
+                    ]),
+                    allow_additional_properties: false,
+                    // One edge per distinct packet record is constructed here
+                    // and validated by the contract. A schema pair constraint
+                    // would make every later commit in the scope load every
+                    // relation in it (POAM-034).
+                    unique_pair: false,
+                    max_outgoing: None,
+                    max_incoming: None,
+                },
+            )
+            .map_err(core_contract)?
+    };
+    Ok(record_changed || event_changed || use_changed)
 }
 
 fn record_properties(record: &PromptFlightRecord) -> Result<RuntimeProperties> {
@@ -928,6 +1257,10 @@ fn record_properties(record: &PromptFlightRecord) -> Result<RuntimeProperties> {
             RuntimeValue::Unsigned(record.metrics.elapsed_ms),
         ),
         (
+            "use_count".to_owned(),
+            RuntimeValue::Unsigned(record.use_count),
+        ),
+        (
             "event_count".to_owned(),
             RuntimeValue::Unsigned(record.event_count),
         ),
@@ -1045,6 +1378,7 @@ fn public_record(
         },
         flight_cursor,
         known_at_cursor,
+        use_count: unsigned(properties, "use_count")?,
         event_count: unsigned(properties, "event_count")?,
     })
 }
