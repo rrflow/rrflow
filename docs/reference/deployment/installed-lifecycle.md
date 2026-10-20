@@ -527,10 +527,11 @@ supported target:
   create-or-open engine construction remains only in component tests that do
   not claim installation.
 - Installation, retry, replay, open, and quick verification now share one
-  engine-owned clock boundary. The portable abrupt-kill/reopen lifecycle is
-  scheduled unchanged on Linux, Windows, and macOS development runners; only
-  Linux has passed in this local evidence, so native platform qualification
-  remains open.
+  engine-owned clock boundary. The native lifecycle combines abrupt termination,
+  authenticated restart and backup publication/readback, with graceful SIGINT
+  on subsequent Unix shutdowns. The [integration repair receipt](../../evidence/change-journals/repository/interrupted-local-integration-repair.md)
+  records local Windows results and binds candidate CI; broader native platform
+  and signed distribution qualification remain open.
 - The internal `rrd-server` process and embedded `rrflow-mcp` mode require an
   installed project plus the exact distribution executable and call
   `RrdEngine::open_installed`; neither can initialize absent state. They remain

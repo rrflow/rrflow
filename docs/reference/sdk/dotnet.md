@@ -62,35 +62,35 @@ The complete reviewed source layout is:
 
 ```text
 sdks/dotnet/
-â”œâ”€â”€ Directory.Build.props
-â”œâ”€â”€ Directory.Packages.props
-â”œâ”€â”€ README.md
-â”œâ”€â”€ Rrflow.Rrd.slnx
-â”œâ”€â”€ global.json
-â”œâ”€â”€ scripts/
-â”‚   â””â”€â”€ generate.py
-â”œâ”€â”€ src/Rrflow.Rrd.Client/
-â”‚   â”œâ”€â”€ ClientOptions.cs
-â”‚   â”œâ”€â”€ EndpointResolver.cs
-â”‚   â”œâ”€â”€ Errors.cs
-â”‚   â”œâ”€â”€ Generated/
-â”‚   â”‚   â””â”€â”€ OperationId.g.cs
-â”‚   â”œâ”€â”€ HttpTransport.cs
-â”‚   â”œâ”€â”€ OperationBinding.cs
-â”‚   â”œâ”€â”€ OperationExecutor.cs
-â”‚   â”œâ”€â”€ ProtocolCodec.cs
-â”‚   â”œâ”€â”€ RequestOptions.cs
-â”‚   â”œâ”€â”€ ResourcePath.cs
-â”‚   â”œâ”€â”€ RetryPolicy.cs
-â”‚   â”œâ”€â”€ RrdClient.cs
-â”‚   â”œâ”€â”€ Rrflow.Rrd.Client.csproj
-â”‚   â”œâ”€â”€ Session.cs
-â”‚   â””â”€â”€ packages.lock.json
-â””â”€â”€ tests/Rrflow.Rrd.Client.Tests/
-    â”œâ”€â”€ RrdClientTests.cs
-    â”œâ”€â”€ Rrflow.Rrd.Client.Tests.csproj
-    â”œâ”€â”€ SdkConformanceTests.cs
-    â””â”€â”€ packages.lock.json
+├── Directory.Build.props
+├── Directory.Packages.props
+├── README.md
+├── Rrflow.Rrd.slnx
+├── global.json
+├── scripts/
+│   └── generate.py
+├── src/Rrflow.Rrd.Client/
+│   ├── ClientOptions.cs
+│   ├── EndpointResolver.cs
+│   ├── Errors.cs
+│   ├── Generated/
+│   │   └── OperationId.g.cs
+│   ├── HttpTransport.cs
+│   ├── OperationBinding.cs
+│   ├── OperationExecutor.cs
+│   ├── ProtocolCodec.cs
+│   ├── RequestOptions.cs
+│   ├── ResourcePath.cs
+│   ├── RetryPolicy.cs
+│   ├── RrdClient.cs
+│   ├── Rrflow.Rrd.Client.csproj
+│   ├── Session.cs
+│   └── packages.lock.json
+└── tests/Rrflow.Rrd.Client.Tests/
+    ├── RrdClientTests.cs
+    ├── Rrflow.Rrd.Client.Tests.csproj
+    ├── SdkConformanceTests.cs
+    └── packages.lock.json
 ```
 
 `RrdClient` is now the narrow asynchronous generic HTTP facade implementing
@@ -414,7 +414,7 @@ The remaining qualification target:
 - treats the tracked SDK pin and shared build/dependency files as reviewed
   inputs, then qualifies their exact bytes rather than assuming the pin makes
   the toolchain or dependency closure reproducible;
-- targets only supported modern TFMs that pass the full matrixâ€”initially
+- targets only supported modern TFMs that pass the full matrix—initially
   `net10.0`; it adds no older compatibility target or conditional shim merely
   to increase a badge count;
 - enables warning-clean XML documentation, package validation, trimming and
@@ -484,35 +484,35 @@ subordinate to the executable public contract.
 
 ```text
 sdks/dotnet/
-â”œâ”€â”€ Directory.Build.props               # one compiler/build/package policy
-â”œâ”€â”€ Directory.Packages.props            # one dependency-version authority
-â”œâ”€â”€ README.md                            # narrow SDK workspace/package entrance
-â”œâ”€â”€ Rrflow.Rrd.slnx
-â”œâ”€â”€ global.json                         # exact accepted SDK selection
-â”œâ”€â”€ scripts/
-â”‚   â””â”€â”€ generate.py                     # sole catalogue projection generator
-â”œâ”€â”€ src/Rrflow.Rrd.Client/
-â”‚   â”œâ”€â”€ ClientOptions.cs                # public options + validated internal copy
-â”‚   â”œâ”€â”€ EndpointResolver.cs             # current loopback URI/path validation
-â”‚   â”œâ”€â”€ Errors.cs                       # current public client/API errors
-â”‚   â”œâ”€â”€ Generated/
-â”‚   â”‚   â””â”€â”€ OperationId.g.cs            # sole catalogue-derived projection
-â”‚   â”œâ”€â”€ HttpTransport.cs                # current response-bounded HTTP carriage
-â”‚   â”œâ”€â”€ OperationBinding.cs             # current envelope/resource/auth binding
-â”‚   â”œâ”€â”€ OperationExecutor.cs            # current encode/send/decode coordination
-â”‚   â”œâ”€â”€ ProtocolCodec.cs                # current partial envelope codec
-â”‚   â”œâ”€â”€ RequestOptions.cs               # current public per-call values
-â”‚   â”œâ”€â”€ ResourcePath.cs                 # current public resource component
-â”‚   â”œâ”€â”€ RetryPolicy.cs                  # current broad retry/deadline behavior
-â”‚   â”œâ”€â”€ RrdClient.cs                    # narrow public facade
-â”‚   â”œâ”€â”€ Rrflow.Rrd.Client.csproj
-â”‚   â”œâ”€â”€ Session.cs                      # current public credential records
-â”‚   â””â”€â”€ packages.lock.json
-â””â”€â”€ tests/Rrflow.Rrd.Client.Tests/
-    â”œâ”€â”€ RrdClientTests.cs
-    â”œâ”€â”€ SdkConformanceTests.cs
-    â”œâ”€â”€ Rrflow.Rrd.Client.Tests.csproj
-    â””â”€â”€ packages.lock.json
+├── Directory.Build.props               # one compiler/build/package policy
+├── Directory.Packages.props            # one dependency-version authority
+├── README.md                            # narrow SDK workspace/package entrance
+├── Rrflow.Rrd.slnx
+├── global.json                         # exact accepted SDK selection
+├── scripts/
+│   └── generate.py                     # sole catalogue projection generator
+├── src/Rrflow.Rrd.Client/
+│   ├── ClientOptions.cs                # public options + validated internal copy
+│   ├── EndpointResolver.cs             # current loopback URI/path validation
+│   ├── Errors.cs                       # current public client/API errors
+│   ├── Generated/
+│   │   └── OperationId.g.cs            # sole catalogue-derived projection
+│   ├── HttpTransport.cs                # current response-bounded HTTP carriage
+│   ├── OperationBinding.cs             # current envelope/resource/auth binding
+│   ├── OperationExecutor.cs            # current encode/send/decode coordination
+│   ├── ProtocolCodec.cs                # current partial envelope codec
+│   ├── RequestOptions.cs               # current public per-call values
+│   ├── ResourcePath.cs                 # current public resource component
+│   ├── RetryPolicy.cs                  # current broad retry/deadline behavior
+│   ├── RrdClient.cs                    # narrow public facade
+│   ├── Rrflow.Rrd.Client.csproj
+│   ├── Session.cs                      # current public credential records
+│   └── packages.lock.json
+└── tests/Rrflow.Rrd.Client.Tests/
+    ├── RrdClientTests.cs
+    ├── SdkConformanceTests.cs
+    ├── Rrflow.Rrd.Client.Tests.csproj
+    └── packages.lock.json
 ```
 
 `scripts/build_package.py`, `RrdCall`, `Subscription`,

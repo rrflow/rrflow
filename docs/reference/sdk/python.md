@@ -46,25 +46,25 @@ and pytest 9.1.1 for development. The reviewed executable layout is:
 
 ```text
 sdks/python/
-â”œâ”€â”€ pyproject.toml
-â”œâ”€â”€ uv.lock
-â”œâ”€â”€ scripts/generate.py
-â”œâ”€â”€ src/rrd_client/
-â”‚   â”œâ”€â”€ __init__.py
-â”‚   â”œâ”€â”€ client.py
-â”‚   â”œâ”€â”€ endpoint.py
-â”‚   â”œâ”€â”€ error.py
-â”‚   â”œâ”€â”€ operation.py
-â”‚   â”œâ”€â”€ retry.py
-â”‚   â”œâ”€â”€ session.py
-â”‚   â”œâ”€â”€ transport.py
-â”‚   â”œâ”€â”€ py.typed
-â”‚   â””â”€â”€ generated/
-â”‚       â”œâ”€â”€ __init__.py
-â”‚       â””â”€â”€ endpoints.py
-â””â”€â”€ tests/
-    â”œâ”€â”€ test_client.py
-    â””â”€â”€ sdk_conformance.py
+├── pyproject.toml
+├── uv.lock
+├── scripts/generate.py
+├── src/rrd_client/
+│   ├── __init__.py
+│   ├── client.py
+│   ├── endpoint.py
+│   ├── error.py
+│   ├── operation.py
+│   ├── retry.py
+│   ├── session.py
+│   ├── transport.py
+│   ├── py.typed
+│   └── generated/
+│       ├── __init__.py
+│       └── endpoints.py
+└── tests/
+    ├── test_client.py
+    └── sdk_conformance.py
 ```
 
 `RrdClient` is a synchronous HTTP client. It exposes ergonomic calls for
@@ -379,22 +379,22 @@ forwarding module. The executable source layout is:
 
 ```text
 sdks/python/src/rrd_client/
-â”œâ”€â”€ __init__.py              # narrow public exports
-â”œâ”€â”€ client.py                # synchronous construction and public calls
-â”œâ”€â”€ endpoint.py              # current loopback endpoint policy
-â”œâ”€â”€ error.py                 # current client and API error types
-â”œâ”€â”€ operation.py             # request coordinates and resource validation
-â”œâ”€â”€ retry.py                 # current broad attempt/deadline rule
-â”œâ”€â”€ session.py               # current public bearer-bearing representation
-â”œâ”€â”€ transport.py             # bounded HTTP response/envelope handling
-â”œâ”€â”€ py.typed
-â””â”€â”€ generated/
-    â”œâ”€â”€ __init__.py
-    â””â”€â”€ endpoints.py
+├── __init__.py              # narrow public exports
+├── client.py                # synchronous construction and public calls
+├── endpoint.py              # current loopback endpoint policy
+├── error.py                 # current client and API error types
+├── operation.py             # request coordinates and resource validation
+├── retry.py                 # current broad attempt/deadline rule
+├── session.py               # current public bearer-bearing representation
+├── transport.py             # bounded HTTP response/envelope handling
+├── py.typed
+└── generated/
+    ├── __init__.py
+    └── endpoints.py
 
 sdks/python/tests/
-â”œâ”€â”€ test_client.py
-â””â”€â”€ sdk_conformance.py
+├── test_client.py
+└── sdk_conformance.py
 ```
 
 `async_client.py`, `subscription.py`, generated `models.py`, and the planned

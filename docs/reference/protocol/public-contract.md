@@ -84,8 +84,8 @@ the focused parity test compares OpenAPI back to the live kernel value.
 
 | Contract | Current rule |
 |---|---|
-| `CanonicalId` | 1â€“128 bytes; lowercase ASCII letters, digits, and bounded `-`, `_`, or `.` placement; human labels remain separate. |
-| `CorrelationId` | 1â€“128 ASCII letters, digits, `-`, `_`, `.`, or `:` for request, operation, transaction, session, subscription, and idempotency coordinates. |
+| `CanonicalId` | 1–128 bytes; lowercase ASCII letters, digits, and bounded `-`, `_`, or `.` placement; human labels remain separate. |
+| `CorrelationId` | 1–128 ASCII letters, digits, `-`, `_`, `.`, or `:` for request, operation, transaction, session, subscription, and idempotency coordinates. |
 | `ResourcePath` | One to sixteen explicit typed segments; a resource kind cannot repeat; nothing is inferred from cwd, connection state, or a display label. |
 | `RequestContext` | Carries request ID, operation ID, optional idempotency key, and optional absolute deadline. Contract validation requires an idempotency key when the catalogued operation is a mutation. |
 | `RequestEnvelope<T>` | Binds protocol identity, request context, explicit resource path, and typed payload. |

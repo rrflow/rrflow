@@ -47,21 +47,21 @@ layout is:
 
 ```text
 sdks/go/
-â”œâ”€â”€ go.mod
-â”œâ”€â”€ doc.go
-â”œâ”€â”€ config.go
-â”œâ”€â”€ client.go
-â”œâ”€â”€ endpoint.go
-â”œâ”€â”€ errors.go
-â”œâ”€â”€ operation.go
-â”œâ”€â”€ retry.go
-â”œâ”€â”€ session.go
-â”œâ”€â”€ transport.go
-â”œâ”€â”€ endpoints_gen.go
-â”œâ”€â”€ client_test.go
-â””â”€â”€ cmd/
-    â”œâ”€â”€ generate/main.go
-    â””â”€â”€ conformance/main.go
+├── go.mod
+├── doc.go
+├── config.go
+├── client.go
+├── endpoint.go
+├── errors.go
+├── operation.go
+├── retry.go
+├── session.go
+├── transport.go
+├── endpoints_gen.go
+├── client_test.go
+└── cmd/
+    ├── generate/main.go
+    └── conformance/main.go
 ```
 
 A-07.1e directly produced this layout from the former 498-line `client.go`
@@ -392,21 +392,21 @@ current source tree:
 
 ```text
 sdks/go/
-â”œâ”€â”€ go.mod
-â”œâ”€â”€ doc.go                         # package contract and canonical links
-â”œâ”€â”€ config.go                      # validated public construction inputs
-â”œâ”€â”€ client.go                      # narrow concurrent public facade
-â”œâ”€â”€ endpoint.go                    # current loopback endpoint policy
-â”œâ”€â”€ errors.go                      # current API-error representation
-â”œâ”€â”€ operation.go                   # current generic operation construction
-â”œâ”€â”€ retry.go                       # current broad attempt/deadline behavior
-â”œâ”€â”€ session.go                     # current plain secret-bearing values
-â”œâ”€â”€ transport.go                   # current bounded HTTP response decoding
-â”œâ”€â”€ endpoints_gen.go               # catalogue-derived descriptor projection
-â”œâ”€â”€ client_test.go                 # existing mock characterization
-â””â”€â”€ cmd/
-    â”œâ”€â”€ generate/main.go
-    â””â”€â”€ conformance/main.go
+├── go.mod
+├── doc.go                         # package contract and canonical links
+├── config.go                      # validated public construction inputs
+├── client.go                      # narrow concurrent public facade
+├── endpoint.go                    # current loopback endpoint policy
+├── errors.go                      # current API-error representation
+├── operation.go                   # current generic operation construction
+├── retry.go                       # current broad attempt/deadline behavior
+├── session.go                     # current plain secret-bearing values
+├── transport.go                   # current bounded HTTP response decoding
+├── endpoints_gen.go               # catalogue-derived descriptor projection
+├── client_test.go                 # existing mock characterization
+└── cmd/
+    ├── generate/main.go
+    └── conformance/main.go
 ```
 
 The following files remain deliberately absent until their assigned gate adds

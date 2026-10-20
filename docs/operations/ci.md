@@ -43,8 +43,10 @@ timeout; this does not qualify the default short-request timeout for heavy
 physical verification or generic uncertain-outcome recovery.
 Fresh and existing projects cover no-write deterministic plan, exact apply,
 authenticated discovery, commit/query, backup, termination, restarted query,
-offline verification, and restore publication/readback. Unix checks graceful
-SIGINT; Windows checks termination of the owned child after acknowledged work.
+offline verification, and restore publication/readback. All native platforms terminate the initial owned child after acknowledged work;
+subsequent Unix shutdowns check graceful SIGINT. Restart discovery verifies the
+installed instance and closed authentication session; restored readback compares
+query, scope, schema, read-manifest and row identity with the original result.
 This bounded corpus does not prove graceful Windows shutdown, a complete
 crash matrix, clean-machine distribution, rrflowMX/rrflowKV equivalence, native
 graph/BM25/vector projections, streamed Arrow/DataFusion, or model reasoning.
