@@ -52,6 +52,12 @@ Connectome, project databases, mesh services, providers, and other external
 systems remain optional public-contract integrations and cannot be required
 for default RRFlow readiness.
 
+The optional Connectome UI is pinned at `connectome/` to the separate
+`rrflow/connectome-development` repository. It must not supply engine or
+bundled-adapter source, build inputs, installation, or default readiness.
+Its checkout and public-engine boundary are owned by
+`docs/reference/client/connectome.md#repository-checkout`.
+
 RRFlow is an independently installable and operable reasoning and recall
 engine. A project's code or schema generator, build/test/evaluation harness,
 CI system, database, mesh, model provider, or development tool may be

@@ -113,6 +113,15 @@ pub enum PhysicalOperator {
         exact: bool,
         stable_order: String,
     },
+    /// Reads `sources` (each traversal's start identity plus any joined
+    /// family), then expands every bounded traversal one breadth-first level
+    /// at a time through temporal adjacency ranges and the identity
+    /// histories of the relations they name.
+    AdjacencyTraversal {
+        sources: Vec<RuntimeVersionedSource>,
+        exact: bool,
+        stable_order: String,
+    },
     MaterializedIndex {
         id: ProjectionId,
         kind: IndexKind,
@@ -380,13 +389,15 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         explain_analyze: bound.explain_analyze,
     };
     let event_cursor = event_cursor_filter(bound);
+    let traversal = std::iter::once(&bound.source)
+        .chain(bound.join.as_ref().map(|join| &join.source))
+        .any(|source| matches!(source, Source::Traversal { .. }));
     let match_field = bound
         .filters
         .iter()
         .find(|filter| filter.comparison.is_match())
         .map(|filter| filter.field.as_str());
-    let selected_index = event_cursor
-        .is_none()
+    let selected_index = (event_cursor.is_none() && !traversal)
         .then(|| {
             bound
                 .index_candidates
@@ -417,7 +428,28 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
                 })
         })
         .flatten();
-    let mut candidates = if let Some(cursor) = event_cursor {
+    let mut candidates = if traversal {
+        vec![
+            CandidatePath {
+                name: "adjacency_traversal".into(),
+                selected: true,
+                exact: true,
+                reason: "reads each start identity, then per breadth-first level the temporal adjacency of the frontier and the identity history of every relation it names".into(),
+            },
+            CandidatePath {
+                name: "versioned_source_read".into(),
+                selected: false,
+                exact: true,
+                reason: "rejected: relation and record family ranges grow with the estate, not with the visited neighbourhood".into(),
+            },
+            CandidatePath {
+                name: "derived_projection".into(),
+                selected: false,
+                exact: false,
+                reason: "rejected: no projection generation and grounding proof supplied".into(),
+            },
+        ]
+    } else if let Some(cursor) = event_cursor {
         vec![
             CandidatePath {
                 name: "versioned_identity_read".into(),
@@ -541,6 +573,12 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
                 "identity_ascending".into()
             },
         }
+    } else if traversal {
+        PhysicalOperator::AdjacencyTraversal {
+            sources: bound.version_sources.clone(),
+            exact: true,
+            stable_order: "global_cursor".into(),
+        }
     } else {
         PhysicalOperator::VersionedRead {
             sources: bound.version_sources.clone(),
@@ -610,13 +648,29 @@ fn bound_version_sources(
             }
         }
     }
-    let mut sources = vec![query.source.clone()];
-    if let Some(join) = &query.join {
-        sources.push(join.source.clone());
+    let mut sources = Vec::new();
+    for source in std::iter::once(&query.source).chain(query.join.as_ref().map(|join| &join.source))
+    {
+        match source {
+            Source::Traversal { start, .. } => {
+                let model = schema
+                    .logical_model(&start.kind)
+                    .map_err(|error| Error::Binding(error.to_string()))?;
+                if !model.is_record_like() {
+                    return Err(Error::Binding(format!(
+                        "traversal start type {} resolves to non-record model {model:?}",
+                        start.kind
+                    )));
+                }
+                sources.push(RuntimeVersionedSource::Identity {
+                    model,
+                    reference: start.clone(),
+                });
+            }
+            source => sources.extend(version_sources_for_sources(std::slice::from_ref(source))),
+        }
     }
-    Ok(normalize_version_sources(version_sources_for_sources(
-        &sources,
-    )))
+    Ok(normalize_version_sources(sources))
 }
 
 impl PhysicalPlan {
@@ -893,7 +947,14 @@ pub(crate) fn fields_for_source(
                     "relation type {relation} is not registered at this cursor"
                 ))
             })?;
-            if !schema.records.contains_key(&start.kind) {
+            // A start is any record-like table in the catalogue; a schemaless
+            // table is as much a graph node as one with a strict schema.
+            let start_is_record = schema.records.contains_key(&start.kind)
+                || schema
+                    .tables
+                    .get(&start.kind)
+                    .is_some_and(|table| table.model.is_record_like());
+            if !start_is_record {
                 return Err(Error::Binding(format!(
                     "traversal start type {} is not registered at this cursor",
                     start.kind

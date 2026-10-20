@@ -1,8 +1,8 @@
 # rrflowDB capability record
 
-**Status:** active target contract; the estate, temporal graph, claims, and adjacency index exist and native traversal is in review, while prompt graph families, the SQL face, and project links are planned
+**Status:** active target contract; the estate, temporal graph, claims, adjacency index, native traversal, prompt flights, and task records exist, while prompt graph families, the memory contract gap, and project links are planned
 **Coordinate:** `rrflow://rrflow-instance/data/reference/data/rrflowdb-capability`
-**Owner:** the planned capability set of rrflowDB as the per-project AI memory database: its Postgres-like SQL face, prompt graph families, memory model, and opt-in links between projects
+**Owner:** the planned AI memory capabilities of rrflowDB as the per-project estate: prompt graph families, the memory model, and opt-in links between projects; PostgreSQL compatibility is owned by the [PostgreSQL contract](../protocol/postgresql.md)
 
 rrflowDB is the per-project AI estate: one project's governed knowledge,
 memory, temporal graph, reasoning state, evidence, vectors, and index
@@ -13,15 +13,17 @@ fixes what "a Postgres-like database built in Rust and dedicated to AI
 memory" means for RRFlow, which pieces exist, and the order and proof by which
 the rest is built. It owns no delivery status. The
 [roadmap](../../roadmap/rrflow-1.0.md) owns order and completion; items
-H-08, H-09, and H-10 in [Gate H](../../roadmap/rrflow-1.0/gate-h.md) carry
-the work this record describes.
+H-09 and H-10 in [Gate H](../../roadmap/rrflow-1.0/gate-h.md) carry the work
+this record describes. SQL access is not planned here: the
+[PostgreSQL compatibility contract](../protocol/postgresql.md) owns its scope,
+semantics, and qualification, and H-08 owns its packages.
 
 ## Owner decisions this record carries
 
 | Date | Decision | Effect here |
 |---|---|---|
 | 2026-10-17 | One project ↔ one estate (rrflowDB) ↔ one RRD instance; an account owns many estates; a workspace groups estates above the engine. | Every capability below is per project. Nothing merges two estates. |
-| 2026-10-18 | "The pure Rust Postgres DB for AI" is rrflowDB with a Postgres-wire SQL face: one adapter over the same estate, not a second database and not Postgres as persistence. | [SQL face](#sql-face). |
+| 2026-10-18 | "The pure Rust Postgres DB for AI" is rrflowDB with a Postgres-wire SQL face: one adapter over the same estate, not a second database and not Postgres as persistence. | Owned by the [PostgreSQL compatibility contract](../protocol/postgresql.md) and H-08; see [SQL access](#sql-access). |
 | 2026-10-19 | Knowledge and memory are the same graph family. | [Memory model](#memory-model). |
 | 2026-10-19 | The graphs a prompt forms are configurable so they can be tested and experimented with. | [Prompt graph families](#prompt-graph-families). |
 | 2026-10-19 | Relationships between projects are opt-in links: each project stays its own rrflowDB, a link is explicitly allowed, queries may follow it read-only, and every use is audited. | [Project links](#project-links). |
@@ -40,10 +42,10 @@ model. It is one Rust engine with one mutation authority
 | Typed schema and DDL | `RuntimeSchemaRegistry`: record, relation, event, vector, series, geo, and object tables with logical models, revisioned per scope ([schema catalogue](schema-catalogue.md)) | Implemented |
 | B-tree and unique indexes | Scalar and unique entries written with each record mutation | Write side implemented; native reader is E-02 |
 | pgvector | Native collections, named dense/sparse/multi vectors, payload filters, exact and HNSW search, quantization | Implemented in `rrd-vector`; native generations are E-04 |
-| Apache AGE (graph) | Typed temporal relations with outgoing and incoming adjacency; rrflowQL `traverse:` reads native adjacency ranges | Adjacency written (C-03); the native traversal reader is in review (pull request #21, E-01a); context expansion still reads a snapshot |
+| Apache AGE (graph) | Typed temporal relations with outgoing and incoming adjacency; rrflowQL `traverse:` reads native adjacency ranges | Adjacency written (C-03); rrflowQL traversal reads it natively (E-01a, pull request #21); context expansion still reads a snapshot |
 | Full-text search | BM25 with highlights | Implemented over artifacts; incremental postings are E-03 |
-| SQL over the wire | Postgres-wire SQL face | Planned, H-09 |
-| Roles and grants | `RrdEngine` sessions, policies, and audited authorization | Implemented; the SQL face authenticates through it, never through its own user table |
+| SQL over the wire | The rrflowDB PostgreSQL core profile | Planned, H-08 ([PostgreSQL contract](../protocol/postgresql.md)) |
+| Roles and grants | `RrdEngine` sessions, policies, and audited authorization | Implemented |
 | Extensions, PL/pgSQL, server-side triggers, logical replication | Not offered. Triggers, routines, and functions are explicit engine capabilities (Gate I); sync is per estate | Out of scope |
 
 ## Memory model
@@ -56,11 +58,11 @@ separate memory store
 | Memory kind | Stored as | State |
 |---|---|---|
 | Semantic (what is known) | Records, typed relations, and bi-temporal claims | Implemented |
-| Episodic (what happened) | Immutable events, prompt flights and their edges | Events implemented; flights are open pull requests #17–#19 |
+| Episodic (what happened) | Immutable events, prompt flights and their edges | Events and prompt flights implemented (H-06a–H-06c, pull requests #17–#19) |
 | Procedural (how to act) | LFG category tree and revisions, rules, exemplars, recipes, skills, verdicts, and model outcomes per address, each as governed records | Planned with Gate G and Gate I |
 | Consolidation | Claim tiers `local` → `primary` → `tenant`; promotion `unpromoted` → `pending` → `promoted` or `denied`; corrections supersede by digest | Kernel fields exist; nothing runs promotion (RROFLOW) |
 
-Gap to close in H-08: the public `AssertClaim` mutation carries subject,
+Gap to close in H-09: the public `AssertClaim` mutation carries subject,
 predicate, object, `valid_from`, `tx_time`, producer, and confidence only.
 It cannot state `valid_to`, tier, promotion, or the claim it supersedes, so a
 caller cannot write a correction or a promotion that the kernel already
@@ -85,8 +87,8 @@ the Notion RRO and LFG records). Knowledge includes memory.
 | Lexicon | Prompt phrasing → canonical label; alias → label; unresolved phrasing → the inconclusive bucket | LFG lexicon | Absent; authored outside the repo |
 | Classification | Prompt → address path: one node per Gate, Choice, Score, Extract, and Compose answer with value, probability, confidence, tier, and provenance (`rule@rN`, encoder, or model) | LFG kernel and extension (G-01, G-03) | Absent |
 | Reasoning | Prompt → reasoning-tree run: branches taken, recipes, conditions, verification nodes | Persisted tree execution (G-04) | Contract only (A-02) |
-| Plan / task | Named task → its prompts; RRO goal → tasks → parallel branches → output contract | Task records and plan compilation | Tasks are open pull request #19 |
-| Evidence | Prompt → each record its context used, with rank, fused score, and retrieval avenues; results, citations, and artifact references | Prompt flights | Open pull request #18 |
+| Plan / task | Named task → its prompts; RRO goal → tasks → parallel branches → output contract | Task records and plan compilation | Task records implemented (H-06c, pull request #19); plan compilation planned |
+| Evidence | Prompt → each record its context used, with rank, fused score, and retrieval avenues; results, citations, and artifact references | Prompt flights | Flight-used edges with rank, fused score, and avenues implemented (H-06b, pull request #18); the registry-owned family is planned (M3) |
 | Source | Record or answer → where it came from: file and revision, document and date, commit, operator correction, or model | Project inventory and ingestion (D-03, D-05) and commit provenance | Commits carry actor and digest; no source-node vocabulary |
 | Knowledge (memory) | Records, relations, and claims the prompt read, asserted, corrected, or promoted | Ingestion, claim writes, consolidation | Records, relations, and claims exist; see the claim gap above |
 | Governance | Checks run, verdicts (pass, fail, inconclusive), permission-scope decisions, and the actions they allowed or refused | Governance verification and permission gate | Absent |
@@ -115,34 +117,14 @@ the Notion RRO and LFG records). Knowledge includes memory.
   probability where the producer is probabilistic. A family is replayable
   from its committed inputs.
 
-## SQL face
+## SQL access
 
-One adapter crate, `crates/adapters/rrflow-postgres`, speaks the Postgres
-wire protocol and lowers SQL onto the same stamped query execution that
-rrflowQL uses. It owns translation only: no state, no planner of its own, no
-second authority.
-
-| Concern | Contract |
-|---|---|
-| Wire protocol | Startup, simple and extended query, cancel, TLS, and SCRAM through the `pgwire` crate (MIT or Apache-2.0; 0.41.1 published 2026-09-29 supports protocol 3.0 and 3.2, extended query, COPY, TLS, SCRAM-SHA-256, cancel, and notifications). Locked as an ordinary third-party dependency. |
-| Reference only | `datafusion-postgres` 0.18 and `datafusion-pg-catalog` (Apache-2.0) show a working pgwire + DataFusion composition, but target DataFusion 54 while RRFlow pins 55. Their catalog and type-mapping behavior is a reference input under the AGENTS source-adaptation rule, not a dependency. |
-| Authentication | The connection authenticates against the same RRFlow session and credential authority as HTTP and the SDKs. There is no database user table. Loopback by default; network listeners follow H-07. |
-| Transactions | `BEGIN` captures one read stamp (repeatable-read snapshot). Every statement reads at it. A writing transaction commits as one `DataTransaction` whose expected cursor is that stamp; a moved head fails with SQLSTATE `40001` (serialization failure). |
-| Time | `SET rrflow.valid_at` and `SET rrflow.known_at` select the temporal coordinate for the session; table functions accept an explicit coordinate per query. |
-| Catalog | `information_schema` and a focused `pg_catalog` subset (`pg_database`, `pg_namespace`, `pg_class`, `pg_attribute`, `pg_type`, `pg_settings`) generated from the stamped schema registry. One schema per family (`records`, `relations`, `claims`, `events`, `vectors`, `series`, `geo`), one table per kind. |
-| Graph | `rrflow.traverse(relation, start_kind, start_id, direction, depth)` as a set-returning function over the native adjacency reader, plus each prompt graph family as relation tables. |
-| Vectors | A pgvector-shaped `vector` type and the `<->` (L2), `<=>` (cosine), and `<#>` (negative inner product) operators; `ORDER BY embedding <=> $1 LIMIT k` lowers to native candidate search with exact rerank (E-04, E-05). |
-| Text | `@@` lowers to BM25 match with scores and highlights (E-03). |
-| Evidence | Every result can return its read stamp, plan digest, and read evidence through `rrflow.last_evidence()`; budgets are the caller's session budgets. |
-| Writes | `INSERT`, `UPDATE`, and `DELETE` lower to `TransactionMutation` values; `COPY FROM` lowers to bounded governed import batches; `CREATE TABLE` proposes a schema revision subject to policy. |
-| Not offered | Arbitrary DDL beyond the schema registry, stored procedures, SQL triggers, extensions, logical replication, foreign data wrappers. |
-
-Field experience to plan for: tools such as DataGrip issue complex
-`pg_catalog` queries at connect time, extended query requires parameter type
-inference without execution, and the row-oriented wire format needs a
-columnar-to-row conversion. GreptimeDB reported each of these when it built
-the same composition (2026-04-01). The tool matrix below makes them explicit
-acceptance cases rather than surprises.
+PostgreSQL clients reach rrflowDB only through the
+[PostgreSQL compatibility contract](../protocol/postgresql.md), which owns
+scope, type and transaction semantics, the wire adapter inside `rrd-server`,
+the AI SQL surface, and qualification; H-08a to H-08h own its order. This
+record adds no SQL behavior. Prompt graph families and project links appear to
+SQL only through the relational and function surface that contract admits.
 
 ## Project links
 
@@ -172,42 +154,38 @@ link lets one project read another, never write it.
 |---|---|
 | One estate per project, rrflowKV storage, one authority | [instance topology](../../architecture/instance-topology.md), ADR-0001 |
 | Typed temporal relations with both adjacency directions written atomically | C-03; [multi-model contract](multi-model-object-contract.md) |
-| rrflowQL traversal reads native adjacency ranges and matches an independent full-replay oracle | In review: E-01a, pull request #21 |
+| rrflowQL traversal reads native adjacency ranges and matches an independent full-replay oracle | Implemented: E-01a, pull request #21 |
 | Claims are bi-temporal with tier, promotion, confidence, and supersession in the kernel | `rrd-core/src/claim.rs`; `ClaimChangeSnapshot` exposes them on reads |
 | The public claim mutation omits `valid_to`, tier, promotion, and supersession | `TransactionMutation::AssertClaim` in `rrd-contract` |
-| No SQL wire listener, no project-link record, no graph-family registry | Repository search at this record's revision |
+| No project-link record and no graph-family registry; PostgreSQL compatibility is planned under H-08 | Repository search at this record's revision |
 | DataFusion 55 is embedded in `rrd-query` and evaluates stamped Arrow batches | `crates/compute/rrd-query/Cargo.toml`; OBJ-05 |
 
 ## Build order
 
 Each step is one pull request with its own oracle. Steps inside a column can
-start once their dependency lands; the columns run in parallel.
+start once their dependency lands; the columns run in parallel. SQL access
+builds separately as H-08a to H-08h.
 
 | Step | Work | Depends on | Proof |
 |---|---|---|---|
-| M1 | This record and roadmap items H-08 to H-10 | — | Documentation, navigation, and inventory checks |
+| M1 | This record and roadmap items H-09 and H-10 | — | Documentation, navigation, and inventory checks |
 | M2 | Graph-family definitions in the schema registry, activation in the configuration revision, the bundled default set | Build-order step 2 (configuration revisions) | Golden registry fixture; activation revision round trip; unknown family rejected |
-| M3 | Flight commits form every active family atomically with per-edge provenance; evidence and plan/task move onto the registry | M2, pull requests #17–#19 | One commit per flight; skipped families recorded with reason; rrflowQL walks each family; replay is identical |
+| M3 | Flight commits form every active family atomically with per-edge provenance; evidence and plan/task move onto the registry | M2, H-06a–H-06c (pull requests #17–#19) | One commit per flight; skipped families recorded with reason; rrflowQL walks each family; replay is identical |
 | M4 | Memory contract: `AssertClaim` gains `valid_to`, tier, promotion, and supersession; memory reads by subject, predicate, and time | — | Correction supersedes without loss; promotion is reversible; old stamps unchanged |
 | M5 | Experiment arms: assignment, exposure, and outcome events; promotion by grade and sample | M2, M3 | A seeded two-arm fixture promotes only past both thresholds |
 | M6 | Source family from the committed project tree and commit provenance | D-03, D-05 | Every ingested record resolves to its file and revision |
 | M7 | Lexicon and classification producers | G-01, G-03 | Golden address and lexicon fixtures per prompt |
 | M8 | Reasoning and governance producers | G-04, Governance verification | Verdicts and branches visible per prompt; inconclusive gates as fail |
-| S1 | `rrflow-postgres` read-only: catalog, temporal settings, stamped reads, `rrflow.traverse` | F-01, F-02 | psql and two drivers read exactly what rrflowQL returns at the same stamp |
-| S2 | Vector and text operators | E-03, E-04, E-05 | pgvector-shaped queries equal native search results with exact rerank |
-| S3 | Governed writes and `COPY` | S1, H-04 | CAS conflict returns `40001`; a write is one engine commit with audit |
-| S4 | Tool matrix | S1–S3 | psql, DBeaver, pgAdmin, DataGrip, Metabase, Grafana; SQLAlchemy, node-postgres, pgx, JDBC, Npgsql connect, browse, and query |
 | L1 | Link offer and acceptance records, revocation, audit | H-04 | Two-party opt-in; revocation stops resolution immediately |
 | L2 | Federated read across a link at the workspace layer | L1, H-07 | Result carries both stamps; the target's denial surfaces as unavailable |
 | L3 | Connectome shows links and drills across them | L2, H-06 | Owner can open a linked project's graph read-only |
 
 ## Proof standards
 
-- Every family, SQL path, and link read reproduces the same answer at the same
-  read stamp after close and reopen, on rrflowMX and rrflowKV.
+- Every family and link read reproduces the same answer at the same read
+  stamp after close and reopen, on rrflowMX and rrflowKV.
 - Physical evidence follows the work requested: a traversal follows visited
-  edges, a SQL query reports the same read evidence as its rrflowQL
-  equivalent.
+  edges.
 - No performance or superiority claim against Postgres, pgvector, AGE,
   SurrealDB, Qdrant, or HydraDB is made until J-04's comparative evidence
   passes ([OBJ-10](../../objectives/rrflow-1.0-alpha.md)).
@@ -225,6 +203,3 @@ start once their dependency lands; the columns run in parallel.
 - Owner statements in the Rrflow project, 2026-10-17 to 2026-10-19.
 - LFG_NOTES_v3 (2026-09-26), Notes v2 and v2.1 (2026-09-25), Session Notes (2026-09-24).
 - Notion: RRO, LFG, and "RRO → LFG routing pipeline" records (2026-08-16/17).
-- [pgwire 0.41.1](https://docs.rs/crate/pgwire/latest),
-  [datafusion-postgres 0.18.0](https://docs.rs/crate/datafusion-postgres/latest),
-  [GreptimeDB Postgres compatibility (2026-04-01)](https://greptime.com/blogs/2026-04-01-greptimedb-postgresql-compatibility).

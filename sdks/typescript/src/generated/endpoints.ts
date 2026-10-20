@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 07bef046e96eaa109f9846be695f59657c1867e83ea5068dc66084f26486476f
+// OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -49,6 +49,12 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": false
   },
+  "data-schema-read": {
+    "method": "POST",
+    "path": "/v1/data/schema",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
   "diagnostics-read": {
     "method": "POST",
     "path": "/v1/diagnostics/read",
@@ -58,6 +64,24 @@ export const endpoints = {
   "estate-read": {
     "method": "POST",
     "path": "/v1/estates/{estate}/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-launch": {
+    "method": "POST",
+    "path": "/v1/flights",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "flight-list": {
+    "method": "POST",
+    "path": "/v1/flights/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-read": {
+    "method": "POST",
+    "path": "/v1/flights/read",
     "authentication": "session_bearer",
     "mutation": false
   },
@@ -144,6 +168,30 @@ export const endpoints = {
     "path": "/v1/subscriptions/open",
     "authentication": "session_bearer",
     "mutation": true
+  },
+  "task-open": {
+    "method": "POST",
+    "path": "/v1/tasks",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-close": {
+    "method": "POST",
+    "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-list": {
+    "method": "POST",
+    "path": "/v1/tasks/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-read": {
+    "method": "POST",
+    "path": "/v1/tasks/read",
+    "authentication": "session_bearer",
+    "mutation": false
   },
   "transaction-begin": {
     "method": "POST",
