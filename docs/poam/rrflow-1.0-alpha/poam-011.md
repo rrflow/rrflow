@@ -68,6 +68,19 @@ DevPulse account creation and synchronization. The linked DevPulse contract now 
 implementation and acceptance evidence remain open. H-06 source registration
 alone cannot close those delivery gaps.
 
+The native Connectome workbench now has real local installation/query/reopen
+evidence, linked in its [package receipt](../../evidence/change-journals/gate-h/h-06-native-turnkey-workbench.md).
+That bounded result does not close H-06. Its process fixture exposed a concrete
+query gap: a schemaless key/value table can persist a record, but querying it
+as `record:settings` fails with an unregistered record-type error. The binder
+in `crates/compute/rrd-query/src/plan.rs` (`fields_for_source`) requires the
+registered record schema, while table metadata alone supplies none. The UI
+now disables unsupported Browse and explains the limitation. Gate F/public
+query qualification owns a canonical schemaless binding decision and positive,
+negative, authorization, budget and reopen tests; H-06 then consumes that
+qualified public behavior. A strict-schema positive fixture is not proof that
+the schemaless gap is fixed.
+
 ## Current-detail owners
 
 - [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)

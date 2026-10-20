@@ -52,6 +52,12 @@ pre-alpha status remain authoritative.
 
 ## Enter RRFlow
 
+For a local desktop workflow, use the [native Connectome workbench](docs/reference/client/connectome.md#native-local-workbench):
+start the bundled RRFlow engine after an explicit installation preview, explore
+the authenticated schema and data models, query records, and navigate their
+relationships. This is a development build with real-engine evidence; full
+client qualification remains open.
+
 Start with the [runnable local rrflowDB integration](docs/reference/sdk/rrflowdb-local.md):
 build the native engine, create related records, query them with rrflowQL and
 reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
