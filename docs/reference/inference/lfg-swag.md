@@ -11,6 +11,11 @@ controller and model gateway. This record defines their boundary before code.
 [endpoint profile](../deployment/endpoint-bindings.md) remains the endpoint
 configuration owner. Neither component replaces `RrdEngine`.
 
+The [learning contract](learning/controller-training.md) owns optional
+controller training, evaluation and RROFLOW improvement. Its
+[Spark guide](learning/spark.md) prepares a training host; it does not change
+runtime dependencies or make model execution available.
+
 ## Configurable execution
 
 ```mermaid

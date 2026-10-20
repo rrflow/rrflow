@@ -41,12 +41,22 @@ and validation are not runtime enforcement.
 A local model cannot yet safely steer the fast and analytical paths, and routed state cannot
 prove which durable seat was authorized to cause it.
 
+Inspection at `8e07399843d4dd55e847dc191e7bda59bc05614a` found no
+first-party controller-training pipeline, held-out controller evaluation or
+governed model-promotion implementation, and the canonical RROFLOW term had no
+owning roadmap package. The [learning contract](../../reference/inference/learning/controller-training.md)
+and G-06/I-03/I-07 package refinements assign those missing responsibilities.
+Existing model-manifest validation admits the three route-proposal grammar,
+not an arbitrary endpoint-selector model or unbound LoRA sidecar. No training,
+Spark hardware, runtime admission extension or promotion is qualified here.
+
 ## Owning gates
 
-D-05, G-01 through G-06
+D-05, G-01 through G-06; I-03/I-07 for governed improvement
 
-Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md) and
-[Gate G](../../roadmap/rrflow-1.0/gate-g.md).
+Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
+[Gate G](../../roadmap/rrflow-1.0/gate-g.md), and
+[Gate I](../../roadmap/rrflow-1.0/gate-i.md).
 
 ## Closure evidence
 
