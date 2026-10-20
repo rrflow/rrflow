@@ -843,11 +843,33 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         }
     }
     socket.unsubscribe(&subscription_id).await.unwrap();
-    match receive_application_frame(&mut socket).await.payload {
-        WebSocketPayload::Unsubscribed(result) => {
-            assert_eq!(result.subscription.subscription_id, subscription_id);
+    // Delivery runs on its own polling cadence, so the next page after the
+    // acknowledged cursor may already be on the wire when the server handles
+    // the unsubscribe. Such an in-flight page continues the acknowledged
+    // stream and is bounded by the subscription's max_in_flight (1 here); the
+    // server removes the subscription before it answers, so the `unsubscribed`
+    // frame ends the stream.
+    let mut in_flight = 0;
+    loop {
+        match receive_application_frame(&mut socket).await.payload {
+            WebSocketPayload::Unsubscribed(result) => {
+                assert_eq!(result.subscription.subscription_id, subscription_id);
+                assert_eq!(result.subscription.acknowledged_cursor, 2);
+                break;
+            }
+            WebSocketPayload::Delivery(delivery) if delivery.subscription_id == subscription_id => {
+                in_flight += 1;
+                assert_eq!(
+                    in_flight, 1,
+                    "max_in_flight 1 admits one unacknowledged delivery"
+                );
+                assert_eq!(delivery.connection_generation, replay.connection_generation);
+                assert!(delivery.delivery_sequence > replay.delivery_sequence);
+                assert_eq!(delivery.from_cursor, 2);
+            }
+            WebSocketPayload::Backpressure(_) => {}
+            payload => panic!("unexpected unsubscribe payload: {payload:?}"),
         }
-        payload => panic!("unexpected unsubscribe payload: {payload:?}"),
     }
     socket.close().await.unwrap();
 
