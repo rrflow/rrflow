@@ -9,4 +9,5 @@ linked package evidence.
 
 <!-- rrflow:generated-index:start -->
 - [Configurable reasoning and knowledge connector contract journal](configurable-reasoning-knowledge-contracts.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-g/configurable-reasoning-knowledge-contracts`](rrflow://rrflow-instance/data/evidence/change-journal/gate-g/configurable-reasoning-knowledge-contracts) — active immutable change-journal evidence
+- [SWAG learning boundary alignment journal](swag-learning-boundary-alignment.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-g/swag-learning-boundary-alignment`](rrflow://rrflow-instance/data/evidence/change-journal/gate-g/swag-learning-boundary-alignment) — active immutable change-journal evidence
 <!-- rrflow:generated-index:end -->

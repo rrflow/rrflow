@@ -63,6 +63,28 @@ commands above do not prove the planned cases already exist or pass. Fix test
 names from the actual checkout before running; keep real-model and installed
 acceptance separate from reference-adapter results.
 
+## Controller learning packages
+
+The [learning contract](../../reference/inference/learning/controller-training.md)
+owns dataset, experiment and artifact requirements under G-06. These packages
+are open; offline preparation may run independently, but deployed execution
+still follows G-01 through G-05 and the current dependency spine. Python tools
+remain optional repository tooling or explicitly configured external
+activities. They cannot become a default engine dependency.
+
+| Package and prerequisite | Canonical boundary | First failure oracle and required exit |
+|---|---|---|
+| G-06a: offline dataset and baseline, before selecting a trained candidate | Public router/configuration families and first-party inference tooling under `scripts`; existing model manifests remain runtime authority | Reject unauthorized exports, duplicate leakage across project/time splits, absent labels and mismatched input/configuration digests. Reproduce simple policy/classifier and candidate results from one frozen corpus with counts, failures, total latency/cost and uncertainty. No Spark hardware is required for schema/golden preparation; actual training claims require actual hardware evidence. |
+| G-06b: trained artifact qualification, after G-06a and the capability contract appropriate to the training target | Existing `rrd-contract` model manifest and `rrd-inference` pre-load admission; model/template packaging and real runtime adapter | Fresh-process reload, interrupted/resumed training, final quantization/template identity and held-out comparison pass. Existing route manifests reject endpoint-selector output; G-01b must first define that separate capability. Tampered model/tokenizer/runtime/grammar bytes never reach the loader. A LoRA sidecar is not implicitly admitted. |
+| G-06c: installed candidate comparison, after G-06b and G-01 through G-05 | Existing installed engine, endpoint/configuration revisions and H-05 evidence | Repeat the candidate/baseline corpus through actual engine admission, with stale binding, denied sharing, unavailable model, timeout, cancellation and restart. Include controller overhead and downstream success. Shadow calls consume an authorized budget; comparison never mutates project state implicitly. I-03 owns later promotion. |
+
+Preserve the current `router_contract`, `model_manifest_contract` and
+`rrd-inference` `pipeline` corpora when their implementation changes. In
+particular, the three-proposal golden, candidate/budget binding and rejection
+before the model loader are required behavior, not scaffolding to discard.
+G-01a already owns the existing registry-lock refactor; training packages must
+not introduce a parallel executor to avoid it.
+
 ## Exit condition
 
 Gate G exits only when configured LFG analysis (including disabled and

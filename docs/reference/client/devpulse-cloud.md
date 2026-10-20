@@ -103,8 +103,35 @@ specification may compose these fields, but cannot become a second authority:
 endpoint bindings, H-10 records own project-link consent, H-07 records own sync
 consent, and DevPulse/provider records own physical provisioning. Each view
 references those identities/revisions and shows proposed versus observed
-state. The owner's project-spec name is unresolved; do not publish a new type
-or file format based on an uncertain spelling.
+state.
+
+Use **AI Development Profile** for the user-facing global development
+preferences and **AIDevSpec** as the proposed name of their structured,
+versioned representation. These are RRFlow product terms, not a claim of an
+industry standard or a new executable schema. Project-scoped overrides,
+process requirements, testing expectations and model preferences compose
+through the existing configuration owners. A global profile is a reusable
+input above estates; each estate explicitly accepts a revision. Editing the
+profile cannot silently change every project's effective configuration.
+
+Show effective values, origins, precedence, conflicts, proposed changes and
+the accepted revision in Connectome. Preserve project-owned instructions;
+hard policy and authorization remain independently enforced, and unresolved
+mandatory conflicts block the dependent effect. `AGENTS.md` and
+provider-specific instruction projections are integration formats, not extra
+configuration authorities. [AGENTS.md](https://agents.md/) defines an existing
+project instruction format, while [Claude Code memory](https://code.claude.com/docs/en/memory)
+documents scoped instructions; neither defines this complete product profile.
+Generate or reference authorized projections during the existing
+[bootstrap flow](../agent-bootstrap.md#independent-engine-and-project-integration),
+with ownership-safe removal and no provider hooks.
+
+Attunement may propose profile updates or learning examples. Acceptance of a
+preference is separate from training consent, model activation and cloud
+sharing. The [learning contract](../inference/learning/controller-training.md)
+owns those distinctions. D-06 owns effective configuration and H-06/H-07 own
+its client projections; no profile UI or executable AIDevSpec schema is
+implemented by this naming decision.
 
 The UI must present separate choices with explicit scope:
 
