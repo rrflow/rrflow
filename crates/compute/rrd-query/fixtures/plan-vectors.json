@@ -9,10 +9,10 @@
           "scope": "instance:golden",
           "schema_revision": 1,
           "catalog_revision": 0,
-          "commit_cursor": 4,
-          "head_digest": "e83a72bff2eee024b97b1928261d9a1c7d567abc5d4eb3c620f0185c190f71bc",
-          "accumulator_root": "cb4bfa0b7adb17731dc5217fe1c86adeb726e13ef21948bbe285b3a264865b3c",
-          "manifest_id": "eef349e83bcfdde4b7947a3b1473c887869d4f2e21b19ac29d28e0998b029038"
+          "commit_cursor": 5,
+          "head_digest": "c169775bcdf96afeeec61041765645a8ae3dcf7450670fec8870af02e227e8ab",
+          "accumulator_root": "8c3fc8649cee276dc752b766475245553b3c71ce35c125fb92ca34925f718735",
+          "manifest_id": "33e107860117959fbf2df0f7b81aec295dd7847007297f5aeec2a926b57c30f1"
         },
         "schema_revision": 1,
         "source_cursor": 3,
@@ -83,7 +83,7 @@
       ],
       "explanation": {
         "contract": {
-          "read_manifest": "eef349e83bcfdde4b7947a3b1473c887869d4f2e21b19ac29d28e0998b029038",
+          "read_manifest": "33e107860117959fbf2df0f7b81aec295dd7847007297f5aeec2a926b57c30f1",
           "scope": "instance:golden",
           "valid_at": 100,
           "known_at_cursor": 4,
@@ -112,7 +112,7 @@
           }
         ]
       },
-      "digest": "a73c16ec240cfd14d68569f2690f3e64fb4f40d719cb62d9c553047d0ed3f989"
+      "digest": "665d7df9e6523b16ac6efa09fb37a4f6d8628f8f708999b4d996fefd9d40d908"
     }
   },
   {
@@ -125,10 +125,10 @@
           "scope": "instance:golden",
           "schema_revision": 1,
           "catalog_revision": 0,
-          "commit_cursor": 4,
-          "head_digest": "e83a72bff2eee024b97b1928261d9a1c7d567abc5d4eb3c620f0185c190f71bc",
-          "accumulator_root": "cb4bfa0b7adb17731dc5217fe1c86adeb726e13ef21948bbe285b3a264865b3c",
-          "manifest_id": "eef349e83bcfdde4b7947a3b1473c887869d4f2e21b19ac29d28e0998b029038"
+          "commit_cursor": 5,
+          "head_digest": "c169775bcdf96afeeec61041765645a8ae3dcf7450670fec8870af02e227e8ab",
+          "accumulator_root": "8c3fc8649cee276dc752b766475245553b3c71ce35c125fb92ca34925f718735",
+          "manifest_id": "33e107860117959fbf2df0f7b81aec295dd7847007297f5aeec2a926b57c30f1"
         },
         "schema_revision": 1,
         "source_cursor": 4,
@@ -222,7 +222,7 @@
       ],
       "explanation": {
         "contract": {
-          "read_manifest": "eef349e83bcfdde4b7947a3b1473c887869d4f2e21b19ac29d28e0998b029038",
+          "read_manifest": "33e107860117959fbf2df0f7b81aec295dd7847007297f5aeec2a926b57c30f1",
           "scope": "instance:golden",
           "valid_at": 100,
           "known_at_cursor": 4,
@@ -257,7 +257,157 @@
           }
         ]
       },
-      "digest": "4419f9baab33180caa248a6157b2deaa87951150a43e8be0c57d1e1794abfe16"
+      "digest": "aee1390cddabb5df241c75c1be74a4c04d0dc6148d690c883a017c5049686dd4"
+    }
+  },
+  {
+    "source": "FROM traverse:depends_on START document:a DIRECTION OUTGOING DEPTH 2 AT VALID 100 KNOWN 5 PROJECT node_id, depth EXPLAIN CONTRACT",
+    "plan": {
+      "logical": {
+        "contract_version": 1,
+        "read": {
+          "contract_version": 1,
+          "scope": "instance:golden",
+          "schema_revision": 1,
+          "catalog_revision": 0,
+          "commit_cursor": 5,
+          "head_digest": "c169775bcdf96afeeec61041765645a8ae3dcf7450670fec8870af02e227e8ab",
+          "accumulator_root": "8c3fc8649cee276dc752b766475245553b3c71ce35c125fb92ca34925f718735",
+          "manifest_id": "33e107860117959fbf2df0f7b81aec295dd7847007297f5aeec2a926b57c30f1"
+        },
+        "schema_revision": 1,
+        "source_cursor": 5,
+        "version_sources": [
+          {
+            "family": "identity",
+            "model": "relational",
+            "reference": {
+              "kind": "document",
+              "id": "a"
+            }
+          }
+        ],
+        "field_types": {
+          "depth": [
+            "unsigned"
+          ],
+          "from_id": [
+            "string"
+          ],
+          "from_kind": [
+            "string"
+          ],
+          "node_id": [
+            "string"
+          ],
+          "node_kind": [
+            "string"
+          ],
+          "path": [
+            "list"
+          ],
+          "relation_id": [
+            "string"
+          ],
+          "relation_kind": [
+            "string"
+          ],
+          "to_id": [
+            "string"
+          ],
+          "to_kind": [
+            "string"
+          ]
+        },
+        "operators": [
+          {
+            "operator": "scan",
+            "source": {
+              "family": "traversal",
+              "relation": "depends_on",
+              "start": {
+                "kind": "document",
+                "id": "a"
+              },
+              "direction": "outgoing",
+              "max_depth": 2
+            }
+          },
+          {
+            "operator": "temporal",
+            "valid_at": 100,
+            "known_at_cursor": 5
+          },
+          {
+            "operator": "project",
+            "projection": {
+              "kind": "fields",
+              "fields": [
+                "node_id",
+                "depth"
+              ]
+            }
+          }
+        ]
+      },
+      "operators": [
+        {
+          "operator": "adjacency_traversal",
+          "sources": [
+            {
+              "family": "identity",
+              "model": "relational",
+              "reference": {
+                "kind": "document",
+                "id": "a"
+              }
+            }
+          ],
+          "exact": true,
+          "stable_order": "global_cursor"
+        },
+        {
+          "operator": "data_fusion_evaluate"
+        }
+      ],
+      "explanation": {
+        "contract": {
+          "read_manifest": "33e107860117959fbf2df0f7b81aec295dd7847007297f5aeec2a926b57c30f1",
+          "scope": "instance:golden",
+          "valid_at": 100,
+          "known_at_cursor": 5,
+          "source_cursor": 5,
+          "schema_revision": 1,
+          "exact": true,
+          "deterministic_order": "identity_ascending",
+          "read_authentication": "rfc9162_authenticated_semantic_versions",
+          "read_budget_unit": "physical_keys_examined",
+          "network_required": false,
+          "gpu_required": false,
+          "authorization_boundary": "scope:instance:golden"
+        },
+        "candidates": [
+          {
+            "name": "adjacency_traversal",
+            "selected": true,
+            "exact": true,
+            "reason": "reads each start identity, then per breadth-first level the temporal adjacency of the frontier and the identity history of every relation it names"
+          },
+          {
+            "name": "versioned_source_read",
+            "selected": false,
+            "exact": true,
+            "reason": "rejected: relation and record family ranges grow with the estate, not with the visited neighbourhood"
+          },
+          {
+            "name": "derived_projection",
+            "selected": false,
+            "exact": false,
+            "reason": "rejected: no projection generation and grounding proof supplied"
+          }
+        ]
+      },
+      "digest": "51e0bb6bf5a40bbbb46dd71a1f4119afd4a9c99e5687c7aea45fa4a112b8822e"
     }
   }
 ]

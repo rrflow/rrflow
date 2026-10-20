@@ -14,6 +14,10 @@ mod fusion;
 mod graphql;
 mod index;
 mod live;
+/// Native physical access operators. The module root file is planned for F-03.
+mod physical {
+    pub(crate) mod graph;
+}
 mod pipeline;
 mod plan;
 mod syntax;

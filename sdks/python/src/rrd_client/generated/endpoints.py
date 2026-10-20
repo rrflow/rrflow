@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76
+# OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[

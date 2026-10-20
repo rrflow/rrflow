@@ -5,7 +5,8 @@ use crate::access::runtime_state::{
 };
 use crate::access::{
     index_source_deltas, prepare_semantic_commit, read_versioned as read_versioned_access,
-    schema_at_read, vector_source_deltas,
+    read_versioned_expanding as read_versioned_expanding_access, schema_at_read,
+    vector_source_deltas,
 };
 use crate::keyspaces::{self, Durability};
 use crate::{
@@ -84,6 +85,23 @@ impl<'a> RuntimeRepository<'a> {
     ) -> Result<RuntimeVersionedRead> {
         let transaction = self.storage.begin_transaction()?;
         read_versioned_access(&*transaction, read, sources, budget)
+    }
+
+    /// Reads authenticated semantic versions in dependent steps under one
+    /// read stamp, key budget, stamp validation, and accumulator. `expand`
+    /// receives each step's authenticated changes in global cursor order and
+    /// returns the next typed ranges; a range already read is not read again
+    /// and an empty selection ends the read. Native adjacency traversal
+    /// selects each frontier's ranges from the previous step this way.
+    pub fn read_versioned_expanding(
+        &self,
+        read: &ReadStamp,
+        sources: &[RuntimeVersionedSource],
+        budget: RuntimeReadBudget,
+        expand: &mut dyn FnMut(&[RuntimeChange]) -> Vec<RuntimeVersionedSource>,
+    ) -> Result<RuntimeVersionedRead> {
+        let transaction = self.storage.begin_transaction()?;
+        read_versioned_expanding_access(&*transaction, read, sources, budget, expand)
     }
 
     pub fn open_snapshot(
