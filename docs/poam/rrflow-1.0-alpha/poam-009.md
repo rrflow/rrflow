@@ -29,6 +29,15 @@ and prove bounded dispatch/cancellation before increasing concurrency.
 
 ## Impact
 
+Inspection at `3a8828b42a11899d03fd45db0b2d2fd694dc8ce9` found that Gate G
+still described LFG as the model router although the canonical terminology
+already separated optional CPU analysis (LFG) from System One selection and
+dispatch (SWAG). The [LFG/SWAG contract](../../reference/inference/lfg-swag.md)
+and revised Gate G correct that planning mismatch. No executable analysis,
+SWAG policy, governed runtime endpoint activation or scoped inference-cache
+adapter is supplied by the correction. Existing `EndpointProfile` declaration
+and validation are not runtime enforcement.
+
 A local model cannot yet safely steer the fast and analytical paths, and routed state cannot
 prove which durable seat was authorized to cause it.
 

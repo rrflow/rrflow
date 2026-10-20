@@ -98,6 +98,17 @@ J-04's competitive parity requirement.
 
 ## Current-detail owners
 
+The [knowledge connector contract](../../reference/data/knowledge-connectors.md)
+and [project sharing/isolation requirements](../../reference/client/devpulse-cloud.md#project-preferences-sharing-and-isolation)
+now specify additional missing integration behavior: generated credential/
+capability requirements and live availability, source-provenance/ACL fidelity,
+governed Parquet exchange, and independent sharing/placement controls.
+Inspection of `rrd-query/Cargo.toml` at `3a8828b42a11899d03fd45db0b2d2fd694dc8ce9`
+shows DataFusion default features disabled; it does not establish an admitted
+Parquet operation. D-05/D-06 and H-04/H-07/H-09/H-10 own implementation and
+real-adapter/UI evidence. A configured endpoint or successful local query is
+not proof of these behaviors, provider support, login, cloud sync or isolation.
+
 - [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)
 - [PostgreSQL compatibility and independent database contract](../../reference/protocol/postgresql.md)
 - [Executable public contract](../../reference/protocol/public-contract.md)

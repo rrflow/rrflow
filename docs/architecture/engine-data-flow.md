@@ -34,7 +34,8 @@ names describe cooperating layers, not independent products or stores:
 | Arrow substrate | Shared columnar buffer model used by eligible immutable segment pages and streamed analytical batches. |
 | DataFusion | Bounded vectorized execution over stamped Arrow batches; it does not authorize or commit RRFlow state. |
 | Native indexes | Scalar/unique, graph adjacency, BM25, exact-vector, HNSW, and related access paths bound to canonical source coordinates. |
-| LFG or provider model | Replaceable constrained adapter that proposes recipes, branches, or bounded query intent. |
+| LFG | Optional CPU analysis that supplies bounded observations to SWAG; it neither dispatches models nor authorizes effects. |
+| SWAG and selected model adapter | Configured System One selection and engine-admitted dispatch; recipe, branch and context proposals remain constrained by the [LFG/SWAG contract](../reference/inference/lfg-swag.md). |
 | HTTP, WebSocket, SDK, MCP, CLI, Connectome | Transport and client surfaces invoking public `RrdEngine` capabilities without recreating engine logic. |
 
 ## Write and commit flow
