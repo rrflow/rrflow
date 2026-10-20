@@ -3723,6 +3723,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "parquet"
+version = "59.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7065842956a20c2a536924ce8e4d9955f7422451511b9eb7500d7bfe5077e59c"
+dependencies = [
+ "ahash 0.8.12",
+ "arrow-array",
+ "arrow-buffer",
+ "arrow-data",
+ "arrow-ipc",
+ "arrow-schema",
+ "arrow-select",
+ "base64 0.23.1",
+ "bytes",
+ "chrono",
+ "half",
+ "hashbrown 0.17.1",
+ "num-bigint 0.5.1",
+ "num-integer",
+ "num-traits",
+ "seq-macro",
+ "twox-hash",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4522,11 +4547,13 @@ dependencies = [
  "async-graphql-parser",
  "async-graphql-value",
  "async-trait",
+ "bytes",
  "datafusion",
  "datafusion-datasource",
  "datafusion-session",
  "futures",
  "futures-timer",
+ "parquet",
  "rrd-core",
  "rrd-store",
  "serde",
@@ -4607,12 +4634,15 @@ dependencies = [
 name = "rrflow-cli"
 version = "1.0.0"
 dependencies = [
+ "bytes",
  "clap",
+ "parquet",
  "rrd-client",
  "rrd-contract",
  "rrd-core",
  "rrd-engine",
  "rrd-estate",
+ "rrd-query",
  "rrd-security",
  "rrd-server",
  "rrd-store",
@@ -4909,6 +4939,12 @@ name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+
+[[package]]
+name = "seq-macro"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
 
 [[package]]
 name = "serde"

@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
+// OpenAPI SHA-256: 24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -22,6 +22,7 @@ public enum OperationId {
     HEALTH_READY("health-ready", "GET", "/v1/health/ready", Authentication.PUBLIC, false),
     OPENAPI_READ("openapi-read", "GET", "/v1/schema/openapi", Authentication.PUBLIC, false),
     QUERY_EXECUTE("query-execute", "POST", "/v1/query", Authentication.SESSION_BEARER, false),
+    QUERY_EXPORT("query-export", "POST", "/v1/query/export", Authentication.SESSION_BEARER, false),
     QUERY_INDEX_ENSURE("query-index-ensure", "POST", "/v1/query/indexes/ensure", Authentication.SESSION_BEARER, true),
     QUERY_INDEX_LIST("query-index-list", "POST", "/v1/query/indexes/list", Authentication.SESSION_BEARER, false),
     QUERY_LIVE_POLL("query-live-poll", "POST", "/v1/query/live/poll", Authentication.SESSION_BEARER, false),
@@ -45,7 +46,7 @@ public enum OperationId {
     VECTOR_POINT_SCROLL("vector-point-scroll", "POST", "/v1/vector/points/scroll", Authentication.SESSION_BEARER, false),
     VECTOR_SEARCH("vector-search", "POST", "/v1/vector/search", Authentication.SESSION_BEARER, false);
 
-    static final String OPENAPI_DOCUMENT_SHA256 = "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69";
+    static final String OPENAPI_DOCUMENT_SHA256 = "24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb";
 
     public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }
 

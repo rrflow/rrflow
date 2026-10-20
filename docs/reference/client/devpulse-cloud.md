@@ -22,6 +22,59 @@ The available Windows development engine/Connectome bundle proves only the
 bounded local behavior in its receipt. It is not a qualified DevPulse package,
 managed database service, sync implementation, or competitive parity result.
 
+## Guided installation and Windows-first DevPulse
+
+DevPulse ships first on Windows and bundles the qualified RRFlow artifact and
+its public-contract identity. Standalone RRFlow with the optional Connectome
+desktop must also offer guided installation on Windows, macOS and Linux.
+These are release requirements; the current development bundle does not yet
+prove clean-machine installation on all three platforms.
+
+The normal flow is **Install → Choose or create a project → Start**. Advanced
+configuration remains available without making compiler, CLI, database,
+provider or container knowledge a prerequisite. Show one understandable
+summary of the selected project, local data location, permissions and resource
+budget before applying the engine's exact installation plan. Progress and
+errors must describe the next useful action. The UI never invents readiness:
+it verifies the installed engine, catalogue identity and authenticated session.
+
+Docker is a project-runtime capability managed by DevPulse, never a
+prerequisite for RRFlow readiness. When a project's declared runtime needs
+containers, first detect an existing compatible runtime and offer its reuse.
+If missing, explain the download, runtime/backend, disk requirement,
+permissions and applicable terms, then let the user authorize guided setup.
+Use a reviewed version/publisher/checksum manifest, invoke the supported
+installer directly, and verify the running daemon and a bounded project build
+or run before reporting success. Never silently accept third-party agreements,
+change host virtualization settings, or mount another project's data.
+
+On Windows, prefer the supported per-user Docker Desktop path with WSL 2 when
+it fits the project. Installing Docker itself may not require elevation, while
+enabling missing OS features can. Detect unsupported hardware, disabled
+virtualization, an unavailable WSL backend, administrator denial and required
+restart as distinct states. Save setup progress and revalidate after restart;
+do not repeat completed installation or report a running project early.
+Platform requirements must be checked against the selected installer release.
+[Docker Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/)
+and [Microsoft WSL installation](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+Docker/WSL provisioning is a separately authorized DevPulse host effect;
+`rrflow install apply` continues to use only the acquired RRFlow bundle.
+Container placement, isolated engine instances, context-sharing consent and
+cloud synchronization remain separate settings. A shared Docker daemon does
+not authorize shared credentials, storage mounts or AI context.
+
+Acceptance belongs to D-01/H-06 for guided engine/client installation, H-07
+for DevPulse project-runtime adapters, and J for qualified distribution.
+Clean-machine fixtures must cover all declared OS/architecture targets,
+signed/publisher-verified acquisition, default local startup without an account
+or Docker, existing-project preservation, canceled setup, retry, update and
+ownership-safe removal. Windows-first DevPulse additionally proves Docker
+already present/missing, WSL missing, denied elevation, restart/resume,
+offline/interrupted acquisition, engine-ready/runtime-not-ready distinction,
+and a real containerized project whose UI opens privately. Cloud opt-in stays
+off throughout these local tests.
+
 ## Relationship and authority
 
 ```mermaid

@@ -81,6 +81,106 @@ async fn schema(client: &RrdClient, session: &Session, key: &str) -> DataSchemaS
 }
 
 #[tokio::test]
+async fn parquet_export_rejects_truncation_and_foreign_engine_sessions() {
+    let temporary = tempfile::tempdir().unwrap();
+    let first = temporary.path().join("first");
+    let second = temporary.path().join("second");
+    for project in [&first, &second] {
+        std::fs::create_dir(project).unwrap();
+        let plan = RrdEngine::plan_installation(
+            project,
+            InstallationTargetKind::FreshProject,
+            "default",
+            None,
+            &executable(),
+        )
+        .unwrap();
+        RrdEngine::apply_installation(
+            project,
+            InstallationTargetKind::FreshProject,
+            &plan,
+            &plan.installation.plan_sha256,
+            &executable(),
+        )
+        .unwrap();
+    }
+    let (first_client, first_stop, first_server) = start(&first).await;
+    let (second_client, second_stop, second_server) = start(&second).await;
+    let first_session = login(&first_client, &first, "export-first-session").await;
+    let at = now();
+    database::initialize(&first_client, &first_session, at, "export-init")
+        .await
+        .unwrap();
+    let transaction = database::begin(&first_client, &first_session, "export-add-begin")
+        .await
+        .unwrap();
+    let mut extra = database::task_record("another task", "open", at);
+    if let TransactionMutation::PutRecord { reference, .. } = &mut extra {
+        reference.id = database::id("second-task");
+    } else {
+        panic!("fixture must be a record");
+    }
+    database::commit(
+        &first_client,
+        &first_session,
+        &transaction,
+        vec![extra],
+        "export-add",
+    )
+    .await
+    .unwrap();
+    let query = rrd_contract::ExecuteQuery {
+        scope: format!("instance:{}", first_client.instance_id()),
+        query: format!(
+            "FROM record:{} AT VALID {at} KNOWN HEAD PROJECT id, title, status",
+            database::TASK
+        ),
+        parameters: Default::default(),
+        budget: rrd_contract::QueryBudget {
+            max_rows: 1,
+            ..Default::default()
+        },
+    };
+    let partial = first_client
+        .execute_query(
+            &first_session,
+            query.clone(),
+            read_options("export-partial-query").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(partial.execution.truncated);
+    let request = rrd_contract::ExportQuery {
+        query,
+        max_output_bytes: 524288,
+    };
+    let denied = first_client
+        .export_query(
+            &first_session,
+            request.clone(),
+            read_options("export-truncated").unwrap(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(denied, rrd_client::Error::Api { error, .. }
+        if error.code == rrd_contract::ErrorCode::ResourceExhausted));
+    let mut foreign = request;
+    foreign.query.scope = format!("instance:{}", second_client.instance_id());
+    assert!(second_client
+        .export_query(
+            &first_session,
+            foreign,
+            read_options("export-foreign-session").unwrap()
+        )
+        .await
+        .is_err());
+    first_stop.send(()).unwrap();
+    second_stop.send(()).unwrap();
+    first_server.await.unwrap().unwrap();
+    second_server.await.unwrap().unwrap();
+}
+
+#[tokio::test]
 async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen() {
     let temporary = tempfile::tempdir().unwrap();
     let project = temporary.path().join("project");

@@ -26,6 +26,108 @@ fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_rrflow")
 }
 
+async fn verify_parquet_export(
+    client: &RrdClient,
+    session: &rrd_client::Session,
+    expected: &QueryResult,
+) {
+    let request = rrd_contract::ExportQuery {
+        query: ExecuteQuery {
+            scope: format!("instance:{}", client.instance_id()),
+            query: expected.canonical_query.clone(),
+            parameters: BTreeMap::new(),
+            budget: QueryBudget {
+                max_storage_keys: 75_000,
+                max_rows: 768,
+                max_output_bytes: 393_216,
+                max_batch_rows: 192,
+                max_memory_bytes: 33_554_432,
+                max_spill_bytes: 67_108_864,
+                max_elapsed_ms: 20_000,
+            },
+        },
+        max_output_bytes: 393_216,
+    };
+    let export = client
+        .export_query(
+            session,
+            request.clone(),
+            RequestOptions::read("parquet-read", "parquet-export").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(export.source.canonical_query, expected.canonical_query);
+    assert_eq!(
+        export.source.read_manifest_sha256,
+        expected.read_manifest_sha256
+    );
+    assert_eq!(export.source.known_at_cursor, expected.known_at_cursor);
+    assert_eq!(export.source.schema_revision, expected.schema_revision);
+    assert_eq!(
+        export.source.plan.authorization_sha256,
+        expected.plan.authorization_sha256
+    );
+    let reader = parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
+        bytes::Bytes::from(export.decode_artifact().unwrap()),
+    )
+    .unwrap();
+    let metadata = reader
+        .metadata()
+        .file_metadata()
+        .key_value_metadata()
+        .unwrap();
+    let source = metadata
+        .iter()
+        .find(|entry| entry.key == "rrflow.export.source")
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<rrd_contract::QueryExportSource>(source.value.as_ref().unwrap())
+            .unwrap(),
+        export.source
+    );
+    let rows: Vec<_> = reader
+        .build()
+        .unwrap()
+        .flat_map(|batch| rrd_query::record_batch_to_rows(&batch.unwrap()).unwrap())
+        .collect();
+    assert_eq!(rows.len(), expected.rows.len());
+    for (row, expected) in rows.iter().zip(&expected.rows) {
+        assert_eq!(row.identity, expected.identity);
+        assert_eq!(
+            row.values.get("object").unwrap(),
+            &rrd_core::RuntimeValue::String(match &expected.values["object"] {
+                QueryValue::String(value) => value.clone(),
+                other => panic!("unexpected fixture object: {other:?}"),
+            })
+        );
+    }
+    let mut tiny = request.clone();
+    tiny.max_output_bytes = 12;
+    let denied = client
+        .export_query(
+            session,
+            tiny,
+            RequestOptions::read("parquet-small-read", "parquet-small-export").unwrap(),
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(denied, rrd_client::Error::Api { error, .. }
+        if error.code == ErrorCode::ResourceExhausted));
+    let mut foreign = request;
+    foreign.query.scope = "instance:another-project".into();
+    assert!(client
+        .export_query(
+            session,
+            foreign,
+            RequestOptions::read("parquet-foreign-read", "parquet-foreign-export").unwrap()
+        )
+        .await
+        .is_err());
+    let mut tampered = export;
+    tampered.artifact_sha256 = "0".repeat(64);
+    assert!(tampered.decode_artifact().is_err());
+}
+
 fn invoke(args: &[&str]) -> Output {
     Command::new(binary())
         .args(args)
@@ -282,6 +384,7 @@ fn assert_restarted_status(
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].identity, "claim:installed-walking-product:status");
         assert_eq!(result.rows[0].values.get("object"), Some(&QueryValue::String(expected.into())));
+        verify_parquet_export(&client, &session, &result).await;
         client
             .close_session(
                 &session,
@@ -765,6 +868,7 @@ max_elapsed_ms = 20000
                 query.rows[0].values.get("object"),
                 Some(&QueryValue::String("ui-queryable".into()))
             );
+            verify_parquet_export(&client, &session, &query).await;
 
             // A backup at runtime cursor 3, a later commit the backup does not
             // carry, and a staged restore of the backup for offline publication.

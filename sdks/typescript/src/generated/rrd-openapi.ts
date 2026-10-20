@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
+// OpenAPI SHA-256: 24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -283,6 +283,23 @@ export interface paths {
         put?: never;
         /** RRD query-execute */
         post: operations["query-execute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/query/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD query-export */
+        post: operations["query-export"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16890,6 +16907,467 @@ export interface operations {
                                 /** Format: uint64 */
                                 schema_revision: number;
                                 scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "query-export": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /** Format: uint64 */
+                        max_output_bytes: number;
+                        query: {
+                            /**
+                             * @default {
+                             *       "max_batch_rows": 256,
+                             *       "max_elapsed_ms": 30000,
+                             *       "max_memory_bytes": 67108864,
+                             *       "max_output_bytes": 524288,
+                             *       "max_rows": 10000,
+                             *       "max_spill_bytes": 268435456,
+                             *       "max_storage_keys": 100000
+                             *     }
+                             */
+                            budget?: {
+                                /** Format: uint64 */
+                                max_batch_rows: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 30000
+                                 */
+                                max_elapsed_ms?: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 67108864
+                                 */
+                                max_memory_bytes?: number;
+                                /** Format: uint64 */
+                                max_output_bytes: number;
+                                /** Format: uint64 */
+                                max_rows: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 268435456
+                                 */
+                                max_spill_bytes?: number;
+                                /** Format: uint64 */
+                                max_storage_keys: number;
+                            };
+                            parameters?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "null";
+                                } | {
+                                    /** @constant */
+                                    type: "bool";
+                                    value: boolean;
+                                } | {
+                                    /** @constant */
+                                    type: "integer";
+                                    /** Format: int64 */
+                                    value: number;
+                                } | {
+                                    /** @constant */
+                                    type: "unsigned";
+                                    /** Format: uint64 */
+                                    value: number;
+                                } | {
+                                    /** @constant */
+                                    type: "decimal";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "string";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "digest";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "list";
+                                    value: components["schemas"]["QueryValue"][];
+                                } | {
+                                    /** @constant */
+                                    type: "map";
+                                    value: {
+                                        [key: string]: components["schemas"]["QueryValue"];
+                                    };
+                                };
+                            };
+                            query: string;
+                            scope: string;
+                        };
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                artifact_base64: string;
+                                /** Format: uint64 */
+                                artifact_bytes: number;
+                                artifact_sha256: string;
+                                /** Format: uint64 */
+                                columns: number;
+                                /** Format: uint64 */
+                                elapsed_micros: number;
+                                /** Format: uint64 */
+                                input_bytes: number;
+                                media_type: string;
+                                /** Format: uint64 */
+                                observed_writer_bytes: number;
+                                profile: string;
+                                /** Format: uint64 */
+                                reserved_working_bytes: number;
+                                /** Format: uint64 */
+                                row_groups: number;
+                                source: {
+                                    canonical_query: string;
+                                    execution: {
+                                        analysis?: {
+                                            /** Format: uint64 */
+                                            elapsed_micros: number;
+                                            engine: string;
+                                            filter_pushdown: string;
+                                            /** Format: uint64 */
+                                            input_batches: number;
+                                            /** Format: uint64 */
+                                            input_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            input_rows: number;
+                                            limit_pushdown: string;
+                                            /** Format: uint64 */
+                                            output_batches: number;
+                                            /** Format: uint64 */
+                                            peak_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            physical_operators: number;
+                                            projection_pushdown: string;
+                                            /** Format: uint64 */
+                                            provider_scans: number;
+                                            /** Format: uint64 */
+                                            spill_count: number;
+                                            /** Format: uint64 */
+                                            spilled_bytes: number;
+                                            /** Format: uint64 */
+                                            spilled_rows: number;
+                                        } | null;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                        read_evidence: {
+                                            /** Format: uint16 */
+                                            contract_version: number;
+                                            /** Format: uint64 */
+                                            decoded_bytes: number;
+                                            /** Format: uint64 */
+                                            key_budget: number;
+                                            /** Format: uint64 */
+                                            keys_examined: number;
+                                            paths: {
+                                                /** Format: uint64 */
+                                                decoded_bytes: number;
+                                                /** Format: uint64 */
+                                                keys_examined: number;
+                                                /**
+                                                 * @description The semantic physical path charged during a normal state read.
+                                                 * @enum {string}
+                                                 */
+                                                path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                                /** Format: uint64 */
+                                                point_reads: number;
+                                                /** Format: uint64 */
+                                                range_scans: number;
+                                                /** Format: uint64 */
+                                                values_decoded: number;
+                                            }[];
+                                            /** Format: uint64 */
+                                            point_reads: number;
+                                            /** Format: uint64 */
+                                            range_scans: number;
+                                            stamp_validation: {
+                                                /**
+                                                 * Format: uint64
+                                                 * @description Authenticated log-head/schema changes needed only to prove a retained
+                                                 *     historical stamp. This is not the source of normal query rows.
+                                                 */
+                                                change_reads: number;
+                                                /**
+                                                 * @description The authentication strategy applied to the requested read stamp.
+                                                 * @enum {string}
+                                                 */
+                                                method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                                /** Format: uint16 */
+                                                proof_nodes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            values_decoded: number;
+                                        };
+                                        /** Format: uint64 */
+                                        returned_rows: number;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    };
+                                    /** Format: uint64 */
+                                    known_at_cursor: number;
+                                    plan: {
+                                        authorization_boundary: string;
+                                        authorization_sha256: string;
+                                        candidates: {
+                                            exact: boolean;
+                                            name: string;
+                                            reason: string;
+                                            selected: boolean;
+                                        }[];
+                                        deterministic_order: string;
+                                        exact: boolean;
+                                        plan_sha256: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Revision of the security authority compiled before query binding. Zero
+                                         *     denotes an explicitly unsecured loopback development engine.
+                                         */
+                                        security_policy_revision: number;
+                                    };
+                                    read_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision: number;
+                                    scope: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                artifact_base64: string;
+                                /** Format: uint64 */
+                                artifact_bytes: number;
+                                artifact_sha256: string;
+                                /** Format: uint64 */
+                                columns: number;
+                                /** Format: uint64 */
+                                elapsed_micros: number;
+                                /** Format: uint64 */
+                                input_bytes: number;
+                                media_type: string;
+                                /** Format: uint64 */
+                                observed_writer_bytes: number;
+                                profile: string;
+                                /** Format: uint64 */
+                                reserved_working_bytes: number;
+                                /** Format: uint64 */
+                                row_groups: number;
+                                source: {
+                                    canonical_query: string;
+                                    execution: {
+                                        analysis?: {
+                                            /** Format: uint64 */
+                                            elapsed_micros: number;
+                                            engine: string;
+                                            filter_pushdown: string;
+                                            /** Format: uint64 */
+                                            input_batches: number;
+                                            /** Format: uint64 */
+                                            input_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            input_rows: number;
+                                            limit_pushdown: string;
+                                            /** Format: uint64 */
+                                            output_batches: number;
+                                            /** Format: uint64 */
+                                            peak_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            physical_operators: number;
+                                            projection_pushdown: string;
+                                            /** Format: uint64 */
+                                            provider_scans: number;
+                                            /** Format: uint64 */
+                                            spill_count: number;
+                                            /** Format: uint64 */
+                                            spilled_bytes: number;
+                                            /** Format: uint64 */
+                                            spilled_rows: number;
+                                        } | null;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                        read_evidence: {
+                                            /** Format: uint16 */
+                                            contract_version: number;
+                                            /** Format: uint64 */
+                                            decoded_bytes: number;
+                                            /** Format: uint64 */
+                                            key_budget: number;
+                                            /** Format: uint64 */
+                                            keys_examined: number;
+                                            paths: {
+                                                /** Format: uint64 */
+                                                decoded_bytes: number;
+                                                /** Format: uint64 */
+                                                keys_examined: number;
+                                                /**
+                                                 * @description The semantic physical path charged during a normal state read.
+                                                 * @enum {string}
+                                                 */
+                                                path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                                /** Format: uint64 */
+                                                point_reads: number;
+                                                /** Format: uint64 */
+                                                range_scans: number;
+                                                /** Format: uint64 */
+                                                values_decoded: number;
+                                            }[];
+                                            /** Format: uint64 */
+                                            point_reads: number;
+                                            /** Format: uint64 */
+                                            range_scans: number;
+                                            stamp_validation: {
+                                                /**
+                                                 * Format: uint64
+                                                 * @description Authenticated log-head/schema changes needed only to prove a retained
+                                                 *     historical stamp. This is not the source of normal query rows.
+                                                 */
+                                                change_reads: number;
+                                                /**
+                                                 * @description The authentication strategy applied to the requested read stamp.
+                                                 * @enum {string}
+                                                 */
+                                                method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                                /** Format: uint16 */
+                                                proof_nodes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            values_decoded: number;
+                                        };
+                                        /** Format: uint64 */
+                                        returned_rows: number;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    };
+                                    /** Format: uint64 */
+                                    known_at_cursor: number;
+                                    plan: {
+                                        authorization_boundary: string;
+                                        authorization_sha256: string;
+                                        candidates: {
+                                            exact: boolean;
+                                            name: string;
+                                            reason: string;
+                                            selected: boolean;
+                                        }[];
+                                        deterministic_order: string;
+                                        exact: boolean;
+                                        plan_sha256: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Revision of the security authority compiled before query binding. Zero
+                                         *     denotes an explicitly unsecured loopback development engine.
+                                         */
+                                        security_policy_revision: number;
+                                    };
+                                    read_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision: number;
+                                    scope: string;
+                                };
                             };
                             /** @constant */
                             status: "ok";

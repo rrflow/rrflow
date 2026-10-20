@@ -117,6 +117,43 @@ impl RrdClient {
             .await
     }
 
+    pub async fn export_query(
+        &self,
+        session: &Session,
+        request: rrd_contract::ExportQuery,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::QueryExport> {
+        request.validate().map_err(contract)?;
+        let scope = request.query.scope.clone();
+        let limit = request.max_output_bytes;
+        let catalogue = rrd_contract::endpoint_catalogue();
+        let endpoint = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == "query-export")
+            .ok_or_else(|| Error::Contract("query export operation is unavailable".into()))?;
+        let method = match endpoint.method {
+            rrd_contract::HttpMethod::Get => Method::GET,
+            rrd_contract::HttpMethod::Post => Method::POST,
+            rrd_contract::HttpMethod::Delete => Method::DELETE,
+        };
+        let result: rrd_contract::QueryExport = self
+            .session_call(
+                method,
+                &endpoint.path,
+                session,
+                request,
+                options,
+                endpoint.mutation,
+            )
+            .await?;
+        result.decode_artifact().map_err(contract)?;
+        if result.source.scope != scope || result.artifact_bytes > limit {
+            return Err(Error::ResponseIdentityMismatch);
+        }
+        Ok(result)
+    }
+
     pub async fn begin_transaction(
         &self,
         session: &Session,

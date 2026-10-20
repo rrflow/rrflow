@@ -20,6 +20,7 @@ mod memory_context;
 mod memory_estate;
 mod model_manifest;
 mod platform;
+mod query_export;
 mod read;
 mod reasoning_tree;
 mod restore_publication;
@@ -141,6 +142,11 @@ pub use model_manifest::{
     ROUTER_MODEL_MANIFEST_CONTRACT_VERSION,
 };
 pub use platform::{PlatformTermDefinition, PlatformTermRole, PLATFORM_TERMS};
+pub use query_export::{
+    ExportQuery, QueryExport, QueryExportSource, MAX_PARQUET_EXPORT_BYTES,
+    MAX_PARQUET_EXPORT_COLUMNS, MAX_PARQUET_EXPORT_INPUT_BYTES, MAX_PARQUET_EXPORT_ROWS,
+    MAX_PARQUET_ROW_GROUP_ROWS, PARQUET_EXPORT_PROFILE,
+};
 pub use read::{
     ReadAccessPath, ReadEvidence, ReadPathEvidence, ReadStampValidationEvidence,
     ReadStampValidationMethod, READ_EVIDENCE_CONTRACT_VERSION,
@@ -208,7 +214,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69";
+    "24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3627,6 +3633,16 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "DataSchemaSnapshot",
         ),
         endpoint(
+            "query-export",
+            HttpMethod::Post,
+            "/v1/query/export",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::QueryExecute,
+            "ExportQuery",
+            "QueryExport",
+        ),
+        endpoint(
             "query-execute",
             HttpMethod::Post,
             "/v1/query",
@@ -4171,6 +4187,7 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "CreateInstanceBackup" => schema_json::<RequestEnvelope<CreateInstanceBackup>>(),
         "CreateSession" => schema_json::<RequestEnvelope<CreateSession>>(),
         "ExecuteQuery" => schema_json::<RequestEnvelope<ExecuteQuery>>(),
+        "ExportQuery" => schema_json::<RequestEnvelope<ExportQuery>>(),
         "ExportAudit" => schema_json::<RequestEnvelope<ExportAudit>>(),
         "EnsureQueryIndex" => schema_json::<RequestEnvelope<EnsureQueryIndex>>(),
         "EnsureVectorCollection" => schema_json::<RequestEnvelope<EnsureVectorCollection>>(),
@@ -4234,6 +4251,7 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "OpenApiDocument" => schema_json::<ResponseEnvelope<serde_json::Value>>(),
         "OpenSubscriptionResult" => schema_json::<ResponseEnvelope<OpenSubscriptionResult>>(),
         "QueryResult" => schema_json::<ResponseEnvelope<QueryResult>>(),
+        "QueryExport" => schema_json::<ResponseEnvelope<QueryExport>>(),
         "EnsureQueryIndexResult" => schema_json::<ResponseEnvelope<EnsureQueryIndexResult>>(),
         "EnsureVectorCollectionResult" => {
             schema_json::<ResponseEnvelope<EnsureVectorCollectionResult>>()

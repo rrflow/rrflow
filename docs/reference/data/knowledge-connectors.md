@@ -123,9 +123,10 @@ source instructions into permissions.
 ## Parquet and external knowledge services
 
 Apache Parquet is a columnar interchange/analytical artifact format, not
-rrflowKV's WAL or transactional store. The inspected `rrd-query` manifest pins
-DataFusion 55 with default features disabled; Arrow/DataFusion presence alone
-does not establish a Parquet import/export capability.
+rrflowKV's WAL or transactional store. `rrd-query` pins DataFusion 55 and the
+matching Arrow/Parquet 59.2.0 family. The bundled query-result export below is
+the first implemented exchange profile; arbitrary-file import and streaming
+exchange remain open.
 
 A governed adapter must pin its reader/writer and supported logical types,
 encodings and compression; map schemas explicitly; bind authorized immutable
@@ -136,6 +137,59 @@ corruption and unsupported types fail explicitly. Imports pass through
 canonical mutation validation; exports bind a read stamp and publish only
 after the complete artifact/manifest verifies. Interrupted work remains
 unpublished. A Parquet file is not a native restore image. [Apache Parquet overview](https://parquet.apache.org/docs/overview/).
+
+### Bundled query export
+
+`query-export` (`POST /v1/query/export`) accepts the usual request envelope
+with an `ExportQuery` payload: `query` is an ordinary `ExecuteQuery`, and
+`max_output_bytes` is the artifact limit. Session authentication and
+`QueryExecute` authorization are mandatory. `RrdEngine` runs the existing
+query pipeline once, including tenant/row/field policy, before encoding its
+result. The generated catalogue and SDK operations expose this capability to
+AI clients. Connectome's dedicated export control is not yet implemented.
+
+The `rrflow-parquet-1` profile has these bounds:
+
+| Property | Admitted profile |
+|---|---|
+| Rows | At most 1,024; truncated query execution is rejected |
+| Columns | At most 64 returned fields plus `__rrd_identity`; that name is reserved |
+| Serialized source | At most 256 KiB, including source metadata |
+| Artifact | At most 512 KiB and within the request/query/installed output ceiling |
+| Row groups | At most 64 rows each, explicitly flushed |
+| Encoding | Uncompressed; dictionary and statistics disabled |
+| Time | Query and encoding share the query elapsed budget |
+| Memory | Conservative admission reservation plus sampled Arrow/writer buffers; no global allocator or streaming qualification |
+
+Existing Arrow field metadata preserves null, boolean, signed/unsigned integer,
+decimal, string, digest, list, map and mixed runtime values. Empty results have
+only the identity column: this is a returned-value schema, not an export of
+the project's schema registry. Source metadata includes canonical query,
+instance scope, read manifest, known cursor, schema revision, query plan,
+authorization identity and read evidence. Complete bytes are base64 encoded
+in the response with a SHA-256 digest. Consumers verify the digest before
+decoding. Equivalent exports need not have identical physical bytes.
+
+The codec never accepts a filesystem destination, remote URL or executable.
+It returns no artifact on encoding or budget failure. Metadata describes the
+authorized result and is not a credential or a grant to another engine.
+Sharing the artifact remains a separate explicitly authorized client action.
+
+Apache Parquet is a locked Rust build dependency, not a separately running
+daemon or a Git submodule. It ships inside `rrflow`; installation and export
+fetch no codec. To update it, review the Arrow/DataFusion/Parquet compatibility
+set, change the exact pins and lockfile together, rerun typed round-trip,
+resource-denial, authorization and installed restart tests, and pass candidate
+CI before distributing a rebuilt bundle. Native hot-swapping is not supported.
+Apache documents the writer's row-group buffering and memory estimates.
+[Apache ArrowWriter](https://arrow.apache.org/rust/parquet/arrow/arrow_writer/struct.ArrowWriter.html).
+
+The [bounded export journal](../../evidence/change-journals/gate-d/d-06-bundled-parquet-export.md)
+records implementation and validation. Full import/export qualification
+retains Gate D's malformed-input, decompression, source-binding and Gate F
+streaming requirements.
+
+### External knowledge services
 
 HydraDB, Pinecone Nexus and Qdrant each require a separately implemented and
 qualified optional adapter; none is qualified by this document.

@@ -1067,6 +1067,62 @@ fn compiled_role_policy_injects_tenant_rows_and_fields_before_query_planning() {
     assert!(result
         .canonical_query
         .contains("classification = \"public\""));
+    let export_request = rrd_contract::ExportQuery {
+        query: query.clone(),
+        max_output_bytes: 524288,
+    };
+    let export = engine
+        .export_query_scoped(
+            &lease.session_id,
+            &lease.token,
+            &export_request,
+            &resource,
+            30,
+            "request-tenant-export",
+            "operation-tenant-export",
+        )
+        .unwrap();
+    assert_eq!(export.source.execution.returned_rows, 1);
+    assert_eq!(export.columns, 3); // identity plus the two authorized fields
+    assert_eq!(export.source.plan, result.plan);
+    let bytes = export.decode_artifact().unwrap();
+    for forbidden in [
+        "alpha-secret",
+        "private-secret",
+        "beta-secret",
+        "beta-public",
+        "alpha-private",
+    ] {
+        assert!(!bytes
+            .windows(forbidden.len())
+            .any(|window| window == forbidden.as_bytes()));
+    }
+    assert!(matches!(
+        engine.export_query_scoped(
+            &lease.session_id,
+            &id("incorrect-token"),
+            &export_request,
+            &resource,
+            30,
+            "request-denied-export",
+            "operation-denied-export",
+        ),
+        Err(ServiceError::Unauthenticated)
+    ));
+    let mut secret_export = export_request.clone();
+    secret_export.query.query = "FROM record:document AT VALID 20 KNOWN HEAD PROJECT secret".into();
+    assert!(matches!(
+        engine.export_query_scoped(
+            &lease.session_id,
+            &lease.token,
+            &secret_export,
+            &resource,
+            30,
+            "request-secret-export",
+            "operation-secret-export",
+        ),
+        Err(ServiceError::PermissionDenied)
+    ));
     let denied = engine.execute_query(
         &lease.session_id,
         &lease.token,
