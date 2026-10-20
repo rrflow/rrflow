@@ -114,6 +114,13 @@ Delivery is currently checked on a bounded polling cadence rather than
 awakened directly by each commit. One socket can carry multiple independently
 fenced subscriptions and continues to process ACK, heartbeat, unsubscribe,
 and cancellation traffic while any stream is backpressured.
+The socket handles inbound frames and delivery polls in one ordered loop, so
+a delivery sent on a poll before the server reads an `unsubscribe` can reach
+the client ahead of `unsubscribed`. That delivery continues the acknowledged
+stream and stays within the subscription's `max_in_flight`. The server removes
+the subscription before it answers, so no delivery for it follows
+`unsubscribed`; a client waiting for `unsubscribed` must accept those earlier
+deliveries rather than treat them as a protocol error.
 `changes/follow` and live-query polling also remain callable as separate
 bounded HTTP surfaces; H-03 owns their convergence with commit-impact
 delivery.
