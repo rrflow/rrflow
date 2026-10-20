@@ -36,6 +36,11 @@ request or ref. The reusable workflow reduces every partition into one stable
 
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
+Those jobs omit dev/test debug symbols and log executable size; executable
+identity still binds the actual tested bytes. Startup retains a 60-second
+bound. The backup/restore lifecycle client uses an explicit 60-second request
+timeout; this does not qualify the default short-request timeout for heavy
+physical verification or generic uncertain-outcome recovery.
 Fresh and existing projects cover no-write deterministic plan, exact apply,
 authenticated discovery, commit/query, backup, termination, restarted query,
 offline verification, and restore publication/readback. Unix checks graceful

@@ -17,6 +17,7 @@ pub enum ServiceError {
     TransactionQuota,
     RenewalQuota,
     IdempotencyConflict,
+    InvocationInProgress,
     CommitInProgress,
     WrongScope,
     OperationDigestMismatch,
@@ -88,7 +89,7 @@ impl ServiceError {
             | Self::TaskNotFound => ServiceErrorKind::NotFound,
             Self::Unauthenticated => ServiceErrorKind::Unauthenticated,
             Self::PermissionDenied => ServiceErrorKind::PermissionDenied,
-            Self::IdempotencyConflict => ServiceErrorKind::Conflict,
+            Self::IdempotencyConflict | Self::InvocationInProgress => ServiceErrorKind::Conflict,
             Self::SessionExpired
             | Self::TransactionExpired
             | Self::TransactionClosed
@@ -114,7 +115,7 @@ impl ServiceError {
     }
 
     pub fn retryable(&self) -> bool {
-        matches!(self, Self::StorageConflict(_))
+        matches!(self, Self::StorageConflict(_) | Self::InvocationInProgress)
     }
 }
 

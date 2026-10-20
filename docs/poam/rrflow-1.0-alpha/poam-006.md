@@ -63,3 +63,13 @@ denials, live-writer exclusion and credential-redaction assertions.
 Platform CI now runs that corpus explicitly. Windows owned-process
 termination is not graceful shutdown qualification; signed offline bundles,
 hostile-path/ACL proof and the broader D-01/C-07 matrix remain open.
+
+The first native candidate exposed an overlapping-invocation defect: rejected
+admission replaced the active thread owner, and completion identified work only
+by caller coordinates. A stale completion could therefore clear newer work.
+The [invocation correction receipt](../../evidence/change-journals/gate-d/d-01-native-invocation-correction.md)
+records deterministic failures and their replacement evidence. Admission now
+preserves the occupied reservation, reports a retryable in-progress conflict
+with a completed audit, and binds completion to a private per-admission token.
+This does not close durable reasoning, generic uncertain-outcome recovery,
+or the wider installed-product qualification item.

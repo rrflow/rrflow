@@ -1,4 +1,5 @@
 use super::*;
+use crate::ServiceErrorKind;
 use rrd_contract::{
     AssembleContext, DataLogicalModel, DataPropertySchema, DataRecordSchema, DataReference,
     DataSchemaMode, DataSchemaRegistry, DataTableSchema, DataValueType, ExecuteQuery, QueryBudget,
@@ -9,6 +10,127 @@ use rrd_security::{
     DataPolicy, IdentityBinding, JwtIssueRequest, JwtIssuer, PolicyPredicate, Role,
 };
 use std::collections::{BTreeMap, BTreeSet};
+
+fn overlapping_backup_invocation(now: u64, attempt: u64) -> Invocation {
+    Invocation {
+        context: mutation_context(
+            &id("overlap-backup-key"),
+            "overlap-backup-request",
+            "overlap-backup-operation",
+        ),
+        resource: ResourcePath {
+            segments: vec![ResourceId::new(ResourceKind::Instance, instance().as_str()).unwrap()],
+        },
+        observed_at_unix_ms: now,
+        attempt,
+        request_sha256: digest::sha256_hex(b"same-backup-request"),
+    }
+}
+
+fn successful_invocation_completion() -> InvocationCompletion {
+    InvocationCompletion {
+        decision: AuditDecision::Allowed,
+        status_code: 200,
+        response_sha256: digest::sha256_hex(b"same-backup-result"),
+    }
+}
+
+#[test]
+fn overlapping_invocation_rejection_preserves_original_owner() {
+    let (_root, persistent) = isolated_engine();
+    for engine in [persistent, RrdEngine::rrflow_mx(instance(), TOKEN_KEY)] {
+        let first = engine
+            .begin_invocation(
+                overlapping_backup_invocation(1_000, 1),
+                RrdOperation::BackupCreate,
+                InvocationCredential::Anonymous,
+            )
+            .unwrap();
+        let (error, owns_unrelated_call) = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let error = engine
+                        .begin_invocation(
+                            overlapping_backup_invocation(1_100, 2),
+                            RrdOperation::BackupCreate,
+                            InvocationCredential::Anonymous,
+                        )
+                        .unwrap_err();
+                    (
+                        error,
+                        engine.has_active_invocation("unrelated-request", "unrelated-operation"),
+                    )
+                })
+                .join()
+                .unwrap()
+        });
+        assert!(
+            !owns_unrelated_call,
+            "rejected caller stole the active thread reservation"
+        );
+        assert!(engine.has_active_invocation("unrelated-request", "unrelated-operation"));
+        assert_eq!(error.kind(), ServiceErrorKind::Conflict);
+        assert!(
+            error.retryable(),
+            "in-flight work is not a permanent payload conflict"
+        );
+        let audit = SecurityRepository::new(&engine.storage, instance())
+            .audit_since(0, 16)
+            .unwrap();
+        assert_eq!(
+            audit
+                .records
+                .iter()
+                .filter(|(_, record)| {
+                    record.action == SecurityAction::BackupCreate
+                        && record.phase == AuditPhase::Completed
+                        && record.decision == AuditDecision::Failed
+                        && record.status_code == 409
+                })
+                .count(),
+            1,
+            "the overlapping request must have its own completed denial"
+        );
+        engine
+            .complete_invocation(&first, successful_invocation_completion())
+            .unwrap();
+        assert!(!engine.has_active_invocation("overlap-backup-request", "overlap-backup-operation"));
+    }
+}
+
+#[test]
+fn overlapping_invocation_stale_completion_cannot_remove_a_later_attempt() {
+    let (_root, persistent) = isolated_engine();
+    for engine in [persistent, RrdEngine::rrflow_mx(instance(), TOKEN_KEY)] {
+        let first = engine
+            .begin_invocation(
+                overlapping_backup_invocation(1_000, 1),
+                RrdOperation::BackupCreate,
+                InvocationCredential::Anonymous,
+            )
+            .unwrap();
+        engine
+            .complete_invocation(&first, successful_invocation_completion())
+            .unwrap();
+        let second = engine
+            .begin_invocation(
+                // Even identical caller metadata must receive a new reservation.
+                overlapping_backup_invocation(1_000, 1),
+                RrdOperation::BackupCreate,
+                InvocationCredential::Anonymous,
+            )
+            .unwrap();
+        assert!(matches!(
+            engine.complete_invocation(&first, successful_invocation_completion()),
+            Err(ServiceError::IdempotencyConflict)
+        ));
+        assert!(engine.has_active_invocation("overlap-backup-request", "overlap-backup-operation"));
+        engine
+            .complete_invocation(&second, successful_invocation_completion())
+            .unwrap();
+        assert!(!engine.has_active_invocation("overlap-backup-request", "overlap-backup-operation"));
+    }
+}
 
 #[test]
 fn embedded_engine_cannot_bypass_policy_grants() {

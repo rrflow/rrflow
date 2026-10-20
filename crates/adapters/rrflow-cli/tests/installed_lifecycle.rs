@@ -353,6 +353,10 @@ fn fresh_installed_engine_survives_restart_and_restore() {
 }
 
 fn installed_lifecycle(mode: &str) {
+    eprintln!(
+        "native {mode} lifecycle executable bytes={}",
+        std::fs::metadata(binary()).unwrap().len()
+    );
     let root = tempfile::tempdir().unwrap();
     let project = root.path().join("project");
     std::fs::create_dir(&project).unwrap();
@@ -563,7 +567,13 @@ max_elapsed_ms = 20000
     let client = RrdClient::connect_local(
         address.parse().unwrap(),
         locator.identity.instance_id,
-        ClientConfig::default(),
+        // Backup/restore include authenticated physical verification. Their
+        // explicit budget is separate from the default short-request timeout;
+        // overlapping attempts are covered by deterministic engine tests.
+        ClientConfig {
+            request_timeout: Duration::from_secs(60),
+            ..ClientConfig::default()
+        },
     )
     .unwrap();
     let backup_sha256 = tokio::runtime::Builder::new_current_thread()
