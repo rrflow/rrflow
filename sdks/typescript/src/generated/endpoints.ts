@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
+// OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -46,6 +46,12 @@ export const endpoints = {
   "context-assemble": {
     "method": "POST",
     "path": "/v1/context/assemble",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "data-schema-read": {
+    "method": "POST",
+    "path": "/v1/data/schema",
     "authentication": "session_bearer",
     "mutation": false
   },
@@ -162,6 +168,30 @@ export const endpoints = {
     "path": "/v1/subscriptions/open",
     "authentication": "session_bearer",
     "mutation": true
+  },
+  "task-open": {
+    "method": "POST",
+    "path": "/v1/tasks",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-close": {
+    "method": "POST",
+    "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-list": {
+    "method": "POST",
+    "path": "/v1/tasks/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-read": {
+    "method": "POST",
+    "path": "/v1/tasks/read",
+    "authentication": "session_bearer",
+    "mutation": false
   },
   "transaction-begin": {
     "method": "POST",

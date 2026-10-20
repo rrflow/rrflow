@@ -30,7 +30,7 @@ checkout-only constructor.
 | 7 | F-01 through F-05 | rrflowKV streams bounded Arrow batches into native/DataFusion operators with honest pushdown, one resource budget, and a measured cache decision. |
 | 8 | D-05 through D-11, then KB-06 and KB-07 | Every attunement phase uses accepted C/E/F paths; external sources remain adapters; placement/accounting/hibernation and complete verify/repair/restore/uninstall pass; the checkout knowledge package imports and survives readback/recovery. |
 | 9 | G-01 through G-06 | LFG can propose bounded routing decisions while `RrdEngine` retains predicates, physical planning, authorization, CAS, and persistence. |
-| 10 | H-01 through H-07 | Dynamic context, pure RRF feedback, live deltas, all public surfaces, complete traces, Connectome, and mesh resolution observe one engine. |
+| 10 | H-01 through H-10 | Dynamic context, pure RRF feedback, live deltas, all public surfaces, complete traces, Connectome, mesh resolution, the PostgreSQL core profile, configurable prompt graph families, and opt-in project links observe one engine. H-08a reference preparation may precede this wave; H-08b through H-08h follow their explicit prerequisite DAG. |
 | 11 | I-01 through I-07 | Canonical events, triggers, routines, skills, and optional host adapters are explicit persisted capabilities, not hooks or a parallel runtime. |
 | 12 | J-01 through J-03, then KB-08, then J-04 and J-05 | Alternate paths are absent; failure and clean-install qualification pass on every supported native artifact; rrflowDB becomes the normal warp path; comparative evidence and the signed distribution close release. |
 
@@ -39,6 +39,15 @@ vocabulary. Each later work package adds the trace and physical counters for
 its behavior in the same change. H-05 proves complete cross-surface
 correlation, export, and redaction; it does not postpone instrumentation until
 Wave 8.
+
+The owner-directed [rrflowDB compatibility plan](../../reference/protocol/postgresql.md)
+adds H-08 without reopening accepted storage-format work or bypassing unfinished
+native gates. H-08a can establish reference fixtures now. H-08b/H-08c extend
+native types and transactions only after D-01 and C-04/C-07 evidence; their
+accepted work may then precede the remaining H packages. H-08d additionally
+requires E/F access and streaming/budget evidence; H-08e requires the H-04
+public-capability foundation. The [H-08 package table](gate-h.md#h-08-postgresql-compatibility-packages)
+owns the remaining dependencies. A wire-only server cannot skip those exits.
 
 The active executable item is **D-01**. Accepted C-06 replaced
 row-record immutable segments with segment v6's ordered key/version spine,

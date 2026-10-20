@@ -111,8 +111,12 @@ Retained runtime changes can still construct the explicit test, diagnostic, and
 structural-differential oracle. Accepted C-03 atomically maintains direct
 versions and both adjacency directions, while accepted C-04 serves normal
 current and temporal selection from authenticated semantic-version keys rather
-than rebuilding the log. Gate E-01 must prove bounded native traversal against
-the retained oracle. A structural differential is neither a committed mutation
+than rebuilding the log. rrflowQL traversal now selects the native adjacency
+reader: it reads each start identity, then per breadth-first level the
+frontier's temporal adjacency ranges and the identity history of every relation
+they name, and matches an independent full-replay oracle. Context graph
+expansion and memory-estate seat planning still materialize a scope snapshot and
+remain Gate E-01 work. A structural differential is neither a committed mutation
 nor a live query result until its owning `RrdEngine` operation validates and
 commits the corresponding proposal.
 
@@ -498,9 +502,13 @@ One launch runs inside one authenticated read stamp:
    event carries the five plan-stage decisions and the plan/packet digests,
    not a second copy of the packet items.
 5. Commit one cursor-CAS runtime commit: the strict table schema on first
-   use, one `rrflow-prompt-flight` lifecycle record, and its
-   `rrflow-prompt-flight-event` lifecycle events. A lost cursor race retries
-   at most three times, then reports a retryable conflict.
+   use (the edge table's target kinds grow with each record kind a flight
+   uses), one `rrflow-prompt-flight` lifecycle record, one
+   `rrflow-prompt-flight-used` edge per context item that is a canonical
+   record (rank, fused score, and contributing avenues; claims are not graph
+   nodes), and its `rrflow-prompt-flight-event` lifecycle events. A lost
+   cursor race retries at most three times, then reports a retryable
+   conflict.
 
 The `observe` provider prepares the packet inside the engine and launches
 nothing, so the flight completes as `prepared`. Model-provider arms are
@@ -508,11 +516,55 @@ explicit opt-in adapters; each enters the closed provider, stage, and status
 vocabularies only together with its governed adapter, budget, and audit
 evidence.
 
-List and read are stamped direct reads of the flight record kind and, for a
-read, the flight event kind; neither replays the runtime log. Flight rows and
-events are ordinary temporal data, visible to data snapshots, changefeeds,
-and the diagnostic graph lens. A flight records only externally observable
+A read names the flight's record by identity, then, at the same stamp, each
+edge by its deterministic identity (`<flight-id>.<rank>`) and each event by
+its log cursor, so it costs the flight's own size and never the estate's.
+The list is a stamped read of the flight record kind and still grows with the
+number of flights until a cursor-ordered access path exists (Gate E). Neither
+replays the runtime log. Flight rows, edges, and events are ordinary temporal
+data, visible to data snapshots, changefeeds, and the diagnostic graph lens,
+and rrflowQL walks them in both directions:
+`FROM traverse:rrflow-prompt-flight-used START rrflow-prompt-flight:<id>
+DIRECTION OUTGOING DEPTH 1 …` returns the records a prompt used, and
+`… START <kind>:<id> DIRECTION INCOMING …` returns every prompt that used a
+record. A flight records only externally observable
 runtime events and never hidden chain-of-thought.
+
+## Task flow
+
+A task is a named, durable record of one unit of intended work: a title, a
+goal, and a status that prompt flights join. `rrd-contract` owns `OpenTask`,
+`CloseTask`, `TaskRecord`, and the list/read types; `RrdEngine::open_task`,
+`close_task`, `list_tasks`, and `read_task` own the implementation behind
+`task-open` and `task-close` (`POST /v1/tasks` and `/v1/tasks/close`,
+`task_write` grant, mutating) and `task-list`/`task-read`
+(`POST /v1/tasks/list` and `/v1/tasks/read`, `task_read` grant). A task
+orchestrates nothing; it is not a routine.
+
+1. `task-open` derives the task identity from instance, session, and
+   idempotency key. A stamped identity read returns an existing task as an
+   exact replay; the same key with a different operation digest conflicts.
+   One cursor-CAS commit installs the strict `rrflow-task` table on first use
+   and writes the task's single open version.
+2. `task-close` writes the second and final version, `completed` or
+   `abandoned`, with its close time and optional outcome. Closing again with
+   the same status and outcome replays; any other close of a closed task fails
+   as a failed precondition.
+3. A flight launched with `task_id` checks, at its own stamp, that the task
+   exists and is open, then writes one `rrflow-task-includes` edge from the
+   task to the flight in the flight's own commit, after its events. The edge
+   identity is the flight identity, so a flight joins at most one task; the
+   edge table declares no pair or degree constraint
+   ([POAM-034](../poam/rrflow-1.0-alpha/poam-034.md)).
+
+A task read names the row by identity and costs its one or two versions. Its
+flights are graph neighbours rather than a second list:
+`FROM traverse:rrflow-task-includes START rrflow-task:<id> DIRECTION OUTGOING
+DEPTH 1 …` returns them, and each flight's `rrflow-prompt-flight-used` edges
+return the records it used. The task list is a stamped read of the task
+record kind and grows with the number of tasks until a cursor-ordered access
+path exists (Gate E); traversal reconstructs the graph from relations until
+E-01.
 
 ## Trace and observability flow
 
@@ -1376,7 +1428,7 @@ compile cannot substitute for this proof.
 | DataFusion | Real bounded execution over the materialized Arrow snapshot; it does not yet consume the C-06g storage stream. | Push projection/predicate/limit through the provider into rrflowKV and compose native graph/BM25/vector operators at one stamp. |
 | Project discovery and attunement | B-01 freezes the provider-neutral eleven-phase plan/job/checkpoint contract, but no engine-persisted executor, project-tree snapshot, inventory phase implementation, or parse phase exists. | D-01 through D-05 must prove preview/apply, a deterministic committed tree snapshot and change set, pure phase proposals, restartable checkpoints, and downstream work pinned to exact source/policy/tool revisions. |
 | Embedding and vectors | Deterministic local embedding, model/provenance binding, exact search, filtered planning, compact dense artifacts, HNSW, quantization, and accelerator differential checks exist. Canonical vector heads retain their source commit coordinate and commit temporal versions plus collection/name/field pointer deltas atomically; that address is required across the public mutation, kernel, inference, commit digest, source keys, and every derived artifact, and no accelerator is built in the write path. Generic publication is exact/compact/HNSW-only; scalar/product/binary/TurboQuant artifacts use one explicit lifecycle and join the same planner only after activation. | D-05/E-04/E-05/F-03 must consume committed deltas incrementally, bind every derived artifact to its source cursor, and preserve exact fallback/reranking inside the stamped native/Arrow plan. |
-| Graph, scalar, and BM25 | Current and temporal bidirectional adjacency keys commit with relation changes. Schema-bound scalar/unique entries and exact BM25 old/new source fields commit with record changes and survive rrflowKV reopen. Normal state selection now uses C-04's authenticated direct versions, but graph assembly still materializes selected state and no native adjacency/scalar reader or incremental term dictionary/posting materializer is planner-selected. | E-01 through E-03 must expose bounded stamped access, prove graph/scalar/BM25 results against exact oracles, and make stale/corrupt projections fall back or fail exactly as declared. |
+| Graph, scalar, and BM25 | Current and temporal bidirectional adjacency keys commit with relation changes. Schema-bound scalar/unique entries and exact BM25 old/new source fields commit with record changes and survive rrflowKV reopen. Normal state selection now uses C-04's authenticated direct versions. rrflowQL traversal selects the native temporal adjacency reader, but context graph expansion still materializes selected state and no native scalar reader or incremental term dictionary/posting materializer is planner-selected. | E-01 through E-03 must expose bounded stamped access, prove graph/scalar/BM25 results against exact oracles, and make stale/corrupt projections fall back or fail exactly as declared. |
 | Reasoning and context | Generic reasoning-tree, router, context-plan, evidence, and bounded context contracts exist; current assembly uses snapshot BM25, exact vectors, graph BFS, and RRF. | G/H must persist CAS tree execution and dynamically select native or analytical paths without adding another model, planner, or context authority. |
 | Automation, skills, and MCP | The canonical `engine/function/` boundary now has a closed content-addressed artifact/schema/definition/binding/receipt contract; typed rrflowMX/rrflowKV catalogue records with immutable membership and one CAS head; frozen JavaScript and Wasm runtime-build identities; transaction-prepared receipts; atomic accepted receipt/derived-event publication; historical lineage enforcement; physically satisfiable catalogue maxima; full semantic WAL-boundary evidence; and lost-acknowledgement recovery without guest re-execution. The former monolithic control record, inline definition bytes, direct function storage path, and recovery re-execution are removed without an alias. MCP still exposes only one context tool. No canonical engine event, post-commit trigger, durable routine, skill package, project-command candidate/binding, external activity operation, install path, cross-language fixture, or outward function operation exists. | H must complete stamped identity/authorization/evidence and outward conformance; D/I must add offline installation, retirement, engine events, triggers, routines, skills, and prepared external activities without creating another authority. |
 | Edge and outward delivery | The separate `rrflow-edge` adapter has deterministic offline/provenance evidence; HTTP, SDK, MCP, CLI, and subscriptions have partial real-process coverage. | H/J must route every surface through the same public operations and prove correlated identity, authorization, stamp, result, restart, and distribution behavior. |

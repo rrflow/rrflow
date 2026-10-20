@@ -55,6 +55,7 @@ http_dispatch_catalogue! {
     ChangefeedFollow => ("changefeed-follow", RrdOperation::ChangefeedFollow),
     ChangefeedRead => ("changefeed-read", RrdOperation::ChangefeedRead),
     ContextAssemble => ("context-assemble", RrdOperation::MemoryContextRead),
+    DataSchemaRead => ("data-schema-read", RrdOperation::DiagnosticsRead),
     DiagnosticsRead => ("diagnostics-read", RrdOperation::DiagnosticsRead),
     FlightLaunch => ("flight-launch", RrdOperation::FlightLaunch),
     FlightList => ("flight-list", RrdOperation::FlightRead),
@@ -74,6 +75,10 @@ http_dispatch_catalogue! {
     SessionRenew => ("session-renew", RrdOperation::SessionRenew),
     SubscriptionClose => ("subscription-close", RrdOperation::SubscriptionClose),
     SubscriptionOpen => ("subscription-open", RrdOperation::SubscriptionOpen),
+    TaskClose => ("task-close", RrdOperation::TaskWrite),
+    TaskList => ("task-list", RrdOperation::TaskRead),
+    TaskOpen => ("task-open", RrdOperation::TaskWrite),
+    TaskRead => ("task-read", RrdOperation::TaskRead),
     TransactionAbort => ("transaction-abort", RrdOperation::TransactionAbort),
     TransactionBegin => ("transaction-begin", RrdOperation::TransactionBegin),
     TransactionCommit => ("transaction-commit", RrdOperation::TransactionCommit),
@@ -205,6 +210,7 @@ impl AppState {
             Some(HttpDispatch::SessionClose) => self.close_session(&headers, &body, &path, now),
             Some(HttpDispatch::TransactionBegin) => self.begin_transaction(&headers, &body, now),
             Some(HttpDispatch::QueryExecute) => self.execute_query(&headers, &body, now),
+            Some(HttpDispatch::DataSchemaRead) => self.read_data_schema(&headers, &body, now),
             Some(HttpDispatch::QueryIndexEnsure) => self.ensure_query_index(&headers, &body, now),
             Some(HttpDispatch::QueryIndexList) => self.list_query_indexes(&headers, &body, now),
             Some(HttpDispatch::QueryLivePoll) => self.poll_live_query(&headers, &body, now),
@@ -224,6 +230,10 @@ impl AppState {
             Some(HttpDispatch::FlightLaunch) => self.launch_prompt_flight(&headers, &body, now),
             Some(HttpDispatch::FlightList) => self.list_prompt_flights(&headers, &body, now),
             Some(HttpDispatch::FlightRead) => self.read_prompt_flight(&headers, &body, now),
+            Some(HttpDispatch::TaskOpen) => self.open_task(&headers, &body, now),
+            Some(HttpDispatch::TaskClose) => self.close_task(&headers, &body, now),
+            Some(HttpDispatch::TaskList) => self.list_tasks(&headers, &body, now),
+            Some(HttpDispatch::TaskRead) => self.read_task(&headers, &body, now),
             Some(HttpDispatch::VectorCollectionEnsure) => {
                 self.ensure_vector_collection(&headers, &body, now)
             }

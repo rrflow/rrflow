@@ -7,17 +7,17 @@ use rrd_client::{
 };
 use rrd_contract::{
     transaction_operation_sha256, AbortTransaction, AssembleContext, BeginTransaction, CanonicalId,
-    CloseSubscription, CommitTransaction, ContextEvidenceKind, CreateSession,
+    CloseSubscription, CloseTask, CommitTransaction, ContextEvidenceKind, CreateSession,
     DeploymentConformanceCorpus, DeploymentForm, EndpointPresentation, ErrorCode, ExecuteQuery,
     ExportAudit, InstallationManagedPathKind, InstallationTargetKind, LaunchPromptFlight,
-    ListPromptFlights, OpenSubscription, PreviewTransaction, PromptFlightContextMode,
-    PromptFlightContextRequest, PromptFlightProvider, PromptFlightStage, QueryBudget,
-    ReadAccessPath, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot, ReadPromptFlight,
-    RequestContext, RequestEnvelope, ResourceId, ResourceKind, ResourcePath, SessionLimits,
-    StorageProfileKind, SubscriptionAcknowledgement, SubscriptionDelivery, SubscriptionResume,
-    SubscriptionStream, TransactionMutation, WebSocketCancel, WebSocketCancellationDisposition,
-    WebSocketErrorTarget, WebSocketFrame, WebSocketPayload, WebSocketRequest, PROTOCOL,
-    PROTOCOL_VERSION,
+    ListPromptFlights, ListTasks, OpenSubscription, OpenTask, PreviewTransaction,
+    PromptFlightContextMode, PromptFlightContextRequest, PromptFlightProvider, PromptFlightStage,
+    QueryBudget, ReadAccessPath, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot,
+    ReadPromptFlight, ReadTask, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
+    ResourcePath, SessionLimits, StorageProfileKind, SubscriptionAcknowledgement,
+    SubscriptionDelivery, SubscriptionResume, SubscriptionStream, TaskStatus, TransactionMutation,
+    WebSocketCancel, WebSocketCancellationDisposition, WebSocketErrorTarget, WebSocketFrame,
+    WebSocketPayload, WebSocketRequest, PROTOCOL, PROTOCOL_VERSION,
 };
 use rrd_core::{
     digest, RuntimeCommit, RuntimeLogicalModel, RuntimeProperties, RuntimePropertySchema,
@@ -366,6 +366,8 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
             Action::DiagnosticsRead,
             Action::FlightLaunch,
             Action::FlightRead,
+            Action::TaskWrite,
+            Action::TaskRead,
         ]
         .into_iter()
         .map(|action| ResourceGrant {
@@ -843,11 +845,33 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         }
     }
     socket.unsubscribe(&subscription_id).await.unwrap();
-    match receive_application_frame(&mut socket).await.payload {
-        WebSocketPayload::Unsubscribed(result) => {
-            assert_eq!(result.subscription.subscription_id, subscription_id);
+    // Delivery runs on its own polling cadence, so the next page after the
+    // acknowledged cursor may already be on the wire when the server handles
+    // the unsubscribe. Such an in-flight page continues the acknowledged
+    // stream and is bounded by the subscription's max_in_flight (1 here); the
+    // server removes the subscription before it answers, so the `unsubscribed`
+    // frame ends the stream.
+    let mut in_flight = 0;
+    loop {
+        match receive_application_frame(&mut socket).await.payload {
+            WebSocketPayload::Unsubscribed(result) => {
+                assert_eq!(result.subscription.subscription_id, subscription_id);
+                assert_eq!(result.subscription.acknowledged_cursor, 2);
+                break;
+            }
+            WebSocketPayload::Delivery(delivery) if delivery.subscription_id == subscription_id => {
+                in_flight += 1;
+                assert_eq!(
+                    in_flight, 1,
+                    "max_in_flight 1 admits one unacknowledged delivery"
+                );
+                assert_eq!(delivery.connection_generation, replay.connection_generation);
+                assert!(delivery.delivery_sequence > replay.delivery_sequence);
+                assert_eq!(delivery.from_cursor, 2);
+            }
+            WebSocketPayload::Backpressure(_) => {}
+            payload => panic!("unexpected unsubscribe payload: {payload:?}"),
         }
-        payload => panic!("unexpected unsubscribe payload: {payload:?}"),
     }
     socket.close().await.unwrap();
 
@@ -1169,6 +1193,7 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
             max_storage_keys: 1_024,
         },
         acceptance_marker: None,
+        task_id: None,
     };
     let flight = client
         .launch_prompt_flight(
@@ -1202,7 +1227,7 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
     let replay = client
         .launch_prompt_flight(
             &session,
-            launch,
+            launch.clone(),
             RequestOptions::mutation(
                 "request-flight-again",
                 "operation-flight-again",
@@ -1259,12 +1284,12 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         )
         .await
         .unwrap();
-    assert_eq!(after_flight.through_cursor, runtime_head + 5);
-    assert_eq!(
-        after_flight.changes.len(),
-        5,
-        "schema, row, and three events"
-    );
+    // Schema, row, one edge per record the context used, and three events.
+    assert_eq!(record.use_count, 1, "the flight used document:alpha");
+    assert_eq!(flight.flight.uses[0].reference.id.as_str(), "alpha");
+    let flight_changes = 5 + record.use_count;
+    assert_eq!(after_flight.through_cursor, runtime_head + flight_changes);
+    assert_eq!(after_flight.changes.len() as u64, flight_changes);
     let flight_audit = client
         .read_audit(
             &session,
@@ -1286,6 +1311,107 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
             && record.phase == rrd_contract::AuditPhase::Completed
             && record.decision == rrd_contract::AuditDecision::Allowed
     }));
+
+    // A named task over the real socket: open, join one flight, read, list,
+    // close, and refuse a flight once closed.
+    let opened = client
+        .open_task(
+            &session,
+            OpenTask {
+                scope: scope.clone(),
+                title: "Alpha recall".into(),
+                goal: "Answer Alpha from the estate.".into(),
+            },
+            RequestOptions::mutation("request-task-open", "operation-task-open", "task-key")
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!opened.idempotent_replay);
+    assert_eq!(opened.task.status, TaskStatus::Open);
+    let joined = client
+        .launch_prompt_flight(
+            &session,
+            LaunchPromptFlight {
+                task_id: Some(opened.task.task_id.clone()),
+                ..launch.clone()
+            },
+            RequestOptions::mutation(
+                "request-task-flight",
+                "operation-task-flight",
+                "task-flight-key",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        joined.flight.record.task_id.as_ref(),
+        Some(&opened.task.task_id)
+    );
+    let read_task = client
+        .read_task(
+            &session,
+            ReadTask {
+                scope: scope.clone(),
+                task_id: opened.task.task_id.clone(),
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-task-read", "operation-task-read").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(read_task.task, opened.task);
+    let closed = client
+        .close_task(
+            &session,
+            CloseTask {
+                scope: scope.clone(),
+                task_id: opened.task.task_id.clone(),
+                status: TaskStatus::Completed,
+                outcome: Some("Alpha answered.".into()),
+            },
+            RequestOptions::mutation("request-task-close", "operation-task-close", "task-close")
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(closed.task.status, TaskStatus::Completed);
+    let tasks = client
+        .list_tasks(
+            &session,
+            ListTasks {
+                scope: scope.clone(),
+                after_cursor: 0,
+                limit: 8,
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-task-list", "operation-task-list").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(tasks.tasks, vec![closed.task.clone()]);
+    match client
+        .launch_prompt_flight(
+            &session,
+            LaunchPromptFlight {
+                task_id: Some(opened.task.task_id.clone()),
+                ..launch.clone()
+            },
+            RequestOptions::mutation(
+                "request-task-flight-late",
+                "operation-task-flight-late",
+                "task-flight-late-key",
+            )
+            .unwrap(),
+        )
+        .await
+    {
+        Err(Error::Api { error, .. }) => {
+            assert_eq!(error.code, ErrorCode::FailedPrecondition)
+        }
+        other => panic!("a closed task admits no flight: {other:?}"),
+    }
 
     assert!(matches!(
         RrdClient::connect_local(

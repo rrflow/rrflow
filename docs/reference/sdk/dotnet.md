@@ -99,7 +99,7 @@ endpoint/route resolution, HTTP carriage, common operation binding/execution,
 partial protocol coding, and broad retry/deadline behavior. Public value types
 have one responsibility file, and the generated operation projection has one
 path. Helpers cover capabilities, endpoint catalogue, OpenAPI, and session
-creation; `CallAsync` can address all 36 current HTTP operation identifiers.
+creation; `CallAsync` can address all 40 current HTTP operation identifiers.
 That is structural source convergence and route reachability, not complete
 operation semantics. There is no .NET WebSocket, D-01-installed endpoint
 binding, authenticated remote resolver/TLS profile, server-cancellation path,
@@ -135,17 +135,18 @@ binary as an argument vector without a shell, reads the complete OpenAPI 3.1
 document, sorts operations, and supports a byte-for-byte drift check. The
 checked-in `Generated/OperationId.g.cs` contains:
 
-- 36 enum members;
+- 40 enum members;
 - wire operation name, HTTP method, route template, first authentication
   scheme, and mutation flag for each member; and
 - OpenAPI SHA-256
-  `0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956`.
+  `97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11`.
 
 An earlier flat record incorrectly said 34 routes when the generator, enum,
 unit assertion, public catalogue, and OpenAPI projection contained 33. The
 prompt-flight family (`flight-launch`, `flight-list`, `flight-read`) then
-raised every projection to 36; this reference records 36. Neither change is
-a language-binding capability claim.
+raised every projection to 36, and the task family (`task-open`,
+`task-close`, `task-list`, `task-read`) to 40; this reference records 40.
+None of these changes is a language-binding capability claim.
 
 The generator does not emit request/result/error models, allowed route
 parameters, security actions, exact success statuses, media types, causal
@@ -448,7 +449,7 @@ Current evidence is deliberately bounded:
 | `dotnet restore ... --locked-mode` plus `dotnet build ... --no-restore` | Before and after the split, the solution restored and built with zero warnings under pinned SDK 10.0.111 on Linux x64. | One installed SDK/cache; no toolchain/platform/offline closure. |
 | `dotnet run --project ...Tests.csproj --no-restore` | xUnit reported four tests passed, but the manifest-absent conformance method returned before executing a scenario and was not reported skipped. | Three mock-focused tests plus one false pass; no configured engine corpus. |
 | temporary baseline/candidate assembly reflection audit | All 140 exported type/member signatures matched: zero removed and zero added. | Public assembly shape only; it does not prove behavior or packaging compatibility. |
-| `python3 sdks/dotnet/scripts/generate.py --check` | The sole enum at `Generated/OperationId.g.cs` matched 36 operations and the OpenAPI digest. | Method/path/auth/mutation projection only. |
+| `python3 sdks/dotnet/scripts/generate.py --check` | The sole enum at `Generated/OperationId.g.cs` matched 40 operations and the OpenAPI digest. | Method/path/auth/mutation projection only. |
 | `dotnet format ... --verify-no-changes` and Release `dotnet pack` | Formatting passed; both package observations resolved the moved root README and emitted six entries, but their sizes were 24,983 and 24,982 bytes. | Source style and package topology pass; byte reproducibility, signature, and consumer proof fail or remain absent. |
 | full shared conformance runner | The configured .NET entry passed with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2`. | Real HTTP against one direct-seeded rrflowKV daemon fixture; not installation, rrflowMX parity, or complete labelled behavior. |
 | temporary adversarial test | Replayed an unpinned invalid query, accepted `201 text/plain` plus invalid payload, and exposed the bearer through record formatting and JSON. | Reproducible open H-04 correctness/security defects. |

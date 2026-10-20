@@ -44,6 +44,8 @@ pub enum ServiceError {
     FunctionCatalogueRevisionNotFound,
     MemoryTargetNotFound,
     FlightNotFound,
+    TaskNotFound,
+    TaskClosed,
     SeatNotRepresented,
     Runtime(String),
     PermissionDenied,
@@ -82,7 +84,8 @@ impl ServiceError {
             | Self::SubscriptionNotFound
             | Self::FunctionNotFound
             | Self::MemoryTargetNotFound
-            | Self::FlightNotFound => ServiceErrorKind::NotFound,
+            | Self::FlightNotFound
+            | Self::TaskNotFound => ServiceErrorKind::NotFound,
             Self::Unauthenticated => ServiceErrorKind::Unauthenticated,
             Self::PermissionDenied => ServiceErrorKind::PermissionDenied,
             Self::IdempotencyConflict => ServiceErrorKind::Conflict,
@@ -93,6 +96,7 @@ impl ServiceError {
             | Self::SubscriptionExpired { .. }
             | Self::SubscriptionLeaseExpired
             | Self::SubscriptionClosed
+            | Self::TaskClosed
             | Self::SubscriptionConnectionReplaced
             | Self::FunctionCatalogueRevisionNotFound
             | Self::SeatNotRepresented

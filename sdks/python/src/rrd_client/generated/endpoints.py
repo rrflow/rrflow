@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 0e82b4d308ba0e9fe1915992045f5a5852de9a7535887e2b499ee9449ce77956
+# OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[
@@ -11,6 +11,7 @@ OperationId = Literal[
     "changefeed-follow",
     "changefeed-read",
     "context-assemble",
+    "data-schema-read",
     "diagnostics-read",
     "endpoint-catalogue",
     "estate-read",
@@ -30,6 +31,10 @@ OperationId = Literal[
     "session-renew",
     "subscription-close",
     "subscription-open",
+    "task-close",
+    "task-list",
+    "task-open",
+    "task-read",
     "transaction-abort",
     "transaction-begin",
     "transaction-commit",
@@ -97,6 +102,12 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/context/assemble",
+    },
+    "data-schema-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/data/schema",
     },
     "diagnostics-read": {
         "authentication": "session_bearer",
@@ -211,6 +222,30 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": True,
         "path": "/v1/subscriptions/open",
+    },
+    "task-close": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/close",
+    },
+    "task-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/list",
+    },
+    "task-open": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks",
+    },
+    "task-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/read",
     },
     "transaction-abort": {
         "authentication": "session_bearer",

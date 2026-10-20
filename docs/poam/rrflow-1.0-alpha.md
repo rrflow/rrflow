@@ -46,3 +46,5 @@
 | POAM-030 | High | Sequenced | [bounded audit read across a partial final journal page](rrflow-1.0-alpha/poam-030.md) |
 | POAM-031 | Critical | Closed | [installed-estate backups omit the installed control state](rrflow-1.0-alpha/poam-031.md) |
 | POAM-032 | High | Open | [prompt flights removed without engine absorption](rrflow-1.0-alpha/poam-032.md) |
+| POAM-033 | High | Open | [rejected native commits retain an unabortable intent](rrflow-1.0-alpha/poam-033.md) |
+| POAM-034 | High | Open | [commit-time schema constraints load the whole scope](rrflow-1.0-alpha/poam-034.md) |

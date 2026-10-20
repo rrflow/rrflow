@@ -25,6 +25,81 @@ remote, or explicitly mesh-resolved instances without Connectome, and the
 default RRFlow distribution does not require the Connectome checkout or
 artifact.
 
+### Repository checkout
+
+The RRFlow repository registers Connectome at `connectome/` as an optional Git
+submodule of `https://github.com/rrflow/connectome-development.git`. The parent
+Git tree pins the exact UI revision; `.gitmodules` owns the source URL. UI
+changes are developed and reviewed in that separate repository, then a bounded
+RRFlow change advances the pin with its integration evidence. A submodule pin
+does not qualify the UI or create engine authority.
+
+For UI development, explicitly acquire the pinned checkout:
+
+```bash
+git submodule update --init -- connectome
+git submodule status -- connectome
+```
+
+The Connectome development repository is public and supports anonymous
+acquisition. Engine-only local clones can omit initialization. Candidate CI
+recursively checks out the pinned UI source under the repository source policy.
+The [publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records the authorized visibility change and anonymous-access verification. The
+default engine build and installed distribution cannot read source or assets
+from the UI checkout. A UI distribution must package its required assets;
+installed startup cannot fetch this repository.
+
+The parent inventory records the gitlink revision without traversing child
+files. Local UI edits remain owned by the child repository. Never replace its
+pin with an escaping sibling path or treat a dirty checkout as reproducible
+integration evidence. Use `git submodule update --init -- connectome` to restore
+the recorded revision, rather than updating to an unreviewed branch tip.
+
+The [delivery architecture](../../architecture/system-overview.md#delivery-experiences)
+relates this UI to shippin.cloud private devspaces and the DevPulse local
+offering. Hosted project execution, previews, web launch, account creation,
+and synchronization are product targets requiring their own public-contract
+integration and proof; this source registration supplies none of those effects.
+
+### Native local workbench
+
+[Connectome PR12](https://github.com/rrflow/connectome-development/pull/12)
+implements visible local startup, a DB/QL/KV guide, and a native model browser
+on the existing authenticated Rust SDK session. The packaged engine/SDK input
+is RRFlow `4860a253663c9c757800aafeb40890b76114c4f0`; the parent gitlink records
+the reviewed UI revision independently. The
+[workbench guide](https://github.com/rrflow/connectome-development/blob/main/docs/native-workbench.md)
+owns build and desktop-use instructions.
+
+The desktop shows the native installation preview, requires its exact accepted
+digest, and regenerates the plan before apply. Existing estates reopen through
+the same installed lifecycle. Data models display the authenticated catalogue,
+bounded native query results and read cursors; graph, vector and storage lenses
+remain public-operation projections. The local workflow requires no account.
+The renderer holds a credential path, never the long-lived credential itself.
+
+Real-process tests cover installation rejection/acceptance/reopen, independent
+sessions, the digest-verified bundled engine, catalogue reads, key/value,
+event, time-series and geo queries, and graph/vector/storage views. The Windows
+development desktop was also driven through actual install, query, close and
+reopen; native quick verification passed. The
+[package receipt](../../evidence/change-journals/gate-h/h-06-native-turnkey-workbench.md)
+links candidate, build and bounded acceptance evidence. Browser rendering
+tests remain distinct from this actual native evidence.
+
+Current limits: row queries for records, relations and events require a
+registered typed schema; schemaless table metadata alone does not register a
+query source. The UI explains unavailable browsing. Time-series queries select
+the series record kind, not the sample table kind. Object metadata without a
+public row source remains schema-only. Media understanding/generation requires
+separately configured models and authorization. PostgreSQL compatibility,
+DevPulse packaging, cloud accounts/synchronization and hosted devspaces are
+still open. The unsigned Windows development bundle does not satisfy signed
+release, complete H-06, or clean-machine installer acceptance.
+
+### Projection authority
+
 Connectome is a projection client. It may:
 
 - discover and invoke available public RRD operations;
@@ -278,9 +353,9 @@ connect to them as hidden RRFlow persistence or infer that discovery activated
 them. A future enterprise fleet control plane requires its own accepted public
 contract; a client-local `rrflow-control` protocol cannot create one.
 
-## Current separate-checkout audit
+## Historical separate-checkout audit
 
-The reviewed implementation baseline is the clean separate repository at
+The historical reviewed implementation baseline is the clean separate repository at
 `../connectome`, commit
 `38f68ce7adda9d03501f3591165f0e14996899ec` (`feat: add authenticated native
 RRD client`). Its successful checks characterize useful code; they do not prove

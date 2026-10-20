@@ -22,6 +22,7 @@ pub enum ReadAccessPath {
     ClaimVersions,
     RecordVersions,
     RelationVersions,
+    AdjacencyVersions,
     EventVersions,
     VectorVersions,
     SeriesVersions,
