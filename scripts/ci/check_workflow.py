@@ -365,6 +365,18 @@ def main() -> None:
             "timeout-minutes:" in block, f"CI job {job} must have an explicit timeout"
         )
 
+    for job in ["topology-smoke", "estate-portability"]:
+        require(
+            "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
+            in jobs[job],
+            f"{job} must exercise the installed primary executable lifecycle",
+        )
+    require(
+        "cargo clippy -p rrflow-cli --test installed_lifecycle --locked -- -D warnings"
+        in jobs["estate-portability"],
+        "native installed lifecycle tests must not hide platform warnings",
+    )
+
     gate = jobs["ci-gate"]
     needs_match = re.search(
         r"(?ms)^    needs:\s*$\n((?:^      - [a-z0-9-]+\s*$\n?)+)", gate

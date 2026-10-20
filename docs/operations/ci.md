@@ -22,7 +22,7 @@ dispatches. Its concurrency key cancels stale executions for the same pull
 request or ref. The reusable workflow reduces every partition into one stable
 `ci-gate` check for branch protection:
 
-- supervised RRD daemon smoke on the standard Linux runner;
+- installed primary-executable lifecycle on the standard Linux runner;
 - repository policy, formatting, architecture, evaluation, dependency, and
   binary-budget gates on a heavy Linux runner;
 - five default-feature engine suites on isolated heavy Linux runners:
@@ -30,13 +30,19 @@ request or ref. The reusable workflow reduces every partition into one stable
   and `product-operations`;
 - one current shared SDK harness, isolated optional-feature checks, and a real
   PostgreSQL/pgvector integration;
-- daemon portability on GitHub-hosted Windows and macOS runners; and
+- installed lifecycle and daemon portability on GitHub-hosted Windows and
+  macOS runners; and
 - one always-evaluated gate which fails unless every partition succeeded.
 
-The topology job starts one local RRD daemon and checks readiness and
-capabilities. It does not start Connectome or prove installation, rrflowMX and
-rrflowKV semantic equivalence, native graph/BM25/vector projections, streamed
-Arrow/DataFusion execution, persistent reasoning/context, or restart recovery.
+The topology and native portability jobs run `installed_lifecycle` against the
+actual primary executable, without a surrogate executable-identity fixture.
+Fresh and existing projects cover no-write deterministic plan, exact apply,
+authenticated discovery, commit/query, backup, termination, restarted query,
+offline verification, and restore publication/readback. Unix checks graceful
+SIGINT; Windows checks termination of the owned child after acknowledged work.
+This bounded corpus does not prove graceful Windows shutdown, a complete
+crash matrix, clean-machine distribution, rrflowMX/rrflowKV equivalence, native
+graph/BM25/vector projections, streamed Arrow/DataFusion, or model reasoning.
 The shared SDK harness is also current characterization: the deficiencies and
 real-process corpus required for H-04 remain open. Neither job may be cited as
 complete-engine evidence.

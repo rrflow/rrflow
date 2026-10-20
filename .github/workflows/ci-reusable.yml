@@ -63,6 +63,10 @@ jobs:
         run: cargo test -p rrd-estate --all-targets --locked
       - name: Test RRD daemon process contract
         run: cargo test -p rrd-server --bin rrd-server --locked
+      - name: Test native installed primary lifecycle
+        run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Deny installed lifecycle test warnings
+        run: cargo clippy -p rrflow-cli --test installed_lifecycle --locked -- -D warnings
       - name: Build cross-package controller fixture
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test process fault injection (not product-readiness evidence)
