@@ -39,6 +39,8 @@ jobs:
           cache-on-failure: true
       - name: Test the real install, serve, authenticate, stop, reopen lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Capture clean primary build provenance
+        run: python3 scripts/build_rrflow.py --profile dev --output "$RUNNER_TEMP/rrflow-build-receipt.json"
 
   estate-portability:
     name: estate process (${{ matrix.os }})
@@ -107,6 +109,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Enforce owner-controlled release version
         run: python3 scripts/check_version.py
+      - name: Test build provenance and diagnostic profile policy
+        run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
         run: python3 scripts/ci/check_workflow.py
       - name: Enforce documentation authority and local links

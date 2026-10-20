@@ -48,3 +48,9 @@ unicode-normalization = "0.1"
 # Thin LTO keeps codegen parallel; symbols and panic unwinding are unchanged.
 [profile.release]
 lto = "thin"
+
+# Observation symbols only: semantic settings inherit release unchanged.
+[profile.diagnostic]
+inherits = "release"
+debug = "line-tables-only"
+strip = "none"
