@@ -46,6 +46,29 @@ The SurrealDB functional matrix includes the admitted model/transaction/query,
 subscription, recovery and self-hosted deployment profiles. Record exclusions;
 a vector-only benchmark cannot establish database-wide parity.
 
+The owner's **Pinecone Nexus** target is its governed knowledge engine, not
+only Pinecone's vector database. Its official product description names source
+curation into reusable knowledge and typed, cited answers through KnowQL.
+Treat vendor measurements as hypotheses to test, not RRFlow evidence. Compare
+RRFlow's canonical attunement, graph/claim provenance, bounded context and
+reasoning paths without importing a second engine or copying KnowQL:
+
+- Pin the same source corpus/revisions, questions, expected answers and task
+  end states, model versions, permissions and budgets. Score correctness,
+  abstention, conflicting/stale sources, citation support and forbidden-data
+  leakage using independent expected results and reviewable grading.
+- Measure initial ingestion/curation and incremental update/delete costs
+  separately from repeated query costs. Include model/tool calls, tokens,
+  latency distributions, resource use, storage and amortized total cost;
+  precomputation cannot disappear from the comparison.
+- Change and revoke source content, then verify derived knowledge freshness,
+  provenance and access enforcement after restart. Include relationships and
+  questions requiring several sources rather than only nearest-neighbor recall.
+- Run the admitted native binary/service profile with a real Nexus access path
+  only when configured and authorized. An unavailable comparator is reported
+  as not run. Pin its tested version/configuration and retain raw responses
+  and error samples; published marketing numbers are not the baseline run.
+
 Declare workloads and pass/fail thresholds before running the comparison,
 retain failures, and compare at matched correctness/quality. No competitor
 parity, superiority or ease-of-deployment claim is accepted from feature names,
@@ -54,6 +77,8 @@ reference inputs (reviewed 2026-10-19; not benchmark results):
 
 - [SurrealDB model and deployment overview](https://surrealdb.com/docs/what-is-surrealdb)
 - [Pinecone architecture](https://www.pinecone.io/how-pinecone-works/)
+- [Pinecone Nexus product and knowledge interface](https://www.pinecone.io/product/nexus/)
+- [Pinecone Nexus GA architecture and benchmark account](https://www.pinecone.io/blog/pinecone-nexus-generally-available/)
 - [Pinecone production checklist](https://docs.pinecone.io/guides/production/production-checklist)
 
 ## Release condition

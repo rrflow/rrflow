@@ -187,7 +187,7 @@ builds separately as H-08a to H-08h.
 - Physical evidence follows the work requested: a traversal follows visited
   edges.
 - No performance or superiority claim against Postgres, pgvector, AGE,
-  SurrealDB, Pinecone, Qdrant, or HydraDB is made until J-04's comparative evidence
+  SurrealDB, Pinecone Database/Nexus, Qdrant, or HydraDB is made until J-04's comparative evidence
   passes ([OBJ-10](../../objectives/rrflow-1.0-alpha.md)).
 
 ## Open decisions
