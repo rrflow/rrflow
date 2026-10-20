@@ -69,8 +69,9 @@ Native Windows, pinned Rust 1.99.1; Cargo commands use
 
 The executable is 152262144 bytes with SHA-256
 `6e6aa7e51dd8f95fe8def773698674aee82dca2dd06456269946594b0f28dfbe`.
-Its local development artifact and verification JSON are in
-`target/rrflow-engine-check-20261019/`. Source is the implementation in this
+Its local development artifact and verification JSON are located in the
+PR 31 artifact receipt. This locator has a [recorded correction](h-01-context-ci-correction.md).
+Source is the implementation in this
 package; artifact provenance binds the eventual committed source revision and
 file digests outside the repository. No official artifact is published.
 
