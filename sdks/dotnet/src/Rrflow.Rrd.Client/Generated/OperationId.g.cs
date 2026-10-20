@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
+// OpenAPI SHA-256: 24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -23,6 +23,7 @@ public enum OperationId
     HealthReady,
     OpenapiRead,
     QueryExecute,
+    QueryExport,
     QueryIndexEnsure,
     QueryIndexList,
     QueryLivePoll,
@@ -63,8 +64,8 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const string OpenApiDocumentSha256 = "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69";
-    public const int Count = 41;
+    public const string OpenApiDocumentSha256 = "24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb";
+    public const int Count = 42;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -87,6 +88,7 @@ public static class EndpointCatalog
         OperationId.HealthReady => new("health-ready", "GET", "/v1/health/ready", Authentication.Public, false),
         OperationId.OpenapiRead => new("openapi-read", "GET", "/v1/schema/openapi", Authentication.Public, false),
         OperationId.QueryExecute => new("query-execute", "POST", "/v1/query", Authentication.SessionBearer, false),
+        OperationId.QueryExport => new("query-export", "POST", "/v1/query/export", Authentication.SessionBearer, false),
         OperationId.QueryIndexEnsure => new("query-index-ensure", "POST", "/v1/query/indexes/ensure", Authentication.SessionBearer, true),
         OperationId.QueryIndexList => new("query-index-list", "POST", "/v1/query/indexes/list", Authentication.SessionBearer, false),
         OperationId.QueryLivePoll => new("query-live-poll", "POST", "/v1/query/live/poll", Authentication.SessionBearer, false),

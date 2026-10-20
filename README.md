@@ -41,7 +41,10 @@ demonstrate current AI-assisted development: create projects, run Rust,
 Python, and Go code, load the running project's UI inside the private cloud
 devspace, and launch projects on the web.
 
-**DevPulse** is the project development application. Its RRFlow integration
+**DevPulse** is the project development application, shipping first on Windows.
+Standalone RRFlow with Connectome targets guided installation in a few steps
+on Windows, macOS and Linux. DevPulse bundles RRFlow and guides optional
+Docker setup when a project needs containers. Its RRFlow integration
 must provision local project VMs/containers, run their toolchains and UIs, and
 support explicitly selected **bidirectional synchronization** with either
 **shippin.cloud or an operator-controlled homelab**. Local and homelab operation
@@ -68,6 +71,12 @@ build the native engine, create related records, query them with rrflowQL and
 reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
 defines local operation without an account and the explicit cloud opt-in boundary.
 Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
+
+The installed engine also exposes an authenticated, bounded
+[Parquet query-result export](docs/reference/data/knowledge-connectors.md#bundled-query-export).
+Apache's Rust writer is linked into the binary. This capability is available
+through the public operation catalogue and clients; a Connectome export control,
+bulk import and streaming exchange remain unqualified.
 
 | Need | Single owning record |
 |---|---|

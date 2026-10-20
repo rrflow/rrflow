@@ -2,9 +2,9 @@
 
 package rrd
 
-// OpenAPI SHA-256: 6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69
+// OpenAPI SHA-256: 24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb
 
-const EndpointOpenAPIDocumentSHA256 = "6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69"
+const EndpointOpenAPIDocumentSHA256 = "24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb"
 
 type OperationID string
 
@@ -28,6 +28,7 @@ const (
 	OperationHealthReady            OperationID = "health-ready"
 	OperationOpenapiRead            OperationID = "openapi-read"
 	OperationQueryExecute           OperationID = "query-execute"
+	OperationQueryExport            OperationID = "query-export"
 	OperationQueryIndexEnsure       OperationID = "query-index-ensure"
 	OperationQueryIndexList         OperationID = "query-index-list"
 	OperationQueryLivePoll          OperationID = "query-live-poll"
@@ -72,6 +73,7 @@ var endpoints = map[OperationID]Endpoint{
 	OperationHealthReady:            {Method: "GET", Path: "/v1/health/ready", Authentication: "public", Mutation: false},
 	OperationOpenapiRead:            {Method: "GET", Path: "/v1/schema/openapi", Authentication: "public", Mutation: false},
 	OperationQueryExecute:           {Method: "POST", Path: "/v1/query", Authentication: "session_bearer", Mutation: false},
+	OperationQueryExport:            {Method: "POST", Path: "/v1/query/export", Authentication: "session_bearer", Mutation: false},
 	OperationQueryIndexEnsure:       {Method: "POST", Path: "/v1/query/indexes/ensure", Authentication: "session_bearer", Mutation: true},
 	OperationQueryIndexList:         {Method: "POST", Path: "/v1/query/indexes/list", Authentication: "session_bearer", Mutation: false},
 	OperationQueryLivePoll:          {Method: "POST", Path: "/v1/query/live/poll", Authentication: "session_bearer", Mutation: false},
