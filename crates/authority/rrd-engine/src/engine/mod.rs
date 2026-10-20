@@ -122,6 +122,7 @@ mod rollback;
 mod security;
 mod session;
 mod subscription;
+mod task;
 mod token_key;
 mod transaction;
 mod vector;

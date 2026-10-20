@@ -196,6 +196,11 @@ pub struct LaunchPromptFlight {
     pub context: PromptFlightContextRequest,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acceptance_marker: Option<String>,
+    /// The open task this flight joins. The engine writes one
+    /// `rrflow-task-includes` edge from the task to the flight in the
+    /// flight's own commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<CanonicalId>,
 }
 
 impl LaunchPromptFlight {
@@ -316,6 +321,9 @@ pub struct PromptFlightRecord {
     pub context_request: PromptFlightContextRequest,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acceptance_marker: Option<String>,
+    /// The task the flight joined at launch, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<CanonicalId>,
     pub status: PromptFlightStatus,
     pub created_at_unix_ms: u64,
     /// The caller's replay coordinate. The same key with the same operation

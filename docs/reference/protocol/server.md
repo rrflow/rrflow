@@ -175,6 +175,7 @@ The generated catalogue currently covers these capability families:
 | Transactions | Begin, preview, commit, and abort typed mutation work. | `RrdEngine`; rrflowKV owns durable physical commit. |
 | Query and context | rrflowQL reads, live-query poll, index administration, and context assembly. | `RrdEngine`, rrflowQL, and the selected storage profile. |
 | Prompt flights | Launch one governed prompt flight, list flight records, and read one flight with its events. | `RrdEngine`; flight rows and events are lifecycle data in the canonical runtime log. |
+| Tasks | Open and close one named task, list task records, and read one task; a flight joins an open task at launch. | `RrdEngine`; task rows and task-to-flight edges are lifecycle data in the canonical runtime log. |
 | Recall | Vector collection, point, and search operations. | RRFlow's vector subsystem under `RrdEngine`; never a separate database authority. |
 | Delivery | Changefeed read/follow and durable subscriptions over the generic multiplexed WebSocket. | Committed engine state and durable subscription coordinates; WebSocket connection/sequence state remains transport-local. |
 | Recovery | Logical backup catalogue, backup creation, and restore into a generated inactive root. | Engine-authorized logical recovery; no active-root switch. |

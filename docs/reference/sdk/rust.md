@@ -42,9 +42,9 @@ merely compare JSON shapes.
 
 ## Audited current surface
 
-The executable `endpoint_catalogue()` contains 37 HTTP operations and one
+The executable `endpoint_catalogue()` contains 41 HTTP operations and one
 generic authenticated `/v1/ws` descriptor. `RrdClient` currently supplies
-typed HTTP methods for 32 of those 37 operations, while `RrdWebSocket`
+typed HTTP methods for 36 of those 41 operations, while `RrdWebSocket`
 implements the bounded B-04 multiplexed protocol. The current boundary is:
 
 | Family | Catalogued HTTP operations | Rust methods now | Missing now |
@@ -64,8 +64,9 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Audit | 2 | 2 | none |
 | Diagnostics | 1 | 1 | none |
 | Prompt flights | 3 | 3 | none |
+| Tasks | 4 | 4 | none |
 | Context | 1 | 1 | none |
-| **Total** | **37** | **32** | **5** |
+| **Total** | **41** | **36** | **5** |
 
 The WebSocket method authenticates one generic connection, validates the
 server's opening identity and negotiated limits, and carries request,
@@ -307,7 +308,7 @@ names.
 | `cargo test -p rrd-client --test transport_faults --locked` | 3 tests covering 6 malicious-server scenarios passed | B-04 connection, sequence, shape, binary, size, and response-correlation rejection; not every transport/TLS/failure race. |
 | Rust conformance test with no manifest | Cargo reported 1 passed in 0.00 s | The test returned before executing a scenario; this is not conformance evidence. |
 | `python3 scripts/ci/run_sdk_conformance.py` | Rust, TypeScript, Python, Go, Java, and .NET passed one real installed daemon; corpus SHA-256 was `0f6ba4c172d58a64c69757c26bf502e93ed8b9cbe8394d84aaad1defe80fd09e`. | Canonical installed identity and six-language execution of the present limited rrflowKV corpus; not public setup, rrflowMX parity, full labelled behavior, or release proof. |
-| Generated-surface parity check | 36 HTTP operations matched OpenAPI | Checks generated TypeScript/Python/Go/Java/.NET endpoint maps; it does not inspect Rust method coverage. |
+| Generated-surface parity check | 40 HTTP operations matched OpenAPI | Checks generated TypeScript/Python/Go/Java/.NET endpoint maps; it does not inspect Rust method coverage. |
 | Normal dependency inspection | no RRFlow implementation crate below `rrd-client` | Correct client dependency direction; dev-only server/engine/store dependencies remain test fixtures. |
 
 No row proves the persistent multi-model reasoning/recall engine. That proof is
@@ -348,7 +349,7 @@ The gates then close behavior in dependency order:
 2. **B-04 (implemented):** the dedicated socket is absent; one bounded
    multiplexed protocol and Rust carriage now own request/cancel/subscription
    correlation, exact resume state, and adversarial frame rejection.
-3. **H-04:** bind all 37 operations from the catalogue, validate every request
+3. **H-04:** bind all 41 operations from the catalogue, validate every request
    and response, and compare Rust with every supported surface against one
    real `RrdEngine` corpus.
 4. **H-07:** add endpoint resolution/rotation as an outward adapter while
