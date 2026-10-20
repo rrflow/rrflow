@@ -1,6 +1,68 @@
 use super::*;
+use rrd_contract::{DataSchemaSnapshot, ReadDataSchema};
+use rrd_store::{RuntimeReadBudget, RuntimeVersionedSource};
 
 impl RrdEngine {
+    /// Read the native catalogue at one authenticated stamp without scanning
+    /// application data or the causal log. This administrative operation does
+    /// not support filtered grants: a restricted principal must fail closed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn read_data_schema(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &ReadDataSchema,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<DataSchemaSnapshot> {
+        request
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        self.authorize_resource_without_data_policy(
+            session_id,
+            token,
+            SecurityAction::DiagnosticsRead,
+            &self.instance_resource(),
+            now,
+            request_id,
+            operation_id,
+        )?;
+        let scope = self.query_scope(&request.scope)?;
+        let read = self.storage.runtime().read_stamp(&scope)?;
+        let direct = self.storage.runtime().read_versioned(
+            &read,
+            &[RuntimeVersionedSource::Schema],
+            RuntimeReadBudget::new(u64::from(request.max_storage_keys))?,
+        )?;
+        let schema = direct
+            .changes
+            .iter()
+            .rev()
+            .find_map(|change| match &change.mutation {
+                RuntimeMutation::Schema { registry }
+                    if Some(registry.revision) == read.schema_revision =>
+                {
+                    Some(registry)
+                }
+                _ => None,
+            })
+            .map(public_schema)
+            .transpose()?;
+        if schema.as_ref().map(|registry| registry.revision) != read.schema_revision {
+            return Err(ServiceError::Query(
+                "stamped schema revision is unavailable".into(),
+            ));
+        }
+        Ok(DataSchemaSnapshot {
+            scope: request.scope.clone(),
+            known_at_cursor: read.commit_cursor,
+            read_manifest_sha256: read.manifest_id,
+            schema,
+            read_evidence: crate::runtime::public_read_evidence(direct.evidence)?,
+        })
+    }
+
     /// Read every logical model through one catalogue revision, valid-time
     /// instant, authenticated log root, and transaction cursor.
     #[allow(clippy::too_many_arguments)]

@@ -1,5 +1,5 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 617822f343220b219edc8febdccadaa43c414f9a781285987560e75c630379db
+# OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
 from typing import Final, Literal, TypedDict
 
 OperationId = Literal[
@@ -11,9 +11,13 @@ OperationId = Literal[
     "changefeed-follow",
     "changefeed-read",
     "context-assemble",
+    "data-schema-read",
     "diagnostics-read",
     "endpoint-catalogue",
     "estate-read",
+    "flight-launch",
+    "flight-list",
+    "flight-read",
     "health-live",
     "health-ready",
     "openapi-read",
@@ -27,6 +31,10 @@ OperationId = Literal[
     "session-renew",
     "subscription-close",
     "subscription-open",
+    "task-close",
+    "task-list",
+    "task-open",
+    "task-read",
     "transaction-abort",
     "transaction-begin",
     "transaction-commit",
@@ -95,6 +103,12 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": False,
         "path": "/v1/context/assemble",
     },
+    "data-schema-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/data/schema",
+    },
     "diagnostics-read": {
         "authentication": "session_bearer",
         "method": "POST",
@@ -112,6 +126,24 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/estates/{estate}/read",
+    },
+    "flight-launch": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/flights",
+    },
+    "flight-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/flights/list",
+    },
+    "flight-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/flights/read",
     },
     "health-live": {
         "authentication": "public",
@@ -190,6 +222,30 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": True,
         "path": "/v1/subscriptions/open",
+    },
+    "task-close": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/close",
+    },
+    "task-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/list",
+    },
+    "task-open": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks",
+    },
+    "task-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/read",
     },
     "transaction-abort": {
         "authentication": "session_bearer",

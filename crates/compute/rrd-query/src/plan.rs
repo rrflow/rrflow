@@ -947,7 +947,14 @@ pub(crate) fn fields_for_source(
                     "relation type {relation} is not registered at this cursor"
                 ))
             })?;
-            if !schema.records.contains_key(&start.kind) {
+            // A start is any record-like table in the catalogue; a schemaless
+            // table is as much a graph node as one with a strict schema.
+            let start_is_record = schema.records.contains_key(&start.kind)
+                || schema
+                    .tables
+                    .get(&start.kind)
+                    .is_some_and(|table| table.model.is_record_like());
+            if !start_is_record {
                 return Err(Error::Binding(format!(
                     "traversal start type {} is not registered at this cursor",
                     start.kind

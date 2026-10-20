@@ -477,6 +477,95 @@ BFS, and reciprocal-rank fusion. Roadmap Gates E, F, and H replace their
 whole-snapshot costs with native incremental access paths without changing the
 public operation or its single-stamp semantics.
 
+## Prompt-flight flow
+
+A prompt flight is the durable, comparable record of one prompt crossing the
+runtime boundary. `rrd-contract` owns `LaunchPromptFlight`, `PromptFlight`,
+and the list/read types; `RrdEngine::launch_prompt_flight`,
+`list_prompt_flights`, and `read_prompt_flight` own the implementation behind
+`flight-launch` (`POST /v1/flights`, `flight_launch` grant, mutating) and
+`flight-list`/`flight-read` (`POST /v1/flights/list` and `/v1/flights/read`,
+`flight_read` grant). Clients render flights; none keeps a flight ledger,
+runner, or diagnostics protocol of its own.
+
+One launch runs inside one authenticated read stamp:
+
+1. Authorize `flight_launch` and enforce the estate recall ceilings on the
+   flight's declared context budget.
+2. Derive the flight identity from instance, session, and idempotency key.
+   A stamped identity read returns an existing flight as an exact replay; the
+   same key with a different operation digest conflicts.
+3. `fresh` injects no context. `pruned` calls the same engine
+   `context-assemble` path every client uses; a packet whose stamp differs
+   from the flight stamp restarts the attempt rather than mixing two stamps.
+4. Append ordered stage events (`prompt`, `context`, `outcome`). The context
+   event carries the five plan-stage decisions and the plan/packet digests,
+   not a second copy of the packet items.
+5. Commit one cursor-CAS runtime commit: the strict table schema on first
+   use (the edge table's target kinds grow with each record kind a flight
+   uses), one `rrflow-prompt-flight` lifecycle record, one
+   `rrflow-prompt-flight-used` edge per context item that is a canonical
+   record (rank, fused score, and contributing avenues; claims are not graph
+   nodes), and its `rrflow-prompt-flight-event` lifecycle events. A lost
+   cursor race retries at most three times, then reports a retryable
+   conflict.
+
+The `observe` provider prepares the packet inside the engine and launches
+nothing, so the flight completes as `prepared`. Model-provider arms are
+explicit opt-in adapters; each enters the closed provider, stage, and status
+vocabularies only together with its governed adapter, budget, and audit
+evidence.
+
+A read names the flight's record by identity, then, at the same stamp, each
+edge by its deterministic identity (`<flight-id>.<rank>`) and each event by
+its log cursor, so it costs the flight's own size and never the estate's.
+The list is a stamped read of the flight record kind and still grows with the
+number of flights until a cursor-ordered access path exists (Gate E). Neither
+replays the runtime log. Flight rows, edges, and events are ordinary temporal
+data, visible to data snapshots, changefeeds, and the diagnostic graph lens,
+and rrflowQL walks them in both directions:
+`FROM traverse:rrflow-prompt-flight-used START rrflow-prompt-flight:<id>
+DIRECTION OUTGOING DEPTH 1 …` returns the records a prompt used, and
+`… START <kind>:<id> DIRECTION INCOMING …` returns every prompt that used a
+record. A flight records only externally observable
+runtime events and never hidden chain-of-thought.
+
+## Task flow
+
+A task is a named, durable record of one unit of intended work: a title, a
+goal, and a status that prompt flights join. `rrd-contract` owns `OpenTask`,
+`CloseTask`, `TaskRecord`, and the list/read types; `RrdEngine::open_task`,
+`close_task`, `list_tasks`, and `read_task` own the implementation behind
+`task-open` and `task-close` (`POST /v1/tasks` and `/v1/tasks/close`,
+`task_write` grant, mutating) and `task-list`/`task-read`
+(`POST /v1/tasks/list` and `/v1/tasks/read`, `task_read` grant). A task
+orchestrates nothing; it is not a routine.
+
+1. `task-open` derives the task identity from instance, session, and
+   idempotency key. A stamped identity read returns an existing task as an
+   exact replay; the same key with a different operation digest conflicts.
+   One cursor-CAS commit installs the strict `rrflow-task` table on first use
+   and writes the task's single open version.
+2. `task-close` writes the second and final version, `completed` or
+   `abandoned`, with its close time and optional outcome. Closing again with
+   the same status and outcome replays; any other close of a closed task fails
+   as a failed precondition.
+3. A flight launched with `task_id` checks, at its own stamp, that the task
+   exists and is open, then writes one `rrflow-task-includes` edge from the
+   task to the flight in the flight's own commit, after its events. The edge
+   identity is the flight identity, so a flight joins at most one task; the
+   edge table declares no pair or degree constraint
+   ([POAM-034](../poam/rrflow-1.0-alpha/poam-034.md)).
+
+A task read names the row by identity and costs its one or two versions. Its
+flights are graph neighbours rather than a second list:
+`FROM traverse:rrflow-task-includes START rrflow-task:<id> DIRECTION OUTGOING
+DEPTH 1 …` returns them, and each flight's `rrflow-prompt-flight-used` edges
+return the records it used. The task list is a stamped read of the task
+record kind and grows with the number of tasks until a cursor-ordered access
+path exists (Gate E); traversal reconstructs the graph from relations until
+E-01.
+
 ## Trace and observability flow
 
 RRFlow has one causal operation graph with two representations. Durable trace

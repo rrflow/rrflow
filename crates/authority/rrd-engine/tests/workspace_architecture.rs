@@ -1117,10 +1117,27 @@ fn workspace_source_inputs_are_repository_closed() {
         .collect::<BTreeSet<_>>();
 
     let mut violations = Vec::new();
+    let ui_root = metadata.root.join("connectome");
+    let canonical_ui =
+        fs::canonicalize(&ui_root).unwrap_or_else(|_| canonical_root.join("connectome"));
+    for member in &member_roots {
+        if member.starts_with(&canonical_ui) {
+            violations.push(format!(
+                "engine workspace member enters optional UI source at {}",
+                member.display()
+            ));
+        }
+    }
     for source in &metadata.target_sources {
         let path = metadata.root.join(source);
         let canonical = fs::canonicalize(&path)
             .unwrap_or_else(|error| panic!("cannot resolve {}: {error}", path.display()));
+        if source.starts_with("connectome") || canonical.starts_with(&canonical_ui) {
+            violations.push(format!(
+                "Cargo target enters optional UI source at {}",
+                source.display()
+            ));
+        }
         if !canonical.starts_with(&canonical_root) {
             violations.push(format!(
                 "Cargo target {} resolves outside the repository to {}",
@@ -1148,6 +1165,13 @@ fn workspace_source_inputs_are_repository_closed() {
         };
         let canonical = fs::canonicalize(path)
             .unwrap_or_else(|error| panic!("cannot resolve {}: {error}", path.display()));
+        if canonical.starts_with(&canonical_ui) {
+            violations.push(format!(
+                "{} depends on optional UI source at {}",
+                dependency.owner,
+                path.display()
+            ));
+        }
         if !canonical.starts_with(&canonical_root) {
             violations.push(format!(
                 "{} depends on local package {} outside the repository at {}",
@@ -1206,6 +1230,33 @@ fn workspace_source_inputs_are_repository_closed() {
     assert!(
         violations.is_empty(),
         "RRFlow source must come from this workspace or a declared, pinned HTTPS submodule, without Git dependencies or escaping-path inputs: {violations:#?}"
+    );
+}
+
+#[test]
+fn connectome_ui_is_pinned_to_its_development_repository() {
+    let metadata = workspace_metadata();
+    let entries = git_index_entries(&metadata.root);
+    assert!(entries
+        .iter()
+        .any(|entry| entry.mode == "100644" && entry.path == Path::new(".gitmodules")));
+    assert!(entries
+        .iter()
+        .any(|entry| entry.mode == "160000" && entry.path == Path::new("connectome")));
+    let declarations = declared_submodules(&metadata.root);
+    let connectome = declarations
+        .iter()
+        .filter(|declaration| declaration.name == "connectome")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        connectome.len(),
+        1,
+        "Connectome must have one named declaration"
+    );
+    assert_eq!(connectome[0].path.as_deref(), Some("connectome"));
+    assert_eq!(
+        connectome[0].url.as_deref(),
+        Some("https://github.com/rrflow/connectome-development.git")
     );
 }
 

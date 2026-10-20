@@ -5,6 +5,17 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
+**rrflowDB is the database within RRFlow: a pure Rust, PostgreSQL-inspired
+database dedicated to AI and designed for AI use, with PostgreSQL compatibility
+as a product requirement.** It stores the knowledge, memory, reasoning state,
+and evidence of each project estate. The [database identity and compatibility
+boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary)
+separates that target from current implementation and compatibility evidence.
+The [PostgreSQL compatibility and independent database contract](docs/reference/protocol/postgresql.md)
+defines the first SQL/client profile, native-engine integration, Turso exit,
+data portability and qualification. [H-08](docs/roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+owns its implementation packages; compatibility is not yet implemented.
+
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;
 it delegates each detailed subject to exactly one linked memory record. The
@@ -17,7 +28,41 @@ baseline is established. Current maturity is **pre-alpha**. The version is a
 contract line, not a claim that the complete system is stable, optimized, or
 release-ready.
 
+## Engine, UI, cloud, and desktop
+
+RRFlow is the reasoning engine. **Connectome** is its operator and developer
+UI, maintained in its own repository and pinned here as the optional
+`connectome/` Git submodule. The [Connectome client contract](docs/reference/client/connectome.md#repository-checkout)
+owns checkout instructions and the UI's public-engine boundary.
+
+We plan to offer RRFlow as a cloud service through **shippin.cloud**, with a
+private devspace included. The initial friends-and-family experience will
+demonstrate current AI-assisted development: create projects, run Rust,
+Python, and Go code, load the running project's UI inside the private cloud
+devspace, and launch projects on the web.
+
+**DevPulse** will offer the local RRFlow reasoning engine, with optional
+shippin.cloud account creation and explicitly selected synchronization. Local
+operation remains available independently of a cloud account.
+
+These are delivery targets, not claims of available hosted execution,
+deployment, or synchronization. The [delivery boundaries](docs/architecture/system-overview.md#delivery-experiences)
+define how these experiences share one engine; the existing roadmap and
+pre-alpha status remain authoritative.
+
 ## Enter RRFlow
+
+For a local desktop workflow, use the [native Connectome workbench](docs/reference/client/connectome.md#native-local-workbench):
+start the bundled RRFlow engine after an explicit installation preview, explore
+the authenticated schema and data models, query records, and navigate their
+relationships. This is a development build with real-engine evidence; full
+client qualification remains open.
+
+Start with the [runnable local rrflowDB integration](docs/reference/sdk/rrflowdb-local.md):
+build the native engine, create related records, query them with rrflowQL and
+reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
+defines local operation without an account and the explicit cloud opt-in boundary.
+Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
 
 | Need | Single owning record |
 |---|---|
