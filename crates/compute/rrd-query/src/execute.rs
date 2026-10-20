@@ -1,17 +1,18 @@
+use crate::physical::graph::{AdjacencyExpansion, TraversalPlan};
 use crate::{
     execute_snapshot, highlight_offsets, index::index_artifact_name, rows_to_arrow_snapshot,
     ArrowReadStamp, Bm25Artifact, Bm25Config, Bm25Offset, BoundFilter, Error, FusionAnalysis,
     FusionBudget, IndexArtifact, IndexKind, LogicalOperator, PhysicalOperator, PhysicalPlan,
     Result,
 };
-use crate::{Join, Projection, Source, TraversalDirection};
+use crate::{Join, Projection, Source};
 use rrd_core::{
     resolve_as_of, Claim, GeoValue, RuntimeChange, RuntimeGeo, RuntimeMutation, RuntimeRecord,
     RuntimeRelation, RuntimeValue, SeriesValue,
 };
 use rrd_store::{RuntimeReadBudget, RuntimeReadEvidence, RuntimeVersionedSource, StorageEngine};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionBudget {
@@ -254,6 +255,10 @@ enum ReadPath {
     Versioned {
         sources: Vec<RuntimeVersionedSource>,
     },
+    Adjacency {
+        sources: Vec<RuntimeVersionedSource>,
+        traversals: Vec<TraversalPlan>,
+    },
     Index {
         id: rrd_core::ProjectionId,
         kind: IndexKind,
@@ -309,12 +314,17 @@ impl ReadPath {
                     .into(),
             ));
         };
+        let traversals = std::iter::once(&shape.source)
+            .chain(shape.join.as_ref().map(|join| &join.source))
+            .filter_map(TraversalPlan::from_source)
+            .collect::<Vec<_>>();
         match access {
             PhysicalOperator::VersionedRead {
                 sources,
                 exact,
                 stable_order,
             } if *exact
+                && traversals.is_empty()
                 && stable_order == "global_cursor"
                 && sources == &plan.logical.version_sources
                 && selected[0].name
@@ -329,6 +339,32 @@ impl ReadPath {
             {
                 Ok(Self::Versioned {
                     sources: sources.clone(),
+                })
+            }
+            PhysicalOperator::AdjacencyTraversal {
+                sources,
+                exact,
+                stable_order,
+            } if *exact
+                && !traversals.is_empty()
+                && stable_order == "global_cursor"
+                && sources == &plan.logical.version_sources
+                && selected[0].name == "adjacency_traversal"
+                && traversals.iter().all(|traversal| {
+                    sources.iter().any(|source| match source {
+                        RuntimeVersionedSource::Identity { model, reference } => {
+                            model.is_record_like() && reference == &traversal.start
+                        }
+                        RuntimeVersionedSource::Records { kind } => kind
+                            .as_ref()
+                            .is_none_or(|kind| kind == &traversal.start.kind),
+                        _ => false,
+                    })
+                }) =>
+            {
+                Ok(Self::Adjacency {
+                    sources: sources.clone(),
+                    traversals,
                 })
             }
             PhysicalOperator::MaterializedIndex {
@@ -434,11 +470,30 @@ impl ReadPath {
                 read_evidence: validation.evidence,
             });
         }
-        let sources = match self {
-            Self::Versioned { sources } => sources,
+        let selected = match self {
+            Self::Versioned { sources } => {
+                engine.runtime().read_versioned(stamp, sources, budget)?
+            }
+            Self::Adjacency {
+                sources,
+                traversals,
+            } => {
+                let mut expansion = AdjacencyExpansion::new(
+                    &stamp.scope,
+                    shape.valid_at,
+                    shape.known_at_cursor,
+                    sources,
+                    traversals,
+                );
+                engine.runtime().read_versioned_expanding(
+                    stamp,
+                    sources,
+                    budget,
+                    &mut |changes| expansion.next(changes),
+                )?
+            }
             Self::Index { .. } => unreachable!("indexes return above"),
         };
-        let selected = engine.runtime().read_versioned(stamp, sources, budget)?;
         let selected_versions = selected.changes.len();
         let rows = rows_for_source(
             &selected.changes,
@@ -782,7 +837,7 @@ fn rows_for_source(
             start,
             direction,
             max_depth,
-        } => traversal_rows(
+        } => crate::physical::graph::traversal_rows(
             changes,
             scope,
             relation,
@@ -802,93 +857,8 @@ fn rows_for_source(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn traversal_rows(
-    changes: &[RuntimeChange],
-    scope: &rrd_core::ScopeId,
-    relation_kind: &rrd_core::RuntimeType,
-    start: &rrd_core::RuntimeRef,
-    direction: TraversalDirection,
-    max_depth: u16,
-    valid_at: u64,
-    known_at_cursor: u64,
-) -> Vec<QueryRow> {
-    let (records, relations) = active_graph_values(changes, scope, valid_at, known_at_cursor);
-    if !records.contains_key(start) {
-        return Vec::new();
-    }
-    let mut relations = relations
-        .into_values()
-        .filter(|relation| &relation.reference.kind == relation_kind)
-        .collect::<Vec<_>>();
-    relations.sort_by(|left, right| left.reference.cmp(&right.reference));
-    let mut visited = BTreeSet::from([start.clone()]);
-    let mut queue = VecDeque::from([(start.clone(), 0_u16, vec![start.clone()])]);
-    let mut rows = Vec::new();
-    while let Some((current, depth, path)) = queue.pop_front() {
-        if depth >= max_depth {
-            continue;
-        }
-        for relation in &relations {
-            let next = match direction {
-                TraversalDirection::Outgoing if relation.from == current => Some(&relation.to),
-                TraversalDirection::Incoming if relation.to == current => Some(&relation.from),
-                TraversalDirection::Both if relation.from == current => Some(&relation.to),
-                TraversalDirection::Both if relation.to == current => Some(&relation.from),
-                _ => None,
-            };
-            let Some(next) = next else {
-                continue;
-            };
-            if !visited.insert(next.clone()) {
-                continue;
-            }
-            let next_depth = depth + 1;
-            let mut next_path = path.clone();
-            next_path.push(next.clone());
-            let mut values = BTreeMap::new();
-            values.insert(
-                "depth".into(),
-                RuntimeValue::Unsigned(u64::from(next_depth)),
-            );
-            values.insert("node_kind".into(), string(next.kind.to_string()));
-            values.insert("node_id".into(), string(next.id.to_string()));
-            values.insert(
-                "relation_kind".into(),
-                string(relation.reference.kind.to_string()),
-            );
-            values.insert(
-                "relation_id".into(),
-                string(relation.reference.id.to_string()),
-            );
-            values.insert("from_kind".into(), string(relation.from.kind.to_string()));
-            values.insert("from_id".into(), string(relation.from.id.to_string()));
-            values.insert("to_kind".into(), string(relation.to.kind.to_string()));
-            values.insert("to_id".into(), string(relation.to.id.to_string()));
-            values.insert(
-                "path".into(),
-                RuntimeValue::List(
-                    next_path
-                        .iter()
-                        .map(|node| string(format!("{}:{}", node.kind, node.id)))
-                        .collect(),
-                ),
-            );
-            rows.push(QueryRow {
-                identity: format!(
-                    "traversal:{}:{}:{}:{}:{}:{}",
-                    relation_kind, start.kind, start.id, next_depth, relation.reference.id, next.id
-                ),
-                values,
-            });
-            queue.push_back((next.clone(), next_depth, next_path));
-        }
-    }
-    rows
-}
-
-fn active_graph_values(
-    changes: &[RuntimeChange],
+pub(crate) fn active_graph_values<'a>(
+    changes: impl IntoIterator<Item = &'a RuntimeChange>,
     scope: &rrd_core::ScopeId,
     valid_at: u64,
     known_at_cursor: u64,
@@ -899,7 +869,7 @@ fn active_graph_values(
     let mut records = BTreeMap::new();
     let mut relations = BTreeMap::new();
     for change in changes
-        .iter()
+        .into_iter()
         .filter(|change| change.cursor <= known_at_cursor && &change.scope == scope)
     {
         match &change.mutation {
@@ -1216,7 +1186,7 @@ fn apply_projection(row: &mut QueryRow, projection: &Projection) {
     }
 }
 
-fn string(value: String) -> RuntimeValue {
+pub(crate) fn string(value: String) -> RuntimeValue {
     RuntimeValue::String(value)
 }
 

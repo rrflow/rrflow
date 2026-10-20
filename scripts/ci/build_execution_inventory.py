@@ -732,6 +732,10 @@ GENERATED_PROJECTIONS = {
 }
 
 PLANNED_PATHS: dict[str, tuple[str, ...]] = {
+    "crates/transport/rrd-contract/src/graph_family.rs": ("H-09",),
+    "crates/authority/rrd-engine/src/engine/graph_family.rs": ("H-09",),
+    "crates/transport/rrd-contract/src/project_link.rs": ("H-10",),
+    "crates/authority/rrd-engine/src/engine/project_link.rs": ("H-10",),
     "scripts/ci/check_change_plan.py": ("J-01", "J-02"),
     "scripts/ci/test_change_plan.py": ("J-01", "J-02"),
     "crates/persistence/rrd-lsm/src/lib.rs": ("C-02", "C-07", "D-01"),

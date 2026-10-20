@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 52cee221bf6d1c22b8146fd490cfd080af764b21270ca50caee6a5abce21de76
+// OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -7891,7 +7891,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -8102,7 +8102,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -8243,7 +8243,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -8433,7 +8433,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -15170,7 +15170,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -15407,7 +15407,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -15807,7 +15807,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -16145,7 +16145,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -16572,7 +16572,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -16762,7 +16762,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -17149,7 +17149,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -17322,7 +17322,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -20077,7 +20077,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -20216,7 +20216,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -20417,7 +20417,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -20560,7 +20560,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -24819,7 +24819,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -26751,7 +26751,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -27627,7 +27627,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -27893,7 +27893,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -28565,7 +28565,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -28832,7 +28832,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -29424,7 +29424,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -29591,7 +29591,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */

@@ -155,6 +155,8 @@ define the native rrflowDB SQL/client and data-portability work.
 | [ ] | H-06 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | H-07 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | H-08 | [Gate H](rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages) |
+| [ ] | H-09 | [Gate H](rrflow-1.0/gate-h.md) |
+| [ ] | H-10 | [Gate H](rrflow-1.0/gate-h.md) |
 | [ ] | I-01 | [Gate I](rrflow-1.0/gate-i.md) |
 | [ ] | I-02 | [Gate I](rrflow-1.0/gate-i.md) |
 | [ ] | I-03 | [Gate I](rrflow-1.0/gate-i.md) |
