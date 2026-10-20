@@ -7,7 +7,7 @@ use crate::engine::token_key::{
 use std::fs::File;
 use std::io::Read;
 
-const INSTALL_INTENT_FORMAT: u16 = 1;
+const INSTALL_INTENT_FORMAT: u16 = 2;
 const MAX_INSTALL_INTENT_BYTES: u64 = 32 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,7 +63,7 @@ impl InstallRecoveryState {
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct InstallIntentV1 {
+pub(super) struct InstallIntent {
     format_version: u16,
     stage: InstallApplyStage,
     plan_sha256: String,
@@ -74,7 +74,7 @@ pub(super) struct InstallIntentV1 {
     profile_sha256: String,
     executable_sha256: String,
     configuration_sha256: String,
-    applied_at_unix_ms: u64,
+    clock_anchor: ClockObservation,
     token_key_bytes: Vec<u8>,
     token_key_sha256: String,
     operator_credential_bytes: Vec<u8>,
@@ -82,10 +82,10 @@ pub(super) struct InstallIntentV1 {
     intent_sha256: String,
 }
 
-impl std::fmt::Debug for InstallIntentV1 {
+impl std::fmt::Debug for InstallIntent {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("InstallIntentV1")
+            .debug_struct("InstallIntent")
             .field("format_version", &self.format_version)
             .field("stage", &self.stage)
             .field("plan_sha256", &self.plan_sha256)
@@ -99,7 +99,7 @@ impl std::fmt::Debug for InstallIntentV1 {
             .field("profile_sha256", &self.profile_sha256)
             .field("executable_sha256", &self.executable_sha256)
             .field("configuration_sha256", &self.configuration_sha256)
-            .field("applied_at_unix_ms", &self.applied_at_unix_ms)
+            .field("clock_anchor", &self.clock_anchor)
             .field("token_key_bytes", &"[REDACTED]")
             .field("token_key_sha256", &self.token_key_sha256)
             .field("operator_credential_bytes", &"[REDACTED]")
@@ -109,8 +109,8 @@ impl std::fmt::Debug for InstallIntentV1 {
     }
 }
 
-impl InstallIntentV1 {
-    fn new(preview: &InstallationPreview, applied_at_unix_ms: u64) -> Result<Self> {
+impl InstallIntent {
+    fn new(preview: &InstallationPreview, clock_anchor: &ClockObservation) -> Result<Self> {
         let token_key = generate_token_key().map_err(storage_error)?;
         let credential = generate_api_key_document(
             &preview.installation.plan_sha256,
@@ -135,7 +135,7 @@ impl InstallIntentV1 {
                 .configuration
                 .configuration_sha256
                 .clone(),
-            applied_at_unix_ms,
+            clock_anchor: clock_anchor.clone(),
             token_key_bytes: token_key.to_vec(),
             token_key_sha256: digest::sha256_hex(&token_key),
             operator_credential_bytes,
@@ -158,7 +158,7 @@ impl InstallIntentV1 {
             &self.profile_sha256,
             &self.executable_sha256,
             &self.configuration_sha256,
-            self.applied_at_unix_ms,
+            &self.clock_anchor,
             &self.token_key_bytes,
             &self.token_key_sha256,
             &self.operator_credential_bytes,
@@ -184,7 +184,6 @@ impl InstallIntentV1 {
             || self.executable_sha256 != executable_sha256
             || self.executable_sha256 != preview.installation.executable_sha256
             || self.configuration_sha256 != preview.installation.configuration.configuration_sha256
-            || self.applied_at_unix_ms == 0
             || self.token_key_sha256 != digest::sha256_hex(&token_key)
             || credential.plan_sha256 != preview.installation.plan_sha256
             || credential.principal_id != preview.installation.initial_principal_id
@@ -194,11 +193,11 @@ impl InstallIntentV1 {
         {
             return Err(ServiceError::ProjectBindingMismatch);
         }
-        Ok(())
+        self.clock_anchor.validate()
     }
 
-    pub(super) fn applied_at_unix_ms(&self) -> u64 {
-        self.applied_at_unix_ms
+    pub(super) fn clock_anchor(&self) -> &ClockObservation {
+        &self.clock_anchor
     }
 
     pub(super) fn token_key(&self) -> Result<[u8; TOKEN_KEY_BYTES]> {
@@ -229,9 +228,9 @@ pub(super) fn load_or_create_intent(
     project: &Path,
     layout: &EstateLayout,
     preview: &InstallationPreview,
-    at_unix_ms: u64,
+    clock_anchor: &ClockObservation,
     executable_sha256: &str,
-) -> Result<(InstallIntentV1, InstallRecoveryState)> {
+) -> Result<(InstallIntent, InstallRecoveryState)> {
     let path = install_intent_path(project, layout)?;
     match std::fs::symlink_metadata(&path) {
         Ok(_) => {
@@ -240,7 +239,7 @@ pub(super) fn load_or_create_intent(
             Ok((intent, InstallRecoveryState::OwnedIntent))
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let intent = InstallIntentV1::new(preview, at_unix_ms)?;
+            let intent = InstallIntent::new(preview, clock_anchor)?;
             intent.validate(preview, executable_sha256)?;
             write_private_new(&path, &intent.encoded()?).map_err(storage_error)?;
             let readback = read_intent(&path)?;
@@ -258,7 +257,7 @@ pub(super) fn read_existing_intent(
     layout: &EstateLayout,
     preview: &InstallationPreview,
     executable_sha256: &str,
-) -> Result<Option<InstallIntentV1>> {
+) -> Result<Option<InstallIntent>> {
     let path = install_intent_path(project, layout)?;
     match std::fs::symlink_metadata(&path) {
         Ok(_) => {
@@ -296,7 +295,7 @@ pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: boo
 pub(super) fn acknowledge_intent(
     project: &Path,
     layout: &EstateLayout,
-    expected: &InstallIntentV1,
+    expected: &InstallIntent,
 ) -> Result<()> {
     let path = install_intent_path(project, layout)?;
     if read_intent(&path)? != *expected {
@@ -306,9 +305,9 @@ pub(super) fn acknowledge_intent(
     rrd_store::sync_directory_metadata(project).map_err(storage_error)
 }
 
-fn read_intent(path: &Path) -> Result<InstallIntentV1> {
+fn read_intent(path: &Path) -> Result<InstallIntent> {
     let bytes = read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)?;
-    let intent: InstallIntentV1 = serde_json::from_slice(&bytes).map_err(contract_json)?;
+    let intent: InstallIntent = serde_json::from_slice(&bytes).map_err(contract_json)?;
     if intent.encoded()? != bytes {
         return Err(ServiceError::ProjectBindingMismatch);
     }

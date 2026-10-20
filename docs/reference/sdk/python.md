@@ -46,25 +46,25 @@ and pytest 9.1.1 for development. The reviewed executable layout is:
 
 ```text
 sdks/python/
-├── pyproject.toml
-├── uv.lock
-├── scripts/generate.py
-├── src/rrd_client/
-│   ├── __init__.py
-│   ├── client.py
-│   ├── endpoint.py
-│   ├── error.py
-│   ├── operation.py
-│   ├── retry.py
-│   ├── session.py
-│   ├── transport.py
-│   ├── py.typed
-│   └── generated/
-│       ├── __init__.py
-│       └── endpoints.py
-└── tests/
-    ├── test_client.py
-    └── sdk_conformance.py
+â”œâ”€â”€ pyproject.toml
+â”œâ”€â”€ uv.lock
+â”œâ”€â”€ scripts/generate.py
+â”œâ”€â”€ src/rrd_client/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ client.py
+â”‚   â”œâ”€â”€ endpoint.py
+â”‚   â”œâ”€â”€ error.py
+â”‚   â”œâ”€â”€ operation.py
+â”‚   â”œâ”€â”€ retry.py
+â”‚   â”œâ”€â”€ session.py
+â”‚   â”œâ”€â”€ transport.py
+â”‚   â”œâ”€â”€ py.typed
+â”‚   â””â”€â”€ generated/
+â”‚       â”œâ”€â”€ __init__.py
+â”‚       â””â”€â”€ endpoints.py
+â””â”€â”€ tests/
+    â”œâ”€â”€ test_client.py
+    â””â”€â”€ sdk_conformance.py
 ```
 
 `RrdClient` is a synchronous HTTP client. It exposes ergonomic calls for
@@ -114,7 +114,7 @@ The current generated projection contains:
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
 It does not generate request models, response models, error-code constraints,
 path-parameter sets, security actions, exact success statuses, media types,
@@ -379,22 +379,22 @@ forwarding module. The executable source layout is:
 
 ```text
 sdks/python/src/rrd_client/
-├── __init__.py              # narrow public exports
-├── client.py                # synchronous construction and public calls
-├── endpoint.py              # current loopback endpoint policy
-├── error.py                 # current client and API error types
-├── operation.py             # request coordinates and resource validation
-├── retry.py                 # current broad attempt/deadline rule
-├── session.py               # current public bearer-bearing representation
-├── transport.py             # bounded HTTP response/envelope handling
-├── py.typed
-└── generated/
-    ├── __init__.py
-    └── endpoints.py
+â”œâ”€â”€ __init__.py              # narrow public exports
+â”œâ”€â”€ client.py                # synchronous construction and public calls
+â”œâ”€â”€ endpoint.py              # current loopback endpoint policy
+â”œâ”€â”€ error.py                 # current client and API error types
+â”œâ”€â”€ operation.py             # request coordinates and resource validation
+â”œâ”€â”€ retry.py                 # current broad attempt/deadline rule
+â”œâ”€â”€ session.py               # current public bearer-bearing representation
+â”œâ”€â”€ transport.py             # bounded HTTP response/envelope handling
+â”œâ”€â”€ py.typed
+â””â”€â”€ generated/
+    â”œâ”€â”€ __init__.py
+    â””â”€â”€ endpoints.py
 
 sdks/python/tests/
-├── test_client.py
-└── sdk_conformance.py
+â”œâ”€â”€ test_client.py
+â””â”€â”€ sdk_conformance.py
 ```
 
 `async_client.py`, `subscription.py`, generated `models.py`, and the planned

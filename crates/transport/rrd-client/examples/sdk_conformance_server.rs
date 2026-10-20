@@ -78,7 +78,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         InstallationTargetKind::FreshProject,
         &preview,
         &plan_sha256,
-        1,
         &distribution,
     )?;
     let root = project.join(

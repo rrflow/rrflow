@@ -58,29 +58,29 @@ The complete reviewed source layout is:
 
 ```text
 sdks/java/
-├── pom.xml
-├── scripts/
-│   └── generate.py
-└── src/
-    ├── main/java/io/rrflow/rrd/
-    │   ├── package-info.java
-    │   ├── ClientConfig.java
-    │   ├── EndpointResolver.java
-    │   ├── HttpTransport.java
-    │   ├── OperationBinding.java
-    │   ├── OperationExecutor.java
-    │   ├── OperationId.java
-    │   ├── ProtocolCodec.java
-    │   ├── RequestOptions.java
-    │   ├── ResourceSegment.java
-    │   ├── RetryPolicy.java
-    │   ├── RrdApiException.java
-    │   ├── RrdClient.java
-    │   ├── RrdClientException.java
-    │   └── Session.java
-    └── test/java/io/rrflow/rrd/
-        ├── RrdClientTest.java
-        └── SdkConformanceTest.java
+â”œâ”€â”€ pom.xml
+â”œâ”€â”€ scripts/
+â”‚   â””â”€â”€ generate.py
+â””â”€â”€ src/
+    â”œâ”€â”€ main/java/io/rrflow/rrd/
+    â”‚   â”œâ”€â”€ package-info.java
+    â”‚   â”œâ”€â”€ ClientConfig.java
+    â”‚   â”œâ”€â”€ EndpointResolver.java
+    â”‚   â”œâ”€â”€ HttpTransport.java
+    â”‚   â”œâ”€â”€ OperationBinding.java
+    â”‚   â”œâ”€â”€ OperationExecutor.java
+    â”‚   â”œâ”€â”€ OperationId.java
+    â”‚   â”œâ”€â”€ ProtocolCodec.java
+    â”‚   â”œâ”€â”€ RequestOptions.java
+    â”‚   â”œâ”€â”€ ResourceSegment.java
+    â”‚   â”œâ”€â”€ RetryPolicy.java
+    â”‚   â”œâ”€â”€ RrdApiException.java
+    â”‚   â”œâ”€â”€ RrdClient.java
+    â”‚   â”œâ”€â”€ RrdClientException.java
+    â”‚   â””â”€â”€ Session.java
+    â””â”€â”€ test/java/io/rrflow/rrd/
+        â”œâ”€â”€ RrdClientTest.java
+        â””â”€â”€ SdkConformanceTest.java
 ```
 
 A-07.1f directly produced this layout from the former 390-line
@@ -129,7 +129,7 @@ checked-in `OperationId.java` contains:
 - wire operation name, HTTP method, route template, first authentication
   scheme, and mutation flag for each constant; and
 - OpenAPI SHA-256
-  `97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11`.
+  `6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 
 An earlier flat record incorrectly said 34 routes when the generator, enum,
 unit assertion, public catalogue, and OpenAPI projection contained 33. The
@@ -440,29 +440,29 @@ contract:
 
 ```text
 sdks/java/
-├── pom.xml
-├── scripts/
-│   └── generate.py
-└── src/
-    ├── main/java/io/rrflow/rrd/
-    │   ├── package-info.java            # public boundary and canonical links
-    │   ├── ClientConfig.java            # current validated construction
-    │   ├── EndpointResolver.java        # current loopback route resolution
-    │   ├── HttpTransport.java           # current bounded response carriage
-    │   ├── OperationBinding.java        # current common request binding
-    │   ├── OperationExecutor.java       # current synchronous coordination
-    │   ├── OperationId.java             # catalogue-derived identifier map
-    │   ├── ProtocolCodec.java            # current partial envelope codec
-    │   ├── RequestOptions.java          # per-call semantic coordinates
-    │   ├── ResourceSegment.java         # typed public resource component
-    │   ├── RetryPolicy.java             # current broad replay/deadline rule
-    │   ├── RrdApiException.java         # typed engine denial
-    │   ├── RrdClient.java               # narrow synchronous public facade
-    │   ├── RrdClientException.java      # closed redacted error root
-    │   └── Session.java                 # current plain secret-bearing record
-    └── test/java/io/rrflow/rrd/
-        ├── RrdClientTest.java
-        └── SdkConformanceTest.java
+â”œâ”€â”€ pom.xml
+â”œâ”€â”€ scripts/
+â”‚   â””â”€â”€ generate.py
+â””â”€â”€ src/
+    â”œâ”€â”€ main/java/io/rrflow/rrd/
+    â”‚   â”œâ”€â”€ package-info.java            # public boundary and canonical links
+    â”‚   â”œâ”€â”€ ClientConfig.java            # current validated construction
+    â”‚   â”œâ”€â”€ EndpointResolver.java        # current loopback route resolution
+    â”‚   â”œâ”€â”€ HttpTransport.java           # current bounded response carriage
+    â”‚   â”œâ”€â”€ OperationBinding.java        # current common request binding
+    â”‚   â”œâ”€â”€ OperationExecutor.java       # current synchronous coordination
+    â”‚   â”œâ”€â”€ OperationId.java             # catalogue-derived identifier map
+    â”‚   â”œâ”€â”€ ProtocolCodec.java            # current partial envelope codec
+    â”‚   â”œâ”€â”€ RequestOptions.java          # per-call semantic coordinates
+    â”‚   â”œâ”€â”€ ResourceSegment.java         # typed public resource component
+    â”‚   â”œâ”€â”€ RetryPolicy.java             # current broad replay/deadline rule
+    â”‚   â”œâ”€â”€ RrdApiException.java         # typed engine denial
+    â”‚   â”œâ”€â”€ RrdClient.java               # narrow synchronous public facade
+    â”‚   â”œâ”€â”€ RrdClientException.java      # closed redacted error root
+    â”‚   â””â”€â”€ Session.java                 # current plain secret-bearing record
+    â””â”€â”€ test/java/io/rrflow/rrd/
+        â”œâ”€â”€ RrdClientTest.java
+        â””â”€â”€ SdkConformanceTest.java
 ```
 
 The following files remain deliberately absent until their assigned gate adds

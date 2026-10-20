@@ -202,12 +202,14 @@ binding are committed.
 
 ## Current pre-release slice and rollout
 
-Packages `D01-02-canonical-estate-layout-and-configuration-v1` and
-`D01-04-precanonical-authority-convergence-and-install-recovery-v5` implement
-the current concrete startup slice without claiming the complete target above:
+Packages `D01-02-canonical-estate-layout-and-configuration-v1`,
+`D01-04-precanonical-authority-convergence-and-install-recovery-v5`, and
+`D01-05-engine-owned-installation-clock-v1` implement the current concrete
+startup slice without claiming the complete target above:
 
 - `rrd-contract` owns `InstalledEstateIdentity`, three independent deployment
-  coordinates, and a strict self-digesting `EstateConfiguration`;
+  coordinates, and a strict self-digesting format-2 `EstateConfiguration`,
+  including `clock.maximum_rollback_ms` with a zero default;
 - the bundled default configuration or one explicit regular, non-symlinked
   TOML file up to 64 KiB is read during planning, validated below hard compiled
   maxima, assigned revision 1, and sealed into the plan;
@@ -224,9 +226,11 @@ the current concrete startup slice without claiming the complete target above:
 - server capabilities and generated OpenAPI/SDK types expose the effective
   configuration and exact deployment coordinates. Reasoning ceilings are
   visible, while `governed-reasoning-runner` remains honestly unavailable;
-- before the first `.rrflow` directory exists, apply publishes one owner-only,
-  plan-addressed recovery intent containing the frozen first-apply time and the
-  exact generated token/credential bytes. Retry accepts it only when its own
+- before the first `.rrflow` directory exists, `RrdEngine` obtains one fallible
+  `host_system_time` / `unverified` observation and publishes one owner-only,
+  plan-addressed recovery intent containing that frozen anchor and the exact
+  generated token/credential bytes. Ordinary callers cannot supply time. Retry
+  accepts the intent only when its own
   digest and the plan, target, project precondition, profile, executable, and
   configuration still match;
 - apply creates or exactly verifies each declared directory, store, token,
@@ -236,8 +240,14 @@ the current concrete startup slice without claiming the complete target above:
 - deterministic test-only observation stops before or after each of the eight
   durable stages: intent, directories, store, token, credential, engine commit,
   locator publication, and intent acknowledgement. Retrying the same plan
-  preserves first-apply time and leaves one token, credential, installed
+  preserves the first clock anchor and leaves one token, credential, installed
   record, policy, audit/checkpoint result, attunement plan/job, and locator;
+- recovery, exact replay, and installed open compare a fresh observation with
+  the anchor and fail closed when time is unavailable or rollback exceeds the
+  sealed policy. Read-only inspection still completes structural checks and
+  reports `current`, `rollback_within_tolerance`, `rollback_exceeded`, or
+  `unavailable` with exact non-secret coordinates; the last two make overall
+  verification fail;
 - malformed, symbolic, foreign, mismatched, partly committed, or missing-secret
   recovery state is preserved and rejected rather than guessed or overwritten;
   and
@@ -251,11 +261,12 @@ The implementation rejects any pre-existing `.rrflow` tree for a new install.
 It does not migrate, merge, or delete a user's pre-canonical
 `.rrflow/instance.toml` state; that collision remains a fail-closed diagnostic.
 The tracked development manifest has been deleted because no source path reads
-it. The source-built CLI obtains first-apply time from its host wall clock and
-passes it into the engine; a versioned trusted-clock capability and its
-rollback/skew/failure qualification remain open. Handle-relative race
-hardening, complete native ACL qualification, configuration plan/apply,
-attunement phase execution, full
+it. The clock substrate proves only relative rollback against a sealed anchor:
+it does not authenticate or correct UTC, detect every forward error or drift,
+or establish runtime-wide timestamp high-water rules. Platform synchronization
+diagnosis, explicitly authorized correction, and native clock qualification
+remain open. Handle-relative race hardening, complete native ACL
+qualification, configuration plan/apply, attunement phase execution, full
 verify/repair/restore/uninstall, service integration, release assembly, and
 clean-machine qualification remain separate packages. The staged rationale and
 exit proofs are in the
@@ -263,11 +274,14 @@ exit proofs are in the
 
 ## Open, serve, and readiness
 
-Normal open is `open_existing`, never create-or-open. It resolves the project
-locator, validates containment and digests, acquires the appropriate process
-lease, authenticates the CURRENT manifest closure, replays only complete
-contiguous WAL frames, restores the MVCC view, reconciles durable engine jobs,
-and refuses unsupported or corrupt state. A torn final frame is reported as a
+Normal open is `open_existing`, never create-or-open. A read-only inspector
+first resolves the project locator, validates the installed closure, and
+assesses the engine-owned host observation against the installed clock anchor
+and policy. Unsupported, corrupt, or unsafe-time state is rejected before the
+persistent engine is opened. Accepted open then validates the same locator,
+record, anchor, and configuration again while authenticating the CURRENT
+manifest closure, replaying only complete contiguous WAL frames, and restoring
+the MVCC view. A torn final frame is reported as a
 repairable condition; it is not truncated by a read-only open.
 
 `rrflow serve` composes the HTTP, WebSocket, and selected MCP presentation in
@@ -297,6 +311,8 @@ the serving process has stopped. Live health is the separate authenticated
   authenticated checksums;
 - WAL header plus contiguous complete-frame prefix without truncation;
 - security authority, install/attunement state, audit head, and last commit;
+- engine clock source/trust, sealed anchor, current observation or failure,
+  rollback, and configured tolerance;
 - projection source cursor/generation identities; and
 - no active conflicting writer for an offline-only check.
 
@@ -472,6 +488,13 @@ check class and omission. Serve/readiness records the binary/bundle identity
 and authenticated instance coordinates. Restore records source backup,
 staging, verification, and publication receipts.
 
+Clock traces contain the lifecycle boundary, source/trust, assessment, anchor,
+observation, rollback, tolerance, and failure class. They do not contain
+credentials, project content, prompts, private model reasoning, or arbitrary
+paths. `SystemTime` supplies fallible wall observations; monotonic process time
+is reserved for elapsed waits and measurements and is never persisted as civil
+authority.
+
 Failures must identify the exact stage, immutable input identity, safe retry
 classification, remaining state, and next permitted operation. Logs and error
 details are bounded and redacted.
@@ -503,6 +526,11 @@ supported target:
   raw-root startup openers, and creation callers are removed; explicit
   create-or-open engine construction remains only in component tests that do
   not claim installation.
+- Installation, retry, replay, open, and quick verification now share one
+  engine-owned clock boundary. The portable abrupt-kill/reopen lifecycle is
+  scheduled unchanged on Linux, Windows, and macOS development runners; only
+  Linux has passed in this local evidence, so native platform qualification
+  remains open.
 - The internal `rrd-server` process and embedded `rrflow-mcp` mode require an
   installed project plus the exact distribution executable and call
   `RrdEngine::open_installed`; neither can initialize absent state. They remain

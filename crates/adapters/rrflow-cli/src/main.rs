@@ -11,14 +11,6 @@ mod installed;
 
 use clap::Parser;
 use command::Cli;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-fn now_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system clock is before the Unix epoch")
-        .as_millis() as u64
-}
 
 /// Traces are opt-in and always use stderr so stdout remains the product's
 /// answer/protocol channel. JSON traces are selected independently of command
@@ -40,7 +32,7 @@ fn install_tracing() {
 fn main() -> std::process::ExitCode {
     install_tracing();
     let cli = Cli::parse();
-    finish(installed::execute(&cli.command, now_millis(), cli.json))
+    finish(installed::execute(&cli.command, cli.json))
 }
 
 fn finish(

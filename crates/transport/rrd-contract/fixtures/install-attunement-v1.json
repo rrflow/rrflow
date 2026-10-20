@@ -198,8 +198,11 @@
     "attunement_plan_id": "attune-01",
     "attunement_plan_sha256": "3813d050efdd0b627a942a6a7a77b593245afafe222cb99ad336688189e1625d",
     "configuration": {
-      "configuration_sha256": "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be",
-      "format_version": 1,
+      "clock": {
+        "maximum_rollback_ms": 0
+      },
+      "configuration_sha256": "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105",
+      "format_version": 2,
       "query": {
         "max_batch_rows": 256,
         "max_elapsed_ms": 30000,
@@ -298,7 +301,7 @@
         "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "507ef6a808a95af022c1ff3eaff5a56d6ebea19735505b354bbce2e5246ca68f",
+    "plan_sha256": "fba315f040319a49886538fc08cc3cb21833cc6a3f8622e595e25f5f72ab79ad",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -351,8 +354,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "507ef6a808a95af022c1ff3eaff5a56d6ebea19735505b354bbce2e5246ca68f",
-    "result_sha256": "74c7e6482b4a9451814fa3319eefaa680cc30c2330ddc508225a958195e7c01a",
+    "plan_sha256": "fba315f040319a49886538fc08cc3cb21833cc6a3f8622e595e25f5f72ab79ad",
+    "result_sha256": "6fb93b1593c4bf27ddd03e952125e0095fa201e08d036bfe0ea4f23c7bb45e2a",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },

@@ -87,6 +87,7 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {{
+    public const string OpenApiDocumentSha256 = "{openapi_digest}";
     public const int Count = {len(endpoints)};
 
     public static Endpoint Get(OperationId operation) => operation switch

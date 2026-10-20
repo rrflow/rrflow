@@ -3,13 +3,15 @@
 //! This is one bounded child lifecycle, not a generic process-kill matrix: the
 //! exact primary executable publishes its address, serves generated discovery,
 //! accepts its generated credential, survives restart, and passes the read-only
-//! verifier. Unix uses graceful SIGINT; Windows terminates only the owned child.
+//! verifier. The initial process is terminated after acknowledged writes; subsequent
+//! Unix shutdowns use graceful SIGINT. Only test-owned children are affected.
 
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
     transaction_operation_sha256, BackupCoverageSnapshot, BeginTransaction, CanonicalId,
     CloseSession, CommitTransaction, CreateInstanceBackup, CreateSession, ErrorCode, ExecuteQuery,
-    QueryBudget, QueryValue, RestoreInstanceBackup, SessionLimits, TransactionMutation,
+    QueryBudget, QueryResult, QueryValue, RestoreInstanceBackup, SessionLimits,
+    TransactionMutation,
 };
 use rrd_engine::RrdEngine;
 use std::collections::BTreeMap;
@@ -139,6 +141,11 @@ impl RunningEngine {
         }
         let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
         assert_eq!(announcement["status"], "listening");
+        let locator = RrdEngine::read_project_locator(project).unwrap();
+        assert_eq!(
+            announcement["instance_id"],
+            locator.identity.instance_id.as_str()
+        );
         static BUILD: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
         let build = BUILD.get_or_init(|| {
             let output = invoke(&["--json", "version"]);
@@ -156,6 +163,12 @@ impl RunningEngine {
             .unwrap()
             .to_owned();
         (process, address)
+    }
+
+    fn terminate(&mut self, captured: &mut Vec<u8>) {
+        self.child.kill().expect("terminate owned rrflow process");
+        self.child.wait().expect("reap owned rrflow process");
+        self.stop(captured);
     }
 
     fn stop(&mut self, captured: &mut Vec<u8>) {
@@ -186,9 +199,31 @@ impl Drop for RunningEngine {
     }
 }
 
-fn assert_restarted_status(project: &Path, valid_at: u64, expected: &str, captured: &mut Vec<u8>) {
+fn assert_restarted_status(
+    project: &Path,
+    valid_at: u64,
+    expected: &str,
+    captured: &mut Vec<u8>,
+) -> QueryResult {
     let (mut process, address) = RunningEngine::start(project, captured);
     let locator = RrdEngine::read_project_locator(project).unwrap();
+    let ready = invoke(&[
+        "--json",
+        "ready",
+        "--project",
+        project.to_str().unwrap(),
+        "--address",
+        &address,
+    ]);
+    capture_output(&ready, captured);
+    assert_success(&ready, "restarted authenticated discovery");
+    let ready: serde_json::Value = serde_json::from_slice(&ready.stdout).unwrap();
+    assert_eq!(ready["status"], "ready");
+    assert_eq!(
+        ready["capabilities"]["instance"]["id"],
+        locator.identity.instance_id.as_str()
+    );
+    assert_eq!(ready["authentication"]["session_closed"], true);
     let credential = RrdEngine::read_installed_api_key(project).unwrap();
     let client = RrdClient::connect_local(
         address.parse().unwrap(),
@@ -200,7 +235,7 @@ fn assert_restarted_status(project: &Path, valid_at: u64, expected: &str, captur
         .enable_all()
         .build()
         .unwrap();
-    runtime.block_on(async {
+    let result = runtime.block_on(async {
         let session = client
             .create_session(
                 credential.principal_id.clone(),
@@ -259,9 +294,11 @@ fn assert_restarted_status(project: &Path, valid_at: u64, expected: &str, captur
             )
             .await
             .unwrap();
+        result
     });
     process.stop(captured);
     assert!(!String::from_utf8_lossy(captured).contains(credential.credential()));
+    result
 }
 
 #[test]
@@ -377,7 +414,10 @@ fn installed_lifecycle(mode: &str) {
     let configuration_file = root.path().join("estate-configuration.toml");
     std::fs::write(
         &configuration_file,
-        r#"format_version = 1
+        r#"format_version = 2
+
+[clock]
+maximum_rollback_ms = 0
 
 [reasoning]
 max_run_elapsed_ms = 720000
@@ -511,6 +551,13 @@ max_elapsed_ms = 20000
     let verified: serde_json::Value = serde_json::from_slice(&verified.stdout).unwrap();
     assert_eq!(verified["status"], "passed");
     assert_eq!(verified["runtime_cursor"], 2);
+    assert_eq!(verified["clock"]["status"], "current");
+    assert_eq!(verified["clock"]["anchor"]["source"], "host_system_time");
+    assert_eq!(verified["clock"]["anchor"]["trust"], "unverified");
+    assert_eq!(
+        verified["clock"]["anchor"]["observed_at_unix_ms"],
+        installed_at
+    );
     assert_eq!(inventory(&project), installed_before_verify);
 
     let replay = invoke(&[
@@ -586,7 +633,7 @@ max_elapsed_ms = 20000
         },
     )
     .unwrap();
-    let backup_sha256 = tokio::runtime::Builder::new_current_thread()
+    let (backup_sha256, first_query, committed_claim_sequence) = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -817,7 +864,7 @@ max_elapsed_ms = 20000
                 )
                 .await
                 .unwrap();
-            backup.backup.backup_sha256
+            (backup.backup.backup_sha256, query, receipt.last_claim_sequence)
         });
 
     let live_verify = invoke(&["verify", "--project", project_arg, "--level", "quick"]);
@@ -827,7 +874,7 @@ max_elapsed_ms = 20000
         "offline verifier must not race the live writer"
     );
 
-    child.stop(&mut lifecycle_output);
+    child.terminate(&mut lifecycle_output);
     assert_restarted_status(
         &project,
         installed_at + 2_000,
@@ -933,12 +980,21 @@ max_elapsed_ms = 20000
     assert_eq!(after_publication["status"], "passed");
     assert_eq!(after_publication["runtime_cursor"], 3);
 
-    assert_restarted_status(
+    let restored_query = assert_restarted_status(
         &project,
-        installed_at + 2_000,
+        installed_at,
         "ui-queryable",
         &mut lifecycle_output,
     );
+    assert!(restored_query.known_at_cursor >= committed_claim_sequence);
+    assert_eq!(restored_query.canonical_query, first_query.canonical_query);
+    assert_eq!(restored_query.scope, first_query.scope);
+    assert_eq!(restored_query.schema_revision, first_query.schema_revision);
+    assert_eq!(
+        restored_query.read_manifest_sha256,
+        first_query.read_manifest_sha256
+    );
+    assert_eq!(restored_query.rows, first_query.rows);
     for (relative, bytes) in before {
         assert_eq!(std::fs::read(project.join(relative)).unwrap(), bytes);
     }

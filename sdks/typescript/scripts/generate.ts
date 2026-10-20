@@ -61,7 +61,7 @@ const endpoints = Object.fromEntries(
     }),
   ),
 );
-const generatedEndpoints = `// Generated from rrd-contract; do not edit.\n${generatedHeader}export const endpoints = ${JSON.stringify(endpoints, null, 2)} as const;\n\nexport type OperationId = keyof typeof endpoints;\n`;
+const generatedEndpoints = `// Generated from rrd-contract; do not edit.\n${generatedHeader}export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "${openapiDigest}" as const;\n\nexport const endpoints = ${JSON.stringify(endpoints, null, 2)} as const;\n\nexport type OperationId = keyof typeof endpoints;\n`;
 
 if (process.argv.includes("--check")) {
   const currentSchema = await readFile(schemaOutput, "utf8").catch(() => "");

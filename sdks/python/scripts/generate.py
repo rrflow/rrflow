@@ -55,6 +55,7 @@ def render() -> str:
         "# Generated from rrd-contract; do not edit.\n"
         f"# OpenAPI SHA-256: {openapi_digest}\n"
         "from typing import Final, Literal, TypedDict\n\n"
+        f'ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = "{openapi_digest}"\n\n'
         "OperationId = Literal[" + operations + "]\n\n"
         "class Endpoint(TypedDict):\n"
         "    method: str\n"

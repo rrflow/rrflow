@@ -306,7 +306,6 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         InstallationTargetKind::ExistingProject,
         &installation,
         &installation.installation.plan_sha256,
-        1,
         &executable,
     )
     .unwrap();

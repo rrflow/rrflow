@@ -69,6 +69,7 @@ def render() -> str:
         "public enum OperationId {\n"
         + ",\n".join(constants)
         + ";\n\n"
+        f'    static final String OPENAPI_DOCUMENT_SHA256 = "{openapi_digest}";\n\n'
         "    public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }\n\n"
         "    private final String wireName;\n"
         "    private final String method;\n"

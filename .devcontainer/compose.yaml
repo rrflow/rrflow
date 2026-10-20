@@ -1,0 +1,50 @@
+# Podman CLI entry for the RRFlow development workspace (local reproduction of
+# candidate CI only). Usage: docs/operations/ci.md#local-development-container.
+#
+#   podman compose -f .devcontainer/compose.yaml build
+#   podman compose -f .devcontainer/compose.yaml run --rm workspace .devcontainer/seed-workspace.sh
+#   podman compose -f .devcontainer/compose.yaml run --rm workspace
+#   podman compose -f .devcontainer/compose.yaml --profile pgvector up -d pgvector
+#
+# RRFLOW_DEV_TARGET=full selects the image with every SDK toolchain.
+name: rrflow-dev
+
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: Containerfile
+      target: ${RRFLOW_DEV_TARGET:-rust}
+    image: localhost/rrflow-dev:${RRFLOW_DEV_TARGET:-rust}
+    userns_mode: keep-id
+    network_mode: host
+    working_dir: /workspaces/rrflow
+    volumes:
+      - rrflow-src:/workspaces/rrflow
+      - rrflow-cache:/cache
+      - ..:/seed:ro
+    stdin_open: true
+    tty: true
+    command: ["bash", "-l"]
+
+  # Same image digest, database, credentials, and 127.0.0.1:5432 endpoint as
+  # the candidate-CI pgvector-feature job.
+  pgvector:
+    profiles: ["pgvector"]
+    image: docker.io/pgvector/pgvector@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
+    network_mode: host
+    environment:
+      POSTGRES_USER: rrflow_test
+      POSTGRES_PASSWORD: rrflow_test_password
+      POSTGRES_DB: rrd_operator_knowledge_test
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "rrflow_test", "-d", "rrd_operator_knowledge_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  rrflow-src:
+    name: rrflow-src
+  rrflow-cache:
+    name: rrflow-cache

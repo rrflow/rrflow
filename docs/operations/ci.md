@@ -64,10 +64,10 @@ semantic parity remains open under H-05a.
 The repository-policy partition also verifies the generated
 `docs/roadmap/rrflow-1.0-file-plan.jsonl`. That inventory must match every
 tracked or non-ignored path and every long-lived future path registered by its
-generator. Immediate absent paths are authorized by the earlier active change
-package and become current inventory records when created. Regenerate the
-inventory with `python3 scripts/ci/build_execution_inventory.py` after an
-accepted path or content change.
+generator. Newly created paths become current inventory records; the pull
+request description binds their intended scope. Regenerate the inventory with
+`python3 scripts/ci/build_execution_inventory.py` after an accepted path or
+content change.
 
 The Connectome UI is optional for engine operation, while candidate CI follows
 repository policy and recursively materializes every declared submodule. The
@@ -143,6 +143,69 @@ not authority. RRFlow deliberately has no installed Git/editor/provider hook:
 client Git hooks are not distributed by clone, can be skipped, and would create
 the exact provider-owned lifecycle behavior prohibited by `AGENTS.md`.
 
+## Local development container
+
+`.devcontainer/` reproduces the candidate-CI toolchain on any host that runs
+rootless Podman (or Docker) on amd64 Linux, including Podman machine on
+Windows. It is local reproduction and early feedback only: a container run is
+not candidate-CI, J-02, POAM-027, alpha, or release evidence, it is not a
+hook, and it declares no editor lifecycle command.
+
+| Target | Contents | Use |
+|---|---|---|
+| `rust` | snapshot-pinned Ubuntu 24.04 build dependencies, rustup 1.29.1, Rust from `rust-toolchain.toml`, uv, and the `actions/python-versions` CPython build that `setup-python` installs as `python3` | engine work, policy scripts, focused tests; the VS Code default |
+| `full` | `rust` plus Node, pnpm, Go, Temurin, Maven, and the .NET SDK | TypeScript/SDK work and `scripts/ci/run_sdk_conformance.py` |
+
+Every base image is digest pinned, every apt package resolves from one fixed
+Ubuntu snapshot, and every downloaded toolchain is verified with
+`sha256sum`/`sha512sum --check --strict` against a checksum in the
+Containerfile. Certificate bootstrap extracts trust roots from an Apt-authenticated
+package without installing a moving OpenSSL dependency; installed packages
+then resolve from the fixed snapshot. The Temurin download tag is recorded
+separately from the equivalent SemVer selector used by `setup-java`.
+`scripts/ci/check_workflow.py` fails when a container version,
+checksum, or image digest diverges from `rust-toolchain.toml` or
+`.github/workflows/ci-reusable.yml`, or when `devcontainer.json` declares a
+lifecycle command. Build steps are POSIX `sh` because Podman's default OCI
+image format ignores `SHELL`.
+
+Keep the source on a Linux filesystem; a Windows bind mount is slow and
+reintroduces executable-bit and line-ending drift. Two entry points share the
+`rrflow-cache` volume (Cargo registry, target directory, and language caches):
+
+- **VS Code:** set `dev.containers.dockerPath` to `podman`, then run
+  *Dev Containers: Clone Repository in Named Container Volume* for the
+  development repository. VS Code builds the `rust` target.
+- **Podman CLI:** from an existing checkout, with a compose provider such as
+  `podman-compose` on `PATH`:
+
+```bash
+podman compose -f .devcontainer/compose.yaml build
+podman compose -f .devcontainer/compose.yaml run --rm workspace \
+  /seed/.devcontainer/seed-workspace.sh
+podman compose -f .devcontainer/compose.yaml run --rm workspace
+```
+
+The seed script clones committed history from the read-only `/seed` mount of
+the invoking checkout into the `rrflow-src` volume and restores its remote
+names, URLs, and upstream. It copies no credentials, hooks, local Git
+configuration, or uncommitted files, and it refuses a non-empty volume. Set
+`RRFLOW_DEV_TARGET=full` to build and enter the SDK image.
+
+The optional pgvector service uses the candidate-CI image digest, database,
+and credentials on host networking, so the CI test URL works unchanged:
+
+```bash
+podman compose -f .devcontainer/compose.yaml --profile pgvector up -d pgvector
+RRFLOW_PGVECTOR_TEST_URL='postgresql://rrflow_test:rrflow_test_password@127.0.0.1:5432/rrd_operator_knowledge_test?sslmode=disable' \
+  RRFLOW_PGVECTOR_TEST_DISPOSABLE=1 \
+  cargo test -p rrd-operator-knowledge --all-targets --all-features --locked
+```
+
+Toolchain downloads are development build inputs, like the CI setup actions;
+they are never RRFlow install-time or runtime fetches. Only amd64 is
+supported; the checked-in digests and checksums name amd64 artifacts.
+
 The documentation policy machine-checks the owner chain, required
 change-authoring procedure/evidence fields, generated-index freshness,
 active-record classification, knowledge-package determinism, and local links.
@@ -166,7 +229,9 @@ supply-chain checks. It requires:
 - top-level read-only contents permission and no `pull_request_target` in any
   workflow; and
 - complete candidate-suite/default-feature/optional-feature coverage, bounded
-  candidate jobs, safe fork routing, and exact final-gate reduction.
+  candidate jobs, safe fork routing, and exact final-gate reduction; and
+- development-container toolchain, checksum, image, and pgvector parity with
+  candidate CI, strict download verification, and no editor lifecycle command.
 
 A Git submodule is a pinned source input, not an install-time fetch. The
 workspace architecture test accepts a gitlink only when `.gitmodules` declares

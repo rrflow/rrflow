@@ -19,7 +19,7 @@ final class SignalCatalogueTest {
         JsonNode catalogue = JSON.readTree(SignalCatalogue.JSON);
 
         assertEquals(EXPECTED_SIGNAL_SHA256, SignalCatalogue.SIGNAL_CATALOGUE_SHA256);
-        assertEquals(EXPECTED_OPENAPI_SHA256, SignalCatalogue.OPENAPI_DOCUMENT_SHA256);
+        assertEquals(OperationId.OPENAPI_DOCUMENT_SHA256, SignalCatalogue.OPENAPI_DOCUMENT_SHA256);
         assertEquals(1, catalogue.path("contract_version").asInt());
         assertEquals(4, catalogue.path("diagnostic_levels").size());
         assertEquals(9, catalogue.path("metric_attributes").size());

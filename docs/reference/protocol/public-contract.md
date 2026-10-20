@@ -63,7 +63,7 @@ version, which remains frozen at `1.0.0` by the
 [version policy](../release/version-policy.md).
 
 The deterministic OpenAPI projection is currently bound to SHA-256
-`97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11`.
+`6a1308b9f4fb436310fc379ae31c33b9c527235b31177741ce58e65fb10a0e69`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against
@@ -84,8 +84,8 @@ the focused parity test compares OpenAPI back to the live kernel value.
 
 | Contract | Current rule |
 |---|---|
-| `CanonicalId` | 1–128 bytes; lowercase ASCII letters, digits, and bounded `-`, `_`, or `.` placement; human labels remain separate. |
-| `CorrelationId` | 1–128 ASCII letters, digits, `-`, `_`, `.`, or `:` for request, operation, transaction, session, subscription, and idempotency coordinates. |
+| `CanonicalId` | 1â€“128 bytes; lowercase ASCII letters, digits, and bounded `-`, `_`, or `.` placement; human labels remain separate. |
+| `CorrelationId` | 1â€“128 ASCII letters, digits, `-`, `_`, `.`, or `:` for request, operation, transaction, session, subscription, and idempotency coordinates. |
 | `ResourcePath` | One to sixteen explicit typed segments; a resource kind cannot repeat; nothing is inferred from cwd, connection state, or a display label. |
 | `RequestContext` | Carries request ID, operation ID, optional idempotency key, and optional absolute deadline. Contract validation requires an idempotency key when the catalogued operation is a mutation. |
 | `RequestEnvelope<T>` | Binds protocol identity, request context, explicit resource path, and typed payload. |
@@ -119,6 +119,14 @@ its `deployment_mode` field and its mixed `rrflow_mx`, `embedded`,
 `storage_profile`, and `endpoint_presentation`. `ServiceCapabilities` also
 projects the optional installed project/estate/instance identity and complete
 effective `EstateConfiguration` revision/digest.
+
+The sole accepted estate-configuration input is format `2`. It adds the closed
+`clock.maximum_rollback_ms` policy to reasoning, recall, and query ceilings.
+The engine assigns revision and the v2 domain-separated digest; the strict
+default is zero and the compiled maximum is one hour. This field governs
+relative rollback against an installed engine observation. It does not state
+that the host clock is synchronized or trusted, and clients cannot use it as a
+clock-correction grant.
 
 The installed composition root supplies identity, storage, and configuration;
 the server supplies endpoint presentation from the actual bound address.
@@ -178,7 +186,7 @@ prove that engine by itself:
 | rrflowQL query | Query text, typed parameters, read coordinates, plan evidence, rows, and scan/memory/spill/time/output budgets have public forms. | Accepted C-04 evidence proves bounded authenticated direct reads at one `ReadStamp`. F-01 through F-05 still must prove bounded streaming Arrow/DataFusion execution and remove eager `Vec<QueryRow>` materialization. |
 | Graph, BM25, vector, and retrieval | Typed graph mutations, scalar/BM25 catalogue kinds, named dense/sparse/multi-dense vectors, HNSW index configuration, explicit scalar/product/binary/TurboQuant lifecycle operations, filters, exact/approximate search, recursive retrieval, and RRF evidence can be represented. | E-01 through E-05 and F-03 must prove transactional native access paths, exact fallbacks, deterministic fusion, recall, update/delete, and reopen behavior. |
 | Context and reasoning | Bounded context packets, reasoning trees, route requests/decisions, and B-03 model-manifest pre-load admission have provider-neutral contracts. | G/H must prove executable routing, persisted CAS tree execution, engine-selected fast or analytical paths, authorized same-stamp context, feedback, and replay. |
-| Installation and knowledge | Provider-neutral installation/attunement jobs and content-addressed knowledge packages have contracts. The bounded D-01 slice proves deterministic plan/apply, one canonical project-local estate, sealed effective configuration, portable locator, installed close/open, capability discovery, and real-process ceiling denial. | D-01 still owns interruption-safe resume/cleanup, native pathname/ACL qualification, lifecycle convergence, and release-contained install/start/verify assets; later D and KB-06 through KB-08 own complete attunement, project inventory, authorized import, readback, and warp resolution. |
+| Installation and knowledge | Provider-neutral installation/attunement jobs and content-addressed knowledge packages have contracts. The bounded D-01 slices prove deterministic plan/apply, one canonical project-local estate, sealed format-2 configuration, portable locator, installed close/open, capability discovery, real-process ceiling denial, and engine-owned unverified clock anchoring with rollback diagnosis/enforcement. | D-01 still owns trusted-time/platform qualification, native pathname/ACL qualification, remaining lifecycle operations, and release-contained install/start/verify assets; later D and KB-06 through KB-08 own complete attunement, project inventory, authorized import, readback, and warp resolution. |
 | Delivery and clients | Changefeeds, durable subscriptions, endpoint discovery, OpenAPI, the B-04 closed multiplexed WebSocket protocol, its Rust client/server implementation, B-05 GraphQL-to-bound-query lowering, and SDK corpus types exist. | H-03/H-04 and J must prove commit-impact delivery, operation execution/cancellation, public GraphQL carriage, cross-surface equivalence, correlated traces, and a clean self-contained deployment. |
 
 Passing a row's serialization test cannot satisfy the behavioral proof in the
@@ -212,8 +220,8 @@ D-01 estate/configuration slice.
 
 | Evidence | What it establishes | What it does not establish |
 |---|---|---|
-| `cargo test -p rrd-contract --test deployment_configuration_contract --locked` | Strict project/estate/instance identity, valid deployment combinations, configuration maxima/digest, and rejection of unknown or old scalar fields. | Installation, runtime enforcement, reasoning execution, or profile equivalence. |
-| `cargo test -p rrd-contract --test public_contract --locked` | Strict selected wire shapes, bounds, 40-operation catalogue, one generic WebSocket descriptor, OpenAPI digest, deployment/SDK corpus validation, and selected cross-language digest vectors. | Server dispatch, storage semantics, DataFusion streaming, native indexes, reasoning execution, or all-language SDK conformance. |
+| `cargo test -p rrd-contract --test deployment_configuration_contract --locked` | Strict project/estate/instance identity, valid deployment combinations, format-2 clock/AI workload ceilings, configuration digest binding, a valid zero-as-strict clock policy, and rejection of unknown/old shapes or invalid workload bounds. | Installation, runtime enforcement, clock synchronization/correction, reasoning execution, or profile equivalence. |
+| `cargo test -p rrd-contract --test public_contract --locked` | Strict selected wire shapes, bounds, 41-operation catalogue, one generic WebSocket descriptor, OpenAPI digest, deployment/SDK corpus validation, and selected cross-language digest vectors. | Server dispatch, storage semantics, DataFusion streaming, native indexes, reasoning execution, or all-language SDK conformance. |
 | `cargo test -p rrd-contract --test signal_catalogue_projection --locked` | Exact kernel-to-OpenAPI catalogue/fingerprint equality, 4/9/22 closure, and a discovery-only field boundary. | Signal emission, level activation, propagation, export, diagnostic parity, overhead, or engine behavior. |
 | `cargo test -p rrd-contract --test websocket_contract --locked` | The B-04 golden frame contract, sender directions, sequence and connection integrity, exact correlations/resume coordinates, negotiated/hard resource limits, and malformed/unknown representation rejection. | H-04 operation execution, generated-language carriage, or release qualification. |
 | `cargo test -p rrd-query --test graphql_equivalence --locked` | B-05 schema-derived GraphQL parsing, lowering, bound-query/digest equality with rrflowQL, historical-schema binding, typed variables, and fail-closed unsupported shapes. | A public GraphQL route, transport authentication, engine execution, storage/index behavior, or cross-surface qualification. |

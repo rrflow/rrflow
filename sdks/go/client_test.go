@@ -60,7 +60,8 @@ func TestCapabilitiesRetryAndIdentity(t *testing.T) {
 					"storage_profile": "rrflow_kv", "endpoint_presentation": "loopback_http_websocket",
 				},
 				"configuration": map[string]any{
-					"format_version": 1, "revision": 1,
+					"format_version": 2, "revision": 1,
+					"clock": map[string]any{"maximum_rollback_ms": 0},
 					"reasoning": map[string]any{
 						"max_run_elapsed_ms": 900000, "max_steps": 256, "max_step_elapsed_ms": 60000,
 					},
@@ -72,7 +73,7 @@ func TestCapabilitiesRetryAndIdentity(t *testing.T) {
 						"max_batch_rows": 256, "max_memory_bytes": 67108864,
 						"max_spill_bytes": 268435456, "max_elapsed_ms": 30000,
 					},
-					"configuration_sha256": "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be",
+					"configuration_sha256": "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105",
 				},
 				"instance":     map[string]any{"kind": "instance", "id": "sdk-test"},
 				"capabilities": []any{},

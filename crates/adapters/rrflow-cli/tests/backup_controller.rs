@@ -51,7 +51,6 @@ fn install_instance(state_root: &Path) -> PathBuf {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1,
         &executable,
     )
     .unwrap();

@@ -1,5 +1,9 @@
 use super::*;
-use crate::{InstallationPreview, InstallationVerificationStatus};
+use crate::engine::clock::FixedClock;
+use crate::{
+    ClockAssessmentStatus, ClockObservationFailure, ClockSourceKind, ClockTrustLevel,
+    InstallationPreview, InstallationVerificationReport, InstallationVerificationStatus,
+};
 use rrd_contract::{installation_plan_sha256, InstallationTargetKind, SessionLease};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -41,6 +45,18 @@ fn plan(project: &Path) -> InstallationPreview {
 
 fn test_executable() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
+}
+
+fn open_at(project: &Path, executable: &Path, at_unix_ms: u64) -> crate::Result<RrdEngine> {
+    RrdEngine::open_installed_with_clock(project, executable, &FixedClock::at(at_unix_ms))
+}
+
+fn inspect_at(
+    project: &Path,
+    executable: &Path,
+    at_unix_ms: u64,
+) -> crate::Result<InstallationVerificationReport> {
+    RrdEngine::inspect_installed_with_clock(project, executable, &FixedClock::at(at_unix_ms))
 }
 
 #[test]
@@ -97,7 +113,7 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
     std::fs::write(project.path().join("README.md"), "walking product\n").unwrap();
     let preview = plan(project.path());
     let executable = test_executable();
-    let result = RrdEngine::apply_installation(
+    let result = RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -110,8 +126,13 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
     assert_eq!(result.runtime_cursor, 2);
     assert!(project.path().join(".rrflow/config.toml").is_file());
 
-    assert!(RrdEngine::open_installed(project.path(), &project.path().join("README.md")).is_err());
-    let engine = RrdEngine::open_installed(project.path(), &executable).unwrap();
+    assert!(open_at(
+        project.path(),
+        &project.path().join("README.md"),
+        1_800_000_000_001
+    )
+    .is_err());
+    let engine = open_at(project.path(), &executable, 1_800_000_000_001).unwrap();
     assert!(engine.security_enforced().unwrap());
     assert_eq!(
         engine.installed_estate_identity(),
@@ -132,8 +153,15 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
     drop(engine);
 
     let before = inventory(project.path());
-    let report = RrdEngine::inspect_installed(project.path(), &executable).unwrap();
+    let report = inspect_at(project.path(), &executable, 1_800_000_000_001).unwrap();
     assert_eq!(report.status, InstallationVerificationStatus::Passed);
+    assert_eq!(report.clock.status, ClockAssessmentStatus::Current);
+    assert_eq!(report.clock.anchor.source, ClockSourceKind::HostSystemTime);
+    assert_eq!(report.clock.anchor.trust, ClockTrustLevel::Unverified);
+    assert_eq!(
+        report.clock.anchor.observed_at_unix_ms,
+        result.applied_at_unix_ms
+    );
     assert!(report.attunement_source_current);
     assert!(report.checks.iter().all(|check| check.passed));
     assert_eq!(inventory(project.path()), before);
@@ -143,7 +171,7 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
         "walking product under active development\n",
     )
     .unwrap();
-    let drift = RrdEngine::inspect_installed(project.path(), &executable).unwrap();
+    let drift = inspect_at(project.path(), &executable, 1_800_000_000_002).unwrap();
     assert_eq!(drift.status, InstallationVerificationStatus::Passed);
     assert!(!drift.attunement_source_current);
     assert_ne!(
@@ -151,7 +179,7 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
         preview.installation.project_precondition_sha256
     );
 
-    let replay = RrdEngine::apply_installation(
+    let replay = RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -165,12 +193,106 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
 }
 
 #[test]
+fn unavailable_or_rolled_back_clock_blocks_effects_but_not_read_only_diagnosis() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::write(project.path().join("README.md"), "clock boundary\n").unwrap();
+    let preview = plan(project.path());
+    let executable = test_executable();
+    let before = inventory(project.path());
+    let unavailable = FixedClock::unavailable(ClockObservationFailure::BeforeUnixEpoch);
+    let error = RrdEngine::apply_installation_with_test_clock(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        &executable,
+        &unavailable,
+    )
+    .unwrap_err();
+    assert!(matches!(error, ServiceError::ClockUnavailable(_)));
+    assert_eq!(inventory(project.path()), before);
+
+    let installed = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        10_000,
+        &executable,
+    )
+    .unwrap();
+    assert_eq!(installed.applied_at_unix_ms, 10_000);
+    let installed_bytes = inventory(project.path());
+
+    let replay_error = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        9_999,
+        &executable,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        replay_error,
+        ServiceError::ClockRollback {
+            observed_at_unix_ms: 9_999,
+            anchor_unix_ms: 10_000,
+            maximum_rollback_ms: 0
+        }
+    ));
+    assert_eq!(inventory(project.path()), installed_bytes);
+
+    let error = open_at(project.path(), &executable, 9_999)
+        .err()
+        .expect("rolled-back clock must reject installed open");
+    assert!(matches!(
+        error,
+        ServiceError::ClockRollback {
+            observed_at_unix_ms: 9_999,
+            anchor_unix_ms: 10_000,
+            maximum_rollback_ms: 0
+        }
+    ));
+    let rolled_back = inspect_at(project.path(), &executable, 9_999).unwrap();
+    assert_eq!(rolled_back.status, InstallationVerificationStatus::Failed);
+    assert_eq!(
+        rolled_back.clock.status,
+        ClockAssessmentStatus::RollbackExceeded
+    );
+    assert_eq!(rolled_back.clock.rollback_ms, Some(1));
+    assert!(
+        !rolled_back
+            .checks
+            .iter()
+            .find(|check| check.id.as_str() == "clock")
+            .unwrap()
+            .passed
+    );
+    assert_eq!(inventory(project.path()), installed_bytes);
+
+    let unavailable = RrdEngine::inspect_installed_with_clock(
+        project.path(),
+        &executable,
+        &FixedClock::unavailable(ClockObservationFailure::Unrepresentable),
+    )
+    .unwrap();
+    assert_eq!(unavailable.status, InstallationVerificationStatus::Failed);
+    assert_eq!(unavailable.clock.status, ClockAssessmentStatus::Unavailable);
+    assert_eq!(
+        unavailable.clock.failure,
+        Some(ClockObservationFailure::Unrepresentable)
+    );
+    assert_eq!(inventory(project.path()), installed_bytes);
+}
+
+#[test]
 fn changed_project_or_credential_permissions_fail_closed() {
     let project = tempfile::tempdir().unwrap();
     std::fs::write(project.path().join("README.md"), "before\n").unwrap();
     let preview = plan(project.path());
     std::fs::write(project.path().join("README.md"), "after\n").unwrap();
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -184,7 +306,7 @@ fn changed_project_or_credential_permissions_fail_closed() {
     let clean = tempfile::tempdir().unwrap();
     let preview = plan(clean.path());
     let executable = test_executable();
-    RrdEngine::apply_installation(
+    RrdEngine::apply_installation_at(
         clean.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -215,7 +337,7 @@ fn installed_open_and_inspection_reject_symbolic_object_paths() {
     let project = tempfile::tempdir().unwrap();
     let executable = test_executable();
     let preview = plan(project.path());
-    RrdEngine::apply_installation(
+    RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -249,7 +371,7 @@ fn rehashed_profile_field_forgery_fails_before_any_project_effect() {
     forged.installation.plan_sha256 = installation_plan_sha256(&forged.installation).unwrap();
     forged.validate().unwrap();
 
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &forged,
@@ -274,7 +396,7 @@ fn fresh_project_apply_and_exact_replay_are_supported() {
     )
     .unwrap();
 
-    let first = RrdEngine::apply_installation(
+    let first = RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::FreshProject,
         &preview,
@@ -285,7 +407,7 @@ fn fresh_project_apply_and_exact_replay_are_supported() {
     .unwrap();
     assert!(!first.idempotent_replay);
 
-    let replay = RrdEngine::apply_installation(
+    let replay = RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::FreshProject,
         &preview,
@@ -305,7 +427,10 @@ fn explicit_configuration_is_sealed_and_apply_does_not_reread_it() {
     let input = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
         input.path(),
-        r#"format_version = 1
+        r#"format_version = 2
+
+[clock]
+maximum_rollback_ms = 250
 
 [reasoning]
 max_run_elapsed_ms = 120000
@@ -339,9 +464,13 @@ max_elapsed_ms = 5000
     )
     .unwrap();
     assert_eq!(preview.installation.configuration.query.max_rows, 9);
+    assert_eq!(
+        preview.installation.configuration.clock.maximum_rollback_ms,
+        250
+    );
     std::fs::write(input.path(), "this no longer parses as TOML = [").unwrap();
 
-    RrdEngine::apply_installation(
+    RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -350,9 +479,16 @@ max_elapsed_ms = 5000
         &executable,
     )
     .unwrap();
-    let engine = RrdEngine::open_installed(project.path(), &executable).unwrap();
+    let engine = open_at(project.path(), &executable, 1_799_999_999_750).unwrap();
     assert_eq!(engine.estate_configuration().query.max_rows, 9);
     drop(engine);
+    let tolerated = inspect_at(project.path(), &executable, 1_799_999_999_750).unwrap();
+    assert_eq!(
+        tolerated.clock.status,
+        ClockAssessmentStatus::RollbackWithinTolerance
+    );
+    assert_eq!(tolerated.clock.rollback_ms, Some(250));
+    assert_eq!(tolerated.status, InstallationVerificationStatus::Passed);
     let mut locator = RrdEngine::read_project_locator(project.path()).unwrap();
     assert_eq!(locator.configuration_revision, 1);
     assert_eq!(
@@ -367,8 +503,8 @@ max_elapsed_ms = 5000
         toml::to_string(&locator).unwrap(),
     )
     .unwrap();
-    assert!(RrdEngine::open_installed(project.path(), &executable).is_err());
-    assert!(RrdEngine::inspect_installed(project.path(), &executable).is_err());
+    assert!(open_at(project.path(), &executable, 1_800_000_000_001).is_err());
+    assert!(inspect_at(project.path(), &executable, 1_800_000_000_001).is_err());
 }
 
 #[test]
@@ -388,7 +524,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
         &executable,
     )
     .unwrap();
-    RrdEngine::apply_installation(
+    RrdEngine::apply_installation_at(
         &original,
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -399,7 +535,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
     .unwrap();
 
     std::fs::rename(&original, &moved).unwrap();
-    let relocated = RrdEngine::open_installed(&moved, &executable).unwrap();
+    let relocated = open_at(&moved, &executable, 1_800_000_000_001).unwrap();
     assert_eq!(
         relocated.installed_estate_identity(),
         Some(&preview.installation.target)
@@ -408,7 +544,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
 
     let nested = moved.join("nested");
     std::fs::create_dir(&nested).unwrap();
-    assert!(RrdEngine::open_installed(&nested, &executable).is_err());
+    assert!(open_at(&nested, &executable, 1_800_000_000_001).is_err());
 
     std::fs::create_dir(&foreign).unwrap();
     std::fs::write(foreign.join("README.md"), "different project\n").unwrap();
@@ -424,7 +560,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
         foreign_preview.installation.target,
         preview.installation.target
     );
-    RrdEngine::apply_installation(
+    RrdEngine::apply_installation_at(
         &foreign,
         InstallationTargetKind::ExistingProject,
         &foreign_preview,
@@ -438,7 +574,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
         moved.join(".rrflow/config.toml"),
     )
     .unwrap();
-    assert!(RrdEngine::open_installed(&moved, &executable).is_err());
+    assert!(open_at(&moved, &executable, 1_800_000_000_001).is_err());
 }
 
 #[test]
@@ -475,7 +611,6 @@ fn installed_backups_and_restore_staging_live_beside_the_storage_roots() {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1_800_000_000_000,
         &executable,
     )
     .unwrap();
@@ -622,7 +757,6 @@ fn install_and_open() -> (InstalledEstate, RrdEngine, SessionLease) {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1_800_000_000_000,
         &executable,
     )
     .unwrap();
