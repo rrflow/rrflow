@@ -1,3 +1,6 @@
+#[cfg(test)]
+use super::clock::FixedClock;
+use super::clock::{assess, observe_required, require_accepted, ClockSource, HostSystemClock};
 use super::*;
 use crate::engine::estate_layout::{
     create_estate_directories, reject_existing_estate, reject_existing_symlink_path, safe_join,
@@ -25,11 +28,11 @@ use std::io::{Read, Write};
 
 const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v1.json");
 const DEFAULT_CONFIGURATION_BYTES: &[u8] =
-    include_bytes!("../../assets/install/default-estate-configuration-v1.toml");
+    include_bytes!("../../assets/install/default-estate-configuration-v2.toml");
 const INSTALL_PROFILE_FORMAT: u16 = 1;
 const LOCATOR_FORMAT: u16 = 1;
-const INSTALLED_RECORD_FORMAT: u16 = 1;
-const INSTALL_CHECKPOINT_FORMAT: u16 = 1;
+const INSTALLED_RECORD_FORMAT: u16 = 2;
+const INSTALL_CHECKPOINT_FORMAT: u16 = 2;
 pub(super) const INSTALLED_RECORD_KEY: &str = "server/state/install/record";
 const INSTALL_CHECKPOINT_KEY: &str = "server/state/install/checkpoint";
 pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
@@ -85,7 +88,7 @@ impl DefaultInstallProfile {
     fn validate(&self) -> Result<()> {
         if self.format_version != INSTALL_PROFILE_FORMAT
             || self.id.as_str() != "default"
-            || self.configuration_asset != "default-estate-configuration-v1.toml"
+            || self.configuration_asset != "default-estate-configuration-v2.toml"
             || self.initial_grant_policy.as_str() != "local-owner-all-actions"
             || !(32..=4_096).contains(&self.credential_bytes)
             || self.inventory_max_files == 0
@@ -239,7 +242,7 @@ pub struct InstalledEstateRecord {
     pub runtime_commit_sha256: String,
     pub expected_runtime_cursor: u64,
     pub bootstrap_control_sequence: u64,
-    pub installed_at_unix_ms: u64,
+    pub clock_anchor: ClockObservation,
     pub record_sha256: String,
 }
 
@@ -255,14 +258,13 @@ impl InstalledEstateRecord {
             || !is_sha256(&self.runtime_commit_sha256)
             || self.expected_runtime_cursor == 0
             || self.bootstrap_control_sequence == 0
-            || self.installed_at_unix_ms == 0
             || self.record_sha256 != installed_record_sha256(self)?
         {
             return Err(ServiceError::Contract(
                 "installed estate record is inconsistent or corrupt".into(),
             ));
         }
-        Ok(())
+        self.clock_anchor.validate()
     }
 }
 
@@ -275,7 +277,7 @@ struct InstallationCheckpoint {
     runtime_cursor: u64,
     control_sequence: u64,
     installed_record_sha256: String,
-    at_unix_ms: u64,
+    clock_anchor_unix_ms: u64,
     checkpoint_sha256: String,
 }
 
@@ -287,7 +289,7 @@ impl InstallationCheckpoint {
             || !is_sha256(&self.installed_record_sha256)
             || self.runtime_cursor == 0
             || self.control_sequence == 0
-            || self.at_unix_ms == 0
+            || self.clock_anchor_unix_ms == 0
             || self.checkpoint_sha256 != installation_checkpoint_sha256(self)?
         {
             return Err(ServiceError::Contract(
@@ -302,6 +304,7 @@ impl InstallationCheckpoint {
 #[serde(rename_all = "snake_case")]
 pub enum InstallationVerificationStatus {
     Passed,
+    Failed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -324,6 +327,7 @@ pub struct InstallationVerificationReport {
     pub runtime_manifest_sha256: String,
     pub runtime_cursor: u64,
     pub control_journal_sequence: u64,
+    pub clock: ClockAssessment,
     pub physical: rrd_store::RrflowKvInspection,
     pub checks: Vec<InstallationVerificationCheck>,
 }
@@ -427,8 +431,28 @@ impl RrdEngine {
         Ok(preview)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn apply_installation(
+        project: &Path,
+        target_kind: InstallationTargetKind,
+        preview: &InstallationPreview,
+        expected_plan_sha256: &str,
+        executable: &Path,
+    ) -> Result<InstallationResult> {
+        let clock = HostSystemClock;
+        Self::apply_installation_with_observer(
+            project,
+            target_kind,
+            preview,
+            expected_plan_sha256,
+            executable,
+            &clock,
+            &mut |_, _| Ok(()),
+        )
+    }
+
+    #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn apply_installation_at(
         project: &Path,
         target_kind: InstallationTargetKind,
         preview: &InstallationPreview,
@@ -436,13 +460,34 @@ impl RrdEngine {
         at_unix_ms: u64,
         executable: &Path,
     ) -> Result<InstallationResult> {
+        let clock = FixedClock::at(at_unix_ms);
         Self::apply_installation_with_observer(
             project,
             target_kind,
             preview,
             expected_plan_sha256,
-            at_unix_ms,
             executable,
+            &clock,
+            &mut |_, _| Ok(()),
+        )
+    }
+
+    #[cfg(test)]
+    pub(super) fn apply_installation_with_test_clock(
+        project: &Path,
+        target_kind: InstallationTargetKind,
+        preview: &InstallationPreview,
+        expected_plan_sha256: &str,
+        executable: &Path,
+        clock: &dyn ClockSource,
+    ) -> Result<InstallationResult> {
+        Self::apply_installation_with_observer(
+            project,
+            target_kind,
+            preview,
+            expected_plan_sha256,
+            executable,
+            clock,
             &mut |_, _| Ok(()),
         )
     }
@@ -464,8 +509,8 @@ impl RrdEngine {
             target_kind,
             preview,
             expected_plan_sha256,
-            at_unix_ms,
             executable,
+            &FixedClock::at(at_unix_ms),
             &mut |stage, _| {
                 if stage == fail_after && !injected {
                     injected = true;
@@ -485,18 +530,16 @@ impl RrdEngine {
         target_kind: InstallationTargetKind,
         preview: &InstallationPreview,
         expected_plan_sha256: &str,
-        at_unix_ms: u64,
         executable: &Path,
+        clock: &dyn ClockSource,
         observer: &mut dyn FnMut(InstallApplyStage, InstallRecoveryState) -> Result<()>,
     ) -> Result<InstallationResult> {
         preview.validate()?;
-        if at_unix_ms == 0
-            || preview.installation.target_kind != target_kind
+        if preview.installation.target_kind != target_kind
             || preview.installation.plan_sha256 != expected_plan_sha256
         {
             return Err(ServiceError::Contract(
-                "installation apply mode, time, or expected digest does not match the preview"
-                    .into(),
+                "installation apply mode or expected digest does not match the preview".into(),
             ));
         }
         let project = canonical_project_root(project)?;
@@ -521,7 +564,7 @@ impl RrdEngine {
         match std::fs::symlink_metadata(&locator_path) {
             Ok(_) => {
                 let intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
-                let result = replay_installation_result(&project, preview, executable)?;
+                let result = replay_installation_result(&project, preview, executable, clock)?;
                 if let Some(intent) = intent {
                     let (_, _, locator_bytes) = read_locator(&project)?;
                     validate_recovery_estate(&project, &layout)?;
@@ -552,6 +595,13 @@ impl RrdEngine {
 
         let existing_intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
         let intent = if let Some(intent) = existing_intent {
+            let clock_assessment = assess(
+                clock.observe(),
+                intent.clock_anchor(),
+                &preview.installation.configuration.clock,
+                "install.apply.recover",
+            )?;
+            require_accepted(&clock_assessment)?;
             validate_recovery_estate(&project, &layout)?;
             if project_inventory_sha256_excluding(
                 &project,
@@ -583,8 +633,14 @@ impl RrdEngine {
                     return Err(ServiceError::ProjectBindingMismatch);
                 }
             }
-            let (intent, recovery_state) =
-                load_or_create_intent(&project, &layout, preview, at_unix_ms, &executable_sha256)?;
+            let clock_anchor = observe_required(clock, "install.apply.new")?;
+            let (intent, recovery_state) = load_or_create_intent(
+                &project,
+                &layout,
+                preview,
+                &clock_anchor,
+                &executable_sha256,
+            )?;
             if project_inventory_sha256_excluding(
                 &project,
                 &profile,
@@ -682,7 +738,7 @@ impl RrdEngine {
         )?;
         let credential_sha256 = intent.credential_sha256().to_owned();
         let token_key_sha256 = intent.token_key_sha256().to_owned();
-        let installed_at_unix_ms = intent.applied_at_unix_ms();
+        let installed_at_unix_ms = intent.clock_anchor().observed_at_unix_ms;
 
         let memory_plan = build_memory_estate_plan(
             &PersistMemoryEstate {
@@ -773,7 +829,7 @@ impl RrdEngine {
             runtime_commit_sha256: runtime_commit_sha256.clone(),
             expected_runtime_cursor,
             bootstrap_control_sequence,
-            installed_at_unix_ms,
+            clock_anchor: intent.clock_anchor().clone(),
             record_sha256: zero_digest(),
         };
         installed.record_sha256 = installed_record_sha256(&installed)?;
@@ -785,7 +841,7 @@ impl RrdEngine {
             runtime_cursor: expected_runtime_cursor,
             control_sequence: bootstrap_control_sequence,
             installed_record_sha256: installed.record_sha256.clone(),
-            at_unix_ms: installed_at_unix_ms,
+            clock_anchor_unix_ms: installed_at_unix_ms,
             checkpoint_sha256: zero_digest(),
         };
         checkpoint.checkpoint_sha256 = installation_checkpoint_sha256(&checkpoint)?;
@@ -941,6 +997,22 @@ impl RrdEngine {
     }
 
     pub fn open_installed(project: &Path, executable: &Path) -> Result<Self> {
+        let clock = HostSystemClock;
+        Self::open_installed_with_clock(project, executable, &clock)
+    }
+
+    pub(super) fn open_installed_with_clock(
+        project: &Path,
+        executable: &Path,
+        clock: &dyn ClockSource,
+    ) -> Result<Self> {
+        let preflight = Self::inspect_installed_with_clock_at_boundary(
+            project,
+            executable,
+            clock,
+            "install.open.preflight",
+        )?;
+        require_accepted(&preflight.clock)?;
         let (project, locator, _) = read_locator(project)?;
         let (_, profile_sha256) = DefaultInstallProfile::load(locator.profile_id.as_str())?;
         if sha256_file(executable)? != locator.executable_sha256
@@ -965,6 +1037,12 @@ impl RrdEngine {
         let installed: InstalledEstateRecord = decode_json(&bytes, "installed estate record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        if locator.identity.instance_id != preflight.instance_id
+            || locator.plan_sha256 != preflight.plan_sha256
+            || installed.clock_anchor != preflight.clock.anchor
+        {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
         let configuration_bytes = engine
             .storage
             .control()
@@ -1014,6 +1092,29 @@ impl RrdEngine {
         project: &Path,
         executable: &Path,
     ) -> Result<InstallationVerificationReport> {
+        let clock = HostSystemClock;
+        Self::inspect_installed_with_clock(project, executable, &clock)
+    }
+
+    pub(super) fn inspect_installed_with_clock(
+        project: &Path,
+        executable: &Path,
+        clock: &dyn ClockSource,
+    ) -> Result<InstallationVerificationReport> {
+        Self::inspect_installed_with_clock_at_boundary(
+            project,
+            executable,
+            clock,
+            "install.inspect",
+        )
+    }
+
+    fn inspect_installed_with_clock_at_boundary(
+        project: &Path,
+        executable: &Path,
+        clock: &dyn ClockSource,
+        boundary: &'static str,
+    ) -> Result<InstallationVerificationReport> {
         let (project, locator, locator_bytes) = read_locator(project)?;
         let executable_sha256 = sha256_file(executable)?;
         if executable_sha256 != locator.executable_sha256 {
@@ -1047,6 +1148,12 @@ impl RrdEngine {
         {
             return Err(ServiceError::ProjectBindingMismatch);
         }
+        let clock_assessment = assess(
+            clock.observe(),
+            &installed.clock_anchor,
+            &configuration.clock,
+            boundary,
+        )?;
         let project_inventory_sha256 = project_inventory_sha256(&project, &profile)?;
         let attunement_source_current =
             project_inventory_sha256 == installed.installation.project_precondition_sha256;
@@ -1109,6 +1216,7 @@ impl RrdEngine {
         if checkpoint.installed_record_sha256 != installed.record_sha256
             || checkpoint.runtime_cursor != installed.expected_runtime_cursor
             || checkpoint.control_sequence != installed.bootstrap_control_sequence
+            || checkpoint.clock_anchor_unix_ms != installed.clock_anchor.observed_at_unix_ms
         {
             return Err(ServiceError::ProjectBindingMismatch);
         }
@@ -1128,7 +1236,7 @@ impl RrdEngine {
             ("attunement", attunement.plan_sha256),
             ("checkpoint", checkpoint.checkpoint_sha256),
         ];
-        let checks = evidence
+        let mut checks = evidence
             .into_iter()
             .map(|(id, evidence_sha256)| {
                 Ok(InstallationVerificationCheck {
@@ -1139,8 +1247,18 @@ impl RrdEngine {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
+        checks.push(InstallationVerificationCheck {
+            id: CanonicalId::new("clock")
+                .map_err(|error| ServiceError::Contract(error.to_string()))?,
+            passed: clock_assessment.passed(),
+            evidence_sha256: json_sha256(&clock_assessment)?,
+        });
         Ok(InstallationVerificationReport {
-            status: InstallationVerificationStatus::Passed,
+            status: if clock_assessment.passed() {
+                InstallationVerificationStatus::Passed
+            } else {
+                InstallationVerificationStatus::Failed
+            },
             product_version: locator.product_version,
             instance_id: locator.identity.instance_id,
             plan_sha256: locator.plan_sha256,
@@ -1149,6 +1267,7 @@ impl RrdEngine {
             runtime_manifest_sha256,
             runtime_cursor: inspector.inspection().runtime_cursor,
             control_journal_sequence: inspector.inspection().control_journal_sequence,
+            clock: clock_assessment,
             physical: inspector.inspection().clone(),
             checks,
         })
@@ -1666,8 +1785,15 @@ fn replay_installation_result(
     project: &Path,
     preview: &InstallationPreview,
     executable: &Path,
+    clock: &dyn ClockSource,
 ) -> Result<InstallationResult> {
-    let report = RrdEngine::inspect_installed(project, executable)?;
+    let report = RrdEngine::inspect_installed_with_clock_at_boundary(
+        project,
+        executable,
+        clock,
+        "install.apply.replay",
+    )?;
+    require_accepted(&report.clock)?;
     if report.plan_sha256 != preview.installation.plan_sha256 {
         return Err(ServiceError::IdempotencyConflict);
     }
@@ -1736,7 +1862,7 @@ fn build_installation_result(
         installed_record_sha256: installed.record_sha256.clone(),
         credential_sha256: credential_sha256.into(),
         locator_sha256: locator_sha256.into(),
-        applied_at_unix_ms: installed.installed_at_unix_ms,
+        applied_at_unix_ms: installed.clock_anchor.observed_at_unix_ms,
         idempotent_replay,
         result_sha256: zero_digest(),
     };
@@ -1856,7 +1982,7 @@ fn installed_record_sha256(record: &InstalledEstateRecord) -> Result<String> {
         &record.runtime_commit_sha256,
         record.expected_runtime_cursor,
         record.bootstrap_control_sequence,
-        record.installed_at_unix_ms,
+        &record.clock_anchor,
     ))
 }
 
@@ -1868,7 +1994,7 @@ fn installation_checkpoint_sha256(checkpoint: &InstallationCheckpoint) -> Result
         checkpoint.runtime_cursor,
         checkpoint.control_sequence,
         &checkpoint.installed_record_sha256,
-        checkpoint.at_unix_ms,
+        checkpoint.clock_anchor_unix_ms,
     ))
 }
 

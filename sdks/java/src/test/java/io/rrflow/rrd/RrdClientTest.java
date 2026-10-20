@@ -42,8 +42,9 @@ final class RrdClientTest {
                             "storage_profile", "rrflow_kv",
                             "endpoint_presentation", "loopback_http_websocket"),
                     "configuration", Map.of(
-                            "format_version", 1,
+                            "format_version", 2,
                             "revision", 1,
+                            "clock", Map.of("maximum_rollback_ms", 0),
                             "reasoning", Map.of(
                                     "max_run_elapsed_ms", 900000,
                                     "max_steps", 256,
@@ -62,7 +63,7 @@ final class RrdClientTest {
                                     "max_spill_bytes", 268435456,
                                     "max_elapsed_ms", 30000),
                             "configuration_sha256",
-                            "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be"),
+                            "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105"),
                     "instance", Map.of("kind", "instance", "id", "sdk-test"),
                     "capabilities", List.of())));
         });

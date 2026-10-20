@@ -69,7 +69,7 @@ embedded or served; and a UI cannot infer durability from its own location.
 canonicalization scheme for interoperable cryptographic hashing. RRFlow's
 current configuration digest is deliberately narrower: it hashes a
 domain-separated serialization of the typed Rust fields in a fixed tuple
-order. It must be called the RRFlow estate-configuration v1 digest, not “JCS”
+order. It must be called the RRFlow estate-configuration v2 digest, not “JCS”
 or generic canonical JSON. If independent implementations must calculate the
 digest later, RRFlow should either publish byte vectors for this encoding or
 adopt an explicitly versioned interoperable canonicalization in a separately
@@ -79,6 +79,53 @@ The important current rule is that the engine assigns `revision` and
 `configuration_sha256`; operator TOML cannot forge either. The full effective
 configuration—not only its digest—is sealed in the install plan and committed
 to rrflowDB.
+
+### Wall time is an observed input, not absolute authority
+
+Rust documents that [`SystemTime`](https://doc.rust-lang.org/stable/std/time/struct.SystemTime.html)
+can move backward and that comparison is fallible. Its
+[`Instant`](https://doc.rust-lang.org/stable/std/time/struct.Instant.html) is
+appropriate for process-local elapsed work, but it cannot be serialized as a
+civil-time or recovery coordinate. NTP deployment guidance in
+[RFC 8633](https://www.rfc-editor.org/rfc/rfc8633.html) treats source selection,
+large corrections, monitoring, and failure handling as operational policy;
+[RFC 8915](https://www.rfc-editor.org/rfc/rfc8915.html) adds authenticated time
+exchange rather than making an arbitrary network response trustworthy.
+
+RRFlow therefore separates four meanings:
+
+- monotonic elapsed time measures one live operation or wait;
+- observed wall time carries a named source and trust classification;
+- semantic valid/effective time belongs to the knowledge or project fact; and
+- durable read, transaction, journal, and sequence coordinates order canonical
+  state independently of the host clock.
+
+Models and adapters must not become the authority for installation,
+credential-validity, audit, or receipt time. This package implements that rule
+for installation; runtime-wide timestamp ownership remains open. `RrdEngine`
+must attach a wall observation when a governed durable boundary needs it. That
+rule constrains effects and evidence, not hypotheses, private reasoning, or
+unfamiliar semantic content. Retrieval may explicitly ask for valid-time/as-of
+semantics, but it cannot silently substitute ingestion time, host time, or
+model prose for those coordinates.
+
+The implemented clock substrate deliberately makes the limited claim its
+evidence supports. A fallible host `SystemTime` observation is encoded with
+format, `host_system_time` source, `unverified` trust, and Unix milliseconds.
+The first accepted observation is sealed into the owner-only install intent
+and then the installed record. Recovery, replay, and open reject an unavailable
+observation or rollback beyond the configured bound. Inspection remains
+read-only and reports the exact anchor, observation/failure, rollback, and
+policy. This detects relative rollback from the sealed anchor; it cannot detect
+a consistently wrong forward clock, authenticate UTC, or prove synchronization.
+
+Clock diagnosis and correction remain different capabilities. A future
+diagnostic can report platform synchronization state and authenticated-source
+evidence. Any correction is an explicit privileged external effect with a
+previewed source, network and command authorization, acceptable step/slew,
+rollback impact, receipt, and post-correction verification. Installation never
+silently changes the OS clock. Signed, expiring distribution metadata is also
+a separate rollback/freeze defense; it does not repair host time.
 
 ### Create-new is necessary but not the whole filesystem safety story
 
@@ -212,10 +259,13 @@ collision remains preserved and fail-closed rather than becoming migration.
 
 ## Configuration model and precedence
 
-The effective v1 input is strict TOML:
+The effective v2 input is strict TOML:
 
 ```toml
-format_version = 1
+format_version = 2
+
+[clock]
+maximum_rollback_ms = 0
 
 [reasoning]
 max_run_elapsed_ms = 900000
@@ -241,6 +291,9 @@ max_elapsed_ms = 30000
 Unknown fields, missing fields, zero values where work must be positive,
 values above compiled maxima, a reasoning step ceiling above its run ceiling,
 non-files, symlinks, invalid UTF-8, and inputs over 64 KiB fail during planning.
+Clock rollback tolerance is explicit, defaults to zero, and cannot exceed the
+compiled one-hour safety maximum. It is tolerance for relative rollback, not a
+claim that the host clock is correct.
 The precedence is:
 
 ```text
@@ -302,8 +355,8 @@ remain open.
   only its acknowledged intent/pending locator; and
 - delete the competing success paths without a compatibility lane.
 
-Implemented result: one owner-only plan-addressed intent freezes first-apply
-time and generated token/credential bytes. Typed tests stop at eight durable
+Implemented result: one owner-only plan-addressed intent freezes the first
+engine clock anchor and generated token/credential bytes. Typed tests stop at eight durable
 stages and prove exact-plan retry, one credential/token and semantic install
 outcome, locator publication, intent cleanup, and fail-closed malformed,
 symbolic, foreign, drifted, partial-control, or missing-secret state. Primary
@@ -312,6 +365,27 @@ catalogue, and Kubernetes rendering use canonical install/open; manifest,
 private binding, raw product commands, supervisor, security initializer, and
 server initializer are absent. This exits R1 locally without closing D-01,
 native-platform qualification, external secret delivery, or release proof.
+
+### R1a — engine-owned installation clock substrate (implemented)
+
+- remove wall-clock input from the public installation API and observe it once
+  inside `RrdEngine`;
+- obtain the versioned source/trust observation before project effects, persist
+  it as the first owner-only effect, and preserve it across every interrupted
+  retry;
+- bind a strict-by-default, bounded rollback policy into configuration v2;
+- reject unavailable or out-of-policy time at recovery, replay, and installed
+  open while returning typed read-only inspection evidence; and
+- run the same bounded abrupt-kill/reopen product journey in Linux, macOS, and
+  Windows development CI.
+
+Implemented result: a caller cannot fabricate installation time; exact retry
+retains the first anchor; one millisecond of rollback fails under the default;
+an explicitly configured bounded rollback is visible; and verification reports
+`current`, `rollback_within_tolerance`, `rollback_exceeded`, or `unavailable`.
+The host source remains `unverified`. Platform synchronization diagnosis,
+authorized correction, runtime-wide temporal high-water rules, and signed
+clean-machine distribution qualification remain open.
 
 ### R2 — governed reconfiguration and attunement recommendations
 
@@ -394,6 +468,12 @@ separately record batch rows/bytes, scan/prune counts, memory/spill, task time,
 cancellation latency, and result serialization so storage sync is not blamed
 for analytical work or vice versa.
 
+Clock tracing records only boundary, source/trust, assessment, anchor,
+observation, rollback, tolerance, and failure class. It excludes credentials,
+project content, prompts, private reasoning, and arbitrary paths. Test-only
+fixed and unavailable sources remain private to the engine so deterministic
+failure proof does not become a public caller-injection API.
+
 ## Rejected designs
 
 - **One broad configuration schema for “AI behavior”:** rejected because it
@@ -435,7 +515,7 @@ GET /v1/capabilities
   -> deployment { contract_version, deployment_form, storage_profile,
                   endpoint_presentation }
   -> configuration { format_version, revision, configuration_sha256,
-                     reasoning, recall, query }
+                     clock, reasoning, recall, query }
   -> capabilities[] and product_capabilities
 ```
 

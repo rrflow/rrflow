@@ -51,8 +51,9 @@ def test_public_negotiation_retries_transport_loss_and_validates_envelope() -> N
                     "endpoint_presentation": "loopback_http_websocket",
                 },
                 "configuration": {
-                    "format_version": 1,
+                    "format_version": 2,
                     "revision": 1,
+                    "clock": {"maximum_rollback_ms": 0},
                     "reasoning": {
                         "max_run_elapsed_ms": 900_000,
                         "max_steps": 256,
@@ -74,7 +75,7 @@ def test_public_negotiation_retries_transport_loss_and_validates_envelope() -> N
                         "max_elapsed_ms": 30_000,
                     },
                     "configuration_sha256": (
-                        "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be"
+                        "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105"
                     ),
                 },
                 "instance": {"kind": "instance", "id": "sdk-test"},

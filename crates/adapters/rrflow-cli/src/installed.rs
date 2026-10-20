@@ -10,13 +10,13 @@ use rrd_contract::{
     CanonicalId, CloseSession, CreateSession, InstallationTargetKind, RestorePublicationPlan,
     SessionLimits, PROTOCOL, PROTOCOL_VERSION,
 };
-use rrd_engine::{digest, InstallationPreview, RrdEngine};
+use rrd_engine::{digest, InstallationPreview, InstallationVerificationStatus, RrdEngine};
 use rrd_server::RrdHttpServer;
 use serde::Serialize;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 const MAX_INSTALLATION_PLAN_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -66,10 +66,10 @@ struct AuthenticatedReady {
     session_closed: bool,
 }
 
-pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, BoxError> {
+pub fn execute(command: &Command, json: bool) -> Result<Execution, BoxError> {
     match command {
         Command::Version => version(json),
-        Command::Install { action } => install(action, now, json),
+        Command::Install { action } => install(action, json),
         Command::Serve {
             project,
             bind,
@@ -80,7 +80,7 @@ pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, Box
             test_distribution_executable.as_deref(),
             json,
         ),
-        Command::Ready { project, address } => ready(project, *address, now, json),
+        Command::Ready { project, address } => ready(project, *address, json),
         Command::Verify {
             project,
             level,
@@ -91,11 +91,11 @@ pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, Box
             test_distribution_executable.as_deref(),
             json,
         ),
-        Command::Restore { action } => restore(action, now, json),
+        Command::Restore { action } => restore(action, json),
     }
 }
 
-fn restore(action: &RestoreAction, now: u64, json: bool) -> Result<Execution, BoxError> {
+fn restore(action: &RestoreAction, json: bool) -> Result<Execution, BoxError> {
     match action {
         RestoreAction::Plan {
             project,
@@ -130,8 +130,13 @@ fn restore(action: &RestoreAction, now: u64, json: bool) -> Result<Execution, Bo
             let started = Instant::now();
             let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
             let plan = read_publication_plan(plan)?;
-            let result =
-                RrdEngine::apply_restore_publication(project, &plan, expect, now, &executable)?;
+            let result = RrdEngine::apply_restore_publication(
+                project,
+                &plan,
+                expect,
+                wall_clock_millis()?,
+                &executable,
+            )?;
             tracing::info!(
                 target: "rrflow::installed",
                 operation = "restore.apply",
@@ -183,7 +188,7 @@ fn version(json: bool) -> Result<Execution, BoxError> {
     .into())
 }
 
-fn install(action: &InstallAction, now: u64, json: bool) -> Result<Execution, BoxError> {
+fn install(action: &InstallAction, json: bool) -> Result<Execution, BoxError> {
     match action {
         InstallAction::Plan {
             project,
@@ -231,7 +236,6 @@ fn install(action: &InstallAction, now: u64, json: bool) -> Result<Execution, Bo
                 target_kind(*mode),
                 &preview,
                 expect,
-                now,
                 &executable,
             )?;
             tracing::info!(
@@ -327,13 +331,9 @@ fn serve(
     })
 }
 
-fn ready(
-    project: &Path,
-    address: std::net::SocketAddr,
-    now: u64,
-    json: bool,
-) -> Result<Execution, BoxError> {
+fn ready(project: &Path, address: std::net::SocketAddr, json: bool) -> Result<Execution, BoxError> {
     let started = Instant::now();
+    let now = wall_clock_millis()?;
     let invocation = format!("{now}-{}", std::process::id());
     let locator = RrdEngine::read_project_locator(project)?;
     let project_root = std::fs::canonicalize(project)?.display().to_string();
@@ -447,24 +447,52 @@ fn verify(
         runtime_cursor = report.runtime_cursor,
         control_journal_sequence = report.control_journal_sequence,
         attunement_source_current = report.attunement_source_current,
+        clock_status = ?report.clock.status,
+        clock_observed_at_unix_ms = report
+            .clock
+            .observation
+            .as_ref()
+            .map(|observation| observation.observed_at_unix_ms),
+        clock_anchor_unix_ms = report.clock.anchor.observed_at_unix_ms,
+        clock_rollback_ms = report.clock.rollback_ms,
+        clock_maximum_rollback_ms = report.clock.maximum_rollback_ms,
         physical_file_count = report.physical.physical.files.len(),
         physical_bytes = report.physical.physical.total_bytes,
         elapsed_ms = started.elapsed().as_millis() as u64,
         "installed lifecycle operation completed"
     );
+    let passed_checks = report.checks.iter().filter(|check| check.passed).count();
+    let success = report.status == InstallationVerificationStatus::Passed;
     let human = format!(
-        "RRFlow installation verified\ninstance: {}\nplan: {}\nattunement source current: {}\nruntime cursor: {}\ncontrol journal: {}\nchecks: {} passed",
+        "RRFlow installation verification: {:?}\ninstance: {}\nplan: {}\nattunement source current: {}\nclock: {:?}\nclock anchor: {}\nclock rollback: {:?} ms\nruntime cursor: {}\ncontrol journal: {}\nchecks: {}/{} passed",
+        report.status,
         report.instance_id,
         report.plan_sha256,
         report.attunement_source_current,
+        report.clock.status,
+        report.clock.anchor.observed_at_unix_ms,
+        report.clock.rollback_ms,
         report.runtime_cursor,
         report.control_journal_sequence,
+        passed_checks,
         report.checks.len(),
     );
     Ok(Execution {
         text: render(&report, json, human)?,
-        success: true,
+        success,
     })
+}
+
+fn wall_clock_millis() -> Result<u64, BoxError> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| std::io::Error::other("host clock is before the Unix epoch"))?;
+    let millis = u64::try_from(elapsed.as_millis())
+        .map_err(|_| std::io::Error::other("host clock is outside RRFlow's range"))?;
+    if millis == 0 {
+        return Err(std::io::Error::other("host clock is at the Unix epoch").into());
+    }
+    Ok(millis)
 }
 
 fn read_installation_plan(path: &Path) -> Result<InstallationPreview, BoxError> {

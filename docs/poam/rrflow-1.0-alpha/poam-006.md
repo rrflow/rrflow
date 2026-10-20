@@ -19,9 +19,12 @@ still missing execution of its persisted pending attunement job, a committed det
 project-tree inventory, generic bundle-resident scaffolding and adapter bindings, real attunement phase
 executors, configuration apply, full verify, canonical installed backup resolution,
 repair, restore, ownership-safe uninstall, service installation, and a signed offline
-platform distribution. The public apply boundary also still accepts an injected
-installation timestamp; the primary CLI supplies its host wall clock, but a versioned
-trusted-clock capability and rollback/skew/failure evidence do not exist. The estate-controller
+platform distribution. Public apply no longer accepts installation time: the engine
+seals one versioned `host_system_time` / `unverified` observation, exact retry preserves
+it, recovery/replay/open enforce the format-2 rollback policy, and read-only verification
+reports typed current/tolerated/exceeded/unavailable evidence. Authenticated time, OS synchronization diagnosis and
+authorized correction and runtime-wide temporal high-water rules remain open.
+The estate-controller
 backup, prune, and restore paths resolve a managed instance through its installed locator
 and distribution binding and act on the instance's own catalogue and staging roots; the
 estate cannot yet register backups the served engine created, so a retention decision over
@@ -47,8 +50,11 @@ Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md) and
 The D-01 single-primary-executable fresh/existing lifecycle passes deterministic plan,
 no-write preview, apply, authenticated ready, commit, close/reopen, and baseline read-only
 verification without checkout companions; old initializer/supervisor/doctor/create-on-open
-success paths are absent. D-02 through D-05 prove durable attunement and inventory/index
-work; D-11 proves safe repair/restore/uninstall; native release qualification passes in J.
+success paths are absent. Engine-owned anchor/rollback tests and the primary Linux
+abrupt-kill/reopen journey are a bounded prerequisite, not closure. D-02 through D-05
+prove durable attunement and inventory/index work; D-11 proves safe
+repair/restore/uninstall; native clock, filesystem, packaging, and signed release
+qualification pass in J.
 
 ## Native installed-process coverage
 

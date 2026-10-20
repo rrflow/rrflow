@@ -1,8 +1,8 @@
 use rrd_contract::{
-    estate_configuration_sha256, CanonicalId, DeploymentForm, DeploymentProfile,
+    estate_configuration_sha256, CanonicalId, ClockPolicy, DeploymentForm, DeploymentProfile,
     EndpointPresentation, EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity,
     QueryBudget, ReasoningLimits, RecallLimits, StorageProfileKind,
-    ESTATE_CONFIGURATION_FORMAT_VERSION,
+    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS,
 };
 
 fn identity() -> InstalledEstateIdentity {
@@ -16,6 +16,9 @@ fn identity() -> InstalledEstateIdentity {
 fn input() -> EstateConfigurationInput {
     EstateConfigurationInput {
         format_version: ESTATE_CONFIGURATION_FORMAT_VERSION,
+        clock: ClockPolicy {
+            maximum_rollback_ms: 0,
+        },
         reasoning: ReasoningLimits {
             max_run_elapsed_ms: 900_000,
             max_steps: 256,
@@ -65,6 +68,21 @@ fn configuration_rejects_invalid_limits_and_digest_drift() {
     let mut configuration = EstateConfiguration::from_input(1, input()).unwrap();
     configuration.query.max_rows += 1;
     assert!(configuration.validate().is_err());
+}
+
+#[test]
+fn clock_rollback_policy_is_strict_bounded_and_digest_bound() {
+    let strict = EstateConfiguration::from_input(1, input()).unwrap();
+    assert_eq!(strict.clock.maximum_rollback_ms, 0);
+
+    let mut maximum = input();
+    maximum.clock.maximum_rollback_ms = MAX_CLOCK_ROLLBACK_MS;
+    let maximum = EstateConfiguration::from_input(1, maximum).unwrap();
+    assert_ne!(maximum.configuration_sha256, strict.configuration_sha256);
+
+    let mut unbounded = input();
+    unbounded.clock.maximum_rollback_ms = MAX_CLOCK_ROLLBACK_MS + 1;
+    assert!(EstateConfiguration::from_input(1, unbounded).is_err());
 }
 
 #[test]

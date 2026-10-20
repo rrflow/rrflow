@@ -98,7 +98,6 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
         InstallationTargetKind::FreshProject,
         &preview,
         &preview.installation.plan_sha256,
-        now(),
         &executable(),
     )
     .unwrap();

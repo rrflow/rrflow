@@ -23,7 +23,6 @@ fn install(project: &Path, executable: &Path) {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1_700_000_000_000,
         executable,
     )
     .unwrap();

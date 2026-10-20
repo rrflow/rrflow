@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "default",
-  "configuration_asset": "default-estate-configuration-v1.toml",
+  "configuration_asset": "default-estate-configuration-v2.toml",
   "deployment": {
     "contract_version": 1,
     "deployment_form": "single_node_server",

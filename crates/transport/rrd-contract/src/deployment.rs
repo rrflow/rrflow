@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub const DEPLOYMENT_PROFILE_CONTRACT_VERSION: u16 = 1;
-pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 1;
+pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 2;
+pub const MAX_CLOCK_ROLLBACK_MS: u64 = 3_600_000;
 pub const MAX_REASONING_RUN_ELAPSED_MS: u64 = 3_600_000;
 pub const MAX_REASONING_STEPS: u64 = 10_000;
 pub const MAX_REASONING_STEP_ELAPSED_MS: u64 = 300_000;
@@ -151,6 +152,28 @@ pub struct RecallLimits {
     pub max_storage_keys: u64,
 }
 
+/// Policy for wall-clock observations at governed durable-effect boundaries.
+///
+/// A value of zero is strict: any observed rollback from a persisted anchor is
+/// rejected. A nonzero value is an explicit operator-selected allowance, not
+/// evidence that the host clock is synchronized or trustworthy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ClockPolicy {
+    pub maximum_rollback_ms: u64,
+}
+
+impl ClockPolicy {
+    pub fn validate(&self) -> Result<()> {
+        if self.maximum_rollback_ms > MAX_CLOCK_ROLLBACK_MS {
+            return invalid(format!(
+                "clock maximum_rollback_ms must be in 0..={MAX_CLOCK_ROLLBACK_MS}"
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl RecallLimits {
     pub fn validate(&self) -> Result<()> {
         if self.max_graph_depth > MAX_CONTEXT_GRAPH_DEPTH {
@@ -207,6 +230,7 @@ impl RecallLimits {
 #[serde(deny_unknown_fields)]
 pub struct EstateConfigurationInput {
     pub format_version: u16,
+    pub clock: ClockPolicy,
     pub reasoning: ReasoningLimits,
     pub recall: RecallLimits,
     pub query: QueryBudget,
@@ -219,6 +243,7 @@ impl EstateConfigurationInput {
                 "estate configuration format version must be {ESTATE_CONFIGURATION_FORMAT_VERSION}"
             ));
         }
+        self.clock.validate()?;
         self.reasoning.validate()?;
         self.recall.validate()?;
         self.query.validate()
@@ -233,6 +258,7 @@ impl EstateConfigurationInput {
 pub struct EstateConfiguration {
     pub format_version: u16,
     pub revision: u64,
+    pub clock: ClockPolicy,
     pub reasoning: ReasoningLimits,
     pub recall: RecallLimits,
     pub query: QueryBudget,
@@ -248,6 +274,7 @@ impl EstateConfiguration {
         let mut configuration = Self {
             format_version: input.format_version,
             revision,
+            clock: input.clock,
             reasoning: input.reasoning,
             recall: input.recall,
             query: input.query,
@@ -260,6 +287,7 @@ impl EstateConfiguration {
     pub fn validate(&self) -> Result<()> {
         EstateConfigurationInput {
             format_version: self.format_version,
+            clock: self.clock.clone(),
             reasoning: self.reasoning.clone(),
             recall: self.recall.clone(),
             query: self.query.clone(),
@@ -326,6 +354,9 @@ impl Default for EstateConfiguration {
             1,
             EstateConfigurationInput {
                 format_version: ESTATE_CONFIGURATION_FORMAT_VERSION,
+                clock: ClockPolicy {
+                    maximum_rollback_ms: 0,
+                },
                 reasoning: ReasoningLimits {
                     max_run_elapsed_ms: 900_000,
                     max_steps: 256,
@@ -348,6 +379,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
     let encoded = serde_json::to_vec(&(
         configuration.format_version,
         configuration.revision,
+        &configuration.clock,
         &configuration.reasoning,
         &configuration.recall,
         &configuration.query,
@@ -356,7 +388,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
         crate::ContractError(format!("configuration digest encoding failed: {error}"))
     })?;
     let mut bytes = Vec::with_capacity(40 + encoded.len());
-    bytes.extend_from_slice(b"rrflow-estate-configuration-v1\0");
+    bytes.extend_from_slice(b"rrflow-estate-configuration-v2\0");
     bytes.extend_from_slice(&encoded);
     Ok(sha256_bytes(&bytes))
 }

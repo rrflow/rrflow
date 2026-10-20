@@ -268,7 +268,19 @@ state; the pre-canonical manifest, private project binding, raw product CLI,
 standalone security initializer, development supervisor, and server initializer
 were removed directly. The linked
 [authority-convergence journal](docs/evidence/change-journals/gate-d/d-01-precanonical-authority-convergence-and-install-recovery.md)
-records the exact replacement and limits. The reasoning runner remains
+records the exact replacement and limits. A fourth bounded prerequisite now
+removes caller-selected installation time. `RrdEngine` makes one fallible host
+clock observation, labels it `host_system_time` / `unverified`, seals the first
+observation into recovery and installed records, and applies the strict
+format-2 `clock.maximum_rollback_ms = 0` default during recovery, replay, and
+open. Read-only verification reports current, explicitly tolerated rollback,
+exceeded rollback, or unavailable time without mutating the estate; unsafe
+open fails closed. The same bounded abrupt-kill/reopen primary-binary test is
+now scheduled on Linux, macOS, and Windows. The linked
+[clock-substrate journal](docs/evidence/change-journals/gate-d/d-01-engine-owned-installation-clock.md)
+records the exact boundary and proof. This does not authenticate or correct
+UTC, establish runtime-wide temporal high-water marks, or qualify a native
+platform distribution. The reasoning runner remains
 truthfully unavailable. This is still not a streamed DataFusion `RecordBatch`
 provider, native graph/BM25/vector access, complete attunement, turnkey release
 distribution, or persistent reasoning/recall proof.

@@ -52,6 +52,12 @@ pub enum ServiceError {
     PermissionDenied,
     DeadlineExceeded,
     ProjectBindingMismatch,
+    ClockUnavailable(ClockObservationFailure),
+    ClockRollback {
+        observed_at_unix_ms: u64,
+        anchor_unix_ms: u64,
+        maximum_rollback_ms: u64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,6 +107,8 @@ impl ServiceError {
             | Self::SubscriptionConnectionReplaced
             | Self::FunctionCatalogueRevisionNotFound
             | Self::SeatNotRepresented
+            | Self::ClockUnavailable(_)
+            | Self::ClockRollback { .. }
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
             | Self::RenewalQuota
@@ -121,7 +129,20 @@ impl ServiceError {
 
 impl fmt::Display for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+        match self {
+            Self::ClockUnavailable(failure) => {
+                write!(f, "host clock is unavailable: {failure:?}")
+            }
+            Self::ClockRollback {
+                observed_at_unix_ms,
+                anchor_unix_ms,
+                maximum_rollback_ms,
+            } => write!(
+                f,
+                "host clock rollback exceeds policy: observed {observed_at_unix_ms}, installation anchor {anchor_unix_ms}, maximum rollback {maximum_rollback_ms} ms"
+            ),
+            _ => write!(f, "{self:?}"),
+        }
     }
 }
 

@@ -96,6 +96,7 @@ use std::time::{Duration, Instant};
 
 mod backup;
 mod changefeed;
+mod clock;
 mod context;
 mod control;
 mod core;
@@ -127,6 +128,10 @@ mod token_key;
 mod transaction;
 mod vector;
 
+pub use clock::{
+    ClockAssessment, ClockAssessmentStatus, ClockObservation, ClockObservationFailure,
+    ClockSourceKind, ClockTrustLevel, CLOCK_OBSERVATION_FORMAT_VERSION,
+};
 use control::*;
 pub use core::RrdEngine;
 use data::public_data_snapshot;

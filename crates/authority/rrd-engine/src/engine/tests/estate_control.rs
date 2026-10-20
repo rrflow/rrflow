@@ -54,7 +54,6 @@ fn install(state_root: &Path, instance: &str) -> CanonicalId {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        100,
         &test_executable(),
     )
     .unwrap();

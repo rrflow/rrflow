@@ -44,8 +44,12 @@ public sealed class RrdClientTests
                     },
                     ["configuration"] = new Dictionary<string, object?>
                     {
-                        ["format_version"] = 1,
+                        ["format_version"] = 2,
                         ["revision"] = 1,
+                        ["clock"] = new Dictionary<string, object?>
+                        {
+                            ["maximum_rollback_ms"] = 0,
+                        },
                         ["reasoning"] = new Dictionary<string, object?>
                         {
                             ["max_run_elapsed_ms"] = 900_000,
@@ -70,7 +74,7 @@ public sealed class RrdClientTests
                             ["max_elapsed_ms"] = 30_000,
                         },
                         ["configuration_sha256"] =
-                            "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be",
+                            "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105",
                     },
                     ["instance"] = new Dictionary<string, object?>
                     {

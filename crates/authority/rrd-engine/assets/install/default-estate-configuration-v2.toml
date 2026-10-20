@@ -1,4 +1,7 @@
-format_version = 1
+format_version = 2
+
+[clock]
+maximum_rollback_ms = 0
 
 [reasoning]
 max_run_elapsed_ms = 900000

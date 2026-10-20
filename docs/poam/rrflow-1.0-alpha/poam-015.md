@@ -20,6 +20,15 @@ serialization, then deserialize from its own JSON bytes to a neighboring binary 
 fail its packet digest. The current digest therefore is not a stable cross-language JSON
 identity for every valid packet.
 
+A post-D-01 baseline check also found a partial generated-surface refresh: the Rust
+contract, public reference, and TypeScript endpoints carried OpenAPI digest `0ef644d8…`,
+while four endpoint projections and all five signal projections still carried
+`8f9efc7b…`. Package A07-2b regenerated those replaceable views from the unchanged
+contract and replaced five handwritten OpenAPI expectations with comparisons between
+the generated endpoint and signal identities. The shared parity checker and focused
+language tests now detect that split; this bounded repair does not resolve the other
+contract deficiencies above or complete H-04's one-compiler target.
+
 ## Impact
 
 Generated artifacts can pass while a sample or runtime description directs a client to a
