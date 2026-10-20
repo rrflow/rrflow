@@ -459,6 +459,13 @@ final fused result is capped by both `max_items` and `max_output_bytes`. Any
 retrieval or output cap that hides remaining work sets `truncated=true`; a
 truncated packet is never represented as complete.
 
+Graph roots are canonical records visible at the captured valid-time snapshot.
+An expired, future, retired or absent requested anchor cannot start expansion
+through a still-visible relation. Seed, lexical and vector roots are deduplicated
+in their existing order; graph stage selection, root count and traversal use
+that same set. Historical requests still resolve roots visible at their own
+valid-time coordinate. This root rule does not change relation-path semantics.
+
 Every returned item carries one or more evidence entries with the source kind,
 source identifier, rank, source score, reciprocal-rank contribution, physical
 plan digest, and evidence digest. The packet carries the read stamp, query
