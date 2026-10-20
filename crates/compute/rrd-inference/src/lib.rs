@@ -16,6 +16,9 @@ use rrd_core::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod registry;
+pub use registry::{EmbeddingBackendRegistry, EmbeddingDispatchError, EmbeddingExecution};
+
 #[cfg(feature = "fastembed-local")]
 mod fastembed_local;
 
@@ -473,78 +476,6 @@ pub struct EmbeddingBatchResult {
     pub registry_revision: u64,
     pub backend: EmbeddingBackendDescriptor,
     pub vectors: Vec<VectorValue>,
-}
-
-/// Process-owned registry of executable adapters. Durable data stores exact
-/// model provenance; executable sessions, accelerator handles, and provider
-/// credentials remain process-local and are never serialized into RRD.
-#[derive(Default)]
-pub struct EmbeddingBackendRegistry {
-    revision: u64,
-    backends: BTreeMap<String, Box<dyn EmbeddingBackend + Send>>,
-}
-
-impl EmbeddingBackendRegistry {
-    pub fn install(&mut self, backend: Box<dyn EmbeddingBackend + Send>) -> Result<u64> {
-        let descriptor = backend.descriptor();
-        descriptor.validate()?;
-        if self.backends.contains_key(&descriptor.id) {
-            return invalid(format!(
-                "embedding backend {} is already installed",
-                descriptor.id
-            ));
-        }
-        self.revision = self
-            .revision
-            .checked_add(1)
-            .ok_or_else(|| Error::InvalidRuntime {
-                reason: "embedding registry revision overflowed u64".into(),
-            })?;
-        self.backends.insert(descriptor.id.clone(), backend);
-        Ok(self.revision)
-    }
-
-    pub fn revision(&self) -> u64 {
-        self.revision
-    }
-
-    pub fn descriptors(&self) -> Vec<EmbeddingBackendDescriptor> {
-        self.backends
-            .values()
-            .map(|backend| backend.descriptor().clone())
-            .collect()
-    }
-
-    pub fn descriptor(&self, backend_id: &str) -> Option<&EmbeddingBackendDescriptor> {
-        self.backends
-            .get(backend_id)
-            .map(|backend| backend.descriptor())
-    }
-
-    pub fn embed_batch(
-        &mut self,
-        backend_id: &str,
-        model: &EmbeddingModelSpec,
-        network_policy: NetworkPolicy,
-        requests: &[EmbeddingRequest],
-    ) -> Result<EmbeddingBatchResult> {
-        let backend = self
-            .backends
-            .get_mut(backend_id)
-            .ok_or_else(|| Error::InvalidRuntime {
-                reason: format!("embedding backend {backend_id} is not installed"),
-            })?;
-        let descriptor = backend.descriptor().clone();
-        if &descriptor.model != model {
-            return invalid("embedding backend model differs from the requested model");
-        }
-        let vectors = dispatch_embedding_batch(backend.as_mut(), network_policy, requests)?;
-        Ok(EmbeddingBatchResult {
-            registry_revision: self.revision,
-            backend: descriptor,
-            vectors,
-        })
-    }
 }
 
 fn dispatch_embedding_batch(

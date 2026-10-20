@@ -16,7 +16,7 @@ is still no executable `RouterBackend` dispatch, LFG adapter/conformance, instal
 selection, persisted tree execution, or route packet binding authenticated provider
 representation and durable seat attribution to the authorization stamp.
 
-Inspection at `554ce4ccf1cb25aceba036dafaf4c8df79c42701` also confirms a
+Inspection at `554ce4ccf1cb25aceba036dafaf4c8df79c42701` identified a
 bounded scale risk in the existing embedding path:
 `RrdEngine::generate_embeddings_at` holds `embedding_backends`' mutex through
 `EmbeddingBackendRegistry::embed_batch` and synchronous adapter execution.
@@ -26,6 +26,30 @@ throughput regression or proof of a deadlock. The
 [G-01a package](../../roadmap/rrflow-1.0/gate-g.md#bounded-reasoning-implementation-packages)
 must characterize blocked-backend interference, preserve provenance checks,
 and prove bounded dispatch/cancellation before increasing concurrency.
+
+[PR 41](https://github.com/rrflow/rrflow-development/pull/41) repairs the
+existing catalogue/execution coupling without increasing that concurrency.
+`EmbeddingBackendRegistry::try_acquire` returns one owned execution lease
+with the immutable installed descriptor and selection-time registry revision.
+`RrdEngine` releases the registry lock before input preparation and backend
+execution. The existing single-batch ceiling becomes explicit fail-fast
+admission: excess calls report retryable `ResourceExhausted` and do not call a
+backend or copy its inputs. Listing and installation remain available during
+execution. Dropping, rejecting, returning or unwinding the lease releases its
+slot; a recognized backend mutex poison is confined to that backend and maps
+to `Internal`. Descriptor drift rejects output and later execution while the
+catalogue retains its admitted identity. The
+[admission repair journal](../../evidence/change-journals/gate-g/g-01a-embedding-admission-repair.md)
+records the failing oracle, replacement tests and limits.
+
+This is a repair of the existing embedding surface, not G-01a closure or a
+change to the D-01-first dependency spine. One blocked adapter still occupies
+the sole execution slot. There is no waiting queue, deadline enforcement,
+cooperative cancellation, hard worker termination, credential revocation
+fence, configurable parallelism, durable inference lease or RouterBackend
+execution. Higher concurrency remains blocked on the named G-01a evidence.
+A retryable busy response is not automatic retry authorization or proof that a
+provider effect can be repeated safely.
 
 ## Impact
 
