@@ -25,6 +25,37 @@ decision. A force push or history rewrite is never a release mechanism.
 | [ ] | J-04 | Publish fixed-hardware rrflowKV, graph, BM25, exact/HNSW, DataFusion, context, LFG, end-to-end, and clean-rollout benchmarks against pinned declared baselines. | evaluation harness | Revision-bound raw histograms name the exact client/server/engine/stage timing boundary and retain failed samples; evidence records build identity, hardware/toolchain/filesystem/device/clock provenance, configuration, corpus/seed, offered-load model, warmup, cache state, concurrency, p50/p95/p99/p99.9, success/error separation, long-duration RSS/CPU/I/O/queue saturation, logical/apparent/allocated bytes, mixed-family interference, recall/quality metrics, and a SurrealDB/Qdrant deployment matrix with artifact and installed bytes, commands, elapsed time, services, ports, configuration, secrets, readiness, and persistent readback. Closed-loop tests correct coordinated omission. No ease or superiority claim is allowed until like-for-like correctness/quality evidence passes. |
 | [ ] | J-05 | Produce reproducible signed default distributions whose one primary operator executable is `rrflow` on Linux/macOS and `rrflow.exe` on Windows, containing or manifest-binding every default engine capability, SDK, schema/golden, project/attunement template, configuration/profile, required local inference asset, SBOM/licence, artifact verifier, backup/restore tool, and runbook. Publish archive/executable checksums, a complete RRFlow byte manifest, build provenance/SBOM attestations, and the native platform signature required by the supported target, including Authenticode for Windows. | release tooling | After artifact acquisition, a clean native supported machine with no compiler, source checkout, sibling repository, repository-local cache, package registry, external database/query/vector service, or outbound network uses only the primary executable to run version, install plan/apply, serve, authenticated ready, commit/query/context, close/reopen, quick/full verify, repair rehearsal, backup/restore, and ownership-safe uninstall; every installed byte and runtime dependency resolves from the signed manifest. |
 
+## Integrated delivery and competitive claims
+
+The [DevPulse integration contract](../../reference/client/devpulse-cloud.md)
+and [H-07 packages](gate-h.md#h-07-devpulse-managed-cloud-and-homelab-packages)
+add explicit managed-service and self-hosted delivery profiles. The same native
+engine remains independently operable. Do not label a development desktop ZIP,
+container launch or local process test as a qualified cloud service or a
+complete DevPulse/homelab integration. Those profile claims require their
+actual provisioning, transfer, isolation, recovery and artifact evidence.
+
+J-04 also includes the owner's Pinecone comparison target. Pin tested service
+API/index configuration, region, data set, embedding model/dimension,
+filter/selectivity distribution, recall target, offered load and cost period.
+Report network-inclusive client latency separately from measured engine time;
+never compare a local in-process call with an unexplained managed round trip.
+Measure filtered dense/sparse/hybrid retrieval, update/delete freshness,
+concurrent ingestion, tenant isolation and sustained resource/cost behavior.
+The SurrealDB functional matrix includes the admitted model/transaction/query,
+subscription, recovery and self-hosted deployment profiles. Record exclusions;
+a vector-only benchmark cannot establish database-wide parity.
+
+Declare workloads and pass/fail thresholds before running the comparison,
+retain failures, and compare at matched correctness/quality. No competitor
+parity, superiority or ease-of-deployment claim is accepted from feature names,
+code inventory, a screenshot, a build or ordinary candidate CI. Current primary
+reference inputs (reviewed 2026-10-19; not benchmark results):
+
+- [SurrealDB model and deployment overview](https://surrealdb.com/docs/what-is-surrealdb)
+- [Pinecone architecture](https://www.pinecone.io/how-pinecone-works/)
+- [Pinecone production checklist](https://docs.pinecone.io/guides/production/production-checklist)
+
 ## Release condition
 
 ### rrflowDB compatibility and independent-release evidence

@@ -27,6 +27,29 @@ selection/consent, durable transfer checkpoints, duplicate/replay handling,
 conflict and revocation behavior require the real-service acceptance in that
 contract; endpoint reachability alone cannot qualify synchronization.
 
+## H-07 DevPulse, managed cloud and homelab packages
+
+The [existing integration contract](../../reference/client/devpulse-cloud.md)
+owns the required local VM/container experience and bidirectional transfer to
+managed or operator-controlled destinations. All packages below remain open.
+They are dependencies to implement, not completed work or new engine APIs.
+The native engine must remain independently installable and operable.
+
+| Package | Prerequisites and canonical boundary | Smallest oracle and required exit |
+|---|---|---|
+| H-07a: executable sync contract and admitted profile | Existing contract; inspect `rrd-contract` operation catalogue, `rrd-engine` transaction/idempotency boundary, `rrd-store` committed change groups and public export coverage. Specification/fixture work may begin now. | Versioned cases name each selected family, source/destination identity, atomic group, snapshot/cursor handoff, conflict policy and unsupported condition. Absent public import/export reports unimplemented, never a passing sync fixture. |
+| H-07b: native durable import and origin receipts | H-07a, accepted D-01/C-07 durability, H-04 public-operation foundation; extend the existing core/store/engine transaction boundaries and generated public catalogue. | Two installed engines apply one selected source commit once across lost ACK, new session, restart and credential rotation. Source origin, deduplication and destination mutations commit atomically. Tampered digest, foreign binding, incompatible schema and partial group reject without effects. |
+| H-07c: snapshot handoff and bidirectional reconciliation | H-07b; engine-owned bindings/checkpoints/conflicts, bounded public transfer adapter. | No gap between initial snapshot and changes; concurrent edits/deletes become declared conflicts or converge by the accepted policy; three peers do not echo commits. Retention gap, full disk, revocation and slow peers preserve acknowledged state and bounded work. |
+| H-07d: native service distribution profiles | D-01/D-06/D-11 and C-07; current CLI/server lifecycle and distribution tooling, using the J-03/J-05 artifact requirements. Final release qualification consumes this package; it is not a circular prerequisite. | Exact Linux/Windows/macOS artifacts and supported service images install, authenticate, persist, recover, back up and restore with no checkout/toolchain. TLS/identity, tenant isolation, quotas and ownership-safe removal are proved for managed and self-hosted profiles; no default SaaS prerequisite. |
+| H-07e: DevPulse project-runtime integration | Authoritative DevPulse checkout identified; H-07d and existing authorized VM/container providers; consume RRFlow public SDKs without a sibling build dependency. | A packaged DevPulse build provisions a supported project runtime, builds/runs Rust/Python/Go fixtures, opens their private UIs and reopens local RRFlow data without a hosted account. Failed/cancelled provisioning cleans only owned resources. |
+| H-07f: selected project files and environment transfer | D-03/D-06 inventory/effect contracts, H-07e; existing project inventory and provider adapters. | File/content digests and environment revisions are independently verified; collisions, excludes, secrets, deletes and interrupted transfers are explicit. No implicit raw database or live-VM-memory copying. Database convergence cannot hide failed file/environment transfer. |
+| H-07g: real managed/homelab end-to-end qualification | H-07c through H-07f; actual managed identity/control service and separately administered homelab. | One DevPulse project exercises both directions, offline concurrent changes, lost ACK, delete/schema conflict, credentials/revocation, restore and interrupted upgrade. Repeat with shippin.cloud unavailable on the homelab path. Correlated source/destination receipts, pending/conflict state and all required failures are retained. |
+
+Each runtime package first resolves exact symbols and tests from its current
+checkout and lands through its own PR/CI. Do not jump from an HTTP connection,
+container startup or UI animation to H-07g completion. J-04's competitive proof
+is separate from these functional/recovery cases.
+
 ## H-08 PostgreSQL compatibility packages
 
 | Done | ID | Required change | Owning boundary | Acceptance evidence |
