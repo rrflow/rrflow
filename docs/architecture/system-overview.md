@@ -90,7 +90,7 @@ authoritative databases or engines.
 | **host-event adapter** | An optional, explicitly installed stateless translator from a host callback or external signal into the canonical engine-event submission operation. | Outward `rrflow-*` adapter; never an automatic hook or scheduler. |
 | **Connectome** | The RRFlow client: a separate operator and developer workbench using public RRD capabilities. The name no longer means a storage substrate; that role is RRFlow's. | Separate repository pinned at `connectome/`; no embedded engine authority. |
 | **shippin.cloud** | Planned hosted RRFlow offering with private development spaces, project execution, UI previews, and web deployment. | Cloud delivery and account services consume explicit public engine and project-execution contracts. |
-| **DevPulse** | Planned desktop application offering a local RRFlow engine and optional shippin.cloud signup and synchronization. | Local client and distribution integration; engine state remains under `RrdEngine`. |
+| **DevPulse** | The project development application; RRFlow integration targets local VM/container project runtimes and opt-in bidirectional synchronization with shippin.cloud or a homelab. | Runtime provisioning and project transfer use explicit adapters; native data and sync receipts remain under `RrdEngine`. |
 | **workspace** | A set of estates grouped by an account or client above the engine. It is never an engine scope, resource, or authorization boundary; the [instance-topology record](instance-topology.md#canonical-identities-and-cardinality) owns the relation. | Client and account concern; no engine type. |
 
 Product documentation uses the exact spellings **RRFlow**, **RRD**,
@@ -292,7 +292,8 @@ that they are available.
 |---|---|---|
 | Connectome UI | Present engine state and invoke available public operations from its independently built UI. | RRFlow's pinned submodule identifies UI source; the public client contract governs connections and effects. |
 | shippin.cloud | Offer RRFlow as a cloud service with an included private devspace, initially for friends-and-family demonstrations of AI-assisted development. Supply project creation, Rust/Python/Go execution, private running-UI previews, and web launch capabilities. | Hosted provisioning, toolchains, execution, preview routing, and deployment are explicit services/adapters; they do not become another reasoning or persistence engine. |
-| DevPulse | Offer the local reasoning engine and invite the user to create a shippin.cloud account and synchronize selected work. | Account creation, project selection, transfer permissions, and synchronization are explicit choices; signup alone grants no upload or mutation permission. |
+| DevPulse | Provision local project VMs/containers, run Rust/Python/Go and private UIs, and integrate the native RRFlow engine; synchronize selected work in both directions with a managed or self-hosted destination. | Provisioning, database sync and file/environment transfer are separate authorized effects. Signup alone grants no upload or mutation permission. |
+| Homelab | Run the same versioned native engine and supported project runtime on operator-controlled infrastructure; synchronize with DevPulse without a shippin.cloud account. | Explicit endpoint/trust, identity, storage and provider configuration; no alternative persistence or implicit hosted dependency. |
 
 A devspace is the hosted project development environment, distinct from an
 RRD instance or its estate. Running project code uses a configured execution
@@ -302,7 +303,7 @@ to its authorized devspace; publishing a web application is a separate,
 explicit deployment effect. A successful build or preview cannot claim that
 the engine's reasoning or persistence gates passed.
 
-DevPulse's local instance and a hosted instance retain their exact project,
+DevPulse's local instance and a managed or homelab instance retain their exact project,
 estate, and instance identities. Synchronization needs a versioned public
 contract covering selected data, authorization, conflicts, retry uncertainty,
 and receipts. Copying storage files or equating an account/workspace with an

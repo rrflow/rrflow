@@ -41,9 +41,14 @@ demonstrate current AI-assisted development: create projects, run Rust,
 Python, and Go code, load the running project's UI inside the private cloud
 devspace, and launch projects on the web.
 
-**DevPulse** will offer the local RRFlow reasoning engine, with optional
-shippin.cloud account creation and explicitly selected synchronization. Local
-operation remains available independently of a cloud account.
+**DevPulse** is the project development application. Its RRFlow integration
+must provision local project VMs/containers, run their toolchains and UIs, and
+support explicitly selected **bidirectional synchronization** with either
+**shippin.cloud or an operator-controlled homelab**. Local and homelab operation
+must remain available without a hosted account. Database synchronization,
+project-file transfer and environment provisioning have distinct receipts and
+failure states; the [integration contract](docs/reference/client/devpulse-cloud.md)
+owns those requirements.
 
 These are delivery targets, not claims of available hosted execution,
 deployment, or synchronization. The [delivery boundaries](docs/architecture/system-overview.md#delivery-experiences)
