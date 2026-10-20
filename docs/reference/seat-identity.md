@@ -21,8 +21,9 @@ different seat without changing RRFlow semantics.
 The executable Clyffy path must remain first-party Rust inside this repository.
 `RrdEngine` owns authentication, authorization, routing orchestration,
 deterministic predicates, context intent, compare-and-swap, audit, and commit.
-LFG or any other `RouterBackend` may return only one of the three bounded router
-proposals. Go can be installed as an outward SDK, generator, harness, or other
+The SWAG-selected `RouterBackend` may return only one of the three bounded router
+proposals; [LFG supplies CPU observations](inference/lfg-swag.md).
+Go can be installed as an outward SDK, generator, harness, or other
 attuned capability; it is not a Clyffy or RRFlow routing, persistence, or
 orchestration authority.
 

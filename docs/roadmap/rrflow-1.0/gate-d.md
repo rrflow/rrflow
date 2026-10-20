@@ -24,6 +24,26 @@ either independently.
 
 ## [Accepted evidence](gate-d-evidence.md)
 
+## Connector and knowledge ingestion packages
+
+The [knowledge connector contract](../../reference/data/knowledge-connectors.md)
+defines target requirements. These packages refine existing D-05/D-06 work;
+they add no completed item or new global execution wave. Specification and
+fixtures may be prepared now; runtime work obeys the dependency spine.
+
+| Package | Existing boundary and prerequisites | Required failure oracle and exit |
+|---|---|---|
+| D-06 configuration/discovery | `rrd-contract` executable capability catalogue, `endpoint_binding.rs`, `deployment.rs`; installed D-01 authority. H-04 later consumes the generated projection; full client parity is not a prerequisite for this core contract. | Generate requirements and availability from one owner; missing secret, unsupported adapter, expired observation, unauthorized and quota states remain distinct. Discover/preview causes no external call or mutation. Exact apply/CAS, revoke/restart and stale revision tests pass; H-04 proves CLI/MCP/SDK/UI parity. |
+| D-06 knowledge adapter | Same binding/admission boundary; qualified configuration/discovery and explicit source credentials/egress | First read-only provider profile proves actual API/version, source identity/ACL, pagination, resource limits, cancellation and uncertainty. Foreign account, incomplete provenance, expired freshness and unsupported operation fail explicitly. Mock results cannot qualify HydraDB, Pinecone Nexus or Qdrant. |
+| D-05 source and chunk provenance | Existing source/object/record/relation/schema, attunement job and semantic commit boundaries; D-02/D-03, qualified adapter and E/F access paths | Stable source/chunk identities, bounded decode, source-span readback, duplicate/restart and source-change/delete/ACL invalidation pass on installed rrflowKV. Publish only complete bounded groups; source snapshots and derived outputs remain distinct. |
+| D-05 knowledge derivation | Qualified chunk provenance; existing inference/embedding and native graph/lexical/vector paths, H-09 family definitions | Extraction proposals retain source/model/configuration and verification; poisoned summary, conflicting entity, unsupported modality and incompatible embedding space cannot silently publish. Measure update/ingest cost and retrieval quality at equal token budgets before selecting a strategy. |
+| D-06 Parquet exchange | Qualified source binding; existing `rrd-query` Arrow/DataFusion and engine mutation/export boundaries, F streaming/budget evidence | Pin reader/type/encoding profile. Malformed/oversized metadata, decompression expansion, lossy coercion, wrong stamp/ACL and interrupted publication fail without partial canonical writes or visible incomplete exports. Import/read/export match canonical values and reopened state; memory/scan/spill remain bounded. |
+
+Each row lands as its own bounded implementation PR with exact symbols,
+characterization tests and research provenance resolved from that candidate.
+H-09 consumes accepted source/projection output; project links remain H-10,
+and bidirectional synchronization remains H-07.
+
 ## Exit condition
 
 Gate D exits only when a fresh and an existing project can be installed from

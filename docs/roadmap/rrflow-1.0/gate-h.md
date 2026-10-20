@@ -78,6 +78,20 @@ complete by this plan. Before each implementation PR, resolve exact symbols
 and runnable test commands from that checkout; proposed test names are not
 reported as existing or passed. Completion is per oracle, never a fixed date.
 
+## Knowledge and project placement acceptance
+
+H-09 uses the [knowledge connector provenance contract](../../reference/data/knowledge-connectors.md)
+for source/chunk/transformation breadcrumbs and ACL/delete invalidation.
+H-10 link consent is independent of copying, synchronization, model cache
+sharing and physical placement. H-07e implements the
+[project sharing and isolation UI contract](../../reference/client/devpulse-cloud.md#project-preferences-sharing-and-isolation):
+private by default, exact peer selection, separate VM/container constraints,
+cost preview and observed enforcement. Test shared/private context crossed
+with dedicated/explicitly permitted shared placement, plus revocation and
+foreign-account/volume denial. Unsupported isolation fails; account login
+and cost optimization cannot silently widen consent. These requirements do
+not mark any H item complete.
+
 ## H-05 execution packages
 
 H-05 is executed as five bounded packages rather than one late observability

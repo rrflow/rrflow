@@ -92,6 +92,85 @@ separation keeps project code execution outside the database authority.
 
 ## Required synchronization mechanics
 
+The following project settings govern selection and placement independently of
+the synchronization protocol.
+
+### Project preferences, sharing, and isolation
+
+Project requirements/preferences are versioned governed data. The user-facing
+specification may compose these fields, but cannot become a second authority:
+`EstateConfiguration` owns effective engine settings, `EndpointProfile` owns
+endpoint bindings, H-10 records own project-link consent, H-07 records own sync
+consent, and DevPulse/provider records own physical provisioning. Each view
+references those identities/revisions and shows proposed versus observed
+state. The owner's project-spec name is unresolved; do not publish a new type
+or file format based on an uncertain spelling.
+
+The UI must present separate choices with explicit scope:
+
+| Choice | Required preview and effect |
+|---|---|
+| Context sharing | Private by default. Select exact peer projects, readable families/resources, purpose, expiration and revocation. H-10 offer/acceptance establishes the read-only link; common account membership does not imply consent. |
+| Data synchronization | Independently select native state, project files and environment transfer, destination and directions under the existing sync contract. Read sharing does not authorize copying, remote writes or synchronization. |
+| Execution isolation | Select required isolation level and eligible placement: dedicated VM/microVM, or explicitly permitted containers within a VM in a declared trust group. Show shared kernel/host boundaries, mounts, network/egress, secrets, ports, resource caps and provider enforcement. |
+| Cost and capacity | Preview measured/declared CPU, RAM, GPU, storage, warm/idle policy, regional rates and estimated recurring/usage costs with currency and observation time. Unknown prices remain unknown. Apply hard limits before optimizing placement. |
+| Models and knowledge sources | Show active versus candidate LFG/SWAG policies and connector requirements, locality, data disclosure, credentials by reference, budgets, health and unavailable reasons from the engine catalogue. |
+
+A sharing graph may inform which placements are candidates, but never selects
+placement by itself. Two sharing projects can require separate VMs; two
+nonsharing projects may occupy one explicitly allowed trust-group VM with
+separate containers and independent estate authorization. Containers sharing a
+guest kernel do not provide the same boundary as separate VMs. Untrusted
+mutually isolated workloads require an approved stronger isolation profile;
+if the provider cannot enforce it, placement fails rather than silently
+downgrading to save money.
+
+Optimize only within approved constraints: bin packing, resource reservations,
+idle suspension, cold storage and warm pools need measured contention,
+wake latency and cleanup evidence. Sharing data never grants host filesystem,
+process, network or credential access. Project code cannot mount RRFlow data
+directories or management sockets. Account switches and restore must not attach
+another project's volume. A VM is also not proof of complete security:
+the actual host/guest, sandbox, patching and network controls require provider
+qualification. [Firecracker production guidance](https://github.com/firecracker-microvm/firecracker/blob/main/docs/prod-host-setup.md)
+is a reference for those controls, not a selected RRFlow dependency.
+
+Show a reviewable proposal and its digest before provisioning or relocation.
+User intent, engine admission and provider enforcement produce distinct
+receipts; they are not one cross-service transaction. Interrupted provisioning
+must reconcile only owned resources. A cost optimization cannot change sharing,
+residency, secret access or isolation without a new authorized configuration.
+Revoking a link stops subsequent reads; it does not promise to erase previously
+exported data or stop a VM. Display these effects separately.
+
+H-07e qualification must exercise all four sharing/separate-or-shared-placement
+combinations, foreign-account/volume/network denial, resource exhaustion,
+unsupported isolation, relocation interruption and per-project cost accounting.
+H-10 supplies actual two-party link/revocation evidence. A UI toggle or
+configuration schema does not qualify either behavior.
+
+### Optional login and maintained updates
+
+RRFlow authentication works locally through its configured identity authority.
+Offer shippin.cloud account linking as an explicit extension, alongside a
+homelab endpoint; never substitute hosted identity for local engine readiness.
+Sign-in lists authorized service choices and prices but enables no upload,
+connector, provisioning, shared cache or paid model call by itself. Disconnect
+must leave local login and local data usable.
+
+Publish signed, digest-bound engine and adapter bundles through Gate J's
+release mechanism. Preview platform/protocol/schema/format compatibility,
+backup and recovery requirements, downtime, permissions and data movement.
+Pin an installed version and rollout channel; check/apply updates only under
+the configured authorization. No install-time fetch is introduced into the
+default offline bundle. Verify the replacement and reopen/health evidence
+before routing work to it; retain the old artifact and verified backup.
+Do not call binary rollback safe if the new writer changed an incompatible
+storage format. Provider-managed API changes likewise invalidate adapter
+conformance until the admitted profile is verified again.
+
+### Transfer protocol requirements
+
 Use the engine's typed public mutation, changefeed and receipt capabilities.
 Account authentication and user consent authorize a binding; they are not
 themselves a replication algorithm. A future sync package must implement:
