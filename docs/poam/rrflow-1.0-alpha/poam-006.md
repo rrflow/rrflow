@@ -49,3 +49,27 @@ no-write preview, apply, authenticated ready, commit, close/reopen, and baseline
 verification without checkout companions; old initializer/supervisor/doctor/create-on-open
 success paths are absent. D-02 through D-05 prove durable attunement and inventory/index
 work; D-11 proves safe repair/restore/uninstall; native release qualification passes in J.
+
+## Native installed-process coverage
+
+The [native lifecycle qualification receipt](../../evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
+records a verified test gap: the primary installed-process case was compiled
+only on Unix and substituted a manifest file for the distribution executable.
+Windows ran only three CLI argument tests. The replacement corpus binds the
+actual executable and tests fresh and existing project installation, durable
+commit, authenticated readback from a restarted process, and published-backup
+readback. It preserves deterministic preview, configured ceilings, exact-plan
+denials, live-writer exclusion and credential-redaction assertions.
+Platform CI now runs that corpus explicitly. Windows owned-process
+termination is not graceful shutdown qualification; signed offline bundles,
+hostile-path/ACL proof and the broader D-01/C-07 matrix remain open.
+
+The first native candidate exposed an overlapping-invocation defect: rejected
+admission replaced the active thread owner, and completion identified work only
+by caller coordinates. A stale completion could therefore clear newer work.
+The [invocation correction receipt](../../evidence/change-journals/gate-d/d-01-native-invocation-correction.md)
+records deterministic failures and their replacement evidence. Admission now
+preserves the occupied reservation, reports a retryable in-progress conflict
+with a completed audit, and binds completion to a private per-admission token.
+This does not close durable reasoning, generic uncertain-outcome recovery,
+or the wider installed-product qualification item.

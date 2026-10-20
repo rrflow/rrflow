@@ -1,3 +1,4 @@
+use super::invocation::ActiveInvocation;
 use super::*;
 
 pub struct RrdEngine {
@@ -22,7 +23,7 @@ pub struct RrdEngine {
     /// adapter. Session-backed methods use this to distinguish a correctly
     /// wrapped call from a direct embedded call and make the latter leave a
     /// durable authorization or denial record as well.
-    pub(crate) active_invocations: Mutex<BTreeMap<(String, String), std::thread::ThreadId>>,
+    pub(in crate::engine) active_invocations: Mutex<BTreeMap<(String, String), ActiveInvocation>>,
     /// One process-local physical authority for decoded vector artifacts.
     /// Durable catalogue/object state remains in `storage` and `objects`;
     /// this bounded manager alone owns serving residency across requests.

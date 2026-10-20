@@ -1,5 +1,6 @@
 use super::security::AuditEvent;
 use super::*;
+use std::sync::Arc;
 
 /// Canonical operation identity presented by every embedded or transported
 /// RRD call. Adapters select an operation; only the engine maps it to policy.
@@ -168,6 +169,14 @@ pub struct AuthorizedInvocation {
     invocation: Invocation,
     operation: RrdOperation,
     principal_id: Option<CanonicalId>,
+    // Pointer identity distinguishes admissions even when callers reuse every
+    // public coordinate. Cloning the handle preserves its completion authority.
+    reservation: Arc<()>,
+}
+
+pub(in crate::engine) struct ActiveInvocation {
+    owner: std::thread::ThreadId,
+    reservation: Arc<()>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -278,19 +287,34 @@ impl RrdEngine {
             digest::sha256_hex(b"rrd-audit-completion-pending"),
         )?;
         let coordinates = invocation_coordinates(&invocation);
-        if self
+        let mut active = self
             .active_invocations
             .lock()
-            .expect("active invocation mutex")
-            .insert(coordinates, std::thread::current().id())
-            .is_some()
-        {
-            return Err(ServiceError::IdempotencyConflict);
-        }
+            .expect("active invocation mutex");
+        let std::collections::btree_map::Entry::Vacant(entry) = active.entry(coordinates) else {
+            drop(active);
+            let error = ServiceError::InvocationInProgress;
+            self.append_invocation_audit(
+                &invocation,
+                operation,
+                principal_id,
+                AuditPhase::Completed,
+                AuditDecision::Failed,
+                409,
+                digest::sha256_hex(error.to_string().as_bytes()),
+            )?;
+            return Err(error);
+        };
+        let reservation = Arc::new(());
+        entry.insert(ActiveInvocation {
+            owner: std::thread::current().id(),
+            reservation: Arc::clone(&reservation),
+        });
         Ok(AuthorizedInvocation {
             invocation,
             operation,
             principal_id,
+            reservation,
         })
     }
 
@@ -301,11 +325,13 @@ impl RrdEngine {
     ) -> Result<()> {
         validate_sha256(&completion.response_sha256)?;
         let coordinates = invocation_coordinates(&authorized.invocation);
-        if !self
+        let mut active = self
             .active_invocations
             .lock()
-            .expect("active invocation mutex")
-            .contains_key(&coordinates)
+            .expect("active invocation mutex");
+        if !active
+            .get(&coordinates)
+            .is_some_and(|entry| Arc::ptr_eq(&entry.reservation, &authorized.reservation))
         {
             return Err(ServiceError::IdempotencyConflict);
         }
@@ -318,10 +344,7 @@ impl RrdEngine {
             completion.status_code,
             completion.response_sha256,
         )?;
-        self.active_invocations
-            .lock()
-            .expect("active invocation mutex")
-            .remove(&coordinates);
+        active.remove(&coordinates);
         Ok(())
     }
 
@@ -452,9 +475,9 @@ impl RrdEngine {
             .lock()
             .expect("active invocation mutex")
             .iter()
-            .any(|(coordinates, owner)| {
+            .any(|(coordinates, active)| {
                 coordinates == &(request_id.into(), operation_id.into())
-                    || owner == &std::thread::current().id()
+                    || active.owner == std::thread::current().id()
             })
     }
 
