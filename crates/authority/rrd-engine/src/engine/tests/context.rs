@@ -227,6 +227,41 @@ fn context_flows_through_one_engine_stamp_and_survives_reopen() {
         .iter()
         .all(|item| item.identity != "record:note:gamma"));
 
+    // The same live root found by both a seed and lexical retrieval is
+    // expanded once, and the plan reports the actual number of roots.
+    let mut overlapping = request.clone();
+    overlapping.seeds.push(reference("note", "alpha"));
+    let overlapping = engine
+        .assemble_context(
+            &lease.session_id,
+            &lease.token,
+            &overlapping,
+            1_200,
+            "request-context-overlap",
+            "operation-context-overlap",
+        )
+        .unwrap();
+    let graph = overlapping
+        .plan
+        .stages
+        .iter()
+        .find(|stage| stage.kind == ContextPlanStageKind::Graph)
+        .unwrap();
+    assert!(graph.reason.ends_with("from 1 root(s)"));
+    let neighbor = overlapping
+        .items
+        .iter()
+        .find(|item| item.identity == "record:note:beta")
+        .unwrap();
+    assert_eq!(
+        neighbor
+            .evidence
+            .iter()
+            .filter(|evidence| evidence.kind == ContextEvidenceKind::Graph)
+            .count(),
+        1
+    );
+
     let mut bounded_request = request.clone();
     bounded_request.max_items = 1;
     bounded_request.max_output_bytes = 4 * 1024;

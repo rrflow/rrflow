@@ -51,3 +51,9 @@ the same captured valid-time snapshot used for seed candidates. Graph stage
 selection and execution must share that filtered root set; historical requests
 must retain their valid neighbors. This bounded correction does not close
 native-index, adaptive-routing or feedback qualification.
+
+The [bounded repair](../../evidence/change-journals/gate-h/h-01-context-anchor-repair.md)
+uses one visible root set for selection and traversal. The expired/future/
+retired/missing, mixed-root and historical corpus passes on rrflowMX and
+rrflowKV, with identical persistent packets after reopen. This is context
+correctness evidence only; the broader item remains open.
