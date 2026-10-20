@@ -20,6 +20,9 @@ adapter, the [engine data flow](../../architecture/engine-data-flow.md) owns the
 underlying execution, and the [roadmap](../../roadmap/rrflow-1.0.md) owns
 acceptance.
 
+The [runnable rrflowDB guide](rrflowdb-local.md) demonstrates the native
+installed relational database path and the account-independent DevPulse target.
+
 ## Required end-to-end boundary
 
 ```text
@@ -39,9 +42,9 @@ merely compare JSON shapes.
 
 ## Audited current surface
 
-The executable `endpoint_catalogue()` contains 36 HTTP operations and one
+The executable `endpoint_catalogue()` contains 37 HTTP operations and one
 generic authenticated `/v1/ws` descriptor. `RrdClient` currently supplies
-typed HTTP methods for 31 of those 36 operations, while `RrdWebSocket`
+typed HTTP methods for 32 of those 37 operations, while `RrdWebSocket`
 implements the bounded B-04 multiplexed protocol. The current boundary is:
 
 | Family | Catalogued HTTP operations | Rust methods now | Missing now |
@@ -50,6 +53,7 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Capability and schema discovery | 3 | 3 | none |
 | Sessions | 3 | 3 | none |
 | Transactions | 4 | 4 | none |
+| Native schema discovery | 1 | 1 | none |
 | rrflowQL query | 1 | 1 | none |
 | Query indexes and live polling | 3 | 0 | `query-index-ensure`, `query-index-list`, `query-live-poll` |
 | Vector collections, points, and search | 5 | 5 | none |
@@ -61,7 +65,7 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Diagnostics | 1 | 1 | none |
 | Prompt flights | 3 | 3 | none |
 | Context | 1 | 1 | none |
-| **Total** | **36** | **31** | **5** |
+| **Total** | **37** | **32** | **5** |
 
 The WebSocket method authenticates one generic connection, validates the
 server's opening identity and negotiated limits, and carries request,
@@ -344,7 +348,7 @@ The gates then close behavior in dependency order:
 2. **B-04 (implemented):** the dedicated socket is absent; one bounded
    multiplexed protocol and Rust carriage now own request/cancel/subscription
    correlation, exact resume state, and adversarial frame rejection.
-3. **H-04:** bind all 36 operations from the catalogue, validate every request
+3. **H-04:** bind all 37 operations from the catalogue, validate every request
    and response, and compare Rust with every supported surface against one
    real `RrdEngine` corpus.
 4. **H-07:** add endpoint resolution/rotation as an outward adapter while

@@ -346,7 +346,40 @@ impl RrdEngine {
                             )?;
                             (outcome, true)
                         }
-                        None => return Err(error.into()),
+                        None => {
+                            // These typed failures are raised before publication
+                            // (or by snapshot conflict before the physical commit).
+                            // An absent outcome plus that proof permits explicit
+                            // abort. Unknown storage/I/O failures retain their
+                            // intent for exact retry and crash reconciliation.
+                            if matches!(
+                                error,
+                                rrd_store::Error::Kernel(_)
+                                    | rrd_store::Error::RuntimeConflict { .. }
+                                    | rrd_store::Error::TransactionConflict { .. }
+                                    | rrd_store::Error::DanglingRuntimeReference(_)
+                                    | rrd_store::Error::RuntimeTargetNotFound(_)
+                                    | rrd_store::Error::RuntimeSchemaMissing(_)
+                                    | rrd_store::Error::RuntimeSchemaConflict { .. }
+                                    | rrd_store::Error::IndexConstraint(_)
+                            ) {
+                                state
+                                    .transactions
+                                    .get_mut(transaction_id)
+                                    .expect("transaction retained")
+                                    .commit_intent = None;
+                                self.replace_session(
+                                    session_id,
+                                    bytes,
+                                    state,
+                                    now,
+                                    "transaction.commit_rejected",
+                                    request_id,
+                                    operation_id,
+                                )?;
+                            }
+                            return Err(error.into());
+                        }
                     },
                 }
             };

@@ -1123,7 +1123,7 @@ fn register_flight_schema(
                     // One edge per distinct packet record is constructed here
                     // and validated by the contract. A schema pair constraint
                     // would make every later commit in the scope load every
-                    // relation in it (POAM-033).
+                    // relation in it (POAM-034).
                     unique_pair: false,
                     max_outgoing: None,
                     max_incoming: None,

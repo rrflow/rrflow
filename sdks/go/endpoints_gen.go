@@ -2,7 +2,7 @@
 
 package rrd
 
-// OpenAPI SHA-256: 63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d
+// OpenAPI SHA-256: 3f2638dd5705cf3bfbc2393c739a367278c772202decd130b4450467de2551f8
 
 type OperationID string
 
@@ -15,6 +15,7 @@ const (
 	OperationChangefeedFollow       OperationID = "changefeed-follow"
 	OperationChangefeedRead         OperationID = "changefeed-read"
 	OperationContextAssemble        OperationID = "context-assemble"
+	OperationDataSchemaRead         OperationID = "data-schema-read"
 	OperationDiagnosticsRead        OperationID = "diagnostics-read"
 	OperationEndpointCatalogue      OperationID = "endpoint-catalogue"
 	OperationEstateRead             OperationID = "estate-read"
@@ -54,6 +55,7 @@ var endpoints = map[OperationID]Endpoint{
 	OperationChangefeedFollow:       {Method: "POST", Path: "/v1/changes/follow", Authentication: "session_bearer", Mutation: false},
 	OperationChangefeedRead:         {Method: "POST", Path: "/v1/changes/read", Authentication: "session_bearer", Mutation: false},
 	OperationContextAssemble:        {Method: "POST", Path: "/v1/context/assemble", Authentication: "session_bearer", Mutation: false},
+	OperationDataSchemaRead:         {Method: "POST", Path: "/v1/data/schema", Authentication: "session_bearer", Mutation: false},
 	OperationDiagnosticsRead:        {Method: "POST", Path: "/v1/diagnostics/read", Authentication: "session_bearer", Mutation: false},
 	OperationEndpointCatalogue:      {Method: "GET", Path: "/v1/schema/endpoints", Authentication: "public", Mutation: false},
 	OperationEstateRead:             {Method: "POST", Path: "/v1/estates/{estate}/read", Authentication: "session_bearer", Mutation: false},

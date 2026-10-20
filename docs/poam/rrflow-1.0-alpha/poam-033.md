@@ -1,55 +1,45 @@
-# POAM-033 — commit-time schema constraints load the whole scope
+# POAM-033 — rejected native commits retain an unabortable intent
 
 **Status:** active parent-owned POA&M detail
 **Coordinate:** `rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-033`
 **Owner:** [RRFlow 1.0 alpha POA&M](../rrflow-1.0-alpha.md)
 
-This detail record is part of the canonical RRFlow 1.0 alpha POA&M. The parent
-ledger owns priority and lifecycle status; this file cannot change either
-independently.
-
 ## Observed deficiency
 
-`validate_schema_and_objects` in
-`crates/persistence/rrd-store/src/access/semantic_commit.rs` validates schema
-constraints against everything stored in the commit's scope:
-
-- when any record schema in the effective registry declares
-  `unique_properties`, every commit in the scope loads every record in the
-  scope (`values_for_scope::<RuntimeRecord>` over `RUNTIME_RECORDS`); and
-- when any relation schema declares `unique_pair`, `max_outgoing`, or
-  `max_incoming`, every commit in the scope loads every relation in the scope
-  (`values_for_scope::<RuntimeRelation>` over `RUNTIME_RELATIONS`).
-
-`RuntimeSchemaRegistry::validate_objects` then checks the constraints over the
-loaded set. The load is triggered by the registry rather than by the commit's
-own mutations, so a commit that writes no constrained table pays it too. The
-memory-estate seat-representation relation in `rrd-engine` declares
-`unique_pair` and `max_outgoing`. Found while designing the H-06c task records;
-H-06b dropped `unique_pair` from the prompt-flight use edge, which the engine
-constructs unique, so prompt flights do not add this cost to a scope.
+The installed real-server local database test first failed when aborting a
+transaction whose unique-constraint violation had already been rejected.
+`RrdEngine::commit_transaction` persisted its commit intent before native
+semantic validation; no authoritative commit outcome existed, but
+`abort_transaction` returned `CommitInProgress`. The same path can retain a
+typed-invalid or stale-cursor rejected transaction. Data atomicity remained
+intact; transaction cleanup and quota availability did not.
 
 ## Impact
 
-Write cost grows with the number of records or relations in a scope, not with
-the size of the commit. An estate that declares any pair, degree, or unique
-property constraint slows every write as it grows, and the memory used by
-validation grows with it.
+Rejected transactions retain an open slot and cannot be explicitly canceled,
+eventually exhausting a session's transaction quota despite no data being
+committed. Unknown-outcome recovery must remain distinct from definite rejection.
 
 ## Owning gates
 
-E-01, E-02
+C-03/C-07 transaction/recovery semantics and H-04 installed client operation.
 
-E-01 owns the adjacency prefixes that answer pair and degree checks for the
-endpoints a commit touches; E-02 owns the persisted unique index that answers
-unique-property checks for the values a commit writes.
-
-Roadmap owner: [Gate E](../../roadmap/rrflow-1.0/gate-e.md).
+Roadmap owners: [Gate C](../../roadmap/rrflow-1.0/gate-c.md) and
+[Gate H](../../roadmap/rrflow-1.0/gate-h.md).
 
 ## Closure evidence
 
-Commit-time constraint validation reads only the adjacency or index entries of
-the endpoints and values the commit touches. A differential test proves the
-same accept/reject outcome as the whole-scope oracle across insert, update,
-retire, conflict, and reopen. Physical counters show a constrained commit's
-read cost unchanged as unrelated records and relations are added to the scope.
+The candidate fix in [PR 26](https://github.com/rrflow/rrflow-development/pull/26)
+clears the intent only after a typed definitive semantic/concurrency rejection
+and an authoritative absent-outcome check. The transaction can then be
+explicitly aborted. Unknown storage/I/O failures retain their intent for exact
+retry and recovery. No storage format or second coordinator is introduced.
+
+The [native database regression](../../../crates/transport/rrd-client/tests/rrflowdb_local.rs)
+proves unique/type/stale-cursor rejection, unchanged rows/cursor, successful
+explicit abort, subsequent valid work, receipt replay and reopen. Existing
+engine recovery/function tests must also remain green. Local passing evidence
+does not close the parent row: candidate CI and reviewed landing are required.
+
+Owning boundaries: C-03/C-07 transaction/recovery semantics and H-04 installed
+client operation. PostgreSQL isolation and savepoints remain H-08 work.

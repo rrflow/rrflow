@@ -7,7 +7,7 @@ namespace Rrflow.Rrd.Client.Tests;
 public sealed class SignalCatalogueTests
 {
     private const string ExpectedOpenApiSha256 =
-        "63bf7037b9ed5f681498dafc9355d75e63e515b0d72ad6cf74c6606dae8fd63d";
+        "3f2638dd5705cf3bfbc2393c739a367278c772202decd130b4450467de2551f8";
     private const string ExpectedSignalSha256 =
         "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07";
 
