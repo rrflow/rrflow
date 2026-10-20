@@ -79,3 +79,27 @@ preserves the occupied reservation, reports a retryable in-progress conflict
 with a completed audit, and binds completion to a private per-admission token.
 This does not close durable reasoning, generic uncertain-outcome recovery,
 or the wider installed-product qualification item.
+
+## Installation inventory resource admission (2026-10-20)
+
+Inspection found that the installation precondition walker collected the whole
+project tree before checking `inventory_max_files`, and the content hasher read
+to EOF after accounting only the file's earlier metadata length. A large tree
+could therefore exhaust memory before refusal; a growing file could consume
+more input than the admitted byte count.
+
+[PR 40](https://github.com/rrflow/rrflow-development/pull/40) moves this one
+precondition implementation into `engine/installation/inventory.rs`. It streams
+directory entries, admits each retained entry before queuing more work, uses an
+iterative walk, and sorts only the bounded output. File hashing reads at most
+the admitted length and rejects short reads or observed length/mtime drift
+between path and open-handle metadata observations. Stable inputs retain the
+version-one digest grammar, exclusions, default profile and no-write preview.
+The [bounded inventory journal](../../evidence/change-journals/gate-d/d-01-bounded-installation-inventory.md)
+records characterization, tests and remaining limits.
+
+This is not an atomic filesystem snapshot, complete link/mount/race proof,
+Git-aware incremental attunement, secret classification, a watcher, or a
+million-file benchmark. It does not close D-01, D-03 or POAM-006. Default
+installation still rejects inputs beyond its explicit bundle profile instead
+of silently ignoring source or claiming a complete index.

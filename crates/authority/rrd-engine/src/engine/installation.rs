@@ -38,7 +38,10 @@ const INSTALL_CHECKPOINT_KEY: &str = "server/state/install/checkpoint";
 pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
 const MAX_CONFIGURATION_BYTES: u64 = 64 * 1024;
 
+mod inventory;
 pub(super) mod recovery;
+
+use inventory::{project_inventory_sha256, project_inventory_sha256_excluding};
 
 use recovery::{
     acknowledge_intent, load_or_create_intent, materialize_secret, read_existing_intent,
@@ -1537,96 +1540,6 @@ fn require_committed_installation(
         ));
     }
     Ok(read)
-}
-
-fn project_inventory_sha256(project: &Path, profile: &DefaultInstallProfile) -> Result<String> {
-    project_inventory_sha256_excluding(project, profile, None)
-}
-
-fn project_inventory_sha256_excluding(
-    project: &Path,
-    profile: &DefaultInstallProfile,
-    excluded_relative: Option<&Path>,
-) -> Result<String> {
-    let mut entries = Vec::<(PathBuf, bool)>::new();
-    collect_project_entries(project, project, excluded_relative, &mut entries)?;
-    entries.sort_by(|left, right| left.0.cmp(&right.0));
-    if entries.len() as u64 > profile.inventory_max_files {
-        return Err(ServiceError::Contract(
-            "project inventory exceeds the configured file bound".into(),
-        ));
-    }
-    let mut aggregate = IncrementalSha256::new();
-    aggregate.update(b"rrflow-project-inventory-v1\0");
-    let mut total = 0u64;
-    for (path, directory) in entries {
-        let relative = path
-            .strip_prefix(project)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
-        let relative = relative
-            .to_str()
-            .ok_or(ServiceError::ProjectBindingMismatch)?
-            .replace('\\', "/");
-        aggregate.update(if directory { b"d\0" } else { b"f\0" });
-        aggregate.update(&(relative.len() as u64).to_be_bytes());
-        aggregate.update(relative.as_bytes());
-        if !directory {
-            let metadata = std::fs::metadata(&path)
-                .map_err(|error| ServiceError::Storage(error.to_string()))?;
-            total = total.checked_add(metadata.len()).ok_or_else(|| {
-                ServiceError::Contract("project inventory byte count overflowed".into())
-            })?;
-            if total > profile.inventory_max_bytes {
-                return Err(ServiceError::Contract(
-                    "project inventory exceeds the configured byte bound".into(),
-                ));
-            }
-            aggregate.update(&metadata.len().to_be_bytes());
-            aggregate.update(sha256_file(&path)?.as_bytes());
-        }
-    }
-    Ok(aggregate.finalize_hex())
-}
-
-fn collect_project_entries(
-    root: &Path,
-    current: &Path,
-    excluded_relative: Option<&Path>,
-    output: &mut Vec<(PathBuf, bool)>,
-) -> Result<()> {
-    let mut entries = std::fs::read_dir(current)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?
-        .collect::<std::io::Result<Vec<_>>>()
-        .map_err(|error| ServiceError::Storage(error.to_string()))?;
-    entries.sort_by_key(std::fs::DirEntry::file_name);
-    for entry in entries {
-        let path = entry.path();
-        let relative = path
-            .strip_prefix(root)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
-        if excluded_relative == Some(relative) {
-            continue;
-        }
-        if relative.components().next().is_some_and(|component| {
-            matches!(component.as_os_str().to_str(), Some(".git" | ".rrflow"))
-        }) {
-            continue;
-        }
-        let metadata = std::fs::symlink_metadata(&path)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
-        if metadata.file_type().is_symlink() {
-            return Err(ServiceError::ProjectBindingMismatch);
-        }
-        if metadata.is_dir() {
-            output.push((path.clone(), true));
-            collect_project_entries(root, &path, excluded_relative, output)?;
-        } else if metadata.is_file() {
-            output.push((path, false));
-        } else {
-            return Err(ServiceError::ProjectBindingMismatch);
-        }
-    }
-    Ok(())
 }
 
 pub(super) fn sha256_file(path: &Path) -> Result<String> {
