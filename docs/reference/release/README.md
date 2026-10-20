@@ -10,3 +10,4 @@ They do not declare roadmap completion or release readiness.
 | Subject | Durable warp | Checkout record | State |
 |---|---|---|---|
 | Product version policy | [`rrflow://rrflow-instance/data/reference/release/version-policy`](rrflow://rrflow-instance/data/reference/release/version-policy) | [`version-policy.md`](version-policy.md) | `1.0.0` frozen during pre-alpha convergence; readiness remains evidence-gated |
+| Primary build identity | [`rrflow://rrflow-instance/data/reference/release/build-identity`](rrflow://rrflow-instance/data/reference/release/build-identity) | [`build-identity.md`](build-identity.md) | Embedded build provenance and local executable observations; H-05a qualification remains open |

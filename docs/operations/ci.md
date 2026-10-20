@@ -52,6 +52,15 @@ The shared SDK harness is also current characterization: the deficiencies and
 real-process corpus required for H-04 remain open. Neither job may be cited as
 complete-engine evidence.
 
+The Linux installed-lifecycle job also runs the
+[primary build-provenance helper](../reference/release/build-identity.md) on
+clean candidate source. It observes Cargo's actual first-party compilation
+units, embeds their declared provenance, rebuilds, and rejects changed source,
+feature/semantic-profile closure or executable identity. Repository verification
+runs the helper's dirty-source, drift, environment-digest and diagnostic-profile
+policy tests. These are build-provenance checks; actual release/diagnostic
+semantic parity remains open under H-05a.
+
 The repository-policy partition also verifies the generated
 `docs/roadmap/rrflow-1.0-file-plan.jsonl`. That inventory must match every
 tracked or non-ignored path and every long-lived future path registered by its

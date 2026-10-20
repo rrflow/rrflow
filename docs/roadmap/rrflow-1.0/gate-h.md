@@ -92,6 +92,14 @@ catalogue, format, result, receipt, and limit parity. This prerequisite must
 exist before D-01 qualifies installed binaries or later packages emit new
 signal families.
 
+The first bounded implementation supplies [primary executable build provenance](../../reference/release/build-identity.md):
+embedded compiler/source/actual-feature inputs, local version/startup identity,
+dirty-source and drift rejection, and a symbols-only release-derived profile.
+The [package journal](../../evidence/change-journals/gate-h/h-05a-primary-build-provenance.md)
+records its tests. This does not complete H-05a: format/bundle identity, remote
+discovery, runtime level enforcement and actual release/diagnostic semantic
+parity remain required.
+
 ### H-05b — causal context
 
 replace direct-store trace emission with one

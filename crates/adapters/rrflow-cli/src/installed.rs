@@ -29,6 +29,7 @@ struct VersionReport {
     protocol: &'static str,
     protocol_version: u16,
     release_stage: &'static str,
+    build: crate::build_identity::BuildReport,
 }
 
 #[derive(Debug, Serialize)]
@@ -38,6 +39,7 @@ struct ServeAnnouncement {
     project_root: String,
     instance_id: String,
     product_version: String,
+    build: crate::build_identity::BuildReport,
     readiness_path: &'static str,
     capability_path: &'static str,
     endpoint_catalogue_path: &'static str,
@@ -168,6 +170,7 @@ fn version(json: bool) -> Result<Execution, BoxError> {
         protocol: PROTOCOL,
         protocol_version: PROTOCOL_VERSION,
         release_stage: "pre-release",
+        build: crate::build_identity::report()?,
     };
     Ok(render(
         &report,
@@ -280,6 +283,7 @@ fn serve(
         project_root,
         instance_id: locator.identity.instance_id.to_string(),
         product_version: locator.product_version,
+        build: crate::build_identity::report()?,
         readiness_path: "/v1/health/ready",
         capability_path: "/v1/capabilities",
         endpoint_catalogue_path: "/v1/schema/endpoints",

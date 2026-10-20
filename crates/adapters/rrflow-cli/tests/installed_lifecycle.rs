@@ -139,6 +139,16 @@ impl RunningEngine {
         }
         let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
         assert_eq!(announcement["status"], "listening");
+        static BUILD: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+        let build = BUILD.get_or_init(|| {
+            let output = invoke(&["--json", "version"]);
+            assert_success(&output, "build identity");
+            serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["build"].clone()
+        });
+        assert_eq!(
+            &announcement["build"], build,
+            "serve/version identity differs"
+        );
         let address = announcement["url"]
             .as_str()
             .unwrap()

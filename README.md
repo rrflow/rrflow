@@ -279,9 +279,11 @@ root quarantined; its help and parser reject the removed raw-database and
 development commands. Repair, uninstall, durable attunement execution, and
 release service management remain absent. The retained internal server and
 adapter binaries open only an already-installed estate, but they are not a
-second supported operator command tree. No signed/offline-complete platform
-bundle or native Windows
-`rrflow.exe` has been built and run. D-01 owns the remaining single-executable
+second supported operator command tree. Native primary-executable lifecycle
+tests now pass on Windows, Linux and macOS; the
+[native lifecycle journal](docs/evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
+records their bounded scope. No signed/offline-complete platform bundle has
+been qualified. D-01 owns the remaining single-executable
 walking lifecycle, D-11 owns complete repair/restore/uninstall, and Gate J owns
 native signed platform distributions. See the
 [installed lifecycle](docs/reference/deployment/installed-lifecycle.md) and
