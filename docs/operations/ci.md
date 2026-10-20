@@ -133,6 +133,78 @@ bodies. These checked-in controls remain bypassable outside candidate CI;
 POAM-027 stays open for eligible server-side review/check/force-push/deletion
 enforcement.
 
+## Local development container
+
+`.devcontainer/` reproduces the candidate-CI toolchain on any host that runs
+rootless Podman (or Docker) on amd64 Linux, including Podman machine on
+Windows. It is local reproduction and early feedback only: a container run is
+not candidate-CI, J-02, POAM-027, alpha, or release evidence, it is not a
+hook, and it declares no editor lifecycle command.
+
+| Target | Contents | Use |
+|---|---|---|
+| `rust` | snapshot-pinned Ubuntu 24.04 build dependencies, rustup 1.29.1, Rust from `rust-toolchain.toml`, uv, and the `actions/python-versions` CPython build that `setup-python` installs as `python3` | engine work, policy scripts, focused tests; the VS Code default |
+| `full` | `rust` plus Node, pnpm, Go, Temurin, Maven, and the .NET SDK | TypeScript/SDK work and `scripts/ci/run_sdk_conformance.py` |
+
+Every base image is digest pinned, every apt package resolves from one fixed
+Ubuntu snapshot, and every downloaded toolchain is verified with
+`sha256sum`/`sha512sum --check --strict` against a checksum in the
+Containerfile. Certificate bootstrap extracts trust roots from an Apt-authenticated
+package without installing a moving OpenSSL dependency; installed packages
+then resolve from the fixed snapshot. The Temurin download tag is recorded
+separately from the equivalent SemVer selector used by `setup-java`.
+`scripts/ci/check_workflow.py` fails when a container version,
+checksum, or image digest diverges from `rust-toolchain.toml` or
+`.github/workflows/ci-reusable.yml`, or when `devcontainer.json` declares a
+lifecycle command. Build steps are POSIX `sh` because Podman's default OCI
+image format ignores `SHELL`.
+
+CI and the container track the latest stable release of every toolchain,
+using the long-term-support line where a project publishes one (Node.js 24,
+Java 25, .NET 10) and the Ubuntu release that GitHub's `ubuntu-latest` runner
+uses (24.04). A toolchain upgrade changes `.github/workflows/ci-reusable.yml`,
+`rust-toolchain.toml` where applicable, and the Containerfile in the same pull
+request; the parity check rejects one without the other.
+
+Keep the source on a Linux filesystem; a Windows bind mount is slow and
+reintroduces executable-bit and line-ending drift. Two entry points share the
+`rrflow-cache` volume (Cargo registry, target directory, and language caches):
+
+- **VS Code:** set `dev.containers.dockerPath` to `podman`, then run
+  *Dev Containers: Clone Repository in Named Container Volume* for the
+  development repository. VS Code builds the `rust` target.
+- **Podman CLI:** from an existing checkout, with a compose provider such as
+  `podman-compose` on `PATH`:
+
+```bash
+podman compose -f .devcontainer/compose.yaml build
+podman compose -f .devcontainer/compose.yaml run --rm workspace \
+  /seed/.devcontainer/seed-workspace.sh
+podman compose -f .devcontainer/compose.yaml run --rm workspace
+```
+
+The seed script clones committed history from the read-only `/seed` mount of
+the invoking checkout into the `rrflow-src` volume, restores its remote names,
+URLs, and upstream, and then initializes every declared submodule (such as
+`connectome`) at its pinned gitlink revision, matching a recursive CI checkout.
+It copies no credentials, hooks, local Git
+configuration, or uncommitted files, and it refuses a non-empty volume. Set
+`RRFLOW_DEV_TARGET=full` to build and enter the SDK image.
+
+The optional pgvector service uses the candidate-CI image digest, database,
+and credentials on host networking, so the CI test URL works unchanged:
+
+```bash
+podman compose -f .devcontainer/compose.yaml --profile pgvector up -d pgvector
+RRFLOW_PGVECTOR_TEST_URL='postgresql://rrflow_test:rrflow_test_password@127.0.0.1:5432/rrd_operator_knowledge_test?sslmode=disable' \
+  RRFLOW_PGVECTOR_TEST_DISPOSABLE=1 \
+  cargo test -p rrd-operator-knowledge --all-targets --all-features --locked
+```
+
+Toolchain downloads are development build inputs, like the CI setup actions;
+they are never RRFlow install-time or runtime fetches. Only amd64 is
+supported; the checked-in digests and checksums name amd64 artifacts.
+
 ## Repository workflow policy
 
 `scripts/ci/check_workflow.py` discovers every checked-in `.yml` and `.yaml`
@@ -146,7 +218,9 @@ supply-chain checks. It requires:
 - top-level read-only contents permission and no `pull_request_target` in any
   workflow; and
 - complete candidate-suite/default-feature/optional-feature coverage, bounded
-  candidate jobs, safe fork routing, and exact final-gate reduction.
+  candidate jobs, safe fork routing, and exact final-gate reduction; and
+- development-container toolchain, checksum, image, and pgvector parity with
+  candidate CI, strict download verification, and no editor lifecycle command.
 
 A Git submodule is a pinned source input, not an install-time fetch. The
 workspace architecture test accepts a gitlink only when `.gitmodules` declares

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import sys
@@ -14,6 +15,41 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIRECTORY = ROOT / ".github/workflows"
 CALLER = ROOT / ".github/workflows/ci.yml"
 REUSABLE = ROOT / ".github/workflows/ci-reusable.yml"
+DEVELOPMENT_CONTAINER = ROOT / ".devcontainer"
+DIGEST_PINNED_IMAGE = re.compile(r"[^@\s]+@sha256:[0-9a-f]{64}")
+
+# Containerfile ARG -> the one candidate-CI value it must equal.
+CI_TOOLCHAIN_PINS = {
+    "NODE_VERSION": r"node-version: (\S+)",
+    "PNPM_VERSION": r"pnpm/action-setup@[^\n]*\n\s+with:\n\s+version: (\S+)",
+    "PYTHON_VERSION": r"python-version: (\S+)",
+    "UV_VERSION": r"astral-sh/setup-uv@[^\n]*\n\s+with:\n\s+version: (\S+)",
+    "GO_VERSION": r"go-version: (\S+)",
+    "JAVA_VERSION": r"java-version: (\S+)",
+    "DOTNET_VERSION": r"dotnet-version: (\S+)",
+    "MAVEN_VERSION": r"MAVEN_VERSION: (\S+)",
+    "MAVEN_SHA512": r"MAVEN_SHA512: (\S+)",
+}
+CONTAINER_CHECKSUMS = {
+    "RUSTUP_SHA256": r"[0-9a-f]{64}",
+    "UV_SHA256": r"[0-9a-f]{64}",
+    "PYTHON_SHA256": r"[0-9a-f]{64}",
+    "NODE_SHA256": r"[0-9a-f]{64}",
+    "PNPM_INTEGRITY": r"sha512-[A-Za-z0-9+/]{86}==",
+    "GO_SHA256": r"[0-9a-f]{64}",
+    "JAVA_SHA256": r"[0-9a-f]{64}",
+    "MAVEN_SHA512": r"[0-9a-f]{128}",
+    "DOTNET_SHA512": r"[0-9a-f]{128}",
+}
+DEVCONTAINER_LIFECYCLE_COMMANDS = {
+    "initializeCommand",
+    "onCreateCommand",
+    "updateContentCommand",
+    "postCreateCommand",
+    "postStartCommand",
+    "postAttachCommand",
+}
+
 
 
 class PolicyError(RuntimeError):
@@ -280,7 +316,7 @@ def verify_sdk_conformance(block: str) -> None:
         "node-version: 24.22.0",
         "version: 12.14.0",
         "python-version: 3.15.0",
-        "version: 0.13.1",
+        "version: 0.13.2",
         "go-version: 1.27.2",
         "cache: false",
         "java-version: 25.0.4+101.0.LTS",
@@ -299,6 +335,140 @@ def verify_sdk_conformance(block: str) -> None:
         block.count("python3 scripts/ci/run_sdk_conformance.py") == 1,
         "SDK qualification must execute through one cohesive orchestrator",
     )
+
+
+def single_ci_value(reusable: str, pattern: str, label: str) -> str:
+    values = set(re.findall(pattern, reusable))
+    require(
+        len(values) == 1,
+        f"candidate CI must declare exactly one {label} value: {sorted(values)}",
+    )
+    return values.pop()
+
+
+def compose_services(compose: str) -> dict[str, str]:
+    marker = "\nservices:\n"
+    require(marker in compose, "development compose file must define services")
+    services = compose.split(marker, 1)[1]
+    services = re.split(r"(?m)^\S", services, maxsplit=1)[0]
+    matches = list(re.finditer(r"(?m)^  ([a-z][a-z0-9-]*):\s*$", services))
+    return {
+        match.group(1): services[match.end() : matches[index + 1].start()]
+        if index + 1 < len(matches)
+        else services[match.end() :]
+        for index, match in enumerate(matches)
+    }
+
+
+def verify_development_container(reusable: str, pgvector_job: str) -> int:
+    """Keep the local workspace a faithful reproduction of candidate CI pins."""
+    containerfile = (DEVELOPMENT_CONTAINER / "Containerfile").read_text(
+        encoding="utf-8"
+    )
+    compose = (DEVELOPMENT_CONTAINER / "compose.yaml").read_text(encoding="utf-8")
+    devcontainer = json.loads(
+        (DEVELOPMENT_CONTAINER / "devcontainer.json").read_text(encoding="utf-8")
+    )
+
+    stages: set[str] = set()
+    for image, stage in re.findall(
+        r"(?m)^FROM\s+(\S+)\s+AS\s+([a-z][a-z0-9-]*)\s*$", containerfile
+    ):
+        require(
+            image in stages or DIGEST_PINNED_IMAGE.fullmatch(image) is not None,
+            f"development container base image must be digest pinned: {image}",
+        )
+        stages.add(stage)
+    require(
+        {"rust", "full"} <= stages,
+        f"development container must provide rust and full targets: {sorted(stages)}",
+    )
+    require(
+        len(re.findall(r"(?m)^FROM\s", containerfile)) == len(stages),
+        "every development container stage must be named",
+    )
+
+    arguments = dict(re.findall(r"(?m)^ARG\s+([A-Z0-9_]+)=(\S+)\s*$", containerfile))
+    with (ROOT / "rust-toolchain.toml").open("rb") as source:
+        channel = tomllib.load(source)["toolchain"]["channel"]
+    expected = {"RUST_VERSION": channel}
+    for name, pattern in CI_TOOLCHAIN_PINS.items():
+        expected[name] = single_ci_value(reusable, pattern, name)
+    for name, value in expected.items():
+        require(
+            arguments.get(name) == value,
+            f"development container {name} must equal candidate CI {value!r}: "
+            f"{arguments.get(name)!r}",
+        )
+    for name, pattern in CONTAINER_CHECKSUMS.items():
+        require(
+            re.fullmatch(pattern, arguments.get(name, "")) is not None,
+            f"development container checksum {name} is absent or malformed",
+        )
+        require(
+            containerfile.count(f"${{{name}") >= 1,
+            f"development container checksum {name} is declared but never verified",
+        )
+    downloads = len(re.findall(r"\bcurl\s+-fsSLo\b", containerfile))
+    verifications = len(
+        re.findall(r"\bsha(?:256|512)sum --check --strict\b", containerfile)
+    )
+    require(
+        downloads == len(CONTAINER_CHECKSUMS) and verifications == downloads,
+        "every development container download must be strictly checksum verified: "
+        f"{downloads} downloads, {verifications} verifications",
+    )
+    require(
+        re.fullmatch(r"\d{8}T\d{6}Z", arguments.get("UBUNTU_SNAPSHOT", "")) is not None
+        and containerfile.count('--snapshot "${UBUNTU_SNAPSHOT}"') == 4,
+        "development container packages must resolve from one fixed Ubuntu snapshot",
+    )
+
+    services = compose_services(compose)
+    require(
+        set(services) == {"workspace", "pgvector"},
+        f"development compose services must be workspace and pgvector: {sorted(services)}",
+    )
+    for name, block in services.items():
+        for image in re.findall(r"(?m)^\s+image:\s+(\S+)", block):
+            local = image.startswith("localhost/") and "\n    build:\n" in block
+            require(
+                local or DIGEST_PINNED_IMAGE.fullmatch(image) is not None,
+                f"development compose image must be locally built or digest pinned: {image}",
+            )
+    pgvector = services["pgvector"]
+    ci_image = single_ci_value(pgvector_job, r"(?m)^\s+image:\s+(\S+)", "pgvector image")
+    local_images = re.findall(r"(?m)^\s+image:\s+(\S+)", pgvector)
+    require(
+        len(local_images) == 1
+        and local_images[0].removeprefix("docker.io/") == ci_image.removeprefix("docker.io/"),
+        f"development pgvector image must equal candidate CI {ci_image}: {local_images}",
+    )
+    for variable in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"):
+        value = single_ci_value(pgvector_job, rf"{variable}: (\S+)", variable)
+        require(
+            f"{variable}: {value}" in pgvector,
+            f"development pgvector {variable} must equal candidate CI {value!r}",
+        )
+    require(
+        "@127.0.0.1:5432/" in pgvector_job
+        and "profiles: [\"pgvector\"]" in pgvector
+        and "network_mode: host" in pgvector
+        and "network_mode: host" in services["workspace"],
+        "development pgvector must be opt-in and reachable at the candidate-CI loopback URL",
+    )
+
+    lifecycle = sorted(DEVCONTAINER_LIFECYCLE_COMMANDS & set(devcontainer))
+    require(
+        not lifecycle,
+        f"devcontainer.json must not declare editor lifecycle commands: {lifecycle}",
+    )
+    build = devcontainer.get("build", {})
+    require(
+        build.get("dockerfile") == "Containerfile" and build.get("target") in stages,
+        "devcontainer.json must build a named target of the one Containerfile",
+    )
+    return len(expected) + len(CONTAINER_CHECKSUMS)
 
 
 def main() -> None:
@@ -442,10 +612,12 @@ def main() -> None:
     verify_workflow_security(workflows)
     verify_action_pins(workflows)
     verify_arc_policy()
+    container_pins = verify_development_container(reusable, jobs["pgvector-feature"])
     print(
         f"CI policy OK: {len(workflows)} workflows, {len(jobs) - 1} substantive jobs, "
         f"{suite_count} cohesive engine suites, "
-        f"{package_count} default-feature packages, {feature_count} optional-feature packages"
+        f"{package_count} default-feature packages, {feature_count} optional-feature packages, "
+        f"{container_pins} development-container pins"
     )
 
 

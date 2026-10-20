@@ -1,0 +1,26 @@
+{
+  "name": "RRFlow development (rust)",
+  "build": {
+    "dockerfile": "Containerfile",
+    "context": ".",
+    "target": "rust"
+  },
+  "runArgs": ["--userns=keep-id", "--network=host"],
+  "mounts": [
+    "source=rrflow-cache,target=/cache,type=volume"
+  ],
+  "containerUser": "dev",
+  "remoteUser": "dev",
+  "containerEnv": {
+    "HOME": "/home/dev"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "ms-python.python",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}
