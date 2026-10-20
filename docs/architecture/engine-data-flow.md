@@ -878,6 +878,41 @@ raw histogram. Open-loop scheduling or coordinated-omission correction is
 required when a closed-loop driver could hide stalls. Comparative claims use
 identical correctness/quality requirements and retain failed samples.
 
+### Signal-to-action acceptance
+
+The [scale design rationale](engine-scale-and-contracts.md) supports this
+existing signal owner. H-05 projects the canonical operation/attribute
+catalogues into diagnostics; it does not add a second job state machine.
+The following table names required observations and operational behavior,
+not a separately authored metric-name catalogue. Any missing instrument or
+closed dimension must enter the existing executable catalogue and its generated
+projections in the owning implementation PR.
+
+| Observed condition | Required signal and evidence | Engine/operator action and acceptance |
+|---|---|---|
+| Admission pressure | Queue wait/depth, admitted/rejected counts, inflight work and reserved bytes, separated by closed workload class | Reject before expensive allocation when the configured limit/deadline is exhausted. A model stall must not starve readiness/cancellation. The overload/drain test in J-04 proves recovery. |
+| Slow request | Client, queue, engine, model, storage, lock and commit timing at their distinct boundaries, with outcome and trace exemplar | Attribute the cost before optimizing; never report model time as database latency or hide failures in success averages. J-04 thresholds bind the tested workload. |
+| Storage or projection debt | WAL/memtable/compaction work, free space, oldest pinned generation, projection source/applied cursor and backlog age | Apply bounded maintenance/write admission; label stale/unavailable projections and use only the declared exact fallback or explicit denial. Never silently reduce durability or query completeness. |
+| Durable work stalled or uncertain | Canonical dispatch/checkpoint/fence, deadline, attempt identity and accepted/uncertain receipt; diagnostics link to these records | Resume from accepted state or require reconciliation; do not infer success from span completion. Kill/lost-ACK/stale-worker fixtures must expose unresolved work. |
+| Invalid model behavior | Invalid/denied/expired decision counts, exact descriptor/input/output digests in authorized evidence, token/time/resource use | Reject effects and charge consumed budget. Bound retries/escalation. Public UI reports the failure class and permitted next action without exposing prompts or hidden reasoning. |
+| Sync incomplete | Per-direction checkpoint/lag, conflict/retention-gap/revocation state from canonical transfer records | UI distinguishes offline, transferring, conflicted and acknowledged convergence; missing or stale observations display unknown. Detail IDs stay in protected records, not metric labels. |
+| Telemetry impaired | Exporter failures/dropped samples, queue occupancy and effective sampling/capture policy | Drop bounded diagnostics, increment self-telemetry and retain truthful engine outcomes. Exporter outage must not deadlock or roll back a successful commit. |
+| Noisy neighbor | Fleet resource/admission series plus authorized per-estate detail and the isolated baseline | Enforce estate allocations or change placement through an authorized control-plane action; never mix estate data or add unbounded estate-ID metric dimensions. |
+
+Freshness matters: every operational projection reports its observation time
+and source coordinate. A live socket is not authenticated readiness, a healthy
+process is not a completed reasoning task, and no recent metric sample is not
+proof of health. User-facing state comes from typed engine records; dashboards
+show observation age and unknown/unavailable status.
+
+Acceptance uses injected queue saturation, stalled backend, late output,
+full disk, maintenance lag, duplicate completion, exporter failure and stale
+observation cases. The test must assert both the visible signal and the correct
+bounded engine action. Never auto-repair authoritative state from a monitoring
+alert. Alert rules and thresholds are versioned operational configuration tied
+to the [J-04 workload envelope](../roadmap/rrflow-1.0/gate-j.md#capacity-and-optimization-qualification);
+they are not inferred from a single development-machine timing.
+
 ### Diagnostic capture and failure workflow
 
 RRFlow distinguishes an authenticated diagnostic snapshot from observability.

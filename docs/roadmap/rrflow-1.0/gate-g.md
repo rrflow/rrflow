@@ -17,6 +17,50 @@ either independently.
 | [ ] | G-05 | Lower `request_context` into semantic rrflowQL/context intent while leaving physical access selection to the engine. | `rrd-engine`, `rrd-query` | LFG cannot select an index/backend; resulting plan is authorized, stamped, budgeted, and equivalent to a typed SDK request. |
 | [ ] | G-06 | Publish model and storage latency separately with task-success, routing-accuracy, invalid-decision, and escalation metrics. | evaluation harness | Reproducible hardware/model manifest and raw samples support every reported latency or quality claim. |
 
+## Bounded reasoning implementation packages
+
+The [researched rationale](../../architecture/engine-scale-and-contracts.md)
+and [structure/input contract](../../reference/data/schema-catalogue.md#structure-and-input-contract-plan)
+support this owner. All packages below are open. The
+[dependency spine](executable-dependency-spine.md) remains in force: D-01 is
+active; installed durability, inventory, native access and analytics cannot be
+skipped by adding a model loop. Specification/golden preparation can proceed
+without claiming runtime completion. Each implementation package is one
+bounded PR, split further when its exact diff requires it.
+
+| Package and prerequisite | Canonical change boundary | First failure oracle and required exit |
+|---|---|---|
+| G-01a: bounded adapter execution, after Gate G prerequisites | `rrd-inference/src/lib.rs` backend ownership/dispatch and `rrd-engine/src/engine/inference.rs`; extend existing admission/configuration rather than add a second scheduler | Two controlled backends: block A, prove listing and admitted B progress without holding the registry mutex; configured per-backend and estate limits reject excess work before allocation. Test queue deadline, revocation, cancellation, late output and permit release. Preserve descriptor/network/provenance and embedding shape tests. |
+| G-01b: executable router port, after G-01a | Existing public router/model manifest contracts and inference artifact admission; engine-owned adapter installation | Reference adapter and the selected real LFG adapter run one corpus: exact model/tokenizer/grammar/runtime identity, byte limits, unavailable model/device, malformed output, timeout and network denial. An unavailable real artifact blocks LFG qualification; a fake proves only the port. |
+| G-02a: durable tree and dispatch identity, after G-01b and accepted transaction/storage prerequisites | Kernel `reasoning_tree.rs`, store semantic plan, engine runtime/job composition; preserve existing task/flight contracts | Competing workers target one expected cursor; only one accepted transition advances it. Kill before dispatch, after external result and after durable commit/before ACK; reopen resolves accepted receipt without re-execution and reports unresolved work honestly. Persisted fences reject stale workers. Public observations and receipts are stored; private thought is not. |
+| G-02b: authorized route packet, after G-02a | `rrd-contract/src/router.rs::RouteStepRequest`, engine security/seat/context projection | Bind principal, representation, durable seat, policy and relevant source/read identity. Golden packet plus expired/revoked/foreign/stale/oversized cases prove unauthorized fields and secret/raw-KV content never reach the adapter. Schema validity alone does not authorize. |
+| G-03: constrained response and semantic admission, after G-02b | Existing three-decision union, selected LFG decoding adapter and engine validators | Invalid grammar/unknown recipe/edge, unsupported parameters, prompt injection, changed descriptor, stale cursor and deadline all produce no accepted mutation. Valid JSON with forbidden meaning still fails. Prove exact raw-output/input digests and bounded diagnostics without logging content by default. |
+| G-04: governed fast-path transition, after G-03 | Existing engine predicates/CAS and store atomic semantic transaction | Recipe/branch path executes no DataFusion plan; accepted tree state, attribution, receipt, audit and outbox are atomic across crash/reopen. Duplicate completion and lost ACK return the same accepted result; payload conflict and stale fence cannot mutate. Measure lock/queue/commit separately. |
+| G-05: context escalation, after G-04 and accepted E/F access paths | Existing typed rrflowQL/context request, planner and one budget owner; full H-01 dynamic-routing qualification follows Gate G | Route-requested context equals a typed SDK request at the same stamp and permissions. Model names semantic intent, not index/backend. Repeated context requests consume one remaining budget, terminate on explicit limits and cannot form an unbounded retry loop. |
+| G-06: installed reasoning qualification, after G-01 through G-05 | Installed `rrflow` process, model manifest, evaluation harness and H-05 causal evidence | One real prompt exercises an admitted model, a fast step and context escalation, persists an attributed result, and survives restart/cancellation/lost ACK. Publish routing accuracy, invalid-decision rate, task success/abstention, citation support, model versus storage/queue time, tokens and resource peaks on declared fixtures. |
+
+For G-02a through G-04, extend the existing tree/job/receipt authority only
+after a package-specific mapping of source types, storage keys and current
+characterization tests. The recent process-local invocation token is retained
+but cannot substitute for a persisted fence. Generic routine/tool execution
+still belongs to Gate I; route execution may not create an alternate external
+activity implementation.
+
+Run the existing characterization commands before the first relevant edit:
+
+```text
+cargo test --locked -p rrd-contract --test reasoning_tree_contract
+cargo test --locked -p rrd-core --test reasoning_tree_contract
+cargo test --locked -p rrd-engine --lib overlapping_invocation
+cargo test --locked -p rrd-inference
+```
+
+Then add each row's failing oracle at its canonical boundary, run that test,
+the affected packages and strict linting, followed by candidate CI. The
+commands above do not prove the planned cases already exist or pass. Fix test
+names from the actual checkout before running; keep real-model and installed
+acceptance separate from reference-adapter results.
+
 ## Exit condition
 
 Gate G exits only when the trained LFG artifact passes the conformance corpus
