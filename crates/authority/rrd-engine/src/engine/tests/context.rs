@@ -641,3 +641,214 @@ fn context_rejects_recall_work_above_the_effective_estate_ceiling() {
     assert_eq!(error.kind(), ServiceErrorKind::ResourceExhausted);
     assert!(matches!(error, ServiceError::ConfigurationLimit(_)));
 }
+
+/// A visible relation must not resurrect an invisible requested anchor.
+/// Use the public engine methods so selection, plan evidence and storage
+/// temporal filtering are exercised together.
+#[test]
+fn context_graph_anchors_require_visible_records_in_memory_and_after_reopen() {
+    fn commit(
+        engine: &RrdEngine,
+        lease: &rrd_contract::SessionLease,
+        key: &str,
+        mutations: Vec<TransactionMutation>,
+    ) {
+        let transaction = engine
+            .begin_transaction(
+                &lease.session_id,
+                &lease.token,
+                &BeginTransaction {
+                    scope: CanonicalId::new("data").unwrap(),
+                    timeout_ms: 1_000,
+                },
+                &mutation_context(&id(key), "anchor-begin", "anchor-begin"),
+                1_050,
+            )
+            .unwrap();
+        engine
+            .commit_transaction(
+                &lease.session_id,
+                &lease.token,
+                &transaction.transaction_id,
+                &id(key),
+                &CommitTransaction {
+                    operation_sha256: rrd_contract::transaction_operation_sha256(&mutations),
+                    mutations,
+                },
+                1_100,
+                "anchor-commit",
+                "anchor-commit",
+            )
+            .unwrap();
+    }
+
+    fn verify(
+        engine: &RrdEngine,
+        lease: &rrd_contract::SessionLease,
+    ) -> Vec<rrd_contract::ContextPacket> {
+        let mut packets = Vec::new();
+        for (seed, valid_at, visible) in [
+            ("expired", 1_300, false),
+            ("future", 1_300, false),
+            ("retired", 1_300, false),
+            ("missing", 1_300, false),
+            ("expired", 1_150, true),
+            ("future", 1_450, true),
+            ("retired", 1_150, true),
+        ] {
+            for mixed in [false, true] {
+                let mut seeds = vec![reference("note", seed)];
+                if mixed {
+                    seeds.push(reference("note", "live"));
+                }
+                let request = AssembleContext {
+                    scope: "instance:test-instance".into(),
+                    query: String::new(),
+                    valid_at,
+                    seeds,
+                    max_graph_depth: 1,
+                    max_items: 8,
+                    max_output_bytes: 64 * 1024,
+                    max_storage_keys: 256,
+                };
+                let packet = engine
+                    .assemble_context(
+                        &lease.session_id,
+                        &lease.token,
+                        &request,
+                        1_500,
+                        "anchor-read",
+                        "anchor-read",
+                    )
+                    .unwrap();
+                packet.validate().unwrap();
+                let identities = packet
+                    .items
+                    .iter()
+                    .map(|item| item.identity.clone())
+                    .collect::<std::collections::BTreeSet<_>>();
+                let mut expected = std::collections::BTreeSet::new();
+                if visible {
+                    expected.insert(format!("record:note:{seed}"));
+                    expected.insert(format!("record:note:{seed}-leaf"));
+                }
+                if mixed {
+                    expected.insert("record:note:live".to_owned());
+                    expected.insert("record:note:live-leaf".to_owned());
+                }
+                assert_eq!(
+                    identities, expected,
+                    "seed={seed}, at={valid_at}, mixed={mixed}"
+                );
+                let graph = packet
+                    .plan
+                    .stages
+                    .iter()
+                    .find(|stage| stage.kind == ContextPlanStageKind::Graph)
+                    .unwrap();
+                assert_eq!(
+                    graph.status,
+                    if visible || mixed {
+                        ContextPlanStageStatus::Selected
+                    } else {
+                        ContextPlanStageStatus::Skipped
+                    }
+                );
+                assert!(!packet.truncated);
+                packets.push(packet);
+            }
+        }
+        packets
+    }
+
+    for persistent in [true, false] {
+        let root = tempfile::tempdir().unwrap();
+        let engine = if persistent {
+            RrdEngine::open(root.path(), instance(), TOKEN_KEY).unwrap()
+        } else {
+            RrdEngine::rrflow_mx(instance(), TOKEN_KEY)
+        };
+        let lease = engine
+            .create_session(
+                &session_request(5_000, 2),
+                &id("anchor-session"),
+                1_000,
+                "anchor-session",
+                "anchor-session",
+            )
+            .unwrap();
+        let mut mutations = vec![TransactionMutation::PutSchema {
+            registry: DataSchemaRegistry {
+                revision: 1,
+                migration: "temporal context anchors".into(),
+                catalogue: DataCatalogueIdentity::default(),
+                tables: [
+                    ("note", DataLogicalModel::GraphNode),
+                    ("supports", DataLogicalModel::GraphRelation),
+                ]
+                .into_iter()
+                .map(|(name, model)| {
+                    (
+                        CanonicalId::new(name).unwrap(),
+                        DataTableSchema {
+                            model,
+                            mode: DataSchemaMode::Schemaless,
+                            properties: BTreeMap::new(),
+                            allow_additional_properties: false,
+                        },
+                    )
+                })
+                .collect(),
+                records: BTreeMap::new(),
+                relations: BTreeMap::new(),
+                events: BTreeMap::new(),
+            },
+        }];
+        for (name, valid_from, valid_to) in [
+            ("live", 1_100, None),
+            ("expired", 1_100, Some(1_200)),
+            ("future", 1_400, None),
+            ("retired", 1_100, None),
+        ] {
+            mutations.push(TransactionMutation::PutRecord {
+                reference: reference("note", name),
+                valid_from,
+                valid_to,
+                properties: BTreeMap::new(),
+            });
+            mutations.push(TransactionMutation::PutRecord {
+                reference: reference("note", &format!("{name}-leaf")),
+                valid_from: 1_100,
+                valid_to: None,
+                properties: BTreeMap::new(),
+            });
+            mutations.push(TransactionMutation::PutRelation {
+                reference: reference("supports", name),
+                from: reference("note", name),
+                to: reference("note", &format!("{name}-leaf")),
+                valid_from: 1_100,
+                valid_to: None,
+                properties: BTreeMap::new(),
+            });
+        }
+        commit(&engine, &lease, "anchor-seed", mutations);
+        commit(
+            &engine,
+            &lease,
+            "anchor-retire",
+            vec![TransactionMutation::RetireData {
+                model: DataLogicalModel::GraphNode,
+                target: rrd_contract::DataTarget::Reference {
+                    reference: reference("note", "retired"),
+                },
+                effective_at: 1_250,
+            }],
+        );
+        let packets = verify(&engine, &lease);
+        if persistent {
+            drop(engine);
+            let reopened = RrdEngine::open(root.path(), instance(), TOKEN_KEY).unwrap();
+            assert_eq!(verify(&reopened, &lease), packets);
+        }
+    }
+}

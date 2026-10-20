@@ -40,3 +40,14 @@ retirement proposals are authorized, reviewable, hold-aware, restart-safe, and r
 until an engine commit; compaction only reclaims versions already made unreachable by
 accepted retention state. No request forces a durability flush, full statistics rebuild,
 vector retrain, or graph rewrite.
+
+
+## Temporal context-anchor correctness
+
+The [H-01 regression](../../evidence/change-journals/gate-h/h-01-context-anchor-failure.md)
+proved that an expired record could remain a graph anchor during context
+assembly and recall its visible neighbor. Requested seeds must be filtered at
+the same captured valid-time snapshot used for seed candidates. Graph stage
+selection and execution must share that filtered root set; historical requests
+must retain their valid neighbors. This bounded correction does not close
+native-index, adaptive-routing or feedback qualification.
