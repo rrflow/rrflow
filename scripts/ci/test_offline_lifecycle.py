@@ -10,6 +10,21 @@ import run_offline_lifecycle as runner
 
 
 class OfflineLifecyclePolicyTests(unittest.TestCase):
+    def test_every_primary_lifecycle_case_is_required(self):
+        cases = {
+            "primary_help_exposes_only_the_installed_product_lifecycle",
+            "raw_database_and_development_commands_fail_during_argument_parsing",
+            "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
+            "fresh_installed_engine_survives_restart_and_restore",
+            "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
+        }
+        runner.require_lifecycle_tests("\n".join(f"{case}: test" for case in sorted(cases)))
+        for missing in sorted(cases):
+            with self.subTest(missing=missing), self.assertRaises(RuntimeError):
+                runner.require_lifecycle_tests(
+                    "\n".join(f"{case}: test" for case in sorted(cases - {missing}))
+                )
+
     def test_zero_or_partial_lifecycle_corpus_is_not_a_pass(self):
         fresh = "fresh_installed_engine_survives_restart_and_restore: test"
         existing = "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens: test"

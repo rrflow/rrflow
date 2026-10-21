@@ -12,11 +12,11 @@ independently.
 
 The source-built primary `rrflow` binary now owns deterministic install plan/apply,
 installed serve, authenticated ready, read-only quick verify, and version. Exact-plan
-retry recovers across eight typed durable stages without duplicating installation
+retry recovers across typed durable stages, including bootstrap publication, without duplicating installation
 authority, and the pre-canonical manifest, raw product CLI, development supervisor,
 standalone security initializer, and server initializer are removed. The lifecycle is
 still missing execution of its persisted pending attunement job, a committed deterministic
-project-tree inventory, generic bundle-resident scaffolding and adapter bindings, real attunement phase
+project-tree inventory, project-integration scaffolding and activated adapter bindings, real attunement phase
 executors, configuration apply, full verify, repair, ownership-safe uninstall,
 service installation, and a signed offline
 platform distribution. Public apply no longer accepts installation time: the engine
@@ -238,4 +238,18 @@ transient paths, bounded initial record declarations and verified instruction
 publication/recovery. Default provider bindings remain inactive and project-owned
 instructions remain unchanged. Native D-01.5 qualification, exact-candidate
 D-01.6 reconciliation and the later attunement/adapter lifecycle remain open.
-Candidate CI must pass before this package is accepted; POAM-006 stays open.
+PR 51 candidate `9cfeeca4` passed all 17 jobs in run `39654924753` and merged
+as `7aa10e23`. The [SDK identity correction](../../evidence/change-journals/gate-d/d-01-bootstrap-sdk-identity.md)
+records the stale checked corpus and focused repair without weakening the live
+harness. POAM-006 stays open.
+
+
+## Native qualification corpus admission (2026-10-21)
+
+The [D-01.5 first oracle](../../evidence/change-journals/gate-d/d-01-native-qualification-oracle.md)
+reproduces incomplete qualification admission: the runner accepts a corpus
+missing the help, rejected-development-command or exact-plan/read-only-shape
+case, provided the fresh/existing pair remains. The expanded native runner
+must require every declared case and its executed result. Windows/macOS
+outbound/source isolation, privileged foreign-owner cases, bounded capture and
+concurrent executable staging remain within D-01.5; no parent status closes.
