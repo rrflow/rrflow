@@ -196,3 +196,10 @@ launch rather than treating retry success as proof that this intermittent
 failure is resolved. Install-wide exclusion, bootstrap completeness, native
 offline/foreign-owner/filesystem qualification and exact-candidate closure
 remain open in the established order.
+
+The first D-01.2 candidate also exposed Windows checkout conversion of the
+canonical manifest golden to CRLF. Its byte-exact identity assertion failed
+after all six filesystem fixtures passed. The
+[checkout correction receipt](../../evidence/change-journals/gate-d/d-01-canonical-manifest-checkout.md)
+pins that fixture to LF without weakening the serializer oracle. A new full
+candidate is required; no D-01 acceptance is inferred from local tests.
