@@ -125,7 +125,9 @@ def inside(stage: Path) -> None:
     require_lifecycle_tests(listing.stdout)
     print(json.dumps({"isolation": "checkout-hidden-network-loopback-only", "uid": os.geteuid(),
                       "masked_roots": [str(path) for path in masks], "sha256": configuration["sha256"]}), flush=True)
-    subprocess.run([str(harness), "--nocapture", "--test-threads=1"], cwd=stage,
+    # The two independent project fixtures may run together; serial execution
+    # duplicates their full restore/verification latency inside one deadline.
+    subprocess.run([str(harness), "--nocapture", "--test-threads=2"], cwd=stage,
                    env=environment, check=True, timeout=540)
 
 
