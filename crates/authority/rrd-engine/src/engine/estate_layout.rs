@@ -17,6 +17,12 @@ pub(super) const RESTORES_DIRECTORY_NAME: &str = "restores";
 pub(super) const LOCATOR_RELATIVE_PATH: &str = ".rrflow/config.toml";
 const INSTALL_INTENT_PREFIX: &str = ".rrflow-install-";
 const INSTALL_INTENT_SUFFIX: &str = ".json";
+const PRIVATE_ESTATE_DIRECTORIES: [&str; 4] = [
+    ESTATE_DIRECTORY,
+    STORAGE_DIRECTORY,
+    STORAGE_ROOTS_DIRECTORY,
+    CREDENTIAL_DIRECTORY,
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct EstateLayout {
@@ -132,24 +138,23 @@ pub(super) fn reject_existing_estate(project: &Path) -> Result<()> {
 }
 
 pub(super) fn create_estate_directories(project: &Path) -> Result<()> {
-    for relative in [
-        ESTATE_DIRECTORY,
-        STORAGE_DIRECTORY,
-        STORAGE_ROOTS_DIRECTORY,
-        CREDENTIAL_DIRECTORY,
-    ] {
+    validate_estate_directories(project, true)?;
+    for relative in PRIVATE_ESTATE_DIRECTORIES {
         let path = project.join(relative);
         match std::fs::symlink_metadata(&path) {
             Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
                 return Err(ServiceError::ProjectBindingMismatch);
             }
-            Ok(_) => continue,
+            Ok(_) => {
+                super::token_key::validate_private_directory(&path)
+                    .map_err(|error| ServiceError::Storage(error.to_string()))?;
+                continue;
+            }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(ServiceError::Storage(error.to_string())),
         }
         let parent = path.parent().ok_or(ServiceError::ProjectBindingMismatch)?;
-        owner_only_directory_builder()
-            .create(&path)
+        super::token_key::create_private_directory(&path)
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
         rrd_store::sync_directory_metadata(parent)
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
@@ -157,23 +162,22 @@ pub(super) fn create_estate_directories(project: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Estate directories are owner-only (0700) on Unix; other platforms use the
-/// platform's default directory permissions.
-fn owner_only_directory_builder() -> std::fs::DirBuilder {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt as _;
-        let mut builder = std::fs::DirBuilder::new();
-        builder.mode(0o700);
-        builder
+/// Admission checks for the four engine-owned directory boundaries. Missing
+/// paths are allowed only during new/interrupted apply; never during installed
+/// reads. This does not pin ancestors against later replacement.
+pub(super) fn validate_estate_directories(project: &Path, allow_missing: bool) -> Result<()> {
+    for relative in PRIVATE_ESTATE_DIRECTORIES {
+        match super::token_key::validate_private_directory(&project.join(relative)) {
+            Ok(()) => {}
+            Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(ServiceError::Storage(error.to_string())),
+        }
     }
-    #[cfg(not(unix))]
-    {
-        std::fs::DirBuilder::new()
-    }
+    Ok(())
 }
 
 pub(super) fn validate_recovery_estate(project: &Path, layout: &EstateLayout) -> Result<()> {
+    validate_estate_directories(project, true)?;
     let storage_id = Path::new(&layout.storage_root)
         .file_name()
         .and_then(|value| value.to_str())

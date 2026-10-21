@@ -4,8 +4,8 @@ use super::clock::{assess, observe_required, require_accepted, ClockSource, Host
 use super::*;
 use crate::engine::estate_layout::{
     create_estate_directories, reject_existing_estate, reject_existing_symlink_path, safe_join,
-    validate_managed_relative, validate_recovery_estate, EstateLayout, LOCATOR_RELATIVE_PATH,
-    STORAGE_DIRECTORY,
+    validate_estate_directories, validate_managed_relative, validate_recovery_estate, EstateLayout,
+    LOCATOR_RELATIVE_PATH, STORAGE_DIRECTORY,
 };
 use crate::engine::memory_estate::build_memory_estate_plan;
 use crate::engine::token_key::{read_api_key_document, read_token_key, ApiKeyDocument};
@@ -564,6 +564,7 @@ impl RrdEngine {
             ));
         }
         let project = canonical_project_root(project)?;
+        validate_estate_directories(&project, true)?;
         let executable_sha256 = sha256_file(executable)?;
         if executable_sha256 != preview.installation.executable_sha256 {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -1599,6 +1600,7 @@ pub(super) fn sha256_file(path: &Path) -> Result<String> {
 
 pub(super) fn read_locator(project: &Path) -> Result<(PathBuf, ProjectLocator, Vec<u8>)> {
     let project = canonical_project(project, InstallationTargetKind::ExistingProject)?;
+    validate_estate_directories(&project, false)?;
     let path = project.join(LOCATOR_RELATIVE_PATH);
     reject_existing_symlink_path(&project, &path)?;
     let metadata = std::fs::symlink_metadata(&path)

@@ -3,6 +3,31 @@ use std::fs::OpenOptions;
 use std::io;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
+pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
+    if create {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new().mode(0o700).create(path)?;
+    }
+    OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
+        .open(path)
+}
+
+pub(super) fn validate_directory(file: &File) -> io::Result<()> {
+    let metadata = file.metadata()?;
+    // SAFETY: geteuid has no pointer arguments or preconditions.
+    if !metadata.is_dir()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.permissions().mode() & 0o7777 != 0o700
+    {
+        return Err(denied(
+            "estate directory requires effective-user ownership and mode 0700",
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options
@@ -32,9 +57,37 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
 }
 
 #[cfg(test)]
+pub(super) fn make_directory_permissive_for_test(path: &Path) {
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+#[cfg(test)]
+pub(super) fn restore_private_directory_for_test(path: &Path) {
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+#[cfg(test)]
 mod tests {
     use super::super::{read_private_bounded, write_private_new};
     use super::*;
+
+    #[test]
+    fn directory_modes_and_symlink_leaves_are_denied_without_repair() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("directory");
+        let directory = open_directory(&path, true).unwrap();
+        validate_directory(&directory).unwrap();
+        for mode in [0o750, 0o755, 0o777, 0o1700, 0o2700] {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+            assert!(validate_directory(&directory).is_err());
+            assert_eq!(std::fs::metadata(&path).unwrap().mode() & 0o7777, mode);
+        }
+        restore_private_directory_for_test(&path);
+        let alias = root.path().join("alias");
+        std::os::unix::fs::symlink(&path, &alias).unwrap();
+        assert!(open_directory(&alias, false).is_err());
+        validate_directory(&directory).unwrap();
+    }
 
     #[test]
     fn permissive_modes_and_symlinks_are_denied_without_repair() {

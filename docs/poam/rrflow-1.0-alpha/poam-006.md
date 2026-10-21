@@ -158,3 +158,21 @@ exclusive installation/recovery, complete bootstrap, native qualification and
 exact-candidate reconciliation. Retain PR 43/44/45's bounded successes. The
 roadmap owns the detailed order and acceptance; this ledger remains open for
 the unresolved D-01 requirements and the later D/J lifecycle work.
+
+## Private estate-directory admission (2026-10-21)
+
+A native Windows regression demonstrated that exact installation recovery
+accepted permissive permissions on `.rrflow/rrd/roots`. D-01.1 supplies private
+creation and handle-based ownership/mode/DACL admission for the four
+engine-owned estate directories. Apply checks existing boundaries before
+recovery secrets/store effects; installed locator, credential, open and
+inspection paths require all four. Permission drift is refused without repair
+or changes to project-owned parents. The existing private-file implementation
+owns the native policy; no separate credential or lifecycle authority is added.
+
+[PR 48](https://github.com/rrflow/rrflow-development/pull/48) and its
+[journal](../../evidence/change-journals/gate-d/d-01-private-estate-directories.md)
+bind the failing oracle, replacement evidence and candidate CI. Retained
+ancestor handles, mount/path races, store-owned descendants and complete
+privileged foreign-owner qualification remain later D-01 work. This bounded
+repair does not close D-01 or POAM-006.
