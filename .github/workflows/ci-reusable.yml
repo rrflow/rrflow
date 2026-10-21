@@ -73,6 +73,8 @@ jobs:
         run: cargo test -p rrd-estate --all-targets --locked
       - name: Test RRD daemon process contract
         run: cargo test -p rrd-server --bin rrd-server --locked
+      - name: Test native secret file permissions and handle identity
+        run: cargo test -p rrd-engine --lib engine::token_key --locked
       - name: Test native installed primary lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
       - name: Deny installed lifecycle test warnings

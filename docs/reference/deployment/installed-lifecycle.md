@@ -295,6 +295,32 @@ clean-machine qualification remain separate packages. The staged rationale and
 exit proofs are in the
 [canonical estate/configuration research](../../research/rrflow-canonical-estate-configuration-and-runtime-controls.md#rollout-sequence).
 
+## Native secret leaf-file boundary
+
+Token keys, operator credentials, installation recovery intents and restore
+publication intents use one engine-owned bounded reader. It opens once,
+validates that handle before and after reading, and rejects multiple hard
+links, non-regular objects, oversized content and observed length/mtime drift.
+Exclusive creation establishes permissions before writing any secret bytes;
+reading never repairs permissions or replaces an unsafe file.
+
+On Unix, the leaf open uses no-follow and nonblocking flags, requires the
+effective user's ownership, and denies group/other permission bits. Creation
+requests mode `0600`. On Windows, creation supplies a protected DACL granting
+only the current process user and LocalSystem. The reader checks the opened
+disk object's owner, protected non-null DACL, basic non-inherited allow entries
+for those principals, regular/non-reparse attributes and single link. The
+read handle excludes concurrent write/delete sharing. Unsupported native
+security enforcement fails closed; no runtime ACL utility is required.
+
+These are leaf-file guarantees, not ancestor-directory or mount containment,
+an atomic project snapshot, resistance to every same-owner race, a credential
+migration facility, or complete native ACL qualification. Privileged foreign-
+owner and Windows reparse adversarial fixtures remain unqualified. The
+[native secret boundary journal](../../evidence/change-journals/gate-d/d-01-native-secret-boundary.md)
+records real filesystem denial and retained installation/recovery evidence.
+D-01 remains open.
+
 ## Open, serve, and readiness
 
 Normal open is `open_existing`, never create-or-open. A read-only inspector
