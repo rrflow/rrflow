@@ -22,8 +22,68 @@ use std::time::Duration;
 #[cfg(unix)]
 use std::time::Instant;
 
-fn binary() -> &'static str {
-    env!("CARGO_BIN_EXE_rrflow")
+struct StandaloneDistribution {
+    root: tempfile::TempDir,
+    executable: PathBuf,
+}
+
+impl StandaloneDistribution {
+    fn stage() -> Self {
+        let source = std::env::var_os("RRFLOW_TEST_BINARY")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(env!("CARGO_BIN_EXE_rrflow")));
+        let root = tempfile::Builder::new()
+            .prefix("rrflow standalone ")
+            .tempdir()
+            .unwrap();
+        let executable = root.path().join(if cfg!(windows) {
+            "rrflow.exe"
+        } else {
+            "rrflow"
+        });
+        std::fs::copy(&source, &executable).expect("stage the actual primary executable");
+        for directory in ["working", "home", "temporary", "empty-path"] {
+            std::fs::create_dir(root.path().join(directory)).unwrap();
+        }
+        Self { root, executable }
+    }
+
+    fn command(&self) -> Command {
+        let mut command = Command::new(&self.executable);
+        command
+            .env_clear()
+            .current_dir(self.root.path().join("working"));
+        // Native OS discovery is the only inherited environment. No Cargo,
+        // provider, checkout, credential, proxy or developer PATH survives.
+        for name in ["SystemRoot", "WINDIR"] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
+        }
+        for name in ["HOME", "USERPROFILE"] {
+            command.env(name, self.root.path().join("home"));
+        }
+        for name in ["TMP", "TEMP", "TMPDIR"] {
+            command.env(name, self.root.path().join("temporary"));
+        }
+        command.env("PATH", self.root.path().join("empty-path"));
+        command.env("LANG", "C");
+        command
+    }
+}
+
+thread_local! {
+    // The fixture outlives this test's child handles and is removed when its
+    // test thread exits. No global working-directory/environment mutation.
+    static DISTRIBUTION: StandaloneDistribution = StandaloneDistribution::stage();
+}
+
+fn binary() -> PathBuf {
+    DISTRIBUTION.with(|distribution| distribution.executable.clone())
+}
+
+fn product_command() -> Command {
+    DISTRIBUTION.with(StandaloneDistribution::command)
 }
 
 async fn verify_parquet_export(
@@ -129,10 +189,7 @@ async fn verify_parquet_export(
 }
 
 fn invoke(args: &[&str]) -> Output {
-    Command::new(binary())
-        .args(args)
-        .output()
-        .expect("run rrflow")
+    product_command().args(args).output().expect("run rrflow")
 }
 
 fn assert_success(output: &Output, operation: &str) {
@@ -202,7 +259,7 @@ struct RunningEngine {
 
 impl RunningEngine {
     fn start(project: &Path, captured: &mut Vec<u8>) -> (Self, String) {
-        let mut child = Command::new(binary())
+        let mut child = product_command()
             .args(["--json", "serve", "--project"])
             .arg(project)
             .args(["--bind", "127.0.0.1:0"])

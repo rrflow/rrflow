@@ -24,6 +24,27 @@ rrflowKV.
 
 ## Impact
 
+### Baseline collision between distinct empty projects
+
+The D-01 offline-qualification inspection reproduced two different empty
+project directories receiving exactly the same installation plan digest and
+project/estate/instance IDs from `rrflow install plan --mode fresh`. The
+observed executable SHA-256 was
+`6853715de7b816f7e9c1e921ceb670f6350bc2fb0d088e0d5cb30df6fb7d0623`.
+`installation_identity_seed` binds mode, inventory, profile, executable and
+configuration digests, but no independently selected installation identity.
+Identical existing-project content has the same structural risk. Separate
+credential generation does not correct the duplicated logical identity.
+
+D-01 must bind an independent, previewed installation identity while retaining
+deterministic planning, exact apply/recovery and portable installed locators.
+Changing a live root path cannot redefine an installed estate. Qualification
+must include two identical-content projects, foreign-plan/locator/credential
+denials and unchanged identity through relocation and reopen. This is an open
+deficiency in that baseline, not repaired by the offline harness. The bounded
+identity repair and its evidence are recorded below; broader topology closure
+still requires the complete acceptance matrix.
+
 Product startup can no longer manufacture its own installation authority, but resource
 authorization can still depend on historical word order, an estate can be mistaken for a
 multi-project fleet, physical placement can diverge from semantic scope, and unfinished

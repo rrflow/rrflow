@@ -545,6 +545,11 @@ def main() -> None:
         in jobs["estate-portability"],
         "native installed lifecycle tests must not hide platform warnings",
     )
+    require(
+        jobs["topology-smoke"].count("python3 scripts/ci/run_offline_lifecycle.py") == 1
+        and "python3 scripts/ci/test_offline_lifecycle.py" in jobs["verify"],
+        "installed lifecycle must enforce offline isolation and test its artifact/mount policy",
+    )
 
     gate = jobs["ci-gate"]
     needs_match = re.search(
