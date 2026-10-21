@@ -9,6 +9,7 @@ from ctypes import wintypes as w
 from contextlib import ExitStack
 import os
 import encodings
+import json
 from pathlib import Path
 import secrets
 import subprocess
@@ -191,7 +192,7 @@ def principal(stack):
     boolean(api(adv, "CreateRestrictedToken", w.BOOL, P, U32, U32, P, U32, P, U32, P, P)(
         token, 0, 0, None, 1, c.byref(privilege), 0, None, c.byref(restricted)), "remove traversal bypass")
     stack.callback(close, restricted)
-    return sid, sid_text, restricted
+    return sid, sid_text, restricted, token
 
 
 def access(stack, path, sid, deny):
@@ -297,13 +298,26 @@ def run_isolated(stage: Path, masks: list[Path]):
     require(stage.is_relative_to(Path(os.environ["PUBLIC"]).resolve()) and stage.name.startswith("rrflow-offline-"),
             "qualification stage must be an owned public-parent fixture")
     with ExitStack() as stack:
-        sid, sid_text, token = principal(stack)
+        sid, sid_text, token, normal_token = principal(stack)
         desktop = private_desktop(stack, sid_text)
         access(stack, stage, sid, False)
         for mask in masks:
             access(stack, mask, sid, True)
         outbound_policy(stack, sid_text)
         probe_runtime_access(token, stage)
+        # These literal no-op launches characterize OS initialization only.
+        # The normal token is never used for source/network probes, cleanup or product tests.
+        startup_results = []
+        for name, probe_token, flags in [
+            ("normal_no_window", normal_token, 0x08000404),
+            ("restricted_no_window", token, 0x08000404),
+            ("restricted_inherited_console", token, 0x404),
+            ("restricted_hidden_new_console", token, 0x414),
+        ]:
+            code = launch(probe_token, stage, name, 15, desktop, flags=flags, probe=True)
+            startup_results.append({"case": name, "exit_status": f"0x{code:08x}"})
+            print(json.dumps({"native_startup": startup_results[-1]}), flush=True)
+            (stage / "startup.json").write_text(json.dumps(startup_results), encoding="utf-8")
         try:
             launch(token, stage, "--windows-inside", 600, desktop)
         finally:
@@ -312,7 +326,7 @@ def run_isolated(stage: Path, masks: list[Path]):
             launch(token, stage, "--cleanup-owned", 60, desktop)
 
 
-def launch(token, stage, mode, timeout, desktop):
+def launch(token, stage, mode, timeout, desktop, *, flags=0x404, probe=False):
     with ExitStack() as stack:
         job = api(kernel, "CreateJobObjectW", P, P, w.LPCWSTR)(None, None)
         boolean(job, "create owned qualification job")
@@ -327,12 +341,15 @@ def launch(token, stage, mode, timeout, desktop):
                        "USERPROFILE": str(stage / "home"), "HOME": str(stage / "home"),
                        "PATH": os.environ["SystemRoot"] + "\\System32"}
         block = c.create_unicode_buffer("\0".join(f"{key}={value}" for key, value in sorted(environment.items())) + "\0\0")
-        command = c.create_unicode_buffer(subprocess.list2cmdline([sys.executable, str(stage / "runner.py"), mode, str(stage)]))
+        arguments = ([sys.executable, "-I", "-S", "-c", "pass"] if probe else
+                     [sys.executable, str(stage / "runner.py"), mode, str(stage)])
+        command = c.create_unicode_buffer(subprocess.list2cmdline(arguments))
         startup, information = Startup(), Information()
         startup.size = c.sizeof(startup)
         startup.desktop = desktop
+        startup.flags, startup.show = 1, 0  # STARTF_USESHOWWINDOW / SW_HIDE
         create = api(adv, "CreateProcessWithTokenW", w.BOOL, P, U32, w.LPCWSTR, w.LPWSTR, U32, P, w.LPCWSTR, P, P)
-        boolean(create(token, 0, sys.executable, command, 0x08000404, block, str(stage), c.byref(startup), c.byref(information)), "create suspended qualification process")
+        boolean(create(token, 0, sys.executable, command, flags, block, str(stage), c.byref(startup), c.byref(information)), "create suspended qualification process")
         stack.callback(close, information.process)
         stack.callback(close, information.thread)
         terminate = api(kernel, "TerminateProcess", w.BOOL, P, U32)
@@ -346,7 +363,9 @@ def launch(token, stage, mode, timeout, desktop):
             require(time.monotonic() < deadline, "Windows qualification exceeded its deadline")
         code = U32()
         boolean(api(kernel, "GetExitCodeProcess", w.BOOL, P, P)(information.process, c.byref(code)), "read qualification exit")
-        require(code.value == 0, f"Windows isolated {mode} failed with exit status 0x{code.value:08x}")
+        if not probe:
+            require(code.value == 0, f"Windows isolated {mode} failed with exit status 0x{code.value:08x}")
+        return code.value
 
 
 def quiesce_job(job):

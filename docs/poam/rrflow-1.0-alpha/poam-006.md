@@ -285,3 +285,9 @@ records interpreter initialization failure 0xC0000142 after policy setup. The
 runner now supplies an owned noninteractive desktop and probes restricted-token
 access to its runtime dependencies. This requires native requalification;
 policy setup alone is not proof of isolation or a running product.
+
+That candidate still exits before Python with 0xC0000142. The
+[startup matrix](../../evidence/change-journals/gate-d/d-01-native-windows-startup-matrix.md)
+separates normal/restricted token and console-creation behavior using bounded
+no-op interpreters. Actual qualification retains the restricted token and all
+denial requirements; these diagnostics cannot close the native gap by themselves.

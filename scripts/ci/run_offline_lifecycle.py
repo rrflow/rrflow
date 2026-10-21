@@ -301,6 +301,8 @@ def qualify_payload(stage: Path, configuration: dict) -> None:
                "filesystem": configuration["filesystem"], "durable_receipts": durable,
                "failed": 0, "ignored": 0, "outbound_denials": ["ipv4", "ipv6"],
                "masked_roots": configuration["masks"], "isolation": configuration["isolation"]}
+    if sys.platform == "win32":
+        receipt["startup_diagnostics"] = json.loads((stage / "startup.json").read_text())
     (stage / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     print(json.dumps(receipt), flush=True)
 
@@ -454,6 +456,7 @@ def main() -> None:
                         "platform": sys.platform, "sha256": source_hashes,
                         "isolation": configuration["isolation"],
                         "diagnostic": "native qualification failed before complete acceptance",
+                        "startup_diagnostics": (json.loads((stage / "startup.json").read_text()) if (stage / "startup.json").is_file() else None),
                         "native_failure": (json.loads((stage / "failure.json").read_text()) if (stage / "failure.json").is_file() else None)}, indent=2), encoding="utf-8")
         print("Offline installed lifecycle passed; no alpha or signed-distribution qualification claimed.")
 
