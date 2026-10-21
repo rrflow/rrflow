@@ -866,36 +866,12 @@ pub(crate) fn active_graph_values<'a>(
     BTreeMap<rrd_core::RuntimeRef, RuntimeRecord>,
     BTreeMap<rrd_core::RuntimeRef, RuntimeRelation>,
 ) {
-    let mut records = BTreeMap::new();
-    let mut relations = BTreeMap::new();
-    for change in changes
-        .into_iter()
-        .filter(|change| change.cursor <= known_at_cursor && &change.scope == scope)
-    {
-        match &change.mutation {
-            RuntimeMutation::Record { record } if record.valid_from <= valid_at => {
-                records.insert(record.reference.clone(), record.clone());
-            }
-            RuntimeMutation::Relation { relation } if relation.valid_from <= valid_at => {
-                relations.insert(relation.reference.clone(), relation.clone());
-            }
-            RuntimeMutation::Retire { retirement } if retirement.effective_at <= valid_at => {
-                if retirement.model.is_record_like() {
-                    records.remove(&retirement.reference);
-                } else if retirement.model == rrd_core::RuntimeLogicalModel::GraphRelation {
-                    relations.remove(&retirement.reference);
-                }
-            }
-            _ => {}
-        }
+    let mut state =
+        crate::physical::graph::state::GraphState::new(scope, valid_at, known_at_cursor);
+    for change in changes {
+        state.apply(change);
     }
-    records.retain(|_, record| {
-        record.valid_from <= valid_at && record.valid_to.is_none_or(|end| valid_at < end)
-    });
-    relations.retain(|_, relation| {
-        relation.valid_from <= valid_at && relation.valid_to.is_none_or(|end| valid_at < end)
-    });
-    (records, relations)
+    state.into_values()
 }
 
 fn geo_rows(

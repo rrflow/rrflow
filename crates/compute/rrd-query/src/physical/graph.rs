@@ -2,7 +2,8 @@
 //!
 //! A bounded traversal reads its start identity, then one breadth-first level
 //! at a time the temporal adjacency range of every frontier node and the
-//! complete identity history of every relation those ranges name. Physical
+//! complete identity history of every relation those ranges name. Temporal
+//! state is reduced once per supplied version, not replayed at each depth. Physical
 //! work therefore follows the visited neighbourhood and its histories, never
 //! the estate's relation or record families. Rows come from one replay over
 //! the authenticated subset with the same temporal semantics as a replay of
@@ -17,6 +18,12 @@ use rrd_core::{
 };
 use rrd_store::{RuntimeAdjacencyDirection, RuntimeVersionedSource};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+pub(crate) mod state;
+use state::GraphState;
+
+#[cfg(test)]
+mod tests;
 
 /// One bounded traversal source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,18 +103,17 @@ enum Loaded {
 /// next frontier. A range already read, or covered by a static family range
 /// of the same read, is never requested again.
 pub(crate) struct AdjacencyExpansion<'a> {
-    scope: &'a ScopeId,
-    valid_at: u64,
-    known_at_cursor: u64,
+    state: GraphState<'a>,
     static_sources: &'a [RuntimeVersionedSource],
     walks: Vec<Walk>,
     stage: Loaded,
-    loaded: BTreeMap<u64, RuntimeChange>,
     /// Relation identities named by a loaded version at each endpoint.
     outgoing: BTreeMap<(RuntimeType, RuntimeRef), BTreeSet<RuntimeRef>>,
     incoming: BTreeMap<(RuntimeType, RuntimeRef), BTreeSet<RuntimeRef>>,
     adjacency_read: BTreeSet<(RuntimeType, RuntimeRef, RuntimeAdjacencyDirection)>,
     identities_read: BTreeSet<RuntimeRef>,
+    #[cfg(test)]
+    reduction_visits: usize,
 }
 
 impl<'a> AdjacencyExpansion<'a> {
@@ -119,9 +125,7 @@ impl<'a> AdjacencyExpansion<'a> {
         traversals: &[TraversalPlan],
     ) -> Self {
         Self {
-            scope,
-            valid_at,
-            known_at_cursor,
+            state: GraphState::new(scope, valid_at, known_at_cursor),
             static_sources,
             walks: traversals
                 .iter()
@@ -134,11 +138,12 @@ impl<'a> AdjacencyExpansion<'a> {
                 })
                 .collect(),
             stage: Loaded::Start,
-            loaded: BTreeMap::new(),
             outgoing: BTreeMap::new(),
             incoming: BTreeMap::new(),
             adjacency_read: BTreeSet::new(),
             identities_read: BTreeSet::new(),
+            #[cfg(test)]
+            reduction_visits: 0,
         }
     }
 
@@ -157,7 +162,11 @@ impl<'a> AdjacencyExpansion<'a> {
                         .insert(relation.reference.clone());
                 }
             }
-            self.loaded.insert(change.cursor, change.clone());
+            self.state.apply(change);
+            #[cfg(test)]
+            {
+                self.reduction_visits += 1;
+            }
         }
         loop {
             let requests = match self.stage {
@@ -183,14 +192,8 @@ impl<'a> AdjacencyExpansion<'a> {
     }
 
     fn begin(&mut self) {
-        let (records, _) = active_graph_values(
-            self.loaded.values(),
-            self.scope,
-            self.valid_at,
-            self.known_at_cursor,
-        );
         for walk in &mut self.walks {
-            if records.contains_key(&walk.plan.start) && walk.plan.max_depth > 0 {
+            if self.state.has_record(&walk.plan.start) && walk.plan.max_depth > 0 {
                 walk.frontier = vec![walk.plan.start.clone()];
                 walk.visited = BTreeSet::from([walk.plan.start.clone()]);
             } else {
@@ -261,29 +264,23 @@ impl<'a> AdjacencyExpansion<'a> {
     /// Every relation named at the frontier now has its complete history
     /// loaded, so its state at the valid time decides the next frontier.
     fn advance(&mut self) {
-        let (_, relations) = active_graph_values(
-            self.loaded.values(),
-            self.scope,
-            self.valid_at,
-            self.known_at_cursor,
-        );
         let mut walks = std::mem::take(&mut self.walks);
         for walk in walks.iter_mut().filter(|walk| !walk.done) {
             let mut next = Vec::new();
-            let mut reached = walk.visited.clone();
+            let mut reached = BTreeSet::new();
             for node in &walk.frontier {
                 for reference in self.incident(walk, node) {
-                    let Some(relation) = relations.get(reference) else {
+                    let Some(relation) = self.state.relation(reference) else {
                         continue;
                     };
                     if let Some(successor) = successor(relation, node, walk.plan.direction) {
-                        if reached.insert(successor.clone()) {
+                        if !walk.visited.contains(successor) && reached.insert(successor.clone()) {
                             next.push(successor.clone());
                         }
                     }
                 }
             }
-            walk.visited = reached;
+            walk.visited.extend(reached);
             walk.depth += 1;
             if walk.depth >= walk.plan.max_depth || next.is_empty() {
                 walk.done = true;
