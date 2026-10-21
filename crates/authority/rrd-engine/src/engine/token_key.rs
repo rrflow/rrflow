@@ -5,7 +5,9 @@ use rrd_contract::CanonicalId;
 use serde::{Deserialize, Serialize};
 
 mod private_file;
-pub(in crate::engine) use private_file::{read_private_bounded, write_private_new};
+pub(in crate::engine) use private_file::{
+    create_private_directory, read_private_bounded, validate_private_directory, write_private_new,
+};
 
 pub const TOKEN_KEY_BYTES: usize = 32;
 const API_KEY_DOCUMENT_FORMAT: u16 = 1;
