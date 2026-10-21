@@ -4425,6 +4425,7 @@ dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
  "hmac",
+ "libc",
  "rquickjs",
  "rrd-cluster",
  "rrd-contract",
@@ -4445,6 +4446,7 @@ dependencies = [
  "tracing",
  "wasmi",
  "wat",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

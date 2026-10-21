@@ -113,3 +113,23 @@ Git-aware incremental attunement, secret classification, a watcher, or a
 million-file benchmark. It does not close D-01, D-03 or POAM-006. Default
 installation still rejects inputs beyond its explicit bundle profile instead
 of silently ignoring source or claiming a complete index.
+
+## Native secret leaf-file boundary (2026-10-20)
+
+A real-file regression demonstrated that the previous token reader accepted
+a hard-linked secret. Inspection also found path validation followed by a
+separate open, and Windows secret creation inherited its parent ACL without
+validating the opened object's security descriptor. These are verified gaps
+within the existing D-01 native filesystem/credential item.
+
+[PR 45](https://github.com/rrflow/rrflow-development/pull/45) consolidates
+credential and secret-bearing recovery-intent I/O behind one bounded,
+handle-validated engine boundary. Native Windows protected ACL creation and
+permissive/null/unprotected ACL denial, hard-link rejection, installation
+open/verify/replay refusal, and interrupted-intent recovery have concrete
+failure oracles. The [package journal](../../evidence/change-journals/gate-d/d-01-native-secret-boundary.md)
+binds results and cross-platform candidate checks.
+
+Ancestor-directory replacement, mount containment, complete native ACL and
+hostile-race qualification, signed packaging and the wider D-01 matrix remain
+open. No alpha outcome or parent POA&M item closes on this bounded repair.

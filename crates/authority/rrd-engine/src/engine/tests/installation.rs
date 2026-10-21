@@ -482,6 +482,63 @@ fn changed_project_or_credential_permissions_fail_closed() {
     }
 }
 
+#[test]
+fn installed_secret_aliases_deny_open_verify_and_replay_without_effects() {
+    let project = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let executable = test_executable();
+    let preview = plan(project.path());
+    let at = 1_800_000_000_000;
+    let applied = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        at,
+        &executable,
+    )
+    .unwrap();
+    let before = inventory(project.path());
+    for kind in [
+        rrd_contract::InstallationManagedPathKind::TokenKey,
+        rrd_contract::InstallationManagedPathKind::OperatorCredential,
+    ] {
+        let secret = project
+            .path()
+            .join(&preview.installation.managed_path(kind).relative_path);
+        let alias = outside.path().join("foreign-alias");
+        std::fs::hard_link(&secret, &alias).unwrap();
+        assert!(open_at(project.path(), &executable, at + 1).is_err());
+        assert!(inspect_at(project.path(), &executable, at + 1).is_err());
+        assert!(RrdEngine::apply_installation_at(
+            project.path(),
+            InstallationTargetKind::ExistingProject,
+            &preview,
+            &preview.installation.plan_sha256,
+            at + 1,
+            &executable,
+        )
+        .is_err());
+        assert_eq!(
+            inventory(project.path()),
+            before,
+            "denial changed installed state"
+        );
+        assert_eq!(
+            std::fs::read(&alias).unwrap(),
+            std::fs::read(&secret).unwrap()
+        );
+        std::fs::remove_file(&alias).unwrap();
+        let report = inspect_at(project.path(), &executable, at + 1).unwrap();
+        assert_eq!(report.status, InstallationVerificationStatus::Passed);
+        assert_eq!(report.runtime_cursor, applied.runtime_cursor);
+        assert_eq!(
+            report.control_journal_sequence,
+            applied.control_journal_sequence
+        );
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn installed_open_and_inspection_reject_symbolic_object_paths() {

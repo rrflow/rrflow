@@ -1,9 +1,11 @@
-use std::fs::{File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::io;
 use std::path::Path;
 
 use rrd_contract::CanonicalId;
 use serde::{Deserialize, Serialize};
+
+mod private_file;
+pub(in crate::engine) use private_file::{read_private_bounded, write_private_new};
 
 pub const TOKEN_KEY_BYTES: usize = 32;
 const API_KEY_DOCUMENT_FORMAT: u16 = 1;
@@ -130,17 +132,7 @@ pub(in crate::engine) fn decode_api_key_document(bytes: &[u8]) -> io::Result<Api
 }
 
 pub fn read_api_key_document(path: &Path) -> io::Result<ApiKeyDocument> {
-    let metadata = private_regular_file(path)?;
-    if metadata.len() > 16 * 1024 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "API key document exceeds its byte bound",
-        ));
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    File::open(path)?
-        .take(16 * 1024 + 1)
-        .read_to_end(&mut bytes)?;
+    let bytes = read_private_bounded(path, 16 * 1024)?;
     decode_api_key_document(&bytes)
 }
 
@@ -164,64 +156,14 @@ pub(super) fn load_or_create_token_key(path: &Path) -> io::Result<[u8; TOKEN_KEY
     }
 }
 
-#[cfg(unix)]
-fn sync_parent(path: &Path) -> io::Result<()> {
-    File::open(path.parent().expect("token key has a parent"))?.sync_all()
-}
-
-#[cfg(not(unix))]
-fn sync_parent(_path: &Path) -> io::Result<()> {
-    Ok(())
-}
-
 pub fn read_token_key(path: &Path) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
-    private_regular_file(path)?;
-    let mut bytes = Vec::new();
-    File::open(path)?
-        .take((TOKEN_KEY_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)?;
+    let bytes = read_private_bounded(path, TOKEN_KEY_BYTES as u64)?;
     bytes.try_into().map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidData,
             "token key must contain exactly 32 bytes",
         )
     })
-}
-
-pub(in crate::engine) fn write_private_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    sync_parent(path)
-}
-
-pub(in crate::engine) fn private_regular_file(path: &Path) -> io::Result<std::fs::Metadata> {
-    let link = std::fs::symlink_metadata(path)?;
-    if link.file_type().is_symlink() || !link.is_file() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "credential path must be a regular non-symlink file",
-        ));
-    }
-    let metadata = std::fs::metadata(path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o077 != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "credential must not be accessible to group or other users",
-            ));
-        }
-    }
-    Ok(metadata)
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -243,5 +185,26 @@ mod tests {
         let reopened = load_or_create_token_key(&path).unwrap();
         assert_eq!(created, reopened);
         assert_ne!(created, [0_u8; TOKEN_KEY_BYTES]);
+    }
+
+    #[test]
+    fn secret_hardlinks_are_rejected_without_changing_either_path() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("RRD.SECRET");
+        let alias = root.path().join("foreign-alias");
+        let created = load_or_create_token_key(&path).unwrap();
+        std::fs::hard_link(&path, &alias).unwrap();
+        assert!(
+            read_token_key(&path).is_err(),
+            "multiply linked secrets must be denied"
+        );
+        assert!(
+            read_token_key(&alias).is_err(),
+            "the alias must also be denied"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), created);
+        assert_eq!(std::fs::read(&alias).unwrap(), created);
+        std::fs::remove_file(&alias).unwrap();
+        assert_eq!(read_token_key(&path).unwrap(), created);
     }
 }

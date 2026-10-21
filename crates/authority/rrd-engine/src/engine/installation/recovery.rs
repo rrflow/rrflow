@@ -2,10 +2,8 @@ use super::*;
 use crate::engine::estate_layout::{install_intent_path, EstateLayout};
 use crate::engine::token_key::{
     decode_api_key_document, encode_api_key_document, generate_api_key_document,
-    generate_token_key, private_regular_file, write_private_new, ApiKeyDocument, TOKEN_KEY_BYTES,
+    generate_token_key, write_private_new, ApiKeyDocument, TOKEN_KEY_BYTES,
 };
-use std::fs::File;
-use std::io::Read;
 
 const INSTALL_INTENT_FORMAT: u16 = 2;
 const MAX_INSTALL_INTENT_BYTES: u64 = 32 * 1024;
@@ -315,20 +313,7 @@ fn read_intent(path: &Path) -> Result<InstallIntent> {
 }
 
 fn read_private_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>> {
-    let metadata = private_regular_file(path).map_err(storage_error)?;
-    if metadata.len() > maximum {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    File::open(path)
-        .map_err(storage_error)?
-        .take(maximum + 1)
-        .read_to_end(&mut bytes)
-        .map_err(storage_error)?;
-    if bytes.len() as u64 > maximum {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    Ok(bytes)
+    crate::engine::token_key::read_private_bounded(path, maximum).map_err(storage_error)
 }
 
 fn storage_error(error: std::io::Error) -> ServiceError {

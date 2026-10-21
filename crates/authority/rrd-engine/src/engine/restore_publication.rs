@@ -17,11 +17,11 @@ use super::estate_layout::{
 };
 use super::installation::{
     canonical_prefixed, decode_control, estate_configuration_key, json_sha256, read_locator,
-    read_regular_bounded, require_locator_record_match, runtime_manifest_from_inspection,
-    sha256_file, DefaultInstallProfile, InstallationVerificationStatus, InstalledEstateRecord,
-    ProjectLocator, INSTALLED_RECORD_KEY,
+    require_locator_record_match, runtime_manifest_from_inspection, sha256_file,
+    DefaultInstallProfile, InstallationVerificationStatus, InstalledEstateRecord, ProjectLocator,
+    INSTALLED_RECORD_KEY,
 };
-use super::token_key::{private_regular_file, read_token_key, write_private_new, TOKEN_KEY_BYTES};
+use super::token_key::{read_private_bounded, read_token_key, write_private_new, TOKEN_KEY_BYTES};
 use super::*;
 use rrd_contract::{
     restore_publication_plan_sha256, restore_publication_result_sha256, RestorePublicationAction,
@@ -702,7 +702,6 @@ fn candidate_token_key_state(candidate: &Path, expected_sha256: &str) -> Result<
     let path = candidate.join(TOKEN_KEY_FILE);
     match fs::symlink_metadata(&path) {
         Ok(_) => {
-            private_regular_file(&path).map_err(storage_error)?;
             let token_key = read_token_key(&path).map_err(storage_error)?;
             if digest::sha256_hex(&token_key) != expected_sha256 {
                 return Err(ServiceError::ProjectBindingMismatch);
@@ -834,8 +833,7 @@ fn acknowledge_intent(path: &Path, expected: &PublicationIntent) -> Result<()> {
 }
 
 fn read_intent(path: &Path) -> Result<PublicationIntent> {
-    private_regular_file(path).map_err(storage_error)?;
-    let bytes = read_regular_bounded(path, MAX_PUBLICATION_INTENT_BYTES)?;
+    let bytes = read_private_bounded(path, MAX_PUBLICATION_INTENT_BYTES).map_err(storage_error)?;
     let intent: PublicationIntent = serde_json::from_slice(&bytes).map_err(contract_json)?;
     if encode(&intent)? != bytes || intent.intent_sha256 != intent.calculated_sha256()? {
         return Err(ServiceError::ProjectBindingMismatch);

@@ -743,6 +743,39 @@ max_elapsed_ms = 20000
     let installed_at = applied["applied_at_unix_ms"].as_u64().unwrap();
 
     let installed_before_verify = inventory(&project);
+    let credential_path = project.join(
+        managed_paths
+            .iter()
+            .find(|path| path["kind"] == "operator_credential")
+            .unwrap()["relative_path"]
+            .as_str()
+            .unwrap(),
+    );
+    let alias = root.path().join("foreign-credential-alias");
+    std::fs::hard_link(&credential_path, &alias).unwrap();
+    let denied_verify = invoke(&[
+        "--json",
+        "verify",
+        "--project",
+        project_arg,
+        "--level",
+        "quick",
+    ]);
+    capture_output(&denied_verify, &mut lifecycle_output);
+    assert!(
+        !denied_verify.status.success(),
+        "aliased credentials must fail verification"
+    );
+    assert_eq!(
+        inventory(&project),
+        installed_before_verify,
+        "denied verify changed state"
+    );
+    assert_eq!(
+        std::fs::read(&alias).unwrap(),
+        std::fs::read(&credential_path).unwrap()
+    );
+    std::fs::remove_file(&alias).unwrap();
     let verified = invoke(&[
         "--json",
         "verify",

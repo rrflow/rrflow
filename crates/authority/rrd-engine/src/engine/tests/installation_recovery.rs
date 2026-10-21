@@ -290,6 +290,57 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
 }
 
 #[test]
+fn aliased_secret_intent_cannot_advance_interrupted_installation() {
+    let project = project_fixture();
+    let outside = tempfile::tempdir().unwrap();
+    let executable = test_executable();
+    let preview = plan(project.path(), &executable);
+    RrdEngine::apply_installation_with_failure(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS,
+        &executable,
+        InstallApplyStage::IntentPublished,
+    )
+    .unwrap_err();
+    let intent = project.path().join(layout(&preview).install_intent);
+    let before = file_inventory(project.path());
+    let alias = outside.path().join("intent-alias");
+    std::fs::hard_link(&intent, &alias).unwrap();
+    assert!(RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 1,
+        &executable,
+    )
+    .is_err());
+    assert_eq!(file_inventory(project.path()), before);
+    assert!(!project.path().join(".rrflow").exists());
+    assert_eq!(
+        std::fs::read(&alias).unwrap(),
+        std::fs::read(&intent).unwrap()
+    );
+    std::fs::remove_file(&alias).unwrap();
+    let recovered = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 2,
+        &executable,
+    )
+    .unwrap();
+    assert_eq!(recovered.applied_at_unix_ms, FIRST_APPLY_MS);
+    assert_eq!(recovered.runtime_cursor, 2);
+    assert_eq!(recovered.control_journal_sequence, 8);
+    assert!(!intent.exists());
+}
+
+#[test]
 fn interrupted_recovery_rejects_clock_rollback_without_changing_owned_state() {
     let project = project_fixture();
     let executable = test_executable();
@@ -421,18 +472,9 @@ fn malformed_or_foreign_recovery_state_is_preserved_and_rejected() {
     let malformed_intent = malformed_project
         .path()
         .join(layout(&malformed_preview).install_intent);
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.mode(0o600);
-    }
-    use std::io::Write as _;
-    options
-        .open(&malformed_intent)
-        .unwrap()
-        .write_all(b"not-an-install-intent")
+    // Keep permissions valid so this remains a malformed-content oracle on
+    // every platform, rather than stopping earlier at the native ACL check.
+    crate::engine::token_key::write_private_new(&malformed_intent, b"not-an-install-intent")
         .unwrap();
     let malformed_before = file_inventory(malformed_project.path());
     assert!(RrdEngine::apply_installation_at(
