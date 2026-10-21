@@ -230,3 +230,12 @@ assets, changing the raw profile digest at the same source revision. D-01.4
 must supply actual bundled templates/specialization manifests, close the
 file/record/effect preview and pin owned asset bytes. The regression is
 intentionally failing until that implementation; no parent status closes.
+
+
+The D-01.4 [implementation journal](../../evidence/change-journals/gate-d/d-01-bundled-bootstrap.md)
+records plan version 4, actual linked generic/Clyffy assets, complete managed
+transient paths, bounded initial record declarations and verified instruction
+publication/recovery. Default provider bindings remain inactive and project-owned
+instructions remain unchanged. Native D-01.5 qualification, exact-candidate
+D-01.6 reconciliation and the later attunement/adapter lifecycle remain open.
+Candidate CI must pass before this package is accepted; POAM-006 stays open.

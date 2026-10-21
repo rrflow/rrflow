@@ -53,6 +53,20 @@ Providers receive a bounded projection of this manifest through public RRFlow
 operations. They never receive raw KV keys, plaintext credentials, unrestricted
 workspace content, or authority to mutate the manifest directly.
 
+The current D-01.4 implementation binds the initial subset through installation
+plan version 4 and its persisted installed record: bundled template bytes,
+selected specialization/seat, configuration and phase digests, exact managed
+paths, initial record kinds, secret-generation bounds and inactive capability
+policy. The generic template materializes only at `.rrflow/bootstrap.md`.
+Project-owned `AGENTS.md`, provider instructions and other source remain
+unchanged. Select `--profile clyffy` explicitly to install the bundled Clyffy
+specialization; the default remains generic. Candidate endpoint profiles use
+the existing revisioned `EndpointProfile` contract and never imply activation;
+the shipped profiles declare them absent. Discovered source/capability evidence,
+provider activation and ongoing attunement remain later gated work. See the
+[installed lifecycle](deployment/installed-lifecycle.md#install-plan) for the
+current effect and recovery contract.
+
 ### Seat and provider truth
 
 The generic template has no built-in persona or provider. A specialization may

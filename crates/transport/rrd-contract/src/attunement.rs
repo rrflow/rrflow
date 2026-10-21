@@ -12,10 +12,17 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+mod bootstrap;
+pub use bootstrap::{
+    InstallationBootstrap, InstallationBootstrapPolicy, InstallationRecordKind,
+    InstallationSpecialization, InstallationStorageGeneration, INSTALLATION_BOOTSTRAP_VERSION,
+    MAX_BOOTSTRAP_RECORD_BYTES, MAX_BOOTSTRAP_TEXT_BYTES,
+};
+
 pub const INSTALL_ATTUNEMENT_CONTRACT_VERSION: u16 = 1;
 /// Independent identity and initial-root binding are mandatory for new plans.
 /// Attunement and installation-result envelopes retain their own version.
-pub const INSTALLATION_PLAN_CONTRACT_VERSION: u16 = 3;
+pub const INSTALLATION_PLAN_CONTRACT_VERSION: u16 = 4;
 pub const INSTALLATION_LEASE_PATH: &str = ".rrflow-install.lock";
 pub const INSTALLATION_LEASE_PRECONDITION: &str = "rrflow-install-lease-absent-or-private-empty-v1";
 pub const MAX_INSTALLATION_ACTIONS: usize = 16;
@@ -94,8 +101,10 @@ pub enum InstallationActionKind {
     ValidateProject,
     AcquireInstallationLease,
     CreateEstateDirectories,
+    MaterializeBootstrap,
     CreateStorageRoot,
     PrepareCredentials,
+    DeliverCredentials,
     InitializeInstance,
     CreateAttunementJob,
     PublishProjectLocator,
@@ -144,6 +153,10 @@ pub enum InstallationManagedPathKind {
     OperatorCredential,
     ProjectLocator,
     InstallationLease,
+    InstallationIntent,
+    LocatorPending,
+    ProjectBootstrap,
+    BootstrapPending,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -172,6 +185,14 @@ impl InstallationManagedPath {
         if self.kind == InstallationManagedPathKind::InstallationLease {
             if self.relative_path != INSTALLATION_LEASE_PATH {
                 return invalid("installation lease must use its fixed project-relative path");
+            }
+        } else if self.kind == InstallationManagedPathKind::InstallationIntent {
+            if !self.relative_path.starts_with(".rrflow-install-")
+                || !self.relative_path.ends_with(".json")
+                || self.relative_path.contains(['/', '\\'])
+                || self.relative_path.len() > 256
+            {
+                return invalid("installation intent must use its plan-addressed root path");
             }
         } else {
             validate_project_relative_path(&self.relative_path)?;
@@ -204,6 +225,7 @@ pub struct InstallationPlan {
     pub project_precondition_sha256: String,
     pub storage_root_id: CanonicalId,
     pub configuration: EstateConfiguration,
+    pub bootstrap: InstallationBootstrap,
     pub initial_seat: MemorySeatDefinition,
     pub initial_principal_id: CanonicalId,
     pub initial_grants: Vec<SecurityAction>,
@@ -219,7 +241,7 @@ pub struct InstallationPlan {
 impl InstallationPlan {
     pub fn validate(&self) -> Result<()> {
         if self.contract_version != INSTALLATION_PLAN_CONTRACT_VERSION {
-            return invalid("unsupported installation plan contract version; expected 3");
+            return invalid("unsupported installation plan contract version; expected 4");
         }
         validate_sha256(&self.installation_identity, "installation identity")?;
         validate_sha256(
@@ -237,6 +259,12 @@ impl InstallationPlan {
         )?;
         self.configuration.validate()?;
         self.initial_seat.validate()?;
+        self.bootstrap.validate()?;
+        if self.bootstrap.specialization.seat != self.initial_seat
+            || self.bootstrap.credential_entropy_bytes != self.credential_bytes
+        {
+            return invalid("bootstrap seat or credential generation differs from installation");
+        }
         if self.initial_grants.is_empty() {
             return invalid("installation initial_grants cannot be empty");
         }
@@ -288,6 +316,22 @@ impl InstallationPlan {
                 InstallationManagedPathKind::InstallationLease,
                 InstallationRemovalRule::RetainForExclusion,
             ),
+            (
+                InstallationManagedPathKind::InstallationIntent,
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
+            (
+                InstallationManagedPathKind::LocatorPending,
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
+            (
+                InstallationManagedPathKind::ProjectBootstrap,
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
+            (
+                InstallationManagedPathKind::BootstrapPending,
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
         ];
         if self.managed_paths.len() != expected_paths.len() {
             return invalid("installation plan must bind every managed path exactly once");
@@ -313,6 +357,51 @@ impl InstallationPlan {
                 return invalid("installation managed paths are duplicated or out of order");
             }
         }
+        let expected_extra_paths = [
+            (
+                InstallationManagedPathKind::InstallationIntent,
+                format!(".rrflow-install-{}.json", self.storage_root_id),
+            ),
+            (
+                InstallationManagedPathKind::LocatorPending,
+                format!(".rrflow/.config.{}.pending", self.storage_root_id),
+            ),
+            (
+                InstallationManagedPathKind::ProjectBootstrap,
+                ".rrflow/bootstrap.md".to_owned(),
+            ),
+            (
+                InstallationManagedPathKind::BootstrapPending,
+                format!(".rrflow/.bootstrap.{}.pending", self.storage_root_id),
+            ),
+        ];
+        for (kind, expected) in expected_extra_paths {
+            if self.managed_path(kind).relative_path != expected {
+                return invalid(
+                    "bootstrap or transient path differs from its installation identity",
+                );
+            }
+        }
+        let mut private_directories: Vec<_> = self.managed_paths[..4]
+            .iter()
+            .map(|path| path.relative_path.clone())
+            .collect();
+        private_directories.sort();
+        let mut private_files: Vec<_> = [
+            InstallationManagedPathKind::TokenKey,
+            InstallationManagedPathKind::OperatorCredential,
+            InstallationManagedPathKind::InstallationLease,
+            InstallationManagedPathKind::InstallationIntent,
+        ]
+        .into_iter()
+        .map(|kind| self.managed_path(kind).relative_path.clone())
+        .collect();
+        private_files.sort();
+        if self.bootstrap.private_directories != private_directories
+            || self.bootstrap.private_files != private_files
+        {
+            return invalid("bootstrap private-object policy differs from managed paths");
+        }
         validate_sha256(
             &self.attunement_plan_sha256,
             "installation attunement_plan_sha256",
@@ -323,9 +412,11 @@ impl InstallationPlan {
         let expected = [
             InstallationActionKind::ValidateProject,
             InstallationActionKind::AcquireInstallationLease,
-            InstallationActionKind::CreateEstateDirectories,
-            InstallationActionKind::CreateStorageRoot,
             InstallationActionKind::PrepareCredentials,
+            InstallationActionKind::CreateEstateDirectories,
+            InstallationActionKind::MaterializeBootstrap,
+            InstallationActionKind::CreateStorageRoot,
+            InstallationActionKind::DeliverCredentials,
             InstallationActionKind::InitializeInstance,
             InstallationActionKind::CreateAttunementJob,
             InstallationActionKind::PublishProjectLocator,
@@ -369,6 +460,10 @@ impl InstallationPlan {
             InstallationManagedPathKind::OperatorCredential => 6,
             InstallationManagedPathKind::ProjectLocator => 7,
             InstallationManagedPathKind::InstallationLease => 8,
+            InstallationManagedPathKind::InstallationIntent => 9,
+            InstallationManagedPathKind::LocatorPending => 10,
+            InstallationManagedPathKind::ProjectBootstrap => 11,
+            InstallationManagedPathKind::BootstrapPending => 12,
         };
         &self.managed_paths[index]
     }
@@ -1115,7 +1210,7 @@ impl AttunementVerification {
 
 pub fn installation_plan_sha256(plan: &InstallationPlan) -> Result<String> {
     digest_json(
-        b"rrflow-installation-plan-v2",
+        b"rrflow-installation-plan-v4",
         &(
             (
                 plan.contract_version,
@@ -1134,6 +1229,7 @@ pub fn installation_plan_sha256(plan: &InstallationPlan) -> Result<String> {
             ),
             (
                 &plan.configuration,
+                &plan.bootstrap,
                 &plan.initial_seat,
                 &plan.initial_principal_id,
                 &plan.initial_grants,

@@ -51,6 +51,11 @@ Package numbers are subdivisions of D-01, not additional release gates.
 
 ### Bootstrap scope and durable-effect boundary
 
+The D-01.4 [implementation receipt](../../evidence/change-journals/gate-d/d-01-bundled-bootstrap.md)
+binds the version-4 preview, linked bootstrap assets, independent effect corpus
+and current local results. Acceptance remains pending its exact candidate CI;
+D-01.5/.6 and parent D-01 stay open.
+
 D-01.4 must bind the template, specialization, attunement profile and effective
 configuration revisions/digests; the initial seat, principals, roles/grants and
 credential generation/sink policy; and every planned path, record, command or

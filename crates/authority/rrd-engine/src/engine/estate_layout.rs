@@ -69,7 +69,11 @@ impl EstateFilesystem {
     }
 
     pub fn managed(&self, relative: &str) -> Result<AnchoredPath> {
-        validate_managed_relative(relative)?;
+        if relative.starts_with(INSTALL_INTENT_PREFIX) {
+            validate_intent_relative(relative)?;
+        } else {
+            validate_managed_relative(relative)?;
+        }
         if let Some((prefix, directory)) = self
             .private
             .iter()
@@ -113,6 +117,8 @@ pub(super) struct EstateLayout {
     pub operator_credential: String,
     pub install_intent: String,
     pub locator_pending: String,
+    pub bootstrap: String,
+    pub bootstrap_pending: String,
 }
 
 impl EstateLayout {
@@ -125,12 +131,16 @@ impl EstateLayout {
                 "{INSTALL_INTENT_PREFIX}{storage_root_id}{INSTALL_INTENT_SUFFIX}"
             ),
             locator_pending: format!("{ESTATE_DIRECTORY}/.config.{storage_root_id}.pending"),
+            bootstrap: format!("{ESTATE_DIRECTORY}/bootstrap.md"),
+            bootstrap_pending: format!("{ESTATE_DIRECTORY}/.bootstrap.{storage_root_id}.pending"),
         };
         for relative in [
             layout.storage_root.as_str(),
             layout.token_key.as_str(),
             layout.operator_credential.as_str(),
             layout.locator_pending.as_str(),
+            layout.bootstrap.as_str(),
+            layout.bootstrap_pending.as_str(),
             LOCATOR_RELATIVE_PATH,
         ] {
             validate_managed_relative(relative)?;
@@ -185,6 +195,26 @@ impl EstateLayout {
                 InstallationManagedPathKind::InstallationLease,
                 rrd_contract::INSTALLATION_LEASE_PATH.to_owned(),
                 InstallationRemovalRule::RetainForExclusion,
+            ),
+            (
+                InstallationManagedPathKind::InstallationIntent,
+                self.install_intent.clone(),
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
+            (
+                InstallationManagedPathKind::LocatorPending,
+                self.locator_pending.clone(),
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
+            (
+                InstallationManagedPathKind::ProjectBootstrap,
+                self.bootstrap.clone(),
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            ),
+            (
+                InstallationManagedPathKind::BootstrapPending,
+                self.bootstrap_pending.clone(),
+                InstallationRemovalRule::RemoveIfOwnedDigestMatches,
             ),
         ]
         .into_iter()
@@ -273,10 +303,21 @@ pub(super) fn validate_recovery_estate(
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or(ServiceError::ProjectBindingMismatch)?;
+    let bootstrap_pending = Path::new(&layout.bootstrap_pending)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or(ServiceError::ProjectBindingMismatch)?;
     validate_directory_entries(
         project,
         ESTATE_DIRECTORY,
-        &["rrd", "credentials", "config.toml", locator_pending],
+        &[
+            "rrd",
+            "credentials",
+            "config.toml",
+            "bootstrap.md",
+            locator_pending,
+            bootstrap_pending,
+        ],
     )?;
     validate_directory_entries(
         project,

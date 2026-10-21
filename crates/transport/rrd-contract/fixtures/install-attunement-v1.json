@@ -166,9 +166,21 @@
       },
       {
         "disposition": "create",
+        "estimated_write_bytes": 65536,
+        "input_sha256": "0000000000000000000000000000000000000000000000000000000000000034",
+        "kind": "prepare_credentials"
+      },
+      {
+        "disposition": "create",
         "estimated_write_bytes": 0,
         "input_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
         "kind": "create_estate_directories"
+      },
+      {
+        "disposition": "create",
+        "estimated_write_bytes": 65536,
+        "input_sha256": "0000000000000000000000000000000000000000000000000000000000000034",
+        "kind": "materialize_bootstrap"
       },
       {
         "disposition": "create",
@@ -180,7 +192,7 @@
         "disposition": "create",
         "estimated_write_bytes": 96,
         "input_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
-        "kind": "prepare_credentials"
+        "kind": "deliver_credentials"
       },
       {
         "disposition": "create",
@@ -203,6 +215,65 @@
     ],
     "attunement_plan_id": "attune-01",
     "attunement_plan_sha256": "3813d050efdd0b627a942a6a7a77b593245afafe222cb99ad336688189e1625d",
+    "bootstrap": {
+      "activated_provider_bindings": [],
+      "credential_entropy_bytes": 32,
+      "format_version": 1,
+      "initial_records": [
+        "seat_schema",
+        "seat_record",
+        "security_authority",
+        "security_genesis_audit",
+        "security_audit_head",
+        "effective_configuration",
+        "installed_binding",
+        "installation_checkpoint",
+        "attunement_plan",
+        "pending_attunement_job"
+      ],
+      "instructions_sha256": "db7a00fd614eafea701240948492a4f08145a71190c99988b06c3dfe693fb7cc",
+      "max_record_bytes": 1048576,
+      "network_endpoints": [],
+      "private_directories": [
+        ".rrflow",
+        ".rrflow/credentials",
+        ".rrflow/rrd",
+        ".rrflow/rrd/roots"
+      ],
+      "private_files": [
+        ".rrflow-install-install-01.json",
+        ".rrflow-install.lock",
+        ".rrflow/credentials/local-operator.json",
+        ".rrflow/rrd/roots/install-01/RRD.TOKEN"
+      ],
+      "process_invocations": [],
+      "project_policy": "preserve_project_owned_state",
+      "specialization": {
+        "endpoint_profile": null,
+        "format_version": 1,
+        "id": "generic",
+        "instructions": "Use explicitly authorized public capabilities.",
+        "revision": 1,
+        "seat": {
+          "display_name": "Local RRFlow",
+          "id": "rrflow-local-seat",
+          "purpose": "Provider-neutral reasoning and recall for this project."
+        }
+      },
+      "specialization_sha256": "aa4f6ab583accd5cd22ee63306520043d7b87b4597bc810aed155dc5dc69cf26",
+      "storage_generation": {
+        "application_format": 1,
+        "batch_format": 2,
+        "manifest_format": 3,
+        "max_initial_transaction_bytes": 4194304,
+        "wal_format": 1
+      },
+      "template_id": "generic-project",
+      "template_revision": 1,
+      "template_sha256": "d60fc6d200bca25f8609ab6724f31a3fb21a80b88bebc82c1241a7a30f64ee65",
+      "template_text": "# Project instructions\n",
+      "token_key_bytes": 32
+    },
     "configuration": {
       "clock": {
         "maximum_rollback_ms": 0
@@ -231,7 +302,7 @@
       },
       "revision": 1
     },
-    "contract_version": 3,
+    "contract_version": 4,
     "credential_bytes": 32,
     "deployment": {
       "contract_version": 1,
@@ -312,9 +383,33 @@
         "precondition_sha256": "7ac5dd273f82b16d9ea5e7156e065f15fe0945faf5f6cf1b07e7ff9072489677",
         "relative_path": ".rrflow-install.lock",
         "removal_rule": "retain_for_exclusion"
+      },
+      {
+        "kind": "installation_intent",
+        "precondition_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+        "relative_path": ".rrflow-install-install-01.json",
+        "removal_rule": "remove_if_owned_digest_matches"
+      },
+      {
+        "kind": "locator_pending",
+        "precondition_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+        "relative_path": ".rrflow/.config.install-01.pending",
+        "removal_rule": "remove_if_owned_digest_matches"
+      },
+      {
+        "kind": "project_bootstrap",
+        "precondition_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+        "relative_path": ".rrflow/bootstrap.md",
+        "removal_rule": "remove_if_owned_digest_matches"
+      },
+      {
+        "kind": "bootstrap_pending",
+        "precondition_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+        "relative_path": ".rrflow/.bootstrap.install-01.pending",
+        "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "7594b67878dfd8c54847d8326836e17e684c520fa132620e936be5612d43b68b",
+    "plan_sha256": "a175b0ce45f68d23eafd1c4ea034813f17d7f63b928a5d8093067424823fc170",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -339,28 +434,36 @@
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000015"
       },
       {
-        "kind": "create_estate_directories",
+        "kind": "prepare_credentials",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000016"
       },
       {
-        "kind": "create_storage_root",
+        "kind": "create_estate_directories",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000017"
       },
       {
-        "kind": "prepare_credentials",
+        "kind": "materialize_bootstrap",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000018"
       },
       {
-        "kind": "initialize_instance",
+        "kind": "create_storage_root",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000019"
       },
       {
-        "kind": "create_attunement_job",
+        "kind": "deliver_credentials",
         "output_sha256": "000000000000000000000000000000000000000000000000000000000000001a"
       },
       {
-        "kind": "publish_project_locator",
+        "kind": "initialize_instance",
         "output_sha256": "000000000000000000000000000000000000000000000000000000000000001b"
+      },
+      {
+        "kind": "create_attunement_job",
+        "output_sha256": "000000000000000000000000000000000000000000000000000000000000001c"
+      },
+      {
+        "kind": "publish_project_locator",
+        "output_sha256": "000000000000000000000000000000000000000000000000000000000000001d"
       }
     ],
     "applied_at_unix_ms": 1800000000010,
@@ -372,8 +475,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "7594b67878dfd8c54847d8326836e17e684c520fa132620e936be5612d43b68b",
-    "result_sha256": "e81241d641cdc79ea68b66160fb1c97b3fcc00f4a2d2668592952e7cf2c86aaa",
+    "plan_sha256": "a175b0ce45f68d23eafd1c4ea034813f17d7f63b928a5d8093067424823fc170",
+    "result_sha256": "65eec86248187531e10632cda0aa1e16605d143b6eb7b968e5593d107ae31f70",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },
