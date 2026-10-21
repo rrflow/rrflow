@@ -12,11 +12,11 @@ independently.
 
 The source-built primary `rrflow` binary now owns deterministic install plan/apply,
 installed serve, authenticated ready, read-only quick verify, and version. Exact-plan
-retry recovers across eight typed durable stages without duplicating installation
+retry recovers across typed durable stages, including bootstrap publication, without duplicating installation
 authority, and the pre-canonical manifest, raw product CLI, development supervisor,
 standalone security initializer, and server initializer are removed. The lifecycle is
 still missing execution of its persisted pending attunement job, a committed deterministic
-project-tree inventory, generic bundle-resident scaffolding and adapter bindings, real attunement phase
+project-tree inventory, project-integration scaffolding and activated adapter bindings, real attunement phase
 executors, configuration apply, full verify, repair, ownership-safe uninstall,
 service installation, and a signed offline
 platform distribution. Public apply no longer accepts installation time: the engine
@@ -238,4 +238,79 @@ transient paths, bounded initial record declarations and verified instruction
 publication/recovery. Default provider bindings remain inactive and project-owned
 instructions remain unchanged. Native D-01.5 qualification, exact-candidate
 D-01.6 reconciliation and the later attunement/adapter lifecycle remain open.
-Candidate CI must pass before this package is accepted; POAM-006 stays open.
+PR 51 candidate `9cfeeca4` passed all 17 jobs in run `39654924753` and merged
+as `7aa10e23`. The [SDK identity correction](../../evidence/change-journals/gate-d/d-01-bootstrap-sdk-identity.md)
+records the stale checked corpus and focused repair without weakening the live
+harness. POAM-006 stays open.
+
+
+## Native qualification corpus admission (2026-10-21)
+
+The [D-01.5 first oracle](../../evidence/change-journals/gate-d/d-01-native-qualification-oracle.md)
+reproduces incomplete qualification admission: the runner accepts a corpus
+missing the help, rejected-development-command or exact-plan/read-only-shape
+case, provided the fresh/existing pair remains. The expanded native runner
+must require every declared case and its executed result. Windows/macOS
+outbound/source isolation, privileged foreign-owner cases, bounded capture and
+concurrent executable staging remain within D-01.5; no parent status closes.
+
+The [D-01.5 qualification candidate](../../evidence/change-journals/gate-d/d-01-native-qualification-candidate.md)
+repairs corpus admission and adds bounded process capture, closed durable
+receipts, explicit privileged ownership fixtures and native isolation runners.
+Local Windows lifecycle and helper results are evidence for their named tests;
+Linux/macOS enforcement and Windows hosted-principal isolation still require
+candidate CI. No D-01 acceptance row or parent alpha outcome is closed here.
+
+The [native coverage completion record](../../evidence/change-journals/gate-d/d-01-native-coverage-completion.md)
+records two additional verified qualification gaps: process-death recovery
+omitted four of eleven typed boundaries, and macOS lacked an explicit mounted
+volume adversary. The candidate expands those cases without changing production
+behavior. Native acceptance remains open; local Windows results cannot close
+the macOS mounted-volume requirement.
+
+The same native run exposed checkout newline conversion of the inert SDK
+identity anchor on Windows. The linked coverage record retains the failing
+identity and Git filter reproduction. The fixture is now byte-preserved and
+asserts its canonical hash; native candidate requalification is still required.
+
+The [Windows mask-policy correction](../../evidence/change-journals/gate-d/d-01-native-windows-mask-policy.md)
+records a second native qualification defect: resolved/unresolved root comparison
+rejected the hosted Windows checkout before isolation setup. A current-drive
+regression now passes with platform-specific protected roots. Preflight failure
+also retains a bounded receipt. Actual Windows principal/WFP enforcement and
+the final candidate pipeline remain required; no status is closed.
+
+The [Windows process-context candidate](../../evidence/change-journals/gate-d/d-01-native-windows-process-context.md)
+records interpreter initialization failure 0xC0000142 after policy setup. The
+runner now supplies an owned noninteractive desktop and probes restricted-token
+access to its runtime dependencies. This requires native requalification;
+policy setup alone is not proof of isolation or a running product.
+
+That candidate still exits before Python with 0xC0000142. The
+[startup matrix](../../evidence/change-journals/gate-d/d-01-native-windows-startup-matrix.md)
+separates normal/restricted token and console-creation behavior using bounded
+no-op interpreters. Actual qualification retains the restricted token and all
+denial requirements; these diagnostics cannot close the native gap by themselves.
+
+
+The matrix passes the ordinary temporary user's interpreter and fails every
+traversal-stripped variant. The [source-object ACL replacement](../../evidence/change-journals/gate-d/d-01-native-windows-source-acl.md)
+therefore retains standard Windows startup privileges and requires inherited
+denial verified for every bounded inventoried source object, protected-child
+bypass rejection and full ACL restoration. This changes the qualification
+mechanism, not the required source/network denial. Hosted acceptance remains
+pending and this deficiency stays open.
+
+
+The [IPv6 probe correction](../../evidence/change-journals/gate-d/d-01-native-windows-ipv6-probe.md)
+records successful Windows startup, complete 34,064-object source denial and
+ACL restoration, followed by an IPv6 network-unreachable result. The probe now
+uses a configured non-loopback link-local scope without changing host routes;
+explicit IPv6 permission denial remains mandatory. Product execution and final
+candidate acceptance remain pending.
+
+
+The [installed WAL denial characterization](../../evidence/change-journals/gate-d/d-01-installed-wal-denial.md)
+adds direct installed-open and verification evidence for torn/missing active
+WAL preservation. Both cases pass locally without production changes; the final
+native candidate must execute the added test before D-01 acceptance closes.

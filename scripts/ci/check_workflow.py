@@ -541,7 +541,7 @@ def main() -> None:
             f"{job} must exercise the installed primary executable lifecycle",
         )
     require(
-        "cargo clippy -p rrflow-cli --test installed_lifecycle --locked -- -D warnings"
+        "cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings"
         in jobs["estate-portability"],
         "native installed lifecycle tests must not hide platform warnings",
     )
@@ -550,6 +550,15 @@ def main() -> None:
         and "python3 scripts/ci/test_offline_lifecycle.py" in jobs["verify"],
         "installed lifecycle must enforce offline isolation and test its artifact/mount policy",
     )
+
+    for native in ["topology-smoke", "estate-portability"]:
+        require("scripts/ci/run_filesystem_containment.py" in jobs[native],
+                f"{native} must execute native mount containment qualification")
+        require("scripts/ci/run_private_owner.py" in jobs[native]
+                and "scripts/ci/run_offline_lifecycle.py --receipt" in jobs[native]
+                and "cargo test -p rrflow-cli --test lifecycle_process --locked" in jobs[native]
+                and "actions/upload-artifact@" in jobs[native],
+                f"{native} must execute required native denials and bounded capture and retain sanitized receipts")
 
     gate = jobs["ci-gate"]
     needs_match = re.search(

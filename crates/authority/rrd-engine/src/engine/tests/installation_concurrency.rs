@@ -218,8 +218,12 @@ fn process_death_releases_admission_without_regenerating_prepared_secrets() {
     for stage in [
         InstallApplyStage::LeaseAcquired,
         InstallApplyStage::IntentPublished,
+        InstallApplyStage::EstateDirectoriesReady,
         InstallApplyStage::BootstrapStaged,
         InstallApplyStage::BootstrapReady,
+        InstallApplyStage::StorageReady,
+        InstallApplyStage::TokenReady,
+        InstallApplyStage::CredentialReady,
         InstallApplyStage::EngineCommitted,
         InstallApplyStage::LocatorPublished,
         InstallApplyStage::IntentAcknowledged,
@@ -258,6 +262,7 @@ fn process_death_releases_admission_without_regenerating_prepared_secrets() {
                 intent["credential_sha256"]
             );
         }
+        eprintln!("installation process-death recovery passed stage={stage:?}");
     }
 }
 
