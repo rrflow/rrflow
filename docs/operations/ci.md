@@ -54,6 +54,27 @@ The shared SDK harness is also current characterization: the deficiencies and
 real-process corpus required for H-04 remain open. Neither job may be cited as
 complete-engine evidence.
 
+The native lifecycle harness stages a copy of the actual primary executable
+in a temporary directory containing spaces and gives each product child an
+empty working directory, isolated home/temp directories and an empty executable
+search directory. Only Windows OS-discovery variables survive from the parent;
+provider credentials, proxy settings and Cargo/developer configuration do not.
+Its child guards retain the fixture until the process is reaped.
+
+Linux additionally runs `python3 scripts/ci/run_offline_lifecycle.py`. After
+building, the runner copies only the binary, test harness and isolation helper
+into `/tmp`. Noninteractive sudo creates private mount, network and PID
+namespaces, masks the checkout parent (including siblings) and Cargo/Rustup
+source roots, and enables only loopback. It verifies namespace separation,
+empty masked directories, no default routes, outbound `ENETUNREACH` and exact
+artifact SHA-256 before dropping to the original non-root user and running all
+five lifecycle cases. Setup failure fails the candidate; it never skips. A
+bounded privileged timeout and PID-namespace teardown cover stranded children.
+The runner requires Linux util-linux, iproute2, Python and sudo at qualification
+time; these are test infrastructure, not product dependencies. System libraries
+remain available. This proves neither hostile-code containment, offline Windows/
+macOS operation nor a signed clean-machine release bundle.
+
 The Linux installed-lifecycle job also runs the
 [primary build-provenance helper](../reference/release/build-identity.md) on
 clean candidate source. It observes Cargo's actual first-party compilation

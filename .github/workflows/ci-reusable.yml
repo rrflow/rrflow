@@ -23,7 +23,7 @@ jobs:
   topology-smoke:
     name: installed RRFlow lifecycle
     runs-on: ${{ fromJSON(inputs.linux-standard-runner) }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
@@ -39,6 +39,8 @@ jobs:
           cache-on-failure: true
       - name: Test the real install, serve, authenticate, stop, reopen lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Qualify the staged binary without checkout, toolchain sources or outbound network
+        run: python3 scripts/ci/run_offline_lifecycle.py
       - name: Capture clean primary build provenance
         run: python3 scripts/build_rrflow.py --profile dev --output "$RUNNER_TEMP/rrflow-build-receipt.json"
 
@@ -113,6 +115,8 @@ jobs:
         run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
         run: python3 scripts/ci/check_workflow.py
+      - name: Test offline qualification input and artifact policy
+        run: python3 scripts/ci/test_offline_lifecycle.py
       - name: Enforce documentation authority and local links
         run: python3 scripts/ci/check_documentation.py
       - name: Enforce knowledge-package drift and reproducibility
