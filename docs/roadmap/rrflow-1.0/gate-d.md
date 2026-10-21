@@ -24,6 +24,30 @@ either independently.
 
 ## [Accepted evidence](gate-d-evidence.md)
 
+## D-01 remaining closure packages
+
+D-01 remains the active dependency-spine item. Its acceptance must be closed
+through the installed executable before C-07, durable attunement, and the
+reasoning packages advance. The existing command implementation is not a
+substitute for these failure oracles. Each row is one bounded package or a
+qualification family; its PR resolves exact code scope before mutation.
+
+| Package | Required implementation or proof | Exit evidence |
+|---|---|---|
+| Standalone offline execution | Stage the actual primary binary outside Cargo's tree; remove inherited developer environment and executable search paths. On Linux, hide checkout/sibling and Cargo/Rust source trees and deny non-loopback networking. | Fresh/existing plan/apply, authentication, commit/query, Parquet export, termination/reopen, backup/restore publication and read-only verification pass with asserted isolation and matching artifact hashes. Isolation failure cannot skip the corpus. Native staged execution also passes on Windows/macOS; their offline enforcement remains separate evidence. |
+| Independent installation identities | Resolve the distinct-project identity collision recorded in [POAM-020](../../poam/rrflow-1.0-alpha/poam-020.md) without making a live filesystem path the permanent estate identity. Bind the selected identity in deterministic preview, exact apply and recovery. | Identical fresh projects and identical-content existing projects install as independent estates; foreign-plan/locator/credential use fails; authorized relocation, exact retry and restart preserve each installed identity. |
+| Native filesystem and credential boundary | Enforce and qualify credential confidentiality, ownership, link/reparse/mount containment and bounded input handling at installation, recovery, open and verification. | Adversarial Windows and Unix fixtures prove no external-path effect or credential disclosure and no silent permission repair. Existing eight-stage recovery retains one credential, policy and audit outcome. |
+| Complete bootstrap preview | Reconcile bundled templates, specialization, managed records and inactive adapter declarations against the D-01 preview contract; implement missing entries at the installation authority. | Exact preview accounts for all effects, digests, budgets and ownership/removal rules; fresh and existing projects preserve project-owned state. Discovery performs no external execution. |
+| D-01 acceptance reconciliation | Rerun the complete D-01 oracle matrix at one candidate and attach its gaps and results to Gate D evidence. | Only the named D-01 acceptance evidence can close D-01 and advance the dependency spine to C-07. Signed distribution and broader J qualification stay separate. |
+
+The subsequent alpha work is already ordered by the
+[dependency spine](executable-dependency-spine.md): installed storage recovery
+and lifetime, durable jobs and project inventory, native retrieval/indexes,
+bounded analytics, complete attunement and operations, executable governed
+reasoning, client equivalence, automation and release qualification. Finishing
+the table above does not complete those downstream outcomes or change alpha
+status.
+
 ## Connector and knowledge ingestion packages
 
 The [knowledge connector contract](../../reference/data/knowledge-connectors.md)

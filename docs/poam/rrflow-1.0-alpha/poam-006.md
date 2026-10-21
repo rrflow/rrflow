@@ -70,6 +70,16 @@ Platform CI now runs that corpus explicitly. Windows owned-process
 termination is not graceful shutdown qualification; signed offline bundles,
 hostile-path/ACL proof and the broader D-01/C-07 matrix remain open.
 
+The [standalone offline qualification package](../../evidence/change-journals/gate-d/d-01-offline-installed-qualification.md)
+replaces execution directly from Cargo's target directory with staged binary
+copies and a scrubbed product environment. Its Linux runner additionally
+requires private mount/network/PID namespaces, masked checkout and toolchain
+source paths, loopback-only networking and verified artifact hashes. The
+candidate result is attached to that package PR; native staging alone is not
+proof of offline isolation. The [D-01 closure table](../../roadmap/rrflow-1.0/gate-d.md#d-01-remaining-closure-packages)
+keeps filesystem/ACL, independent installation identity and full preview
+qualification explicit before the dependency spine advances.
+
 The first native candidate exposed an overlapping-invocation defect: rejected
 admission replaced the active thread owner, and completion identified work only
 by caller coordinates. A stale completion could therefore clear newer work.
