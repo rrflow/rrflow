@@ -1,5 +1,49 @@
 use rrd_lsm::{Error, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION};
 
+#[test]
+#[cfg(any(unix, windows))]
+fn retained_root_rejects_replaced_manifest_directory() {
+    let fixture = tempfile::tempdir().unwrap();
+    let root = fixture.path().join("estate");
+    let outside = fixture.path().join("outside");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::create_dir(&outside).unwrap();
+    std::fs::write(outside.join("sentinel"), b"outside must remain unchanged").unwrap();
+    let store = ManifestStore::open(&root).unwrap();
+    let directory = root.join("manifests");
+    std::fs::rename(&directory, root.join("original-manifests")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&outside, &directory).unwrap();
+    #[cfg(windows)]
+    {
+        let output = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile", "-NonInteractive", "-Command",
+                "New-Item -ItemType Junction -Path $env:RRFLOW_TEST_LINK -Target $env:RRFLOW_TEST_TARGET -ErrorAction Stop | Out-Null",
+            ])
+            .env("RRFLOW_TEST_LINK", &directory)
+            .env("RRFLOW_TEST_TARGET", &outside)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "junction fixture: {:?}", output);
+    }
+    let manifest = Manifest::new(1, None, 100, 0, 1, Vec::new()).unwrap();
+    let result = store.publish(&manifest, None);
+    assert_eq!(
+        std::fs::read_dir(&outside).unwrap().count(),
+        1,
+        "publication escaped into the outside directory: {result:?}"
+    );
+    assert_eq!(
+        std::fs::read(outside.join("sentinel")).unwrap(),
+        b"outside must remain unchanged"
+    );
+    assert!(
+        result.is_err(),
+        "a substituted manifest directory must be denied"
+    );
+}
+
 fn segment(id: &str, first: &[u8], last: &[u8], minimum: u64, maximum: u64) -> SegmentDescriptor {
     SegmentDescriptor {
         id: id.into(),

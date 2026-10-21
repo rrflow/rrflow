@@ -1,12 +1,17 @@
+use rrd_store::filesystem::{AnchorInput, AnchoredPath};
 use std::io;
+#[cfg(test)]
 use std::path::Path;
 
 use rrd_contract::CanonicalId;
 use serde::{Deserialize, Serialize};
 
 mod private_file;
+#[cfg(test)]
+pub(in crate::engine) use private_file::write_private_new;
 pub(in crate::engine) use private_file::{
-    create_private_directory, read_private_bounded, validate_private_directory, write_private_new,
+    create_private_directory_anchored, pin_private_directory, read_private_anchored,
+    write_private_anchored,
 };
 
 pub const TOKEN_KEY_BYTES: usize = 32;
@@ -71,9 +76,9 @@ impl ApiKeyDocument {
     }
 }
 
-fn create_token_key(path: &Path) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
+fn create_token_key(path: &AnchoredPath) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
     let key = generate_token_key()?;
-    write_private_new(path, &key)?;
+    write_private_anchored(path, &key)?;
     Ok(key)
 }
 
@@ -133,33 +138,37 @@ pub(in crate::engine) fn decode_api_key_document(bytes: &[u8]) -> io::Result<Api
     Ok(document)
 }
 
+#[cfg(test)]
 pub fn read_api_key_document(path: &Path) -> io::Result<ApiKeyDocument> {
-    let bytes = read_private_bounded(path, 16 * 1024)?;
-    decode_api_key_document(&bytes)
+    read_api_key_document_anchored(&rrd_store::filesystem::AnchoredPath::from_path(path)?)
 }
 
 /// Loads the RRD token-signing key or creates it exactly once for retained
 /// engine-internal component/control paths. Product transports and adapters
 /// instead open the already-installed key through the installation authority.
-pub(super) fn load_or_create_token_key(path: &Path) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
-    match read_token_key(path) {
+pub(super) fn load_or_create_token_key(
+    path: &(impl AnchorInput + ?Sized),
+) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
+    let path = &path.anchor()?;
+    match read_token_key_anchored(path) {
         Ok(key) => return Ok(key),
         Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
         Err(_) => {}
     }
 
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        parent.create_dir_all()?;
     }
     match create_token_key(path) {
         Ok(key) => Ok(key),
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => read_token_key(path),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => read_token_key_anchored(path),
         Err(error) => Err(error),
     }
 }
 
+#[cfg(test)]
 pub fn read_token_key(path: &Path) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
-    let bytes = read_private_bounded(path, TOKEN_KEY_BYTES as u64)?;
+    let bytes = private_file::read_private_bounded(path, TOKEN_KEY_BYTES as u64)?;
     bytes.try_into().map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidData,
@@ -173,6 +182,19 @@ fn is_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
+pub(in crate::engine) fn read_api_key_document_anchored(
+    path: &rrd_store::filesystem::AnchoredPath,
+) -> io::Result<ApiKeyDocument> {
+    decode_api_key_document(&read_private_anchored(path, 16 * 1024)?)
+}
+pub(in crate::engine) fn read_token_key_anchored(
+    path: &rrd_store::filesystem::AnchoredPath,
+) -> io::Result<[u8; TOKEN_KEY_BYTES]> {
+    read_private_anchored(path, TOKEN_KEY_BYTES as u64)?
+        .try_into()
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid token key length"))
 }
 
 #[cfg(test)]

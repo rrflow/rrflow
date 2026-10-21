@@ -21,10 +21,15 @@ fn inventory(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
             if path.is_dir() {
                 visit(root, &path, output);
             } else {
-                output.insert(
-                    path.strip_prefix(root).unwrap().to_owned(),
-                    std::fs::read(path).unwrap(),
-                );
+                // Windows mandatory locking rejects even a read at EOF on
+                // the empty manifest lease. Its zero length proves the empty
+                // payload without trying to read through the writer's lock.
+                let bytes = if entry.metadata().unwrap().len() == 0 {
+                    Vec::new()
+                } else {
+                    std::fs::read(&path).unwrap()
+                };
+                output.insert(path.strip_prefix(root).unwrap().to_owned(), bytes);
             }
         }
     }

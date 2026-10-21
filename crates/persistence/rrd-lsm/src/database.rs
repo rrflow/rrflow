@@ -1,12 +1,13 @@
+use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SharedIoContext};
 use crate::segment::{
     new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
     ReadView, SharedPageCache,
 };
-use crate::wal::replay_from;
+use crate::wal::replay_file;
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
 use crate::{
-    recover_from, AppendReceipt, Checkpoint, Durability, Error, Manifest, ManifestStore, Memtable,
+    AppendReceipt, Checkpoint, Durability, Error, Manifest, ManifestStore, Memtable,
     PageCachePolicy, ProjectedReadRequest, ProjectedReadResource, ProjectedReadStream, Result,
     Segment, SegmentCompressionPolicy, SegmentIoPolicy, SegmentIoStats, SegmentOpenEvidence,
     SegmentRowGroupBudget, SnapshotBundle, SnapshotBundleFile, SnapshotExportBoundary,
@@ -14,7 +15,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -287,7 +288,7 @@ impl CompactionBoundary {
 /// manifest publication. RRFlow's model, differential, recovery, and benchmark
 /// gates define its correctness and performance requirements.
 pub struct Database {
-    root: PathBuf,
+    root: AnchoredPath,
     manifests: ManifestStore,
     manifest: Manifest,
     wal: WalWriter,
@@ -348,13 +349,26 @@ impl Database {
         options: DatabaseOptions,
         application_format: Option<u64>,
     ) -> Result<Self> {
+        Self::create_anchored(&AnchoredPath::from_path(root)?, options, application_format)
+    }
+
+    pub fn create_anchored(
+        root: &AnchoredPath,
+        options: DatabaseOptions,
+        application_format: Option<u64>,
+    ) -> Result<Self> {
+        if application_format == Some(0) {
+            return Err(Error::InvalidConfiguration(
+                "application format identity must be non-zero".into(),
+            ));
+        }
         let options = options.validate()?;
         let segment_io = IoContext::new(options.segment_io)?;
-        match std::fs::symlink_metadata(root) {
+        match root.metadata() {
             Ok(metadata) => {
                 if metadata.file_type().is_symlink()
                     || !metadata.is_dir()
-                    || std::fs::read_dir(root)?.next().is_some()
+                    || root.entries()?.next().is_some()
                 {
                     return Err(Error::InvalidManifest(
                         "new database path exists and is not an empty non-symlink directory".into(),
@@ -362,15 +376,16 @@ impl Database {
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                std::fs::create_dir(root)?;
+                root.create_dir()?;
             }
             Err(error) => return Err(error.into()),
         }
-        let manifests = ManifestStore::create(root)?;
-        std::fs::create_dir(root.join(WAL_DIRECTORY))?;
-        std::fs::create_dir(root.join(SEGMENT_DIRECTORY))?;
+        let root = root.pin_directory()?;
+        let manifests = ManifestStore::create_anchored(&root)?;
+        root.join(WAL_DIRECTORY).create_dir()?;
+        root.join(SEGMENT_DIRECTORY).create_dir()?;
         let manifest = new_manifest(1, None, 0, 0, 1, Vec::new(), application_format)?;
-        let wal = WalWriter::create_at(&wal_path(root, 1), 1)?;
+        let wal = WalWriter::create_at_anchored(&wal_path(&root, 1), 1)?;
         manifests.publish(&manifest, None)?;
         Ok(Self {
             root: root.to_owned(),
@@ -413,12 +428,17 @@ impl Database {
     }
 
     pub fn open_with_options(root: &Path, options: DatabaseOptions) -> Result<Self> {
+        Self::open_anchored(&AnchoredPath::open_root(root)?, options)
+    }
+
+    pub fn open_anchored(root: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
+        let root = root.pin_directory()?;
         let total_started = Instant::now();
-        validate_existing_database_layout(root)?;
+        validate_existing_database_layout(&root)?;
         let options = options.validate()?;
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
-        let manifests = ManifestStore::open_existing(root)?;
+        let manifests = ManifestStore::open_existing_anchored(&root)?;
         let (_, manifest) = manifests
             .current()?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
@@ -454,11 +474,12 @@ impl Database {
             segments.push(segment);
         }
         let segments_ms = segments_started.elapsed().as_millis() as u64;
-        let path = wal_path(root, manifest.wal_start_sequence);
+        let path = wal_path(&root, manifest.wal_start_sequence);
         require_existing_regular_file(&path, "active WAL")?;
         let mut memtable = Memtable::at_sequence(manifest.durable_sequence);
         let wal_started = Instant::now();
-        let recovery = replay_from(&path, manifest.wal_start_sequence, |batch| {
+        let mut wal_file = OpenOptions::new().read(true).write(true).open(&path)?;
+        let recovery = replay_file(&mut wal_file, manifest.wal_start_sequence, |batch| {
             memtable.apply_owned_recovered(batch)
         })?;
         if let Some(offset) = recovery.torn_tail {
@@ -471,7 +492,7 @@ impl Database {
             peak_memtable_versions: memtable.version_count(),
             ..MaintenanceStats::default()
         };
-        let wal = WalWriter::open_after_recovery(&path, recovery)?;
+        let wal = WalWriter::from_recovered_file(&path, wal_file, recovery)?;
         tracing::info!(
             target: "rrd_lsm::open",
             path = %root.display(),
@@ -519,6 +540,10 @@ impl Database {
     }
 
     pub fn root(&self) -> &Path {
+        self.root.diagnostic_path()
+    }
+
+    pub fn anchored_root(&self) -> &AnchoredPath {
         &self.root
     }
 
@@ -1107,17 +1132,10 @@ impl Database {
             .checked_add(1)
             .ok_or_else(|| Error::InvalidBatch("sequence overflow at flush".into()))?;
         let next_path = wal_path(&self.root, next_sequence);
-        let successor = if next_path.exists() {
-            let recovery = recover_from(&next_path, next_sequence)?;
-            if !recovery.batches.is_empty() || recovery.torn_tail.is_some() {
-                return Err(Error::Corruption {
-                    offset: 0,
-                    reason: "unpublished successor WAL contains data".into(),
-                });
-            }
-            WalWriter::open_at(&next_path, next_sequence)?
+        let successor = if next_path.try_exists()? {
+            WalWriter::open_empty_at_anchored(&next_path, next_sequence)?
         } else {
-            WalWriter::create_at(&next_path, next_sequence)?
+            WalWriter::create_at_anchored(&next_path, next_sequence)?
         };
         inject_failure(failure, FlushBoundary::SuccessorWalSynced)?;
         let mut descriptors = self.manifest.segments.clone();
@@ -1167,11 +1185,11 @@ impl Database {
             .segments
             .iter()
             .map(|descriptor| {
-                let bytes = std::fs::read(
-                    self.root
-                        .join(SEGMENT_DIRECTORY)
-                        .join(format!("{}.seg", descriptor.id)),
-                )?;
+                let bytes = self
+                    .root
+                    .join(SEGMENT_DIRECTORY)
+                    .join(format!("{}.seg", descriptor.id))
+                    .read()?;
                 Ok(SnapshotSegment {
                     descriptor: descriptor.clone(),
                     bytes,
@@ -1187,7 +1205,7 @@ impl Database {
     pub fn export_snapshot_file(
         &mut self,
         at: u64,
-        destination: impl AsRef<Path>,
+        destination: impl crate::filesystem::AnchorInput,
     ) -> Result<SnapshotBundleFile> {
         self.flush_memtable(at)?;
         SnapshotBundleFile::create(
@@ -1200,7 +1218,7 @@ impl Database {
     pub fn export_snapshot_file_with_failure(
         &mut self,
         at: u64,
-        destination: impl AsRef<Path>,
+        destination: impl crate::filesystem::AnchorInput,
         boundary: SnapshotExportBoundary,
         mode: FailureMode,
     ) -> Result<SnapshotBundleFile> {
@@ -1297,16 +1315,10 @@ impl Database {
             .checked_add(1)
             .ok_or_else(|| Error::InvalidManifest("snapshot sequence overflowed".into()))?;
         let next_path = wal_path(&self.root, next_sequence);
-        let successor = if next_path.exists() {
-            let recovery = recover_from(&next_path, next_sequence)?;
-            if !recovery.batches.is_empty() || recovery.torn_tail.is_some() {
-                return Err(Error::InvalidManifest(
-                    "snapshot continuation WAL already contains data".into(),
-                ));
-            }
-            WalWriter::open_at(&next_path, next_sequence)?
+        let successor = if next_path.try_exists()? {
+            WalWriter::open_empty_at_anchored(&next_path, next_sequence)?
         } else {
-            WalWriter::create_at(&next_path, next_sequence)?
+            WalWriter::create_at_anchored(&next_path, next_sequence)?
         };
         inject_snapshot_install_failure(failure, SnapshotInstallBoundary::SuccessorWalSynced)?;
 
@@ -1387,16 +1399,10 @@ impl Database {
             .checked_add(1)
             .ok_or_else(|| Error::InvalidManifest("snapshot sequence overflowed".into()))?;
         let next_path = wal_path(&self.root, next_sequence);
-        let successor = if next_path.exists() {
-            let recovery = recover_from(&next_path, next_sequence)?;
-            if !recovery.batches.is_empty() || recovery.torn_tail.is_some() {
-                return Err(Error::InvalidManifest(
-                    "snapshot continuation WAL already contains data".into(),
-                ));
-            }
-            WalWriter::open_at(&next_path, next_sequence)?
+        let successor = if next_path.try_exists()? {
+            WalWriter::open_empty_at_anchored(&next_path, next_sequence)?
         } else {
-            WalWriter::create_at(&next_path, next_sequence)?
+            WalWriter::create_at_anchored(&next_path, next_sequence)?
         };
         inject_snapshot_install_failure(failure, SnapshotInstallBoundary::SuccessorWalSynced)?;
 
@@ -2170,11 +2176,16 @@ fn new_manifest(
     }
 }
 
-fn validate_existing_database_layout(root: &Path) -> Result<()> {
+fn validate_existing_database_layout(root: &AnchoredPath) -> Result<()> {
     for relative in ["", WAL_DIRECTORY, SEGMENT_DIRECTORY] {
         let path = root.join(relative);
-        let metadata = std::fs::symlink_metadata(&path)
-            .map_err(|error| Error::io("validating database directory", &path, error))?;
+        let metadata = path.metadata().map_err(|error| {
+            Error::io(
+                "validating database directory",
+                path.diagnostic_path(),
+                error,
+            )
+        })?;
         if metadata.file_type().is_symlink() || !metadata.is_dir() {
             return Err(Error::InvalidManifest(format!(
                 "database directory {} is missing, symbolic, or invalid",
@@ -2185,9 +2196,10 @@ fn validate_existing_database_layout(root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn require_existing_regular_file(path: &Path, object: &str) -> Result<()> {
-    let metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| Error::io("validating database file", path, error))?;
+fn require_existing_regular_file(path: &AnchoredPath, object: &str) -> Result<()> {
+    let metadata = path
+        .metadata()
+        .map_err(|error| Error::io("validating database file", path.diagnostic_path(), error))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(Error::InvalidManifest(format!(
             "{object} {} is symbolic or invalid",
@@ -2197,7 +2209,7 @@ fn require_existing_regular_file(path: &Path, object: &str) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn wal_path(root: &Path, starting_sequence: u64) -> PathBuf {
+pub(crate) fn wal_path(root: &AnchoredPath, starting_sequence: u64) -> AnchoredPath {
     root.join(WAL_DIRECTORY)
         .join(format!("{starting_sequence:020}.wal"))
 }
@@ -2287,21 +2299,29 @@ fn inject_compaction_failure(
 }
 
 fn unreachable_files(
-    directory: &Path,
+    directory: &AnchoredPath,
     extension: &str,
     retained: &BTreeSet<String>,
-) -> Result<Vec<(PathBuf, String)>> {
+) -> Result<Vec<(AnchoredPath, String)>> {
     let mut candidates = Vec::new();
-    for entry in std::fs::read_dir(directory)? {
-        let entry = entry?;
-        if !entry.file_type()?.is_file()
-            || entry.path().extension().and_then(|value| value.to_str()) != Some(extension)
+    for entry in directory.read_dir()? {
+        if !entry.metadata()?.is_file()
+            || entry
+                .relative_path()
+                .extension()
+                .and_then(|value| value.to_str())
+                != Some(extension)
         {
             continue;
         }
-        let file_name = entry.file_name().to_string_lossy().into_owned();
+        let file_name = entry
+            .relative_path()
+            .file_name()
+            .ok_or_else(|| Error::InvalidManifest("missing file name".into()))?
+            .to_string_lossy()
+            .into_owned();
         let identity = entry
-            .path()
+            .relative_path()
             .file_stem()
             .and_then(|value| value.to_str())
             .ok_or_else(|| Error::InvalidManifest("non-UTF-8 storage object name".into()))?
@@ -2312,7 +2332,7 @@ fn unreachable_files(
             retained.contains(&identity)
         };
         if !retained_identity {
-            candidates.push((entry.path(), file_name));
+            candidates.push((entry, file_name));
         }
     }
     candidates.sort_by(|left, right| left.1.cmp(&right.1));
@@ -2320,16 +2340,16 @@ fn unreachable_files(
 }
 
 fn remove_candidates(
-    directory: &Path,
-    candidates: Vec<(PathBuf, String)>,
+    directory: &AnchoredPath,
+    candidates: Vec<(AnchoredPath, String)>,
     removed: &mut Vec<String>,
 ) -> Result<()> {
     for (path, file_name) in candidates {
-        std::fs::remove_file(path)?;
+        path.remove_file()?;
         removed.push(file_name);
     }
     if !removed.is_empty() {
-        crate::sync_directory(directory)?;
+        directory.sync_directory()?;
     }
     Ok(())
 }

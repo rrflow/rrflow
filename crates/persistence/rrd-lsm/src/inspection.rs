@@ -9,13 +9,14 @@
 //! is reachable from this module.
 
 use crate::database::{wal_path, SEGMENT_DIRECTORY, WAL_DIRECTORY};
+use crate::filesystem::AnchoredPath;
 use crate::io::IoContext;
 use crate::manifest::{
     CurrentPointer, Manifest, CHECKPOINT_DIRECTORY, CURRENT_FILE, MANIFEST_DIRECTORY,
     MANIFEST_LOCK_FILE,
 };
 use crate::segment::{new_page_cache_with_policy, Segment};
-use crate::wal::replay_from;
+use crate::wal::replay_anchored;
 use crate::{DatabaseOptions, Error, Memtable, Result, VersionedValue};
 use rrd_core::digest::Sha256;
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,7 @@ pub struct DatabaseInspection {
 
 /// A bounded read view backed only by authenticated existing bytes.
 pub struct ReadOnlyDatabase {
+    _root: AnchoredPath,
     _lock: File,
     manifest: Manifest,
     memtable: Memtable,
@@ -67,8 +69,19 @@ impl Drop for ReadOnlyDatabase {
 
 impl ReadOnlyDatabase {
     pub fn open(root: &Path) -> Result<Self> {
-        let metadata = std::fs::symlink_metadata(root)
-            .map_err(|error| Error::io("opening database root for inspection", root, error))?;
+        Self::open_anchored(&AnchoredPath::open_root(root)?)
+    }
+
+    pub fn open_anchored(root: &AnchoredPath) -> Result<Self> {
+        let retained_root = root.pin_directory()?;
+        let root = &retained_root;
+        let metadata = root.metadata().map_err(|error| {
+            Error::io(
+                "opening database root for inspection",
+                root.diagnostic_path(),
+                error,
+            )
+        })?;
         if metadata.file_type().is_symlink() || !metadata.is_dir() {
             return Err(Error::InvalidManifest(
                 "inspection target is not a non-symlink database directory".into(),
@@ -85,18 +98,24 @@ impl ReadOnlyDatabase {
 
         let lock_path = root.join(MANIFEST_LOCK_FILE);
         require_regular_file(root, Path::new(MANIFEST_LOCK_FILE))?;
-        let lock = File::open(&lock_path).map_err(|error| {
-            Error::io("opening manifest lock for inspection", &lock_path, error)
+        let lock = lock_path.open_read().map_err(|error| {
+            Error::io(
+                "opening manifest lock for inspection",
+                lock_path.diagnostic_path(),
+                error,
+            )
         })?;
         match lock.try_lock_shared() {
             Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
-                return Err(Error::DatabaseWriterLock { path: lock_path });
+                return Err(Error::DatabaseWriterLock {
+                    path: lock_path.diagnostic_path().to_owned(),
+                });
             }
             Err(std::fs::TryLockError::Error(error)) => {
                 return Err(Error::io(
                     "acquiring shared manifest inspection lock",
-                    &lock_path,
+                    lock_path.diagnostic_path(),
                     error,
                 ));
             }
@@ -104,8 +123,13 @@ impl ReadOnlyDatabase {
 
         let current_path = root.join(CURRENT_FILE);
         require_regular_file(root, Path::new(CURRENT_FILE))?;
-        let current_bytes = std::fs::read(&current_path)
-            .map_err(|error| Error::io("reading CURRENT for inspection", &current_path, error))?;
+        let current_bytes = current_path.read().map_err(|error| {
+            Error::io(
+                "reading CURRENT for inspection",
+                current_path.diagnostic_path(),
+                error,
+            )
+        })?;
         let pointer: CurrentPointer = serde_json::from_slice(&current_bytes)?;
         pointer.validate()?;
 
@@ -124,7 +148,7 @@ impl ReadOnlyDatabase {
                 ));
             }
             let relative = PathBuf::from(MANIFEST_DIRECTORY).join(format!("{digest}.json"));
-            match std::fs::symlink_metadata(root.join(&relative)) {
+            match root.join(&relative).metadata() {
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     ended_at_gc_boundary = true;
                     break;
@@ -132,7 +156,7 @@ impl ReadOnlyDatabase {
                 Err(error) => {
                     return Err(Error::io(
                         "validating retained manifest for inspection",
-                        root.join(&relative),
+                        root.join(&relative).diagnostic_path(),
                         error,
                     ));
                 }
@@ -200,11 +224,9 @@ impl ReadOnlyDatabase {
 
         let mut memtable = Memtable::at_sequence(manifest.durable_sequence);
         let active_wal = wal_path(root, manifest.wal_start_sequence);
-        let active_wal_relative = active_wal
-            .strip_prefix(root)
-            .map_err(|_| Error::InvalidManifest("active WAL escaped its root".into()))?;
+        let active_wal_relative = active_wal.relative_path();
         require_regular_file(root, active_wal_relative)?;
-        let recovery = replay_from(&active_wal, manifest.wal_start_sequence, |batch| {
+        let recovery = replay_anchored(&active_wal, manifest.wal_start_sequence, |batch| {
             memtable.apply_owned_recovered(batch)
         })?;
         if let Some(offset) = recovery.torn_tail {
@@ -255,6 +277,7 @@ impl ReadOnlyDatabase {
             total_bytes,
         };
         Ok(Self {
+            _root: retained_root,
             _lock: lock,
             manifest,
             memtable,
@@ -317,7 +340,7 @@ impl ReadOnlyDatabase {
     }
 }
 
-fn load_manifest(root: &Path, digest: &str) -> Result<Manifest> {
+fn load_manifest(root: &AnchoredPath, digest: &str) -> Result<Manifest> {
     if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(Error::InvalidManifest(
             "manifest lookup requires a SHA-256 identity".into(),
@@ -326,8 +349,13 @@ fn load_manifest(root: &Path, digest: &str) -> Result<Manifest> {
     let relative = PathBuf::from(MANIFEST_DIRECTORY).join(format!("{digest}.json"));
     require_regular_file(root, &relative)?;
     let path = root.join(relative);
-    let bytes = std::fs::read(&path)
-        .map_err(|error| Error::io("reading manifest for inspection", &path, error))?;
+    let bytes = path.read().map_err(|error| {
+        Error::io(
+            "reading manifest for inspection",
+            path.diagnostic_path(),
+            error,
+        )
+    })?;
     let manifest: Manifest = serde_json::from_slice(&bytes)?;
     manifest.validate()?;
     if manifest.digest != digest {
@@ -338,10 +366,15 @@ fn load_manifest(root: &Path, digest: &str) -> Result<Manifest> {
     Ok(manifest)
 }
 
-fn require_directory(root: &Path, relative: &Path) -> Result<()> {
+fn require_directory(root: &AnchoredPath, relative: &Path) -> Result<()> {
     let path = root.join(relative);
-    let metadata = std::fs::symlink_metadata(&path)
-        .map_err(|error| Error::io("validating inspection directory", &path, error))?;
+    let metadata = path.metadata().map_err(|error| {
+        Error::io(
+            "validating inspection directory",
+            path.diagnostic_path(),
+            error,
+        )
+    })?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(Error::InvalidManifest(format!(
             "inspection directory {} is symbolic or invalid",
@@ -351,10 +384,11 @@ fn require_directory(root: &Path, relative: &Path) -> Result<()> {
     Ok(())
 }
 
-fn require_regular_file(root: &Path, relative: &Path) -> Result<()> {
+fn require_regular_file(root: &AnchoredPath, relative: &Path) -> Result<()> {
     let path = root.join(relative);
-    let metadata = std::fs::symlink_metadata(&path)
-        .map_err(|error| Error::io("validating inspection file", &path, error))?;
+    let metadata = path
+        .metadata()
+        .map_err(|error| Error::io("validating inspection file", path.diagnostic_path(), error))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(Error::InvalidManifest(format!(
             "inspection file {} is symbolic or invalid",
@@ -364,18 +398,27 @@ fn require_regular_file(root: &Path, relative: &Path) -> Result<()> {
     Ok(())
 }
 
-fn inspect_file(root: &Path, relative: &Path) -> Result<InspectionFile> {
+fn inspect_file(root: &AnchoredPath, relative: &Path) -> Result<InspectionFile> {
     require_regular_file(root, relative)?;
     let path = root.join(relative);
-    let mut file = File::open(&path)
-        .map_err(|error| Error::io("opening file for inspection digest", &path, error))?;
+    let mut file = path.open_read().map_err(|error| {
+        Error::io(
+            "opening file for inspection digest",
+            path.diagnostic_path(),
+            error,
+        )
+    })?;
     let mut digest = Sha256::new();
     let mut bytes = 0u64;
     let mut buffer = [0u8; 64 * 1024];
     loop {
-        let read = file
-            .read(&mut buffer)
-            .map_err(|error| Error::io("reading file for inspection digest", &path, error))?;
+        let read = file.read(&mut buffer).map_err(|error| {
+            Error::io(
+                "reading file for inspection digest",
+                path.diagnostic_path(),
+                error,
+            )
+        })?;
         if read == 0 {
             break;
         }

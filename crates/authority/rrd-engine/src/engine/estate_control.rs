@@ -756,24 +756,12 @@ impl RrdEngine {
         let catalogue_root = managed.catalogue_root;
         require_direct_directory(&catalogue_root, "backup catalogue")?;
         let restore_parent = managed.restore_parent;
-        for path in [
-            restore_parent
-                .parent()
-                .ok_or_else(|| ServiceError::Backup("restore parent has no container".into()))?,
-            restore_parent.as_path(),
-        ] {
-            create_direct_directory(path).map_err(|error| {
-                ServiceError::Backup(format!("cannot create fixed restore parent: {error}"))
-            })?;
-        }
-        let canonical_restore_parent = fs::canonicalize(&restore_parent).map_err(|error| {
-            ServiceError::Backup(format!("cannot resolve fixed restore parent: {error}"))
-        })?;
-        if canonical_restore_parent != restore_parent {
-            return Err(ServiceError::Backup(
-                "fixed restore parent must be a direct canonical directory".into(),
-            ));
-        }
+        restore_parent
+            .create_dir_all()
+            .map_err(|e| ServiceError::Backup(e.to_string()))?;
+        let restore_parent = restore_parent
+            .pin_directory()
+            .map_err(|e| ServiceError::Backup(e.to_string()))?;
         let target = restore_parent.join(restore_id.as_str());
         let audit_resource = estate_audit_resource(&authority_instance, &authorization.estate_id);
         let audit_request_sha256 = operation_digest(&(
@@ -913,22 +901,20 @@ impl RrdEngine {
                     .ok_or_else(|| {
                         ServiceError::Backup("recovery point is not catalogued".into())
                     })?;
-                let (inventory, reopened, physical_replay) = if target.exists() {
-                    let metadata = fs::symlink_metadata(&target).map_err(|error| {
+                let (inventory, reopened, physical_replay) = if target
+                    .try_exists()
+                    .map_err(|e| ServiceError::Backup(e.to_string()))?
+                {
+                    let metadata = target.metadata().map_err(|error| {
                         ServiceError::Backup(format!("cannot inspect restore target: {error}"))
                     })?;
-                    let canonical_target = fs::canonicalize(&target).map_err(|error| {
-                        ServiceError::Backup(format!("cannot resolve restore target: {error}"))
-                    })?;
-                    if metadata.file_type().is_symlink()
-                        || !metadata.is_dir()
-                        || canonical_target != target
-                    {
+                    if metadata.file_type().is_symlink() || !metadata.is_dir() {
                         return Err(ServiceError::Backup(
                             "existing restore target is not a direct canonical directory".into(),
                         ));
                     }
-                    let restored = RrflowKvStore::open_existing(&target)?;
+                    let restored =
+                        RrflowKvStore::open_existing_anchored(&target, Default::default())?;
                     if restored.claims().sequence()? != entry.archive.claim_sequence
                         || restored.runtime().cursor()? != entry.archive.runtime_cursor
                     {
@@ -951,7 +937,8 @@ impl RrdEngine {
                         &target,
                         at,
                     )?;
-                    let restored = RrflowKvStore::open_existing(&target)?;
+                    let restored =
+                        RrflowKvStore::open_existing_anchored(&target, Default::default())?;
                     if restored.claims().sequence()? != report.inventory.claim_sequence
                         || restored.runtime().cursor()? != report.inventory.runtime_cursor
                     {
@@ -1102,8 +1089,8 @@ pub(in crate::engine) struct EngineLocalBackupDriver {
 
 /// The resolved filesystem coordinates of one managed instance.
 struct ManagedInstance {
-    catalogue_root: PathBuf,
-    restore_parent: PathBuf,
+    catalogue_root: rrd_store::filesystem::AnchoredPath,
+    restore_parent: rrd_store::filesystem::AnchoredPath,
 }
 
 /// Resolves `instances/<instance>` below the state root as an installed
@@ -1326,12 +1313,17 @@ fn canonical_local_state_root(supplied: &Path) -> Result<PathBuf> {
     Ok(root)
 }
 
-fn require_direct_directory(path: &Path, name: &str) -> Result<()> {
-    let metadata = fs::symlink_metadata(path)
+fn require_direct_directory(
+    path: &(impl rrd_store::filesystem::AnchorInput + ?Sized),
+    name: &str,
+) -> Result<()> {
+    let path = path
+        .anchor()
+        .map_err(|e| ServiceError::Contract(e.to_string()))?;
+    let metadata = path
+        .metadata()
         .map_err(|error| ServiceError::Contract(format!("cannot inspect {name}: {error}")))?;
-    let canonical = fs::canonicalize(path)
-        .map_err(|error| ServiceError::Contract(format!("cannot resolve {name}: {error}")))?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() || canonical != path {
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(ServiceError::Contract(format!(
             "{name} must be a direct canonical directory"
         )));

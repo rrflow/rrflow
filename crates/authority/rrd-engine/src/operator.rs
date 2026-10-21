@@ -29,7 +29,8 @@ impl RrdEngine {
 
     pub fn path(&self) -> OperatorResult<&Path> {
         self.storage_root
-            .as_deref()
+            .as_ref()
+            .map(|root| root.diagnostic_path())
             .ok_or_else(|| "in-memory RRD has no persistent path".into())
     }
 
@@ -205,7 +206,9 @@ impl RrdEngine {
         )?)
     }
 
-    pub fn verify_backup_catalogue(catalogue: &Path) -> OperatorResult<BackupCatalogue> {
+    pub fn verify_backup_catalogue(
+        catalogue: &(impl rrd_store::filesystem::AnchorInput + ?Sized),
+    ) -> OperatorResult<BackupCatalogue> {
         Ok(rrd_store::verify_backup_catalogue(catalogue)?)
     }
 

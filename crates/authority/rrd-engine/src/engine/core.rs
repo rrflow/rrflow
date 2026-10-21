@@ -1,5 +1,6 @@
 use super::invocation::ActiveInvocation;
 use super::*;
+use rrd_store::filesystem::AnchoredPath;
 
 pub struct RrdEngine {
     pub(crate) storage: StorageProfile,
@@ -10,9 +11,10 @@ pub struct RrdEngine {
     /// The managed persistent container `.rrflow/rrd` of an installed estate.
     /// Backups and restore staging roots live beside its storage roots; it is
     /// `None` for component and test roots opened outside an installation.
-    pub(crate) installed_storage_container: Option<PathBuf>,
+    pub(crate) installed_storage_container: Option<AnchoredPath>,
     pub(crate) objects: ObjectStoreBox,
-    pub(crate) storage_root: Option<PathBuf>,
+    pub(crate) storage_root: Option<AnchoredPath>,
+    pub(in crate::engine) component_operation_parent: Option<AnchoredPath>,
     pub(in crate::engine) instance: CanonicalId,
     pub(crate) token_key: [u8; 32],
     /// Serializes the local definition/validation/commit boundary. rrflowKV
@@ -38,27 +40,48 @@ pub struct RrdEngine {
 }
 impl RrdEngine {
     pub fn create_new(root: &Path, instance: CanonicalId, token_key: [u8; 32]) -> Result<Self> {
-        if std::fs::symlink_metadata(root).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
-            return Err(ServiceError::ProjectBindingMismatch);
-        }
-        let storage = RrflowKvStore::create_new(root)?;
+        let root =
+            AnchoredPath::from_path(root).map_err(|e| ServiceError::Storage(e.to_string()))?;
+        Self::create_new_anchored(&root, instance, token_key)
+    }
+    pub(super) fn create_new_anchored(
+        root: &AnchoredPath,
+        instance: CanonicalId,
+        token_key: [u8; 32],
+    ) -> Result<Self> {
+        let operation_parent = root.parent();
+        let storage = RrflowKvStore::create_new_anchored(root, Default::default())?;
         Self::compose_persistent(
-            root,
+            operation_parent,
             instance,
             token_key,
             storage,
+            true,
             crate::VectorResidencyLimits::default(),
         )
     }
-
     pub fn open_existing(root: &Path, instance: CanonicalId, token_key: [u8; 32]) -> Result<Self> {
-        validate_existing_object_layout(root)?;
-        let storage = RrflowKvStore::open_existing(root)?;
+        let root =
+            AnchoredPath::from_path(root).map_err(|e| ServiceError::Storage(e.to_string()))?;
+        Self::open_existing_anchored(&root, instance, token_key)
+    }
+    pub(super) fn open_existing_anchored(
+        root: &AnchoredPath,
+        instance: CanonicalId,
+        token_key: [u8; 32],
+    ) -> Result<Self> {
+        let operation_parent = root.parent();
+        let root = root
+            .pin_directory()
+            .map_err(|e| ServiceError::Storage(e.to_string()))?;
+        validate_existing_object_layout(&root)?;
+        let storage = RrflowKvStore::open_existing_anchored(&root, Default::default())?;
         Self::compose_persistent(
-            root,
+            operation_parent,
             instance,
             token_key,
             storage,
+            false,
             crate::VectorResidencyLimits::default(),
         )
     }
@@ -71,7 +94,7 @@ impl RrdEngine {
         root: &Path,
         instance: CanonicalId,
     ) -> Result<Self> {
-        Self::open_with_token_key_file(root, instance, &root.join("RRD.SECRET"))
+        Self::open_with_token_key_file(root, instance)
     }
 
     pub(in crate::engine) fn query_scope(&self, requested: &str) -> Result<ScopeId> {
@@ -95,14 +118,14 @@ impl RrdEngine {
     /// token-signing key. rrflowKV intentionally requires an empty directory
     /// when it creates a new database, so file-backed credentials must never
     /// be created in the engine root first.
-    fn open_with_token_key_file(
-        root: &Path,
-        instance: CanonicalId,
-        token_key_file: &Path,
-    ) -> Result<Self> {
+    fn open_with_token_key_file(root: &Path, instance: CanonicalId) -> Result<Self> {
         let mut engine = Self::open(root, instance, [0_u8; TOKEN_KEY_BYTES])?;
-        engine.token_key = load_or_create_token_key(token_key_file)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
+        engine.token_key = load_or_create_token_key(
+            &engine
+                .require_persistent_root("local authority")?
+                .join("RRD.SECRET"),
+        )
+        .map_err(|error| ServiceError::Storage(error.to_string()))?;
         Ok(engine)
     }
 
@@ -112,18 +135,27 @@ impl RrdEngine {
         token_key: [u8; 32],
         limits: crate::VectorResidencyLimits,
     ) -> Result<Self> {
-        let storage = RrflowKvStore::open(root)?;
-        Self::compose_persistent(root, instance, token_key, storage, limits)
+        let root =
+            AnchoredPath::from_path(root).map_err(|e| ServiceError::Storage(e.to_string()))?;
+        let operation_parent = root.parent();
+        let storage = RrflowKvStore::open(&root)?;
+        Self::compose_persistent(operation_parent, instance, token_key, storage, true, limits)
     }
 
     fn compose_persistent(
-        root: &Path,
+        operation_parent: Option<AnchoredPath>,
         instance: CanonicalId,
         token_key: [u8; 32],
         storage: RrflowKvStore,
+        create_objects: bool,
         limits: crate::VectorResidencyLimits,
     ) -> Result<Self> {
-        let objects = rrd_store::LocalObjectStore::open(root.join("immutable"))?;
+        let root = storage.anchored_path().clone();
+        let objects = if create_objects {
+            rrd_store::LocalObjectStore::open_anchored(&root.join("immutable"))?
+        } else {
+            rrd_store::LocalObjectStore::open_existing_anchored(&root.join("immutable"))?
+        };
         let vector_residency = crate::VectorResidencyManager::new(limits)
             .map_err(|error| ServiceError::Vector(error.to_string()))?;
         Ok(Self {
@@ -134,7 +166,8 @@ impl RrdEngine {
             installed_deployment: None,
             installed_storage_container: None,
             objects: ObjectStoreBox::new(objects),
-            storage_root: Some(root.to_path_buf()),
+            storage_root: Some(root),
+            component_operation_parent: operation_parent,
             instance,
             token_key,
             transaction_gate: Mutex::new(()),
@@ -175,6 +208,7 @@ impl RrdEngine {
             installed_storage_container: None,
             objects: ObjectStoreBox::new(MemoryObjectStore::new()),
             storage_root: None,
+            component_operation_parent: None,
             instance,
             token_key,
             transaction_gate: Mutex::new(()),
@@ -281,7 +315,7 @@ impl RrdEngine {
         identity: InstalledEstateIdentity,
         deployment: DeploymentProfile,
         configuration: EstateConfiguration,
-        storage_container: PathBuf,
+        storage_container: AnchoredPath,
     ) -> Result<()> {
         identity
             .validate()
@@ -304,8 +338,11 @@ impl RrdEngine {
         Ok(())
     }
 
-    pub(in crate::engine) fn require_persistent_root(&self, operation: &str) -> Result<&Path> {
-        self.storage_root.as_deref().ok_or_else(|| {
+    pub(in crate::engine) fn require_persistent_root(
+        &self,
+        operation: &str,
+    ) -> Result<&AnchoredPath> {
+        self.storage_root.as_ref().ok_or_else(|| {
             ServiceError::Backup(format!(
                 "{operation} requires a persistent RRFlow database; rrflowMX is non-durable"
             ))
@@ -328,7 +365,7 @@ impl RrdEngine {
     }
 }
 
-pub(super) fn validate_existing_object_layout(root: &Path) -> Result<()> {
+pub(super) fn validate_existing_object_layout(root: &AnchoredPath) -> Result<()> {
     for relative in [
         "",
         "immutable",
@@ -338,7 +375,7 @@ pub(super) fn validate_existing_object_layout(root: &Path) -> Result<()> {
         "immutable/quarantine",
     ] {
         let path = root.join(relative);
-        let metadata = std::fs::symlink_metadata(&path).map_err(|error| {
+        let metadata = path.metadata().map_err(|error| {
             ServiceError::Storage(format!(
                 "installed object-store path cannot be inspected ({}): {error}",
                 path.display()

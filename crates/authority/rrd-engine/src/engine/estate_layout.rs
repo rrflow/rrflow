@@ -2,6 +2,7 @@
 
 use super::*;
 use rrd_contract::{InstallationManagedPath, InstallationManagedPathKind, InstallationRemovalRule};
+use rrd_store::filesystem::AnchoredPath;
 
 pub(super) const ESTATE_DIRECTORY: &str = ".rrflow";
 pub(super) const STORAGE_DIRECTORY: &str = ".rrflow/rrd";
@@ -23,6 +24,75 @@ const PRIVATE_ESTATE_DIRECTORIES: [&str; 4] = [
     STORAGE_ROOTS_DIRECTORY,
     CREDENTIAL_DIRECTORY,
 ];
+
+/// One admitted project plus the exact private directories selected beneath it.
+/// Retained directory identities, never display paths, authorize later effects.
+#[derive(Clone, Debug)]
+pub(super) struct EstateFilesystem {
+    project: AnchoredPath,
+    private: BTreeMap<&'static str, AnchoredPath>,
+}
+
+impl EstateFilesystem {
+    pub fn admit(project: AnchoredPath, allow_missing: bool) -> Result<Self> {
+        let mut filesystem = Self {
+            project,
+            private: BTreeMap::new(),
+        };
+        for relative in PRIVATE_ESTATE_DIRECTORIES {
+            let path = filesystem.managed(relative)?;
+            match super::token_key::pin_private_directory(&path) {
+                Ok(directory) => {
+                    filesystem.private.insert(relative, directory);
+                }
+                Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(ServiceError::Storage(error.to_string())),
+            }
+        }
+        Ok(filesystem)
+    }
+
+    pub fn project(&self) -> &AnchoredPath {
+        &self.project
+    }
+
+    pub fn managed(&self, relative: &str) -> Result<AnchoredPath> {
+        validate_managed_relative(relative)?;
+        if let Some((prefix, directory)) = self
+            .private
+            .iter()
+            .filter(|(prefix, _)| {
+                relative == **prefix
+                    || relative
+                        .strip_prefix(**prefix)
+                        .is_some_and(|tail| tail.starts_with('/'))
+            })
+            .max_by_key(|(prefix, _)| prefix.len())
+        {
+            let suffix = relative
+                .strip_prefix(*prefix)
+                .ok_or(ServiceError::ProjectBindingMismatch)?
+                .trim_start_matches('/');
+            return Ok(directory.join(suffix));
+        }
+        Ok(self.project.join(relative))
+    }
+
+    pub fn create_private_directories(&mut self) -> Result<()> {
+        for relative in PRIVATE_ESTATE_DIRECTORIES {
+            if let Some(directory) = self.private.get(relative) {
+                super::token_key::pin_private_directory(directory)
+                    .map_err(|error| ServiceError::Storage(error.to_string()))?;
+            } else {
+                let directory =
+                    super::token_key::create_private_directory_anchored(&self.managed(relative)?)
+                        .map_err(|error| ServiceError::Storage(error.to_string()))?;
+                self.private.insert(relative, directory);
+            }
+        }
+        Ok(())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct EstateLayout {
@@ -116,18 +186,23 @@ impl EstateLayout {
 /// A new install may not coexist with either a pre-canonical
 /// `.rrflow/instance.toml` estate or an unrecognized `.rrflow` tree. Replay is
 /// resolved from the canonical locator before this check is called.
-pub(super) fn reject_existing_estate(project: &Path) -> Result<()> {
-    match std::fs::symlink_metadata(project.join(ESTATE_DIRECTORY)) {
+pub(super) fn reject_existing_estate(project: &EstateFilesystem) -> Result<()> {
+    match project.project().join(ESTATE_DIRECTORY).metadata() {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Ok(_) => Err(ServiceError::ProjectBindingMismatch),
         Err(error) => Err(ServiceError::Storage(error.to_string())),
     }?;
-    let entries =
-        std::fs::read_dir(project).map_err(|error| ServiceError::Storage(error.to_string()))?;
+    let entries = project
+        .project()
+        .entries()
+        .map_err(|error| ServiceError::Storage(error.to_string()))?;
     for entry in entries {
         let name = entry
             .map_err(|error| ServiceError::Storage(error.to_string()))?
+            .relative_path()
             .file_name()
+            .ok_or(ServiceError::ProjectBindingMismatch)?
+            .to_owned()
             .into_string()
             .map_err(|_| ServiceError::ProjectBindingMismatch)?;
         if name.starts_with(INSTALL_INTENT_PREFIX) && name.ends_with(INSTALL_INTENT_SUFFIX) {
@@ -137,46 +212,31 @@ pub(super) fn reject_existing_estate(project: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn create_estate_directories(project: &Path) -> Result<()> {
-    validate_estate_directories(project, true)?;
+pub(super) fn create_estate_directories(project: &mut EstateFilesystem) -> Result<()> {
+    project.create_private_directories()
+}
+
+pub(super) fn validate_estate_directories(
+    project: &EstateFilesystem,
+    allow_missing: bool,
+) -> Result<()> {
     for relative in PRIVATE_ESTATE_DIRECTORIES {
-        let path = project.join(relative);
-        match std::fs::symlink_metadata(&path) {
-            Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            Ok(_) => {
-                super::token_key::validate_private_directory(&path)
+        match project.private.get(relative) {
+            Some(directory) => {
+                super::token_key::pin_private_directory(directory)
                     .map_err(|error| ServiceError::Storage(error.to_string()))?;
-                continue;
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(ServiceError::Storage(error.to_string())),
-        }
-        let parent = path.parent().ok_or(ServiceError::ProjectBindingMismatch)?;
-        super::token_key::create_private_directory(&path)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
-        rrd_store::sync_directory_metadata(parent)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
-    }
-    Ok(())
-}
-
-/// Admission checks for the four engine-owned directory boundaries. Missing
-/// paths are allowed only during new/interrupted apply; never during installed
-/// reads. This does not pin ancestors against later replacement.
-pub(super) fn validate_estate_directories(project: &Path, allow_missing: bool) -> Result<()> {
-    for relative in PRIVATE_ESTATE_DIRECTORIES {
-        match super::token_key::validate_private_directory(&project.join(relative)) {
-            Ok(()) => {}
-            Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(ServiceError::Storage(error.to_string())),
+            None if allow_missing => {}
+            None => return Err(ServiceError::ProjectBindingMismatch),
         }
     }
     Ok(())
 }
 
-pub(super) fn validate_recovery_estate(project: &Path, layout: &EstateLayout) -> Result<()> {
+pub(super) fn validate_recovery_estate(
+    project: &EstateFilesystem,
+    layout: &EstateLayout,
+) -> Result<()> {
     validate_estate_directories(project, true)?;
     let storage_id = Path::new(&layout.storage_root)
         .file_name()
@@ -204,9 +264,13 @@ pub(super) fn validate_recovery_estate(project: &Path, layout: &EstateLayout) ->
     validate_directory_entries(project, CREDENTIAL_DIRECTORY, &[credential_name])
 }
 
-fn validate_directory_entries(project: &Path, relative: &str, allowed: &[&str]) -> Result<()> {
-    let path = project.join(relative);
-    let metadata = match std::fs::symlink_metadata(&path) {
+fn validate_directory_entries(
+    project: &EstateFilesystem,
+    relative: &str,
+    allowed: &[&str],
+) -> Result<()> {
+    let path = project.managed(relative)?;
+    let metadata = match path.metadata() {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(ServiceError::Storage(error.to_string())),
@@ -214,12 +278,16 @@ fn validate_directory_entries(project: &Path, relative: &str, allowed: &[&str]) 
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(ServiceError::ProjectBindingMismatch);
     }
-    let entries =
-        std::fs::read_dir(&path).map_err(|error| ServiceError::Storage(error.to_string()))?;
+    let entries = path
+        .entries()
+        .map_err(|error| ServiceError::Storage(error.to_string()))?;
     for entry in entries {
         let entry = entry.map_err(|error| ServiceError::Storage(error.to_string()))?;
         let name = entry
+            .relative_path()
             .file_name()
+            .ok_or(ServiceError::ProjectBindingMismatch)?
+            .to_owned()
             .into_string()
             .map_err(|_| ServiceError::ProjectBindingMismatch)?;
         if !allowed.contains(&name.as_str()) {
@@ -229,9 +297,12 @@ fn validate_directory_entries(project: &Path, relative: &str, allowed: &[&str]) 
     Ok(())
 }
 
-pub(super) fn install_intent_path(project: &Path, layout: &EstateLayout) -> Result<PathBuf> {
+pub(super) fn install_intent_path(
+    project: &EstateFilesystem,
+    layout: &EstateLayout,
+) -> Result<AnchoredPath> {
     validate_intent_relative(&layout.install_intent)?;
-    Ok(project.join(&layout.install_intent))
+    Ok(project.project().join(&layout.install_intent))
 }
 
 fn validate_intent_relative(relative: &str) -> Result<()> {
@@ -246,23 +317,15 @@ fn validate_intent_relative(relative: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn reject_existing_symlink_path(project: &Path, path: &Path) -> Result<()> {
-    let relative = path
-        .strip_prefix(project)
-        .map_err(|_| ServiceError::ProjectBindingMismatch)?;
-    let mut current = project.to_owned();
-    for component in relative.components() {
-        current.push(component);
-        match std::fs::symlink_metadata(&current) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
-            Err(error) => return Err(ServiceError::Storage(error.to_string())),
-        }
+pub(super) fn reject_existing_symlink_path(
+    _project: &EstateFilesystem,
+    path: &AnchoredPath,
+) -> Result<()> {
+    match path.metadata() {
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(ServiceError::Storage(error.to_string())),
     }
-    Ok(())
 }
 
 pub(super) fn validate_managed_relative(relative: &str) -> Result<()> {
@@ -280,20 +343,17 @@ pub(super) fn validate_managed_relative(relative: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn safe_join(project: &Path, relative: &str) -> Result<PathBuf> {
-    validate_managed_relative(relative)?;
-    let path = project.join(relative);
-    reject_existing_symlink_path(project, &path)?;
-    Ok(path)
+pub(super) fn safe_join(project: &EstateFilesystem, relative: &str) -> Result<AnchoredPath> {
+    project.managed(relative)
 }
 
 /// One installed instance's backup catalogue or restore staging root,
 /// `.rrflow/rrd/<kind>/<instance>` below its project. The served engine, the
 /// offline publication, and the estate controller all resolve the same path.
 pub(super) fn instance_operation_root(
-    project: &Path,
+    project: &EstateFilesystem,
     kind: &str,
     instance: &CanonicalId,
-) -> Result<PathBuf> {
+) -> Result<AnchoredPath> {
     safe_join(project, &format!("{STORAGE_DIRECTORY}/{kind}/{instance}"))
 }

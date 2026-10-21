@@ -707,3 +707,70 @@ fn symbolic_intent_collision_is_preserved_and_rejected() {
     .is_err());
     assert_eq!(file_inventory(project.path()), before);
 }
+
+/// Replacement is injected after admission, at real durable boundaries. Unix
+/// retains the admitted directory; Windows rejects renaming an open authority.
+#[test]
+fn anchored_installation_preserves_outside_state_at_durable_boundaries() {
+    for stage in [
+        InstallApplyStage::IntentPublished,
+        InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::LocatorPublished,
+    ] {
+        let fixture = tempfile::tempdir().unwrap();
+        let project = fixture.path().join("project");
+        let retained = fixture.path().join("retained");
+        let outside = fixture.path().join("outside");
+        std::fs::create_dir(&project).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::write(project.join("README.md"), b"authorized project").unwrap();
+        std::fs::write(
+            outside.join("sentinel"),
+            b"outside may not be read as authority or mutated",
+        )
+        .unwrap();
+        let outside_before = file_inventory(&outside);
+        let executable = test_executable();
+        let preview = plan(&project, &executable);
+        let mut reached = false;
+        let mut moved = false;
+        let result = RrdEngine::apply_installation_with_test_observer(
+            &project,
+            &preview,
+            &executable,
+            &mut |observed, _| {
+                if observed == stage {
+                    reached = true;
+                    match std::fs::rename(&project, &retained) {
+                        Ok(()) => {
+                            moved = true;
+                            #[cfg(unix)]
+                            std::os::unix::fs::symlink(&outside, &project).unwrap();
+                            #[cfg(windows)]
+                            panic!(
+                                "retained Windows project authority allowed ancestor replacement"
+                            );
+                        }
+                        Err(error) => {
+                            #[cfg(not(windows))]
+                            panic!("unexpected native denial: {error}");
+                            #[cfg(windows)]
+                            assert!(matches!(error.raw_os_error(), Some(5 | 32)));
+                        }
+                    }
+                }
+                Ok(())
+            },
+        );
+        assert!(reached, "test boundary was not reached: {result:?}");
+        result.expect("effects remain bound to the original authority");
+        assert_eq!(file_inventory(&outside), outside_before);
+        let installed = if moved { &retained } else { &project };
+        assert!(!installed.join(layout(&preview).install_intent).exists());
+        assert_eq!(
+            std::fs::read(installed.join("README.md")).unwrap(),
+            b"authorized project"
+        );
+        assert!(RrdEngine::read_project_locator(installed).is_ok());
+    }
+}

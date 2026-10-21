@@ -948,8 +948,15 @@ fn installed_backups_and_restore_staging_live_beside_the_storage_roots() {
 
     let layout =
         EstateLayout::new(&storage_root_id, &preview.installation.initial_principal_id).unwrap();
-    validate_recovery_estate(project.path(), &layout)
-        .expect("install recovery accepts an estate that holds backups and restore staging");
+    validate_recovery_estate(
+        &super::super::estate_layout::EstateFilesystem::admit(
+            rrd_store::filesystem::AnchoredPath::open_root(project.path()).unwrap(),
+            false,
+        )
+        .unwrap(),
+        &layout,
+    )
+    .expect("install recovery accepts an estate that holds backups and restore staging");
 
     let reopened = RrdEngine::open_installed(project.path(), &executable).unwrap();
     assert_eq!(
@@ -1565,8 +1572,15 @@ fn a_staged_restore_is_published_in_place_and_the_estate_opens_from_the_backup()
             .principal_id,
     )
     .unwrap();
-    validate_recovery_estate(&estate.project_path, &layout)
-        .expect("install recovery accepts the published estate");
+    validate_recovery_estate(
+        &super::super::estate_layout::EstateFilesystem::admit(
+            rrd_store::filesystem::AnchoredPath::open_root(&estate.project_path).unwrap(),
+            false,
+        )
+        .unwrap(),
+        &layout,
+    )
+    .expect("install recovery accepts the published estate");
 
     // POAM-031 closure: the published root is the installed estate.
     let readiness = authenticated_readiness(&estate, 1_800_000_000_600);

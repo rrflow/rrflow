@@ -86,6 +86,7 @@ pub use rrd_core::{
     DataTransaction, DataTransactionView, ReadStamp, RetentionPin, RetentionPinId,
     RuntimeChangePage, RuntimeCommitOutcome, SnapshotHandle, SnapshotId,
 };
+pub use rrd_lsm::filesystem;
 pub use rrd_lsm::{
     publish_rename as publish_durable_rename, sync_directory as sync_directory_metadata,
 };

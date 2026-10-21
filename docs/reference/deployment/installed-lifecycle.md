@@ -288,7 +288,7 @@ it. The clock substrate proves only relative rollback against a sealed anchor:
 it does not authenticate or correct UTC, detect every forward error or drift,
 or establish runtime-wide timestamp high-water rules. Platform synchronization
 diagnosis, explicitly authorized correction, and native clock qualification
-remain open. Handle-relative race hardening, complete native ACL
+remain open. Complete native filesystem and ACL
 qualification, configuration plan/apply, attunement phase execution, full
 verify/repair/restore/uninstall, service integration, release assembly, and
 clean-machine qualification remain separate packages. The staged rationale and
@@ -313,10 +313,10 @@ for those principals, regular/non-reparse attributes and single link. The
 read handle excludes concurrent write/delete sharing. Unsupported native
 security enforcement fails closed; no runtime ACL utility is required.
 
-These are leaf-file guarantees, not ancestor-directory or mount containment,
-an atomic project snapshot, resistance to every same-owner race, a credential
-migration facility, or complete native ACL qualification. Privileged foreign-
-owner and Windows reparse adversarial fixtures remain unqualified. The
+These private-object checks compose with retained filesystem authority below.
+They do not establish an atomic project snapshot, resistance to every
+same-owner race, a credential migration facility, or complete native ACL
+qualification. Privileged foreign-owner scenarios remain unqualified. The
 [native secret boundary journal](../../evidence/change-journals/gate-d/d-01-native-secret-boundary.md)
 records real filesystem denial and retained installation/recovery evidence.
 D-01 remains open.
@@ -340,12 +340,41 @@ only during new or interrupted apply. A changed mode, unsupported ACL or
 non-directory object is refused without permission repair; project-owned
 parents are never tightened. Creation does not replace an existing object.
 
-These checks extend the private-object boundary; they do not retain ancestor
-handles, prevent mount/path replacement between operations, validate every
-store-owned descendant or qualify all privileged foreign-owner scenarios.
-Those requirements remain in D-01's later containment and native-qualification
-packages. Existing pre-alpha estates with incompatible directory permissions
+These checks extend the private-object boundary. Existing pre-alpha estates
+with incompatible directory permissions
 are refused rather than silently upgraded.
+
+### Retained filesystem authority
+
+Installation retains the admitted project directory and each private estate
+boundary. Store, manifest, WAL, segment, object, backup, archive and restore
+operations carry directory capabilities through their existing owners.
+Diagnostic path strings cannot be used as capability inputs. Each relative
+component is opened without following links and checked against the admitted
+native mount identity. Payload admission rejects nonregular files and multiple
+hard links before reads or truncation; this also applies to installation's
+project-input inventory. Public standalone path APIs establish authority once
+at entry. Host parent aliases may be resolved before initial admission; the
+selected root leaf itself cannot be a link.
+
+WAL replay and writable recovery retain the same file. Object digest
+verification hands its opened file to vector mapping and snapshot transport;
+consumers do not reopen a previously verified pathname. Publication and cleanup
+operate relative to retained parents. Locator and vector publication use atomic
+no-replace operations, preserving a concurrent winner. Windows publication holds
+all ancestors without delete sharing and uses write-through rename. Unix uses
+directory-relative rename and directory synchronization. Linux requires native
+mount IDs; macOS uses the filesystem identity and mounted-on name; Windows
+rejects reparses and volumes without persistent ACL support. Unsupported native
+enforcement is an error, with no pathname fallback.
+
+The [containment journal](../../evidence/change-journals/gate-d/d-01-anchored-filesystem.md)
+records platform-specific tests and qualification limits. These operations do
+not make mutable project content an atomic snapshot or protect against every
+same-owner modification. Whole-install exclusivity, complete bootstrap and the
+full supported-filesystem/offline matrix remain D-01.3 through D-01.5. Network
+filesystems and arbitrary filesystem implementations are not qualified by the
+local native runner results.
 
 ### Installed engine admission
 

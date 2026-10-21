@@ -1,17 +1,45 @@
-use super::{denied, File, Metadata, Path};
-use std::fs::OpenOptions;
+#[cfg(test)]
+use super::Path;
+use super::{denied, File, Metadata};
 use std::io;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
-pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
-    if create {
-        use std::os::unix::fs::DirBuilderExt;
-        std::fs::DirBuilder::new().mode(0o700).create(path)?;
+pub(super) fn open_relative(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+    directory: bool,
+) -> io::Result<File> {
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::ffi::OsStrExt;
+    let name =
+        std::ffi::CString::new(name.as_bytes()).map_err(|_| denied("private name contains NUL"))?;
+    if create
+        && directory
+        && unsafe { libc::mkdirat(parent.as_raw_fd(), name.as_ptr(), 0o700) } != 0
+    {
+        return Err(io::Error::last_os_error());
     }
-    OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
-        .open(path)
+    let mut flags = libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC;
+    if directory {
+        flags |= libc::O_DIRECTORY | libc::O_RDONLY;
+    } else if create {
+        flags |= libc::O_RDWR | libc::O_CREAT | libc::O_EXCL;
+    } else {
+        flags |= libc::O_RDONLY;
+    }
+    let descriptor = unsafe { libc::openat(parent.as_raw_fd(), name.as_ptr(), flags, 0o600) };
+    if descriptor < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: successful openat transfers this new descriptor to the File.
+    Ok(unsafe { File::from_raw_fd(descriptor) })
+}
+
+#[cfg(test)]
+pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
+    let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
+    path.with_parent(|parent, name| open_relative(parent, name, create, true))
 }
 
 pub(super) fn validate_directory(file: &File) -> io::Result<()> {
@@ -28,15 +56,10 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
-    let mut options = OpenOptions::new();
-    options
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC);
-    if create {
-        options.write(true).create_new(true).mode(0o600);
-    }
-    options.open(path)
+    let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
+    path.open_file_with(|parent, name| open_relative(parent, name, create, false))
 }
 
 pub(super) fn validate(file: &File) -> io::Result<Metadata> {
