@@ -49,7 +49,9 @@ requires E/F access and streaming/budget evidence; H-08e requires the H-04
 public-capability foundation. The [H-08 package table](gate-h.md#h-08-postgresql-compatibility-packages)
 owns the remaining dependencies. A wire-only server cannot skip those exits.
 
-The active executable item is **D-01**. Accepted C-06 replaced
+The active executable item is **C-07**. D-01 has
+[accepted installed-foundation evidence](gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+through the actual primary executable on Linux, macOS and Windows. Accepted C-06 replaced
 row-record immutable segments with segment v6's ordered key/version spine,
 six Arrow-layout page buffers, authenticated persisted membership filters, and
 authenticated none/adaptive-LZ4 writer policy, with manifest-authenticated
@@ -87,11 +89,11 @@ C-04 itself remains reopened: vector search now reads artifact and quantization
 catalogues at its request stamp under one key budget, but the independent
 maintenance replay and complete closure evidence remain open
 ([POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md)).
-C-05 and C-06 are accepted for the single-node alpha composition. D-01 is
-next, not another documentation or component-only detour. D-01 must produce
-the first walking installed-product
-proof before C-07 widens the durability/lifetime matrix through that real
-composition.
+C-05, C-06 and the D-01 installed foundation are accepted for the single-node
+alpha composition. C-07 now widens the durability/lifetime matrix through that
+installed composition: WAL/manifest faults, bounded maintenance and write
+backpressure, pinned generations, storage-full behavior and acknowledged-write
+durability. Existing component tests remain inputs to that proof, not its exit.
 A-07 is
 complete: A-07.0 mapped current requirements to code and evidence; A-07.1a
 through A-07.1h directly converged package/type/path vocabulary, SDK
