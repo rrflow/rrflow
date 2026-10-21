@@ -26,9 +26,11 @@ pub(super) fn project_inventory_sha256_excluding(
     excluded_relative: Option<&Path>,
 ) -> Result<String> {
     let mut entries = Vec::<(AnchoredPath, bool)>::new();
+    let admitted_lease = super::lease::admit_existing(project)?;
     collect_project_entries(
         project,
         excluded_relative,
+        admitted_lease.is_some(),
         profile.inventory_max_files,
         &mut entries,
     )?;
@@ -67,6 +69,7 @@ pub(super) fn project_inventory_sha256_excluding(
 fn collect_project_entries(
     root: &AnchoredPath,
     excluded_relative: Option<&Path>,
+    lease_admitted: bool,
     max_entries: u64,
     output: &mut Vec<(AnchoredPath, bool)>,
 ) -> Result<()> {
@@ -79,6 +82,7 @@ fn collect_project_entries(
             let path = entry.map_err(storage_error)?;
             let relative = path.relative_path();
             if excluded_relative == Some(relative)
+                || lease_admitted && relative == Path::new(super::lease::RELATIVE_PATH)
                 || relative.components().next().is_some_and(|component| {
                     matches!(component.as_os_str().to_str(), Some(".git" | ".rrflow"))
                 })
@@ -186,6 +190,7 @@ mod tests {
         super::collect_project_entries(
             &AnchoredPath::open_root(path).map_err(storage_error)?,
             exclude,
+            false,
             max,
             output,
         )

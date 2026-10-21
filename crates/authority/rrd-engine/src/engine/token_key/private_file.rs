@@ -34,6 +34,13 @@ mod platform {
             "native secret-file enforcement unavailable",
         ))
     }
+    pub(super) fn open_empty_relative(
+        parent: &File,
+        name: &std::ffi::OsStr,
+        create: bool,
+    ) -> io::Result<File> {
+        open_relative(parent, name, create, false)
+    }
     pub(super) fn validate_directory(_: &File) -> io::Result<()> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -71,6 +78,25 @@ pub(in crate::engine) fn read_private_anchored(
     let file =
         path.open_file_with(|parent, name| platform::open_relative(parent, name, false, false))?;
     read_opened(file, maximum)
+}
+
+/// Admit an empty private lease without reading or changing its contents. The
+/// caller retains this exact creation/open handle for native lock ownership.
+pub(in crate::engine) fn open_private_empty_anchored(
+    path: &AnchoredPath,
+    create: bool,
+) -> io::Result<File> {
+    let file =
+        path.open_file_with(|parent, name| platform::open_empty_relative(parent, name, create))?;
+    if platform::validate(&file)?.len() != 0 {
+        return Err(denied("installation lease must be empty"));
+    }
+    if create {
+        path.parent()
+            .ok_or_else(|| denied("lease has no parent"))?
+            .sync_directory()?;
+    }
+    Ok(file)
 }
 
 pub(in crate::engine) fn write_private_anchored(

@@ -4,6 +4,14 @@ use super::{denied, File, Metadata};
 use std::io;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
+pub(super) fn open_empty_relative(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+) -> io::Result<File> {
+    open_relative(parent, name, create, false)
+}
+
 pub(super) fn open_relative(
     parent: &File,
     name: &std::ffi::OsStr,

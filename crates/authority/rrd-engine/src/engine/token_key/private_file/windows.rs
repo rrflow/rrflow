@@ -135,6 +135,27 @@ pub(super) fn open_relative(
     create: bool,
     directory: bool,
 ) -> io::Result<File> {
+    open_relative_with_access(parent, name, create, directory, false)
+}
+
+pub(super) fn open_empty_relative(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+) -> io::Result<File> {
+    // Empty lease creation needs no payload write access. Read sharing lets
+    // contenders reach LockFileEx and lets read-only verification admit it.
+    // Deletion and writes remain excluded for this handle's entire lifetime.
+    open_relative_with_access(parent, name, create, false, true)
+}
+
+fn open_relative_with_access(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+    directory: bool,
+    empty_lease: bool,
+) -> io::Result<File> {
     use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
     use windows_sys::Wdk::Storage::FileSystem::{
         NtCreateFile, FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN,
@@ -188,7 +209,11 @@ pub(super) fn open_relative(
                 | READ_CONTROL
                 | FILE_READ_ATTRIBUTES
                 | SYNCHRONIZE
-                | if create { GENERIC_WRITE } else { 0 },
+                | if create && !empty_lease {
+                    GENERIC_WRITE
+                } else {
+                    0
+                },
             &attributes,
             &mut status,
             null(),
@@ -199,7 +224,7 @@ pub(super) fn open_relative(
             },
             if directory {
                 FILE_SHARE_READ | FILE_SHARE_WRITE
-            } else if create {
+            } else if create && !empty_lease {
                 0
             } else {
                 FILE_SHARE_READ

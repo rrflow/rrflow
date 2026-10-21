@@ -176,6 +176,14 @@ fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
                 precondition_sha256: digest(50),
                 removal_rule: InstallationRemovalRule::RemoveIfOwnedDigestMatches,
             },
+            InstallationManagedPath {
+                kind: InstallationManagedPathKind::InstallationLease,
+                relative_path: rrd_contract::INSTALLATION_LEASE_PATH.into(),
+                precondition_sha256: rrd_core::digest::sha256_hex(
+                    rrd_contract::INSTALLATION_LEASE_PRECONDITION.as_bytes(),
+                ),
+                removal_rule: InstallationRemovalRule::RetainForExclusion,
+            },
         ],
         attunement_plan_id: attunement.id.clone(),
         attunement_plan_sha256: attunement.plan_sha256.clone(),
@@ -184,6 +192,12 @@ fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
                 kind: InstallationActionKind::ValidateProject,
                 disposition: InstallationActionDisposition::Unchanged,
                 input_sha256: digest(3),
+                estimated_write_bytes: 0,
+            },
+            InstallationPlanAction {
+                kind: InstallationActionKind::AcquireInstallationLease,
+                disposition: InstallationActionDisposition::Create,
+                input_sha256: digest(51),
                 estimated_write_bytes: 0,
             },
             InstallationPlanAction {
@@ -563,6 +577,24 @@ fn installation_plan_requires_versioned_identity_and_root_binding() {
             plan.plan_sha256
         );
         assert!(changed.validate().is_err());
+    }
+}
+
+#[test]
+fn installation_lease_cannot_change_path_precondition_or_retention_rule() {
+    for mutation in ["path", "precondition", "retention", "missing"] {
+        let mut plan = installation_plan(&attunement_plan());
+        let lease = plan.managed_paths.last_mut().unwrap();
+        match mutation {
+            "path" => lease.relative_path = ".rrflow/other.lock".into(),
+            "precondition" => lease.precondition_sha256 = digest(999),
+            "retention" => lease.removal_rule = InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            _ => {
+                plan.managed_paths.pop();
+            }
+        }
+        plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();
+        assert!(plan.validate().is_err(), "{mutation}");
     }
 }
 
