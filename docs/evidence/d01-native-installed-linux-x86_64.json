@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "platform": "linux",
+  "os_release": "6.17.0-1022-azure",
+  "architecture": "x86_64",
+  "sha256": {
+    "rrflow": "652060742c0c5ca47c05c299ed8d15e285f3e8467494248ff9bbb0b23c93ad68",
+    "installed_lifecycle": "0b7a5d13f8732700334f6fe2e06296a419a92e0f92c8ad734ab83a357665fe4b"
+  },
+  "passed_cases": [
+    "fresh_installed_engine_survives_restart_and_restore",
+    "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
+    "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
+    "primary_help_exposes_only_the_installed_product_lifecycle",
+    "raw_database_and_development_commands_fail_during_argument_parsing"
+  ],
+  "filesystem": {
+    "type": "ext4",
+    "device": 2049
+  },
+  "durable_receipts": [
+    {
+      "mode": "existing",
+      "build": {
+        "executable_sha256": "652060742c0c5ca47c05c299ed8d15e285f3e8467494248ff9bbb0b23c93ad68",
+        "metadata_sha256": "c55a31d9a7d9c1f8a361e6ae760904188ad0c2603136fc8cdeef466521be3c43",
+        "public_contract_sha256": "37f9550c2a8e385b4e82ee3d35ec0c653373015c452f59623d308281dbd89afb",
+        "signal_catalogue_sha256": "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
+      },
+      "installation_plan_sha256": "50f7867e0b88aa7945f87b01b1dd86d07674a89827f09d892831bbc44f6fe751",
+      "restore_plan_sha256": "0852082e9bc574f1c8cadc75b587e2dd177056156ad2e48127bc50bbb37d8777",
+      "backup_sha256": "c574b258d70890eb87e395ecb51d75338ef45bb3eeeb24590acce4ba0d9a4f96",
+      "installed_runtime_cursor": 2,
+      "reopened_runtime_cursor": 4,
+      "restored_runtime_cursor": 3,
+      "committed_claim_sequence": 1,
+      "restored_read_manifest_sha256": "b8f789202b1110fc5dde2986ab415fc38c747b7b48391e27ee4aa3bad2594522",
+      "captured_output_bytes": 16853806,
+      "stream_limit_bytes": 16777216
+    },
+    {
+      "mode": "fresh",
+      "build": {
+        "executable_sha256": "652060742c0c5ca47c05c299ed8d15e285f3e8467494248ff9bbb0b23c93ad68",
+        "metadata_sha256": "c55a31d9a7d9c1f8a361e6ae760904188ad0c2603136fc8cdeef466521be3c43",
+        "public_contract_sha256": "37f9550c2a8e385b4e82ee3d35ec0c653373015c452f59623d308281dbd89afb",
+        "signal_catalogue_sha256": "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
+      },
+      "installation_plan_sha256": "20ffc5edaee9db5114e1fcf1abd5bda3c52f88c621439af3b30abb06f42800db",
+      "restore_plan_sha256": "be17d3ff82160a531354a4d9ae58c622e969a45067cdc18f03e504152f484a8a",
+      "backup_sha256": "82f145f73b8ec0c403682f3bfbf32cbd66194b53a4bfe9bd4021146d8a34ad1c",
+      "installed_runtime_cursor": 2,
+      "reopened_runtime_cursor": 4,
+      "restored_runtime_cursor": 3,
+      "committed_claim_sequence": 1,
+      "restored_read_manifest_sha256": "723e54c5d8ab9e6b3b31ddca583fe2283078a320deb7a72932bb587c4ccbb964",
+      "captured_output_bytes": 16853800,
+      "stream_limit_bytes": 16777216
+    }
+  ],
+  "failed": 0,
+  "ignored": 0,
+  "outbound_denials": [
+    "ipv4",
+    "ipv6"
+  ],
+  "masked_roots": [
+    "/home/runner/.cargo",
+    "/home/runner/.rustup",
+    "/home/runner/work/rrflow-development"
+  ],
+  "isolation": "linux-private-namespaces"
+}

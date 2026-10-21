@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "platform": "win32",
+  "os_release": "2025Server",
+  "architecture": "AMD64",
+  "sha256": {
+    "rrflow.exe": "52369c0bd77cd42ad18829009b40dbdb209aa0475f09b0e7d9e96784a1f51ff8",
+    "installed_lifecycle.exe": "a476acfa61ca68534e6d916f21dbf7cb26932ed9d7fbdab7807b34f5aa0798ce"
+  },
+  "passed_cases": [
+    "fresh_installed_engine_survives_restart_and_restore",
+    "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
+    "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
+    "primary_help_exposes_only_the_installed_product_lifecycle",
+    "raw_database_and_development_commands_fail_during_argument_parsing"
+  ],
+  "filesystem": {
+    "type": "NTFS",
+    "device": 17594508763472084922
+  },
+  "durable_receipts": [
+    {
+      "mode": "fresh",
+      "build": {
+        "executable_sha256": "52369c0bd77cd42ad18829009b40dbdb209aa0475f09b0e7d9e96784a1f51ff8",
+        "metadata_sha256": "5e32ebc53ee6e567577bbcbbc348dc513cb0671692b9181910946671172acd64",
+        "public_contract_sha256": "37f9550c2a8e385b4e82ee3d35ec0c653373015c452f59623d308281dbd89afb",
+        "signal_catalogue_sha256": "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
+      },
+      "installation_plan_sha256": "7c694aba9b0abd666cd75bfa15f67c379d5115824c2735d71e7bef3889f25ad0",
+      "restore_plan_sha256": "f77f11051eb2a61bf9b3a5df7958ed27f5c37c4ffce8e32a2d5116f78af8bbb8",
+      "backup_sha256": "c76af811de7a12b1627e477b184648791270d7f748560cc854639917dbba01e2",
+      "installed_runtime_cursor": 2,
+      "reopened_runtime_cursor": 4,
+      "restored_runtime_cursor": 3,
+      "committed_claim_sequence": 1,
+      "restored_read_manifest_sha256": "4714d36cdd815d02e515c7689fabd4c83b399e3567bd44db6b3152d06c6d90eb",
+      "captured_output_bytes": 16853965,
+      "stream_limit_bytes": 16777216
+    },
+    {
+      "mode": "existing",
+      "build": {
+        "executable_sha256": "52369c0bd77cd42ad18829009b40dbdb209aa0475f09b0e7d9e96784a1f51ff8",
+        "metadata_sha256": "5e32ebc53ee6e567577bbcbbc348dc513cb0671692b9181910946671172acd64",
+        "public_contract_sha256": "37f9550c2a8e385b4e82ee3d35ec0c653373015c452f59623d308281dbd89afb",
+        "signal_catalogue_sha256": "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
+      },
+      "installation_plan_sha256": "6fd1f1163aab565e149c4a834b0f4c84f1d987fa4d6c0aa309751a11f0377245",
+      "restore_plan_sha256": "a06783698d48ec4f5c88595557b4eca00473b4ec83d5963da9daa6b6b171a9e0",
+      "backup_sha256": "3201a4e898c8e490ce98f4502065efc16b90eb7b20ac7a0bf47610ede9623078",
+      "installed_runtime_cursor": 2,
+      "reopened_runtime_cursor": 4,
+      "restored_runtime_cursor": 3,
+      "committed_claim_sequence": 1,
+      "restored_read_manifest_sha256": "3c0c254e680b768eb8a9ae637ec7824b14d7f3ed19eb7972d930e9954dcb8228",
+      "captured_output_bytes": 16853971,
+      "stream_limit_bytes": 16777216
+    }
+  ],
+  "failed": 0,
+  "ignored": 0,
+  "outbound_denials": [
+    "ipv4",
+    "ipv6"
+  ],
+  "masked_roots": [
+    "D:\\a\\rrflow-development",
+    "C:\\Users\\runneradmin\\.rustup",
+    "C:\\Users\\runneradmin\\.cargo"
+  ],
+  "isolation": "windows-principal-job-wfp",
+  "startup_diagnostics": [
+    {
+      "case": "standard_user_complete_source_acl",
+      "exit_status": "0x00000000",
+      "source_object_counts": [
+        8051,
+        499,
+        25517
+      ],
+      "ipv6_probe_scope_id": 11
+    }
+  ]
+}
