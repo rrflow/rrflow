@@ -2,8 +2,10 @@
 //! Ancestor traversal and mount confinement remain the installation boundary's
 //! responsibility; this module does not claim an atomic filesystem snapshot.
 
+use rrd_store::filesystem::AnchoredPath;
 use std::fs::{File, Metadata};
 use std::io::{self, Read, Write};
+#[cfg(test)]
 use std::path::Path;
 
 #[cfg(unix)]
@@ -15,22 +17,21 @@ mod platform;
 #[cfg(not(any(unix, windows)))]
 mod platform {
     use super::*;
-    pub(super) fn open(_: &Path, _: bool) -> io::Result<File> {
+    pub(super) fn open_relative(
+        _: &File,
+        _: &std::ffi::OsStr,
+        _: bool,
+        _: bool,
+    ) -> io::Result<File> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
-            "native secret-file enforcement unavailable",
+            "native private relative I/O unavailable",
         ))
     }
     pub(super) fn validate(_: &File) -> io::Result<Metadata> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "native secret-file enforcement unavailable",
-        ))
-    }
-    pub(super) fn open_directory(_: &Path, _: bool) -> io::Result<File> {
-        Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "native directory enforcement unavailable",
         ))
     }
     pub(super) fn validate_directory(_: &File) -> io::Result<()> {
@@ -45,18 +46,61 @@ fn denied(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::PermissionDenied, message)
 }
 
+pub(in crate::engine) fn pin_private_directory(path: &AnchoredPath) -> io::Result<AnchoredPath> {
+    path.pin_directory_checked(platform::validate_directory)
+}
+
+pub(in crate::engine) fn create_private_directory_anchored(
+    path: &AnchoredPath,
+) -> io::Result<AnchoredPath> {
+    let directory = path.open_directory_with(|parent, name| {
+        let file = platform::open_relative(parent, name, true, true)?;
+        platform::validate_directory(&file)?;
+        Ok(file)
+    })?;
+    path.parent()
+        .ok_or_else(|| denied("private directory has no parent"))?
+        .sync_directory()?;
+    Ok(directory)
+}
+
+pub(in crate::engine) fn read_private_anchored(
+    path: &AnchoredPath,
+    maximum: u64,
+) -> io::Result<Vec<u8>> {
+    let file =
+        path.open_file_with(|parent, name| platform::open_relative(parent, name, false, false))?;
+    read_opened(file, maximum)
+}
+
+pub(in crate::engine) fn write_private_anchored(
+    path: &AnchoredPath,
+    bytes: &[u8],
+) -> io::Result<()> {
+    let mut file =
+        path.open_file_with(|parent, name| platform::open_relative(parent, name, true, false))?;
+    platform::validate(&file)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    platform::validate(&file)?;
+    path.parent()
+        .ok_or_else(|| denied("private file has no parent"))?
+        .sync_directory()
+}
+
+#[cfg(test)]
 pub(in crate::engine) fn validate_private_directory(path: &Path) -> io::Result<()> {
-    platform::validate_directory(&platform::open_directory(path, false)?)
+    pin_private_directory(&AnchoredPath::from_path(path)?).map(|_| ())
 }
 
+#[cfg(test)]
 pub(in crate::engine) fn create_private_directory(path: &Path) -> io::Result<()> {
-    // Security is supplied to creation itself. Never chmod or repair an existing
-    // object. Ancestor identity/retention is a separate installation boundary.
-    platform::validate_directory(&platform::open_directory(path, true)?)
+    create_private_directory_anchored(&AnchoredPath::from_path(path)?).map(|_| ())
 }
 
+#[cfg(test)]
 pub(in crate::engine) fn read_private_bounded(path: &Path, maximum: u64) -> io::Result<Vec<u8>> {
-    read_opened(platform::open(path, false)?, maximum)
+    read_private_anchored(&AnchoredPath::from_path(path)?, maximum)
 }
 
 fn read_opened(mut file: File, maximum: u64) -> io::Result<Vec<u8>> {
@@ -89,26 +133,36 @@ fn read_opened(mut file: File, maximum: u64) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
+#[cfg(test)]
 pub(in crate::engine) fn write_private_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    // Exclusive creation establishes confidentiality before the first byte.
-    // A failed validation leaves only an empty file; never repair an existing ACL.
-    let mut file = platform::open(path, true)?;
-    platform::validate(&file)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    platform::validate(&file)?;
-    #[cfg(unix)]
-    File::open(
-        path.parent()
-            .ok_or_else(|| denied("secret file has no parent"))?,
-    )?
-    .sync_all()?;
-    Ok(())
+    write_private_anchored(&AnchoredPath::from_path(path)?, bytes)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn anchored_private_creation_retains_native_security() {
+        let fixture = tempfile::tempdir().unwrap();
+        let root = AnchoredPath::open_root(fixture.path()).unwrap();
+        let directory = create_private_directory_anchored(&root.join("private")).unwrap();
+        pin_private_directory(&directory).unwrap();
+        let secret = directory.join("secret");
+        write_private_anchored(&secret, b"private bytes").unwrap();
+        assert_eq!(
+            read_private_anchored(&secret, 32).unwrap(),
+            b"private bytes"
+        );
+        assert!(write_private_anchored(&secret, b"replacement").is_err());
+        assert!(read_private_anchored(&secret, 2).is_err());
+        assert_eq!(
+            read_private_anchored(&secret, 32).unwrap(),
+            b"private bytes"
+        );
+        assert!(create_private_directory_anchored(&root.join("private")).is_err());
+    }
 
     #[cfg(any(unix, windows))]
     #[test]

@@ -1,6 +1,8 @@
 //! Win32 handles own both file identity and security inspection. No shell ACL
 //! utility, inherited default ACL, or post-write permission repair is used.
-use super::{denied, File, Metadata, Path};
+#[cfg(test)]
+use super::Path;
+use super::{denied, File, Metadata};
 use std::ffi::c_void;
 use std::io;
 use std::mem::{offset_of, size_of};
@@ -8,7 +10,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::ptr::{null, null_mut};
 use windows_sys::Win32::Foundation::{
-    LocalFree, ERROR_INSUFFICIENT_BUFFER, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE,
+    LocalFree, ERROR_INSUFFICIENT_BUFFER, GENERIC_READ, GENERIC_WRITE,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
@@ -18,14 +20,12 @@ use windows_sys::Win32::Security::{
     EqualSid, GetAce, GetLengthSid, GetSecurityDescriptorControl, GetTokenInformation, IsValidAcl,
     IsValidSecurityDescriptor, IsValidSid, IsWellKnownSid, TokenUser, WinLocalSystemSid,
     ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
-    PSID, SECURITY_ATTRIBUTES, SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
+    PSID, SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateDirectoryW, CreateFileW, GetFileInformationByHandle, GetFileType,
-    BY_HANDLE_FILE_INFORMATION, CREATE_NEW, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
-    FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-    FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TYPE_DISK,
-    OPEN_EXISTING, READ_CONTROL, SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
+    GetFileInformationByHandle, GetFileType, BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY,
+    FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT, FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
+    FILE_SHARE_WRITE, FILE_TYPE_DISK, READ_CONTROL,
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -129,52 +129,106 @@ fn descriptor(sddl: &str) -> io::Result<LocalAllocation> {
     Ok(LocalAllocation(raw))
 }
 
-pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
-    let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
-    if wide.contains(&0) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "directory path contains NUL",
-        ));
+pub(super) fn open_relative(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+    directory: bool,
+) -> io::Result<File> {
+    use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
+    use windows_sys::Wdk::Storage::FileSystem::{
+        NtCreateFile, FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN,
+        FILE_OPEN_REPARSE_POINT, FILE_SYNCHRONOUS_IO_NONALERT,
+    };
+    use windows_sys::Win32::Foundation::{RtlNtStatusToDosError, UNICODE_STRING};
+    use windows_sys::Win32::Security::{SecurityIdentification, SECURITY_QUALITY_OF_SERVICE};
+    use windows_sys::Win32::Storage::FileSystem::SYNCHRONIZE;
+    use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
+    let mut name: Vec<u16> = name.encode_wide().collect();
+    if name.is_empty() || name.contains(&0) || name.len() > 32_767 {
+        return Err(denied("invalid private leaf name"));
     }
-    wide.push(0);
-    if create {
+    let length = (name.len() * 2) as u16;
+    let mut string = UNICODE_STRING {
+        Length: length,
+        MaximumLength: length,
+        Buffer: name.as_mut_ptr(),
+    };
+    let security = if create {
         let user = CurrentUser::query()?.text()?;
-        // Descendants inherit only owner/System grants. Each of the four estate
-        // directories gets its own protected descriptor rather than relying on
-        // the project parent's ACL. Store-owned descendants retain their owner.
-        let security = descriptor(&format!("O:{user}D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)"))?;
-        let attributes = SECURITY_ATTRIBUTES {
-            nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
-            lpSecurityDescriptor: security.0,
-            bInheritHandle: 0,
-        };
-        // SAFETY: path and descriptor remain live; creation never replaces an existing object.
-        if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } == 0 {
-            return Err(io::Error::last_os_error());
-        }
-    }
-    // SAFETY: live terminated path; OPEN_REPARSE_POINT inspects the leaf itself.
-    // These short-lived metadata handles do not claim ancestor exclusion.
-    let raw = unsafe {
-        CreateFileW(
-            wide.as_ptr(),
-            READ_CONTROL | FILE_READ_ATTRIBUTES,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        let inheritance = if directory { "OICI" } else { "" };
+        Some(descriptor(&format!(
+            "O:{user}D:P(A;{inheritance};FA;;;{user})(A;{inheritance};FA;;;SY)"
+        ))?)
+    } else {
+        None
+    };
+    let mut qos = SECURITY_QUALITY_OF_SERVICE {
+        Length: size_of::<SECURITY_QUALITY_OF_SERVICE>() as u32,
+        ImpersonationLevel: SecurityIdentification,
+        ContextTrackingMode: 0,
+        EffectiveOnly: true,
+    };
+    let attributes = OBJECT_ATTRIBUTES {
+        Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
+        RootDirectory: parent.as_raw_handle(),
+        ObjectName: &mut string,
+        Attributes: 0,
+        SecurityDescriptor: security.as_ref().map_or(null_mut(), |value| value.0.cast()),
+        SecurityQualityOfService: (&mut qos as *mut SECURITY_QUALITY_OF_SERVICE).cast(),
+    };
+    let mut status = IO_STATUS_BLOCK::default();
+    let mut raw = null_mut();
+    // One ordinary component relative to a retained directory. The descriptor
+    // is applied atomically by FILE_CREATE, before the first secret byte.
+    let result = unsafe {
+        NtCreateFile(
+            &mut raw,
+            GENERIC_READ
+                | READ_CONTROL
+                | FILE_READ_ATTRIBUTES
+                | SYNCHRONIZE
+                | if create { GENERIC_WRITE } else { 0 },
+            &attributes,
+            &mut status,
             null(),
-            OPEN_EXISTING,
-            FILE_FLAG_BACKUP_SEMANTICS
-                | FILE_FLAG_OPEN_REPARSE_POINT
-                | SECURITY_SQOS_PRESENT
-                | SECURITY_IDENTIFICATION,
-            null_mut(),
+            if directory {
+                FILE_ATTRIBUTE_DIRECTORY
+            } else {
+                FILE_ATTRIBUTE_NORMAL
+            },
+            if directory {
+                FILE_SHARE_READ | FILE_SHARE_WRITE
+            } else if create {
+                0
+            } else {
+                FILE_SHARE_READ
+            },
+            if create { FILE_CREATE } else { FILE_OPEN },
+            FILE_OPEN_REPARSE_POINT
+                | FILE_SYNCHRONOUS_IO_NONALERT
+                | if directory {
+                    FILE_DIRECTORY_FILE
+                } else {
+                    FILE_NON_DIRECTORY_FILE
+                },
+            null(),
+            0,
         )
     };
-    if raw == INVALID_HANDLE_VALUE {
-        return Err(io::Error::last_os_error());
+    if result < 0 {
+        return Err(io::Error::from_raw_os_error(
+            unsafe { RtlNtStatusToDosError(result) } as i32,
+        ));
     }
-    // SAFETY: successful CreateFileW transfers one real handle to File.
+    // SAFETY: a successful NtCreateFile transfers one owned file handle.
     Ok(unsafe { File::from_raw_handle(raw) })
+}
+
+#[cfg(test)]
+pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
+    let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
+    path.with_parent(|parent, name| open_relative(parent, name, create, true))
 }
 
 pub(super) fn validate_directory(file: &File) -> io::Result<()> {
@@ -192,51 +246,10 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
     validate_security(file, true)
 }
 
+#[cfg(test)]
 pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
-    let wide: Vec<u16> = path.as_os_str().encode_wide().collect();
-    if wide.contains(&0) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "secret path contains NUL",
-        ));
-    }
-    let wide: Vec<u16> = wide.into_iter().chain(Some(0)).collect();
-    let security = if create {
-        let user = CurrentUser::query()?.text()?;
-        Some(descriptor(&format!(
-            "O:{user}D:P(A;;FA;;;{user})(A;;FA;;;SY)"
-        ))?)
-    } else {
-        None
-    };
-    let attributes = SECURITY_ATTRIBUTES {
-        nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
-        lpSecurityDescriptor: security.as_ref().map_or(null_mut(), |value| value.0),
-        bInheritHandle: 0,
-    };
-    // SAFETY: all pointers are live for this call. CREATE_NEW cannot truncate
-    // an existing file; the explicit protected ACL applies before any write.
-    // Read handles deny sharing for write/delete and open the reparse object
-    // itself. SQOS prevents a device/pipe from impersonating this process.
-    let raw = unsafe {
-        CreateFileW(
-            wide.as_ptr(),
-            GENERIC_READ | if create { GENERIC_WRITE } else { 0 },
-            if create { 0 } else { FILE_SHARE_READ },
-            if create { &attributes } else { null() },
-            if create { CREATE_NEW } else { OPEN_EXISTING },
-            FILE_ATTRIBUTE_NORMAL
-                | FILE_FLAG_OPEN_REPARSE_POINT
-                | SECURITY_SQOS_PRESENT
-                | SECURITY_IDENTIFICATION,
-            null_mut(),
-        )
-    };
-    if raw == INVALID_HANDLE_VALUE {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: successful CreateFileW transfers ownership of this one handle.
-    Ok(unsafe { File::from_raw_handle(raw) })
+    let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
+    path.open_file_with(|parent, name| open_relative(parent, name, create, false))
 }
 
 pub(super) fn validate(file: &File) -> io::Result<Metadata> {

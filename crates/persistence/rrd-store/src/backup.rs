@@ -7,6 +7,7 @@
 
 use crate::access::runtime_state::{checked_key, get};
 use crate::archive::{ControlArchiveWriter, CATALOGUE_CONTROL_FAMILIES};
+use crate::filesystem::{AnchorInput, AnchoredPath, OpenOptions};
 use crate::keyspaces::{self, Durability};
 use crate::repository::prepare_control_batch;
 use crate::{
@@ -20,9 +21,8 @@ use rrd_core::digest;
 use rrd_core::{ObjectReference, RuntimeMutation, ScopeId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::{Component, Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::{Component, Path};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Version 2 adds the control-journal archive: an application-complete backup
@@ -234,30 +234,31 @@ struct StoredCatalogue {
 /// coverage record to the catalogue.
 pub fn create_logical_backup<E: StorageEngine>(
     engine: &E,
-    catalogue_root: &Path,
+    catalogue_root: &(impl AnchorInput + ?Sized),
     label: &str,
     created_at: u64,
 ) -> Result<BackupEntry> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     validate_label(label)?;
     initialize_catalogue(catalogue_root)?;
     let archives = catalogue_root.join(ARCHIVE_DIRECTORY);
-    fs::create_dir_all(&archives).map_err(backup_io)?;
+    archives.create_dir_all().map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
     let staging = archives.join(format!(".logical-backup-{}-{id}.tmp", std::process::id()));
     let inventory = export_logical_archive(engine, &staging)?;
     let archive_name = format!("{}.rrd-archive", inventory.archive_sha256);
     let archive_path = archives.join(&archive_name);
-    if archive_path.exists() {
+    if archive_path.try_exists().map_err(backup_io)? {
         let retained = inspect_logical_archive(&archive_path)?;
         if retained != inventory {
-            let _ = fs::remove_file(&staging);
+            let _ = staging.remove_file();
             return Err(Error::Archive(
                 "content-addressed backup archive conflicts with retained inventory".into(),
             ));
         }
-        fs::remove_file(&staging).map_err(backup_io)?;
+        staging.remove_file().map_err(backup_io)?;
     } else {
-        rrd_lsm::publish_rename(&archives, &staging, &archive_path).map_err(backup_io)?;
+        staging.rename_to(&archive_path).map_err(backup_io)?;
     }
 
     let backup_id = digest::sha256_hex(
@@ -330,17 +331,18 @@ pub fn create_logical_backup<E: StorageEngine>(
 pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     engine: &E,
     objects: &O,
-    catalogue_root: &Path,
+    catalogue_root: &(impl AnchorInput + ?Sized),
     label: &str,
     created_at: u64,
     control_families: &[String],
 ) -> Result<BackupEntry> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     validate_label(label)?;
     validate_control_families(control_families)?;
     initialize_catalogue(catalogue_root)?;
     let control_sequence = engine.control().sequence()?;
     let archives = catalogue_root.join(ARCHIVE_DIRECTORY);
-    fs::create_dir_all(&archives).map_err(backup_io)?;
+    archives.create_dir_all().map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
     let staging = archives.join(format!(".logical-backup-{}-{id}.tmp", std::process::id()));
     let inventory = export_logical_archive(engine, &staging)?;
@@ -416,13 +418,16 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
 /// is absent while retained artifacts exist beside it fails closed: those
 /// artifacts belonged to entries, and reading them as "no backups" would hide
 /// the loss.
-pub fn load_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
+pub fn load_backup_catalogue(
+    catalogue_root: &(impl AnchorInput + ?Sized),
+) -> Result<BackupCatalogue> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     let path = catalogue_root.join(CATALOGUE_FILE);
-    if !path.exists() {
+    if !path.try_exists().map_err(backup_io)? {
         require_no_orphan_artifacts(catalogue_root)?;
         return catalogue_from_payload(empty_catalogue_payload());
     }
-    let bytes = fs::read(&path).map_err(backup_io)?;
+    let bytes = path.read().map_err(backup_io)?;
     let stored: StoredCatalogue = serde_json::from_slice(&bytes)?;
     if stored.payload.format_version != BACKUP_CATALOGUE_VERSION {
         return Err(Error::Archive(format!(
@@ -450,7 +455,10 @@ pub fn load_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
 /// Verifies the digests of the catalogue and of every retained artifact it
 /// references, reading only: nothing is created or repaired. The digests
 /// detect changed bytes; they do not authenticate a producer.
-pub fn verify_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue> {
+pub fn verify_backup_catalogue(
+    catalogue_root: &(impl AnchorInput + ?Sized),
+) -> Result<BackupCatalogue> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     let catalogue = load_backup_catalogue(catalogue_root)?;
     for entry in &catalogue.backups {
         let path = resolve_archive(catalogue_root, &entry.archive_file)?;
@@ -475,9 +483,10 @@ pub fn verify_backup_catalogue(catalogue_root: &Path) -> Result<BackupCatalogue>
 /// Exact replay is recovered from the bounded receipt embedded in the
 /// catalogue.
 pub fn prune_backup_catalogue(
-    catalogue_root: &Path,
+    catalogue_root: &(impl AnchorInput + ?Sized),
     plan: &BackupPrunePlan,
 ) -> Result<BackupPruneOutcome> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     validate_prune_plan(plan)?;
     let request_sha256 = digest::sha256_hex(&serde_json::to_vec(plan)?);
     let mut catalogue = verify_backup_catalogue(catalogue_root)?;
@@ -566,11 +575,13 @@ pub fn prune_backup_catalogue(
 }
 
 pub fn restore_catalogued_backup(
-    catalogue_root: &Path,
+    catalogue_root: &(impl AnchorInput + ?Sized),
     backup_id: &str,
-    target: &Path,
+    target: &(impl AnchorInput + ?Sized),
     at: u64,
 ) -> Result<LogicalRestoreReport> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
+    let target = &target.anchor().map_err(backup_io)?;
     let catalogue = verify_backup_catalogue(catalogue_root)?;
     let entry = catalogue
         .backups
@@ -597,10 +608,12 @@ pub fn restore_catalogued_backup(
 /// the complete immutable payload closure, catalogue state, and replayed
 /// control journal of a catalogued backup.
 pub fn verify_restored_backup_objects(
-    catalogue_root: &Path,
+    catalogue_root: &(impl AnchorInput + ?Sized),
     backup_id: &str,
-    restored_root: &Path,
+    restored_root: &(impl AnchorInput + ?Sized),
 ) -> Result<()> {
+    let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
+    let restored_root = &restored_root.anchor().map_err(backup_io)?;
     let catalogue = verify_backup_catalogue(catalogue_root)?;
     let entry = catalogue
         .backups
@@ -613,7 +626,7 @@ pub fn verify_restored_backup_objects(
         ));
     }
     let manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
-    let restored = LocalObjectStore::open_existing(restored_root.join("immutable"))?;
+    let restored = LocalObjectStore::open_existing_anchored(&restored_root.join("immutable"))?;
     for object in &manifest.objects {
         let verified = restored.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -663,9 +676,9 @@ fn read_control_restore_progress(
 /// entry; a target whose control state diverges from an entry's recorded
 /// before-state fails closed before any further mutation.
 fn restore_control_journal(
-    archive: &Path,
+    archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
-    staging_root: &Path,
+    staging_root: &AnchoredPath,
 ) -> Result<()> {
     let inspected = inspect_control_archive(archive)?;
     if &inspected != expected {
@@ -673,7 +686,7 @@ fn restore_control_journal(
             "control-journal archive inventory does not match its catalogue entry".into(),
         ));
     }
-    let engine = RrflowKvStore::open_existing(staging_root)?;
+    let engine = RrflowKvStore::open_existing_anchored(staging_root, Default::default())?;
     replay_control_entries(archive, expected, &engine, None)?;
     drop(engine);
     verify_restored_control_journal(archive, expected, staging_root)
@@ -683,7 +696,7 @@ fn restore_control_journal(
 /// ends the replay early without the completion marker; it exists so a test
 /// can interrupt a replay the way a crash would and resume it.
 fn replay_control_entries(
-    archive: &Path,
+    archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
     engine: &RrflowKvStore,
     stop_after: Option<u64>,
@@ -785,11 +798,11 @@ fn replay_control_entries(
 /// time, actor, action, and identities. Nothing but the replay writes control
 /// state into a staged root, so contiguity holds until publication.
 fn verify_restored_control_journal(
-    archive: &Path,
+    archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
-    restored_root: &Path,
+    restored_root: &AnchoredPath,
 ) -> Result<()> {
-    let engine = RrflowKvStore::open_existing(restored_root)?;
+    let engine = RrflowKvStore::open_existing_anchored(restored_root, Default::default())?;
     let progress = control_restore_progress(&engine)?.ok_or_else(|| {
         Error::Archive("restored root carries no control-journal replay marker".into())
     })?;
@@ -863,16 +876,16 @@ fn verify_restored_control_journal(
 /// archive.
 fn retain_control_journal(
     engine: &impl StorageEngine,
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     source_control_sequence: u64,
     families: &[String],
 ) -> Result<(String, ControlArchiveInventory)> {
     let archives = catalogue_root.join(CONTROL_ARCHIVE_DIRECTORY);
-    fs::create_dir_all(&archives).map_err(backup_io)?;
+    archives.create_dir_all().map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
     let staging = archives.join(format!(".control-archive-{}-{id}.tmp", std::process::id()));
+    let mut writer = ControlArchiveWriter::create(&staging, source_control_sequence, families)?;
     let result = (|| {
-        let mut writer = ControlArchiveWriter::create(&staging, source_control_sequence, families)?;
         let mut after = 0u64;
         while after < source_control_sequence {
             let page = engine.control().journal_since(after, PAGE_SIZE)?;
@@ -904,24 +917,24 @@ fn retain_control_journal(
     let inventory = match result {
         Ok(inventory) => inventory,
         Err(error) => {
-            let _ = fs::remove_file(&staging);
+            let _ = staging.remove_file();
             return Err(error);
         }
     };
     let file_name = format!("{}.rrd-control-archive", inventory.archive_sha256);
     let retained_path = archives.join(&file_name);
-    if retained_path.exists() {
+    if retained_path.try_exists().map_err(backup_io)? {
         let actual = inspect_control_archive(&retained_path)?;
         if actual != inventory {
-            let _ = fs::remove_file(&staging);
+            let _ = staging.remove_file();
             return Err(Error::Archive(
                 "content-addressed control-journal archive conflicts with retained inventory"
                     .into(),
             ));
         }
-        fs::remove_file(&staging).map_err(backup_io)?;
+        staging.remove_file().map_err(backup_io)?;
     } else {
-        rrd_lsm::publish_rename(&archives, &staging, &retained_path).map_err(backup_io)?;
+        staging.rename_to(&retained_path).map_err(backup_io)?;
     }
     Ok((
         format!("{CONTROL_ARCHIVE_DIRECTORY}/{file_name}"),
@@ -930,9 +943,9 @@ fn retain_control_journal(
 }
 
 fn load_control_archive_for_entry(
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     entry: &BackupEntry,
-) -> Result<(PathBuf, ControlArchiveInventory)> {
+) -> Result<(AnchoredPath, ControlArchiveInventory)> {
     let file = entry.control_archive_file.as_deref().ok_or_else(|| {
         Error::Archive("application-complete backup has no control-journal archive path".into())
     })?;
@@ -953,28 +966,28 @@ fn load_control_archive_for_entry(
 }
 
 fn retain_content_addressed_file(
-    staging: &Path,
-    retained: &Path,
+    staging: &AnchoredPath,
+    retained: &AnchoredPath,
     inventory: &LogicalArchiveInventory,
 ) -> Result<()> {
-    let parent = retained
-        .parent()
-        .ok_or_else(|| Error::Archive("backup archive has no parent directory".into()))?;
-    if retained.exists() {
+    if retained.try_exists().map_err(backup_io)? {
         let actual = inspect_logical_archive(retained)?;
         if &actual != inventory {
-            let _ = fs::remove_file(staging);
+            let _ = staging.remove_file();
             return Err(Error::Archive(
                 "content-addressed backup archive conflicts with retained inventory".into(),
             ));
         }
-        fs::remove_file(staging).map_err(backup_io)
+        staging.remove_file().map_err(backup_io)
     } else {
-        rrd_lsm::publish_rename(parent, staging, retained).map_err(backup_io)
+        staging.rename_to(retained).map_err(backup_io)
     }
 }
 
-fn retain_catalogue_entry(catalogue_root: &Path, entry: BackupEntry) -> Result<BackupEntry> {
+fn retain_catalogue_entry(
+    catalogue_root: &AnchoredPath,
+    entry: BackupEntry,
+) -> Result<BackupEntry> {
     let mut catalogue = load_backup_catalogue(catalogue_root)?;
     deny_pruned_identity_reuse(&catalogue, &entry.backup_id)?;
     if let Some(existing) = catalogue
@@ -1042,7 +1055,7 @@ fn object_references_at(engine: &impl StorageEngine, head: u64) -> Result<Vec<Ob
 
 fn retain_catalogues(
     engine: &impl StorageEngine,
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
 ) -> Result<(String, CatalogueManifestInventory)> {
     let source_control_sequence = engine.control().sequence()?;
     let mut after = 0u64;
@@ -1118,10 +1131,10 @@ fn retain_catalogues(
         payload_sha256: inventory.manifest_sha256.clone(),
     };
     let manifests = catalogue_root.join(CATALOGUE_MANIFEST_DIRECTORY);
-    fs::create_dir_all(&manifests).map_err(backup_io)?;
+    manifests.create_dir_all().map_err(backup_io)?;
     let file_name = format!("{}.rrd-catalogues.json", inventory.manifest_sha256);
     let retained_path = manifests.join(&file_name);
-    if retained_path.exists() {
+    if retained_path.try_exists().map_err(backup_io)? {
         let actual = load_catalogue_manifest(&retained_path)?;
         if actual != stored.payload {
             return Err(Error::Archive(
@@ -1143,7 +1156,7 @@ fn retain_catalogues(
         file.write_all(&bytes).map_err(backup_io)?;
         file.sync_all().map_err(backup_io)?;
         drop(file);
-        rrd_lsm::publish_rename(&manifests, &staging, &retained_path).map_err(backup_io)?;
+        staging.rename_to(&retained_path).map_err(backup_io)?;
     }
     Ok((
         format!("{CATALOGUE_MANIFEST_DIRECTORY}/{file_name}"),
@@ -1163,7 +1176,7 @@ fn catalogue_scope(key: &str) -> Result<Option<ScopeId>> {
 }
 
 fn load_catalogue_manifest_for_entry(
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     entry: &BackupEntry,
 ) -> Result<CatalogueManifest> {
     let file = entry.catalogue_manifest_file.as_deref().ok_or_else(|| {
@@ -1183,13 +1196,8 @@ fn load_catalogue_manifest_for_entry(
     Ok(manifest)
 }
 
-fn load_catalogue_manifest(path: &Path) -> Result<CatalogueManifest> {
-    if fs::metadata(path).map_err(backup_io)?.len() > MAX_ARCHIVE_MANIFEST_BYTES {
-        return Err(Error::Archive(
-            "catalogue manifest exceeds the v1 byte bound".into(),
-        ));
-    }
-    let bytes = fs::read(path).map_err(backup_io)?;
+fn load_catalogue_manifest(path: &AnchoredPath) -> Result<CatalogueManifest> {
+    let bytes = read_manifest_bytes(path)?;
     let stored: StoredCatalogueManifest = serde_json::from_slice(&bytes)?;
     validate_catalogue_manifest(&stored.payload)?;
     let actual = digest::sha256_hex(&serde_json::to_vec(&stored.payload)?);
@@ -1278,9 +1286,9 @@ fn validate_catalogue_manifest(manifest: &CatalogueManifest) -> Result<()> {
     Ok(())
 }
 
-fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &Path) -> Result<()> {
+fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &AnchoredPath) -> Result<()> {
     validate_catalogue_manifest(manifest)?;
-    let engine = RrflowKvStore::open_existing(staging_root)?;
+    let engine = RrflowKvStore::open_existing_anchored(staging_root, Default::default())?;
     for scope in &manifest.scopes {
         let records = manifest
             .records
@@ -1350,8 +1358,11 @@ fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &Path) -> Resu
     verify_restored_catalogues(manifest, staging_root)
 }
 
-fn verify_restored_catalogues(manifest: &CatalogueManifest, restored_root: &Path) -> Result<()> {
-    let engine = RrflowKvStore::open_existing(restored_root)?;
+fn verify_restored_catalogues(
+    manifest: &CatalogueManifest,
+    restored_root: &AnchoredPath,
+) -> Result<()> {
+    let engine = RrflowKvStore::open_existing_anchored(restored_root, Default::default())?;
     for record in &manifest.records {
         if engine.control().get(&record.key)?.as_deref() != Some(record.value.as_slice()) {
             return Err(Error::Archive(format!(
@@ -1374,7 +1385,7 @@ fn verify_restored_catalogues(manifest: &CatalogueManifest, restored_root: &Path
 
 fn retain_object_payloads(
     source: &impl ImmutableObjectStore,
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     references: &[ObjectReference],
 ) -> Result<(String, ObjectPayloadManifestInventory)> {
     if references.len() > MAX_ARCHIVE_OBJECTS {
@@ -1382,7 +1393,7 @@ fn retain_object_payloads(
             "backup object closure exceeds the v1 entry bound".into(),
         ));
     }
-    let retained = LocalObjectStore::open(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let retained = LocalObjectStore::open_anchored(&catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
     let mut entries = Vec::with_capacity(references.len());
     let mut payload_bytes = 0u64;
     for reference in references {
@@ -1414,10 +1425,10 @@ fn retain_object_payloads(
         payload_sha256: payload_sha256.clone(),
     };
     let manifests = catalogue_root.join(OBJECT_MANIFEST_DIRECTORY);
-    fs::create_dir_all(&manifests).map_err(backup_io)?;
+    manifests.create_dir_all().map_err(backup_io)?;
     let file_name = format!("{payload_sha256}.rrd-objects.json");
     let retained_path = manifests.join(&file_name);
-    if retained_path.exists() {
+    if retained_path.try_exists().map_err(backup_io)? {
         let actual = load_object_manifest(&retained_path)?;
         if actual != stored.payload {
             return Err(Error::Archive(
@@ -1436,7 +1447,7 @@ fn retain_object_payloads(
         file.write_all(&bytes).map_err(backup_io)?;
         file.sync_all().map_err(backup_io)?;
         drop(file);
-        rrd_lsm::publish_rename(&manifests, &staging, &retained_path).map_err(backup_io)?;
+        staging.rename_to(&retained_path).map_err(backup_io)?;
     }
     Ok((
         format!("{OBJECT_MANIFEST_DIRECTORY}/{file_name}"),
@@ -1449,9 +1460,10 @@ fn retain_object_payloads(
     ))
 }
 
-fn verify_object_payloads(catalogue_root: &Path, entry: &BackupEntry) -> Result<()> {
+fn verify_object_payloads(catalogue_root: &AnchoredPath, entry: &BackupEntry) -> Result<()> {
     let manifest = load_object_manifest_for_entry(catalogue_root, entry)?;
-    let payloads = LocalObjectStore::open_existing(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let payloads =
+        LocalObjectStore::open_existing_anchored(&catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
     for object in manifest.objects {
         let verified = payloads.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -1465,12 +1477,13 @@ fn verify_object_payloads(catalogue_root: &Path, entry: &BackupEntry) -> Result<
 }
 
 fn restore_object_payloads(
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     manifest: &ObjectPayloadManifest,
-    staging_root: &Path,
+    staging_root: &AnchoredPath,
 ) -> Result<()> {
-    let source = LocalObjectStore::open_existing(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
-    let target = LocalObjectStore::open(staging_root.join("immutable"))?;
+    let source =
+        LocalObjectStore::open_existing_anchored(&catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?;
+    let target = LocalObjectStore::open_anchored(&staging_root.join("immutable"))?;
     for object in &manifest.objects {
         let verified = source.verify(&object.sha256)?;
         if verified.length != object.length {
@@ -1494,7 +1507,7 @@ fn restore_object_payloads(
 }
 
 fn load_object_manifest_for_entry(
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     entry: &BackupEntry,
 ) -> Result<ObjectPayloadManifest> {
     let file = entry.object_manifest_file.as_deref().ok_or_else(|| {
@@ -1514,13 +1527,8 @@ fn load_object_manifest_for_entry(
     Ok(manifest)
 }
 
-fn load_object_manifest(path: &Path) -> Result<ObjectPayloadManifest> {
-    if fs::metadata(path).map_err(backup_io)?.len() > MAX_ARCHIVE_MANIFEST_BYTES {
-        return Err(Error::Archive(
-            "object manifest exceeds the v1 byte bound".into(),
-        ));
-    }
-    let bytes = fs::read(path).map_err(backup_io)?;
+fn load_object_manifest(path: &AnchoredPath) -> Result<ObjectPayloadManifest> {
+    let bytes = read_manifest_bytes(path)?;
     let stored: StoredObjectPayloadManifest = serde_json::from_slice(&bytes)?;
     validate_object_manifest(&stored.payload)?;
     let actual = digest::sha256_hex(&serde_json::to_vec(&stored.payload)?);
@@ -1530,6 +1538,25 @@ fn load_object_manifest(path: &Path) -> Result<ObjectPayloadManifest> {
         ));
     }
     Ok(stored.payload)
+}
+
+fn read_manifest_bytes(path: &AnchoredPath) -> Result<Vec<u8>> {
+    let file = path.open_read().map_err(backup_io)?;
+    if file.metadata().map_err(backup_io)?.len() > MAX_ARCHIVE_MANIFEST_BYTES {
+        return Err(Error::Archive(
+            "backup manifest exceeds the v1 byte bound".into(),
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_ARCHIVE_MANIFEST_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(backup_io)?;
+    if bytes.len() as u64 > MAX_ARCHIVE_MANIFEST_BYTES {
+        return Err(Error::Archive(
+            "backup manifest exceeds the v1 byte bound".into(),
+        ));
+    }
+    Ok(bytes)
 }
 
 fn object_manifest_inventory(
@@ -1585,20 +1612,23 @@ fn empty_catalogue_payload() -> CataloguePayload {
 
 /// Retained artifacts exist only for catalogued entries, so a catalogue file
 /// that is absent beside them was lost; reading it as empty would hide that.
-fn require_no_orphan_artifacts(catalogue_root: &Path) -> Result<()> {
-    if let Some(directory) = [
+fn require_no_orphan_artifacts(catalogue_root: &AnchoredPath) -> Result<()> {
+    for directory in [
         ARCHIVE_DIRECTORY,
         OBJECT_MANIFEST_DIRECTORY,
         CATALOGUE_MANIFEST_DIRECTORY,
         CONTROL_ARCHIVE_DIRECTORY,
         OBJECT_PAYLOAD_DIRECTORY,
-    ]
-    .into_iter()
-    .find(|directory| catalogue_root.join(directory).exists())
-    {
-        return Err(Error::Archive(format!(
-            "backup catalogue is absent while retained {directory} exist beside it"
-        )));
+    ] {
+        if catalogue_root
+            .join(directory)
+            .try_exists()
+            .map_err(backup_io)?
+        {
+            return Err(Error::Archive(format!(
+                "backup catalogue is absent while retained {directory} exist beside it"
+            )));
+        }
     }
     Ok(())
 }
@@ -1606,12 +1636,16 @@ fn require_no_orphan_artifacts(catalogue_root: &Path) -> Result<()> {
 /// Publishes the empty catalogue before the first artifact is retained, so
 /// every retained artifact is younger than the catalogue that owns it and an
 /// absent catalogue beside artifacts is always a loss.
-fn initialize_catalogue(catalogue_root: &Path) -> Result<()> {
-    if catalogue_root.join(CATALOGUE_FILE).exists() {
+fn initialize_catalogue(catalogue_root: &AnchoredPath) -> Result<()> {
+    if catalogue_root
+        .join(CATALOGUE_FILE)
+        .try_exists()
+        .map_err(backup_io)?
+    {
         return Ok(());
     }
     require_no_orphan_artifacts(catalogue_root)?;
-    fs::create_dir_all(catalogue_root).map_err(backup_io)?;
+    catalogue_root.create_dir_all().map_err(backup_io)?;
     write_catalogue(
         catalogue_root,
         catalogue_from_payload(empty_catalogue_payload())?,
@@ -1628,7 +1662,7 @@ fn catalogue_from_payload(payload: CataloguePayload) -> Result<BackupCatalogue> 
     })
 }
 
-fn write_catalogue(root: &Path, catalogue: BackupCatalogue) -> Result<()> {
+fn write_catalogue(root: &AnchoredPath, catalogue: BackupCatalogue) -> Result<()> {
     let payload = CataloguePayload {
         format_version: BACKUP_CATALOGUE_VERSION,
         revision: catalogue.revision,
@@ -1645,21 +1679,7 @@ fn write_catalogue(root: &Path, catalogue: BackupCatalogue) -> Result<()> {
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
     let temporary = root.join(format!(".catalogue-{}-{id}.tmp", std::process::id()));
     let path = root.join(CATALOGUE_FILE);
-    let result = (|| {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(backup_io)?;
-        file.write_all(&bytes).map_err(backup_io)?;
-        file.sync_all().map_err(backup_io)?;
-        drop(file);
-        rrd_lsm::publish_rename(root, &temporary, &path).map_err(backup_io)
-    })();
-    if result.is_err() && temporary.exists() {
-        fs::remove_file(&temporary).map_err(backup_io)?;
-    }
-    result
+    crate::filesystem::persist_rename(&temporary, &path, &bytes).map_err(backup_io)
 }
 
 fn payload_digest(payload: &CataloguePayload) -> Result<String> {
@@ -1767,7 +1787,7 @@ fn deny_pruned_identity_reuse(catalogue: &BackupCatalogue, backup_id: &str) -> R
 }
 
 fn cleanup_pruned_artifacts(
-    catalogue_root: &Path,
+    catalogue_root: &AnchoredPath,
     removed: &[BackupEntry],
     retained: &[BackupEntry],
 ) -> Result<()> {
@@ -1797,7 +1817,7 @@ fn cleanup_pruned_artifacts(
         removed_files.insert(entry.archive_file.clone());
         if let Some(path) = &entry.object_manifest_file {
             let manifest_path = resolve_object_manifest(catalogue_root, path)?;
-            if manifest_path.exists() {
+            if manifest_path.try_exists().map_err(backup_io)? {
                 removed_objects.extend(
                     load_object_manifest_for_entry(catalogue_root, entry)?
                         .objects
@@ -1818,7 +1838,7 @@ fn cleanup_pruned_artifacts(
         .difference(&retained_objects)
         .cloned()
         .collect::<BTreeSet<_>>();
-    LocalObjectStore::open(catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?
+    LocalObjectStore::open_anchored(&catalogue_root.join(OBJECT_PAYLOAD_DIRECTORY))?
         .reclaim_orphans(&unreachable_objects)?;
     for relative in removed_files.difference(&retained_files) {
         let path = if relative.starts_with(&format!("{ARCHIVE_DIRECTORY}/")) {
@@ -1830,7 +1850,7 @@ fn cleanup_pruned_artifacts(
         } else {
             resolve_catalogue_manifest(catalogue_root, relative)?
         };
-        match fs::remove_file(&path) {
+        match path.remove_file() {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(backup_io(error)),
@@ -1844,8 +1864,8 @@ fn cleanup_pruned_artifacts(
         OBJECT_PAYLOAD_DIRECTORY,
     ] {
         let path = catalogue_root.join(directory);
-        if path.is_dir() {
-            rrd_lsm::sync_directory(&path).map_err(backup_io)?;
+        if path.try_exists().map_err(backup_io)? && path.metadata().map_err(backup_io)?.is_dir() {
+            path.sync_directory().map_err(backup_io)?;
         }
     }
     Ok(())
@@ -2088,22 +2108,22 @@ fn validate_relative_control_archive(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn resolve_archive(root: &Path, value: &str) -> Result<PathBuf> {
+fn resolve_archive(root: &AnchoredPath, value: &str) -> Result<AnchoredPath> {
     validate_relative_archive(value)?;
     Ok(root.join(value))
 }
 
-fn resolve_control_archive(root: &Path, value: &str) -> Result<PathBuf> {
+fn resolve_control_archive(root: &AnchoredPath, value: &str) -> Result<AnchoredPath> {
     validate_relative_control_archive(value)?;
     Ok(root.join(value))
 }
 
-fn resolve_object_manifest(root: &Path, value: &str) -> Result<PathBuf> {
+fn resolve_object_manifest(root: &AnchoredPath, value: &str) -> Result<AnchoredPath> {
     validate_relative_object_manifest(value)?;
     Ok(root.join(value))
 }
 
-fn resolve_catalogue_manifest(root: &Path, value: &str) -> Result<PathBuf> {
+fn resolve_catalogue_manifest(root: &AnchoredPath, value: &str) -> Result<AnchoredPath> {
     validate_relative_catalogue_manifest(value)?;
     Ok(root.join(value))
 }
@@ -2115,6 +2135,27 @@ fn backup_io(error: std::io::Error) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    #[test]
+    fn oversized_manifest_is_refused_without_reading_its_payload() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("oversized-manifest.json");
+        let file = fs::File::create(&path).unwrap();
+        file.set_len(MAX_ARCHIVE_MANIFEST_BYTES + 1).unwrap();
+        drop(file);
+        let path = AnchoredPath::from_path(&path).unwrap();
+        for error in [
+            load_object_manifest(&path).unwrap_err(),
+            load_catalogue_manifest(&path).unwrap_err(),
+        ] {
+            assert!(error.to_string().contains("exceeds the v1 byte bound"));
+        }
+        assert_eq!(
+            path.metadata().unwrap().len(),
+            MAX_ARCHIVE_MANIFEST_BYTES + 1
+        );
+    }
 
     fn transition(
         key: &str,
@@ -2143,7 +2184,7 @@ mod tests {
 
     /// A source with a key that moves three times and another that is created
     /// and deleted, archived under the declared families.
-    fn archived_source(root: &Path) -> (PathBuf, ControlArchiveInventory) {
+    fn archived_source(root: &Path) -> (AnchoredPath, ControlArchiveInventory) {
         let source = RrflowKvStore::create_new(&root.join("source")).unwrap();
         let control = source.control();
         control
@@ -2196,10 +2237,18 @@ mod tests {
             .unwrap();
         let catalogue_root = root.join("catalogue");
         fs::create_dir_all(&catalogue_root).unwrap();
-        let (file, inventory) =
-            retain_control_journal(&source, &catalogue_root, 6, &families()).unwrap();
+        let (file, inventory) = retain_control_journal(
+            &source,
+            &AnchoredPath::from_path(&catalogue_root).unwrap(),
+            6,
+            &families(),
+        )
+        .unwrap();
         assert_eq!(inventory.entry_count, 5);
-        (catalogue_root.join(file), inventory)
+        (
+            AnchoredPath::from_path(&catalogue_root.join(file)).unwrap(),
+            inventory,
+        )
     }
 
     #[test]
@@ -2221,14 +2270,23 @@ mod tests {
         );
         drop(target);
         assert!(
-            verify_restored_control_journal(&archive, &inventory, &target_root)
-                .unwrap_err()
-                .to_string()
-                .contains("incomplete"),
+            verify_restored_control_journal(
+                &archive,
+                &inventory,
+                &AnchoredPath::from_path(&target_root).unwrap()
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("incomplete"),
             "an interrupted replay does not verify"
         );
 
-        restore_control_journal(&archive, &inventory, &target_root).unwrap();
+        restore_control_journal(
+            &archive,
+            &inventory,
+            &AnchoredPath::from_path(&target_root).unwrap(),
+        )
+        .unwrap();
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
         let progress = control_restore_progress(&target).unwrap().unwrap();
         assert!(progress.complete);
@@ -2254,7 +2312,12 @@ mod tests {
         drop(target);
 
         // A completed replay is idempotent.
-        restore_control_journal(&archive, &inventory, &target_root).unwrap();
+        restore_control_journal(
+            &archive,
+            &inventory,
+            &AnchoredPath::from_path(&target_root).unwrap(),
+        )
+        .unwrap();
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
         assert_eq!(target.control().sequence().unwrap(), 5);
     }
@@ -2275,7 +2338,12 @@ mod tests {
             ))
             .unwrap();
         drop(target);
-        let error = restore_control_journal(&archive, &inventory, &target_root).unwrap_err();
+        let error = restore_control_journal(
+            &archive,
+            &inventory,
+            &AnchoredPath::from_path(&target_root).unwrap(),
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("diverged at source sequence 1"));
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
         assert_eq!(

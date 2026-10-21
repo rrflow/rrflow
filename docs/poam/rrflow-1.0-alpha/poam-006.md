@@ -176,3 +176,23 @@ bind the failing oracle, replacement evidence and candidate CI. Retained
 ancestor handles, mount/path races, store-owned descendants and complete
 privileged foreign-owner qualification remain later D-01 work. This bounded
 repair does not close D-01 or POAM-006.
+
+## Filesystem authority handoffs (2026-10-21)
+
+A real manifest regression redirected publication into a substituted Windows
+junction after the original root had been opened. D-01.2 replaces subsequent
+pathname authority with retained directory capabilities through installation,
+rrflowKV/LSM, object/vector and backup/snapshot consumers. Verified payloads
+travel as file handles. Private directory policy remains owned by the engine's
+existing native helpers. [PR 49](https://github.com/rrflow/rrflow-development/pull/49)
+and its [journal](../../evidence/change-journals/gate-d/d-01-anchored-filesystem.md)
+bind the failing oracle and exact candidate evidence; the parent item stays open.
+
+D-01.1's implementation candidate `096272357c02371c8f8bc912017d9af9dbe63d90`
+passed candidate run `39621697700`, attempt 2, and merged in PR 48 as
+`2d7167c9`. Attempt 1 exposed Linux `ETXTBUSY` during staged executable launch;
+the failed jobs passed on retry. D-01.5 must qualify concurrent staging and
+launch rather than treating retry success as proof that this intermittent
+failure is resolved. Install-wide exclusion, bootstrap completeness, native
+offline/foreign-owner/filesystem qualification and exact-candidate closure
+remain open in the established order.

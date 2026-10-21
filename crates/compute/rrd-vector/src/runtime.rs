@@ -117,21 +117,33 @@ impl VectorArtifact {
     /// deliberately return `None`; callers retain the verified owned-byte
     /// fallback rather than pretending they are physically mapped.
     pub fn open_mmap(kind: VectorArtifactKind, path: impl AsRef<Path>) -> Result<Option<Self>> {
-        let path = path.as_ref();
+        if matches!(
+            kind,
+            VectorArtifactKind::ExactSegment | VectorArtifactKind::Hnsw
+        ) {
+            return Ok(None);
+        }
+        let file = std::fs::File::open(path).map_err(|error| Error::InvalidRuntime {
+            reason: format!("cannot open vector artifact: {error}"),
+        })?;
+        Self::open_mmap_file(kind, file)
+    }
+
+    pub fn open_mmap_file(kind: VectorArtifactKind, file: std::fs::File) -> Result<Option<Self>> {
         match kind {
-            VectorArtifactKind::CompactDense => CompactDenseSegment::open_mmap(path)
+            VectorArtifactKind::CompactDense => CompactDenseSegment::open_mmap_file(file)
                 .map(Self::CompactDense)
                 .map(Some),
             VectorArtifactKind::ScalarQuantized
             | VectorArtifactKind::ProductQuantized
             | VectorArtifactKind::BinaryQuantized => {
-                let artifact = QuantizedSegment::open_mmap(path).map(Self::Quantized)?;
+                let artifact = QuantizedSegment::open_mmap_file(file).map(Self::Quantized)?;
                 if artifact.kind() != kind {
                     return invalid("mapped quantized artifact method differs from its codec kind");
                 }
                 Ok(Some(artifact))
             }
-            VectorArtifactKind::TurboQuant => TurboQuantSegment::open_mmap(path)
+            VectorArtifactKind::TurboQuant => TurboQuantSegment::open_mmap_file(file)
                 .map(Self::TurboQuant)
                 .map(Some),
             VectorArtifactKind::ExactSegment | VectorArtifactKind::Hnsw => Ok(None),

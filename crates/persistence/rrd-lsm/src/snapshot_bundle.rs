@@ -1,10 +1,12 @@
+use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::{Error, Manifest, Result, Segment, SegmentDescriptor};
 use rrd_core::digest;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 pub const SNAPSHOT_BUNDLE_FORMAT_VERSION: u16 = 1;
 const MAGIC: &[u8; 8] = b"RRDSNP01";
@@ -63,6 +65,7 @@ struct FileSegment {
 #[derive(Debug, Clone)]
 pub struct SnapshotBundleFile {
     path: PathBuf,
+    file: Arc<Mutex<File>>,
     pub source_manifest: Manifest,
     segments: Vec<FileSegment>,
     pub digest: String,
@@ -72,22 +75,22 @@ pub struct SnapshotBundleFile {
 impl SnapshotBundleFile {
     pub(crate) fn create(
         source_manifest: Manifest,
-        segment_directory: &Path,
-        destination: impl AsRef<Path>,
+        segment_directory: &crate::filesystem::AnchoredPath,
+        destination: impl crate::filesystem::AnchorInput,
     ) -> Result<Self> {
         Self::create_with_hook(source_manifest, segment_directory, destination, |_| Ok(()))
     }
 
     pub(crate) fn create_with_hook(
         source_manifest: Manifest,
-        segment_directory: &Path,
-        destination: impl AsRef<Path>,
+        segment_directory: &crate::filesystem::AnchoredPath,
+        destination: impl crate::filesystem::AnchorInput,
         mut hook: impl FnMut(SnapshotExportBoundary) -> Result<()>,
     ) -> Result<Self> {
         validate_manifest_contract(&source_manifest)?;
-        let destination = destination.as_ref();
+        let destination = destination.anchor()?;
         if let Some(parent) = destination.parent() {
-            std::fs::create_dir_all(parent)?;
+            parent.create_dir_all()?;
         }
         let manifest = serde_json::to_vec(&source_manifest)?;
         if manifest.is_empty() || manifest.len() > MAX_MANIFEST_BYTES {
@@ -100,9 +103,10 @@ impl SnapshotBundleFile {
         let segment_count = u32::try_from(source_manifest.segments.len())
             .map_err(|_| Error::InvalidManifest("snapshot segment count exceeds u32".into()))?;
         let mut output = OpenOptions::new()
+            .read(true)
             .write(true)
             .create_new(true)
-            .open(destination)?;
+            .open(&destination)?;
         let created = (|| -> Result<()> {
             let mut hash = digest::Sha256::new();
             let mut written = 0u64;
@@ -130,7 +134,7 @@ impl SnapshotBundleFile {
                     Error::InvalidManifest("snapshot segment descriptor exceeds u32".into())
                 })?;
                 let source_path = segment_directory.join(format!("{}.seg", descriptor.id));
-                let mut source = File::open(&source_path)?;
+                let mut source = source_path.open_read()?;
                 let segment_len = source.metadata()?.len();
                 if segment_len != descriptor.bytes {
                     return Err(Error::InvalidManifest(format!(
@@ -172,23 +176,28 @@ impl SnapshotBundleFile {
             }
             output.sync_all()?;
             if let Some(parent) = destination.parent() {
-                crate::sync_directory(parent)?;
+                parent.sync_directory()?;
             }
             hook(SnapshotExportBoundary::FileSynced)?;
             Ok(())
         })();
         if let Err(error) = created {
             drop(output);
-            let _ = std::fs::remove_file(destination);
+            let _ = destination.remove_file();
             return Err(error);
         }
-        drop(output);
-        Self::open(destination)
+        Self::open_file(output, destination.diagnostic_path())
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let path = AnchoredPath::from_path(path.as_ref())?;
+        Self::open_file(path.open_read()?, path.diagnostic_path())
+    }
+
+    /// Authenticates and retains the supplied file; `path` is diagnostic only.
+    pub fn open_file(mut file: File, path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let mut file = File::open(&path)?;
+        file.seek(SeekFrom::Start(0))?;
         let length = file.metadata()?.len();
         if length < (HEADER_BYTES + FOOTER_BYTES) as u64 || length > SNAPSHOT_BUNDLE_MAX_BYTES {
             return Err(Error::InvalidManifest(
@@ -299,6 +308,7 @@ impl SnapshotBundleFile {
         }
         let bundle = Self {
             path,
+            file: Arc::new(Mutex::new(file)),
             source_manifest,
             segments,
             digest: encoded_digest,
@@ -310,6 +320,15 @@ impl SnapshotBundleFile {
         Ok(bundle)
     }
 
+    pub fn independent_file(&self) -> Result<File> {
+        let file = self
+            .file
+            .lock()
+            .map_err(|_| Error::InvalidManifest("snapshot file mutex poisoned".into()))?;
+        crate::filesystem::reopen_read(&file).map_err(Error::Io)
+    }
+
+    /// Diagnostic label; use independent_file for an authenticated handoff.
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -375,7 +394,10 @@ impl SnapshotBundleFile {
         let length = usize::try_from(segment.length).map_err(|_| {
             Error::InvalidManifest("snapshot segment length exceeds this platform".into())
         })?;
-        let mut file = File::open(&self.path)?;
+        let mut file = self
+            .file
+            .lock()
+            .map_err(|_| Error::InvalidManifest("snapshot file mutex poisoned".into()))?;
         file.seek(SeekFrom::Start(segment.offset))?;
         let mut bytes = vec![0u8; length];
         file.read_exact(&mut bytes)?;

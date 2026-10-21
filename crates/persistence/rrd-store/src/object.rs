@@ -5,11 +5,14 @@
 //! unreachable object, but never a reachable partial object; inventory and
 //! reclamation make that asymmetry explicit.
 
-use crate::{publish_durable_rename, sync_directory_metadata, Error, Result};
+use crate::{Error, Result};
 use rrd_core::{digest, ObjectReceipt, ObjectReference};
+use rrd_lsm::filesystem::{AnchoredPath, OpenOptions};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File, OpenOptions};
-use std::io::{Cursor, Read, Write};
+#[cfg(test)]
+use std::fs;
+use std::fs::File;
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -68,10 +71,10 @@ pub trait ImmutableObjectStore: Send + Sync {
     ) -> Result<VerifiedObject>;
     fn verify(&self, sha256: &str) -> Result<VerifiedObject>;
     fn get(&self, reference: &ObjectReference) -> Result<Vec<u8>>;
-    /// Returns a verified immutable local path when this backend can expose
-    /// one safely. Callers may use it for read-only mmap; remote and in-memory
+    /// Returns the same file handle whose immutable bytes were verified.
+    /// Callers may use it for read-only mmap; remote and in-memory
     /// authorities return `None` and retain the verified streaming boundary.
-    fn verified_path(&self, _reference: &ObjectReference) -> Result<Option<PathBuf>> {
+    fn verified_file(&self, _reference: &ObjectReference) -> Result<Option<File>> {
         Ok(None)
     }
     fn inventory(&self, reachable: &BTreeSet<String>) -> Result<ObjectInventory>;
@@ -261,8 +264,8 @@ impl ImmutableObjectStore for ObjectStoreBox {
         self.0.get(reference)
     }
 
-    fn verified_path(&self, reference: &ObjectReference) -> Result<Option<PathBuf>> {
-        self.0.verified_path(reference)
+    fn verified_file(&self, reference: &ObjectReference) -> Result<Option<File>> {
+        self.0.verified_file(reference)
     }
 
     fn inventory(&self, reachable: &BTreeSet<String>) -> Result<ObjectInventory> {
@@ -276,7 +279,7 @@ impl ImmutableObjectStore for ObjectStoreBox {
 
 #[derive(Debug, Clone)]
 pub struct LocalObjectStore {
-    root: PathBuf,
+    root: AnchoredPath,
 }
 
 impl LocalObjectStore {
@@ -284,36 +287,32 @@ impl LocalObjectStore {
     /// and restore targets use this; verification uses `open_existing` so a
     /// read-only check never creates bytes.
     pub fn open(root: impl AsRef<Path>) -> Result<Self> {
-        let root = root.as_ref().to_path_buf();
-        fs::create_dir_all(root.join("objects/sha256"))?;
-        fs::create_dir_all(root.join("staging"))?;
-        fs::create_dir_all(root.join("quarantine"))?;
-        sync_directory_metadata(&root)?;
+        Self::open_anchored(&AnchoredPath::from_path(root.as_ref())?)
+    }
+
+    pub fn open_anchored(root: &AnchoredPath) -> Result<Self> {
+        root.create_dir_all()?;
+        let root = root.pin_directory()?;
+        root.join("objects/sha256").create_dir_all()?;
+        root.join("staging").create_dir_all()?;
+        root.join("quarantine").create_dir_all()?;
+        root.sync_directory()?;
         Ok(Self { root })
     }
 
-    /// Opens an object store whose object directory already exists and
-    /// creates nothing; an absent or non-directory root fails closed.
+    /// Opens an existing store without creating any path.
     pub fn open_existing(root: impl AsRef<Path>) -> Result<Self> {
-        let root = root.as_ref().to_path_buf();
-        let objects = root.join("objects/sha256");
-        match fs::symlink_metadata(&objects) {
-            Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
-                Ok(Self { root })
-            }
-            Ok(_) => Err(Error::Substrate(format!(
-                "object store directory is not a directory: {}",
-                objects.display()
-            ))),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(Error::Substrate(
-                format!("object store is absent: {}", objects.display()),
-            )),
-            Err(error) => Err(Error::from(error)),
-        }
+        Self::open_existing_anchored(&AnchoredPath::open_root(root.as_ref())?)
+    }
+
+    pub fn open_existing_anchored(root: &AnchoredPath) -> Result<Self> {
+        let root = root.pin_directory()?;
+        root.join("objects/sha256").pin_directory()?;
+        Ok(Self { root })
     }
 
     pub fn root(&self) -> &Path {
-        &self.root
+        self.root.diagnostic_path()
     }
 
     pub fn put(&self, bytes: &[u8]) -> Result<VerifiedObject> {
@@ -321,8 +320,7 @@ impl LocalObjectStore {
     }
 
     pub fn open_verified(&self, reference: &ObjectReference) -> Result<Box<dyn Read + Send + '_>> {
-        let path = self.verified_path(reference)?;
-        Ok(Box::new(File::open(path)?))
+        Ok(Box::new(self.verified_file(reference)?))
     }
 
     /// Streams a known content address through the same stage/sync/publish
@@ -379,12 +377,12 @@ impl LocalObjectStore {
                 });
             }
             stage.sync_all()?;
-            sync_directory_metadata(&self.root.join("staging"))?;
+            self.root.join("staging").sync_directory()?;
             Ok(())
         })();
         if let Err(error) = staged {
             drop(stage);
-            let _ = fs::remove_file(&stage_path);
+            let _ = stage_path.remove_file();
             return Err(error);
         }
         drop(stage);
@@ -408,10 +406,22 @@ impl LocalObjectStore {
     pub fn put_file_with_hook(
         &self,
         source: impl AsRef<Path>,
+        hook: impl FnMut(ObjectStep) -> Result<()>,
+    ) -> Result<VerifiedObject> {
+        let mut source = AnchoredPath::from_path(source.as_ref())?.open_read()?;
+        self.put_reader_with_hook(&mut source, hook)
+    }
+
+    pub fn put_reader(&self, source: &mut dyn Read) -> Result<VerifiedObject> {
+        self.put_reader_with_hook(source, |_| Ok(()))
+    }
+
+    fn put_reader_with_hook(
+        &self,
+        source: &mut dyn Read,
         mut hook: impl FnMut(ObjectStep) -> Result<()>,
     ) -> Result<VerifiedObject> {
         hook(ObjectStep::BeforeStageWrite)?;
-        let mut source = File::open(source)?;
         let stage_name = format!(
             "{}-{}-stream",
             std::process::id(),
@@ -438,14 +448,14 @@ impl LocalObjectStore {
                 stage.write_all(&buffer[..read])?;
             }
             stage.sync_all()?;
-            sync_directory_metadata(&self.root.join("staging"))?;
+            self.root.join("staging").sync_directory()?;
             Ok((digest.finalize_hex(), length))
         })();
         let (sha256, length) = match staged {
             Ok(value) => value,
             Err(error) => {
                 drop(stage);
-                let _ = fs::remove_file(&stage_path);
+                let _ = stage_path.remove_file();
                 return Err(error);
             }
         };
@@ -492,7 +502,7 @@ impl LocalObjectStore {
         stage.write_all(bytes)?;
         stage.sync_all()?;
         drop(stage);
-        sync_directory_metadata(&self.root.join("staging"))?;
+        self.root.join("staging").sync_directory()?;
         hook(ObjectStep::AfterStageSync)?;
 
         self.publish_stage(&stage_path, &final_path, &sha256)?;
@@ -504,9 +514,13 @@ impl LocalObjectStore {
     }
 
     pub fn verify(&self, sha256: &str) -> Result<VerifiedObject> {
+        self.verify_file(sha256).map(|(verified, _)| verified)
+    }
+
+    fn verify_file(&self, sha256: &str) -> Result<(VerifiedObject, File)> {
         let key = ObjectReference::canonical_key(sha256).map_err(Error::from)?;
         let path = self.root.join(&key);
-        let mut file = File::open(&path).map_err(|error| {
+        let mut file = path.open_read().map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
                 Error::ObjectMissing(sha256.to_owned())
             } else {
@@ -520,58 +534,61 @@ impl LocalObjectStore {
                 actual,
             });
         }
-        Ok(VerifiedObject {
-            sha256: sha256.to_owned(),
-            length,
-            receipt: ObjectReceipt {
-                backend: "local".into(),
-                key,
-                version: None,
-                etag: Some(sha256.to_owned()),
+        file.seek(SeekFrom::Start(0))?;
+        Ok((
+            VerifiedObject {
+                sha256: sha256.to_owned(),
+                length,
+                receipt: ObjectReceipt {
+                    backend: "local".into(),
+                    key,
+                    version: None,
+                    etag: Some(sha256.to_owned()),
+                },
             },
-        })
+            file,
+        ))
     }
 
     pub fn get(&self, reference: &ObjectReference) -> Result<Vec<u8>> {
-        reference.validate().map_err(Error::from)?;
-        let verified = self.verify(&reference.sha256)?;
-        if verified.length != reference.length {
-            return Err(Error::ObjectLengthMismatch {
-                expected: reference.length,
-                actual: verified.length,
-            });
-        }
-        fs::read(self.root.join(&reference.receipt.key)).map_err(Error::from)
+        let mut file = self.verified_file(reference)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Ok(bytes)
     }
 
-    /// Returns a verified canonical path suitable for bounded file I/O.
-    pub fn verified_path(&self, reference: &ObjectReference) -> Result<PathBuf> {
+    /// Returns the authenticated file, rewound for bounded reads or mapping.
+    pub fn verified_file(&self, reference: &ObjectReference) -> Result<File> {
         reference.validate().map_err(Error::from)?;
-        let verified = self.verify(&reference.sha256)?;
+        let (verified, file) = self.verify_file(&reference.sha256)?;
         if verified.length != reference.length {
             return Err(Error::ObjectLengthMismatch {
                 expected: reference.length,
                 actual: verified.length,
             });
         }
-        Ok(self.root.join(&reference.receipt.key))
+        Ok(file)
     }
 
     pub fn inventory(&self, reachable: &BTreeSet<String>) -> Result<ObjectInventory> {
         let mut entries = Vec::new();
         let sha_root = self.root.join("objects/sha256");
         for bucket in sorted_paths(&sha_root)? {
-            if !bucket.is_dir() {
+            if !bucket.metadata()?.is_dir() {
                 continue;
             }
             for path in sorted_paths(&bucket)? {
-                if !path.is_file() {
+                if !path.metadata()?.is_file() {
                     continue;
                 }
-                let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                let Some(name) = path
+                    .relative_path()
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                else {
                     continue;
                 };
-                let mut file = File::open(&path)?;
+                let mut file = path.open_read()?;
                 let (actual, length) = digest_reader(&mut file)?;
                 let state = if actual != name {
                     ObjectInventoryState::Corrupt {
@@ -591,8 +608,14 @@ impl LocalObjectStore {
         }
         Ok(ObjectInventory {
             entries,
-            staging_files: sorted_paths(&self.root.join("staging"))?,
-            quarantined_files: sorted_paths(&self.root.join("quarantine"))?,
+            staging_files: sorted_paths(&self.root.join("staging"))?
+                .iter()
+                .map(|path| path.diagnostic_path().to_owned())
+                .collect(),
+            quarantined_files: sorted_paths(&self.root.join("quarantine"))?
+                .iter()
+                .map(|path| path.diagnostic_path().to_owned())
+                .collect(),
         })
     }
 
@@ -601,7 +624,7 @@ impl LocalObjectStore {
     pub fn quarantine(&self, sha256: &str) -> Result<PathBuf> {
         let key = ObjectReference::canonical_key(sha256).map_err(Error::from)?;
         let source = self.root.join(key);
-        if !source.exists() {
+        if !source.try_exists()? {
             return Err(Error::ObjectMissing(sha256.to_owned()));
         }
         let target = self.root.join("quarantine").join(format!(
@@ -610,7 +633,7 @@ impl LocalObjectStore {
             STAGE_ORDINAL.fetch_add(1, Ordering::Relaxed)
         ));
         publish_object_path(&source, &target)?;
-        Ok(target)
+        Ok(target.diagnostic_path().to_owned())
     }
 
     /// Reclaims only digests the caller proved unreachable. A later M4
@@ -620,8 +643,8 @@ impl LocalObjectStore {
         for sha256 in unreachable {
             let key = ObjectReference::canonical_key(sha256).map_err(Error::from)?;
             let path = self.root.join(key);
-            if path.exists() {
-                fs::remove_file(path)?;
+            if path.try_exists()? {
+                path.remove_file()?;
                 removed.push(sha256.clone());
             }
         }
@@ -629,16 +652,21 @@ impl LocalObjectStore {
         Ok(removed)
     }
 
-    fn publish_stage(&self, stage_path: &Path, final_path: &Path, sha256: &str) -> Result<()> {
+    fn publish_stage(
+        &self,
+        stage_path: &AnchoredPath,
+        final_path: &AnchoredPath,
+        sha256: &str,
+    ) -> Result<()> {
         let parent = final_path
             .parent()
             .ok_or_else(|| Error::Object("object publication target has no parent".into()))?;
-        fs::create_dir_all(parent)?;
-        if final_path.exists() {
+        parent.create_dir_all()?;
+        if final_path.try_exists()? {
             match self.verify(sha256) {
                 Ok(_) => {
                     // Content addressing makes an existing verified value equivalent.
-                    fs::remove_file(stage_path)?;
+                    stage_path.remove_file()?;
                 }
                 Err(Error::ObjectCorrupt { .. }) => {
                     self.quarantine(sha256)?;
@@ -696,8 +724,8 @@ impl ImmutableObjectStore for LocalObjectStore {
         LocalObjectStore::get(self, reference)
     }
 
-    fn verified_path(&self, reference: &ObjectReference) -> Result<Option<PathBuf>> {
-        LocalObjectStore::verified_path(self, reference).map(Some)
+    fn verified_file(&self, reference: &ObjectReference) -> Result<Option<File>> {
+        LocalObjectStore::verified_file(self, reference).map(Some)
     }
 
     fn inventory(&self, reachable: &BTreeSet<String>) -> Result<ObjectInventory> {
@@ -709,29 +737,15 @@ impl ImmutableObjectStore for LocalObjectStore {
     }
 }
 
-fn sorted_paths(path: &Path) -> Result<Vec<PathBuf>> {
-    if !path.exists() {
+fn sorted_paths(path: &AnchoredPath) -> Result<Vec<AnchoredPath>> {
+    if !path.try_exists()? {
         return Ok(Vec::new());
     }
-    let mut paths = fs::read_dir(path)?
-        .map(|entry| entry.map(|entry| entry.path()).map_err(Error::from))
-        .collect::<Result<Vec<_>>>()?;
-    paths.sort();
-    Ok(paths)
+    path.read_dir().map_err(Error::from)
 }
 
-fn publish_object_path(source: &Path, target: &Path) -> Result<()> {
-    let source_parent = source
-        .parent()
-        .ok_or_else(|| Error::Object("object publication source has no parent".into()))?;
-    let target_parent = target
-        .parent()
-        .ok_or_else(|| Error::Object("object publication target has no parent".into()))?;
-    publish_durable_rename(target_parent, source, target)?;
-    if source_parent != target_parent {
-        sync_directory_metadata(source_parent)?;
-    }
-    Ok(())
+fn publish_object_path(source: &AnchoredPath, target: &AnchoredPath) -> Result<()> {
+    source.rename_to(target).map_err(Error::from)
 }
 
 #[cfg(test)]
@@ -799,10 +813,34 @@ mod tests {
             streamed.receipt.clone(),
         )
         .unwrap();
-        assert_eq!(
-            store.verified_path(&reference).unwrap(),
-            store.root().join(&streamed.receipt.key)
-        );
+        let mut verified = store.verified_file(&reference).unwrap();
+        let mut actual = Vec::new();
+        verified.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, bytes);
+    }
+
+    #[test]
+    fn verified_handle_keeps_authenticated_bytes_after_leaf_replacement() {
+        let directory = tempdir().unwrap();
+        let store = LocalObjectStore::open(directory.path()).unwrap();
+        let object = store.put(b"authenticated original").unwrap();
+        let reference = ObjectReference::for_verified(
+            "retained",
+            None,
+            "application/octet-stream",
+            object.sha256,
+            object.length,
+            object.receipt,
+        )
+        .unwrap();
+        let mut file = store.verified_file(&reference).unwrap();
+        let path = store.root().join(&reference.receipt.key);
+        fs::rename(&path, path.with_extension("retained")).unwrap();
+        fs::write(&path, b"substituted contents").unwrap();
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, b"authenticated original");
+        assert!(store.verified_file(&reference).is_err());
     }
 
     #[test]

@@ -84,6 +84,19 @@ runs the helper's dirty-source, drift, environment-digest and diagnostic-profile
 policy tests. These are build-provenance checks; actual release/diagnostic
 semantic parity remains open under H-05a.
 
+Native filesystem containment runs the LSM filesystem and manifest fixtures
+on Linux, Windows and macOS, plus installation ancestor-replacement cases.
+Linux additionally runs `python3 scripts/ci/run_filesystem_containment.py`:
+Cargo identifies the exact test executable, and noninteractive sudo launches
+the required bind-mount adversary in a private mount namespace with private
+propagation. Its 60-second timeout and 5-second kill bound prevent a stalled
+fixture from holding the runner indefinitely. The test asserts namespace
+separation and unchanged outside bytes after denied read, truncate, create,
+publication and cleanup. Missing privileges or namespace support fails the
+candidate. The ordinary suite's ignored privileged case is not acceptance;
+the explicit isolated invocation must pass. This bounded fixture does not
+replace D-01.5's wider native filesystem and offline qualification.
+
 The repository-policy partition also verifies the generated
 `docs/roadmap/rrflow-1.0-file-plan.jsonl`. That inventory must match every
 tracked or non-ignored path and every long-lived future path registered by its

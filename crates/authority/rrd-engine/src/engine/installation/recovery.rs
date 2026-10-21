@@ -1,8 +1,8 @@
 use super::*;
-use crate::engine::estate_layout::{install_intent_path, EstateLayout};
+use crate::engine::estate_layout::{install_intent_path, EstateFilesystem, EstateLayout};
 use crate::engine::token_key::{
     decode_api_key_document, encode_api_key_document, generate_api_key_document,
-    generate_token_key, write_private_new, ApiKeyDocument, TOKEN_KEY_BYTES,
+    generate_token_key, write_private_anchored, ApiKeyDocument, TOKEN_KEY_BYTES,
 };
 
 const INSTALL_INTENT_FORMAT: u16 = 2;
@@ -223,14 +223,14 @@ impl InstallIntent {
 }
 
 pub(super) fn load_or_create_intent(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
     preview: &InstallationPreview,
     clock_anchor: &ClockObservation,
     executable_sha256: &str,
 ) -> Result<(InstallIntent, InstallRecoveryState)> {
     let path = install_intent_path(project, layout)?;
-    match std::fs::symlink_metadata(&path) {
+    match path.metadata() {
         Ok(_) => {
             let intent = read_intent(&path)?;
             intent.validate(preview, executable_sha256)?;
@@ -239,7 +239,7 @@ pub(super) fn load_or_create_intent(
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let intent = InstallIntent::new(preview, clock_anchor)?;
             intent.validate(preview, executable_sha256)?;
-            write_private_new(&path, &intent.encoded()?).map_err(storage_error)?;
+            write_private_anchored(&path, &intent.encoded()?).map_err(storage_error)?;
             let readback = read_intent(&path)?;
             if readback != intent {
                 return Err(ServiceError::ProjectBindingMismatch);
@@ -251,13 +251,13 @@ pub(super) fn load_or_create_intent(
 }
 
 pub(super) fn read_existing_intent(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
     preview: &InstallationPreview,
     executable_sha256: &str,
 ) -> Result<Option<InstallIntent>> {
     let path = install_intent_path(project, layout)?;
-    match std::fs::symlink_metadata(&path) {
+    match path.metadata() {
         Ok(_) => {
             let intent = read_intent(&path)?;
             intent.validate(preview, executable_sha256)?;
@@ -268,8 +268,12 @@ pub(super) fn read_existing_intent(
     }
 }
 
-pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: bool) -> Result<()> {
-    match std::fs::symlink_metadata(path) {
+pub(super) fn materialize_secret(
+    path: &AnchoredPath,
+    expected: &[u8],
+    allow_create: bool,
+) -> Result<()> {
+    match path.metadata() {
         Ok(_) => {
             let observed = read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)?;
             if observed != expected {
@@ -277,7 +281,7 @@ pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: boo
             }
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound && allow_create => {
-            write_private_new(path, expected).map_err(storage_error)?;
+            write_private_anchored(path, expected).map_err(storage_error)?;
             if read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)? != expected {
                 return Err(ServiceError::ProjectBindingMismatch);
             }
@@ -291,7 +295,7 @@ pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: boo
 }
 
 pub(super) fn acknowledge_intent(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
     expected: &InstallIntent,
 ) -> Result<()> {
@@ -299,11 +303,11 @@ pub(super) fn acknowledge_intent(
     if read_intent(&path)? != *expected {
         return Err(ServiceError::ProjectBindingMismatch);
     }
-    std::fs::remove_file(&path).map_err(storage_error)?;
-    rrd_store::sync_directory_metadata(project).map_err(storage_error)
+    path.remove_file().map_err(storage_error)?;
+    project.project().sync_directory().map_err(storage_error)
 }
 
-fn read_intent(path: &Path) -> Result<InstallIntent> {
+fn read_intent(path: &AnchoredPath) -> Result<InstallIntent> {
     let bytes = read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)?;
     let intent: InstallIntent = serde_json::from_slice(&bytes).map_err(contract_json)?;
     if intent.encoded()? != bytes {
@@ -312,8 +316,8 @@ fn read_intent(path: &Path) -> Result<InstallIntent> {
     Ok(intent)
 }
 
-fn read_private_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>> {
-    crate::engine::token_key::read_private_bounded(path, maximum).map_err(storage_error)
+fn read_private_bounded(path: &AnchoredPath, maximum: u64) -> Result<Vec<u8>> {
+    crate::engine::token_key::read_private_anchored(path, maximum).map_err(storage_error)
 }
 
 fn storage_error(error: std::io::Error) -> ServiceError {

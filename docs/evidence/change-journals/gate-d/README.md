@@ -8,6 +8,7 @@ The roadmap owns Gate D acceptance. This generated index only discovers its
 linked package evidence.
 
 <!-- rrflow:generated-index:start -->
+- [D-01.2 retained filesystem authority](d-01-anchored-filesystem.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-anchored-filesystem`](rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-anchored-filesystem) — active implementation candidate; native candidate acceptance pending
 - [D-01 bounded installation inventory](d-01-bounded-installation-inventory.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-bounded-installation-inventory`](rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-bounded-installation-inventory) — active change-journal evidence
 - [D-01 canonical estate layout and configuration evidence journal](d-01-canonical-estate-layout-and-configuration.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-canonical-estate-layout-and-configuration`](rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-canonical-estate-layout-and-configuration) — active immutable change-journal evidence
 - [D-01 remaining closure plan](d-01-closure-plan.md) — [`rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-closure-plan`](rrflow://rrflow-instance/data/evidence/change-journal/gate-d/d-01-closure-plan) — active planning evidence; no runtime or alpha completion claim

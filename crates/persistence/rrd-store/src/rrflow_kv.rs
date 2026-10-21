@@ -17,6 +17,7 @@ use rrd_core::{
     AuditEnvelope, Millis, ObjectReference, ReadStamp, RuntimeCommit, RuntimeCommitOutcome,
     RuntimeLogAccumulator, RuntimeSchemaRegistry, ScopeId, SnapshotHandle, SnapshotId,
 };
+use rrd_lsm::filesystem::AnchoredPath;
 use rrd_lsm::{
     CompactionOutcome, Database, DatabaseInspection, DatabaseOptions, GarbageCollectionReport,
     Manifest, Mutation, PageCacheStats, ReadOnlyDatabase, SegmentIoStats, SegmentOpenEvidence,
@@ -24,7 +25,7 @@ use rrd_lsm::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
@@ -97,7 +98,7 @@ pub struct RrflowKvOpenEvidence {
 }
 
 pub struct RrflowKvStore {
-    path: PathBuf,
+    path: AnchoredPath,
     database: Mutex<Database>,
     open_evidence: RrflowKvOpenEvidence,
     native_write_path_diagnostics_enabled: AtomicBool,
@@ -263,8 +264,11 @@ impl RrflowKvStore {
     }
 
     pub fn create_new_with_options(path: &Path, options: DatabaseOptions) -> Result<Self> {
-        let database =
-            Database::create_with_application_format(path, options, keyspaces::RRFLOW_KV_FORMAT)?;
+        Self::create_new_anchored(&AnchoredPath::from_path(path)?, options)
+    }
+
+    pub fn create_new_anchored(path: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
+        let database = Database::create_anchored(path, options, Some(keyspaces::RRFLOW_KV_FORMAT))?;
         Self::from_explicit_database(database, true)
     }
 
@@ -275,7 +279,11 @@ impl RrflowKvStore {
     }
 
     pub fn open_existing_with_options(path: &Path, options: DatabaseOptions) -> Result<Self> {
-        let database = Database::open_with_options(path, options).map_err(|error| {
+        Self::open_existing_anchored(&AnchoredPath::open_root(path)?, options)
+    }
+
+    pub fn open_existing_anchored(path: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
+        let database = Database::open_anchored(path, options).map_err(|error| {
             Error::Substrate(format!(
                 "cannot open existing rrflowKV database {}: {error}",
                 path.display()
@@ -294,7 +302,7 @@ impl RrflowKvStore {
                 database.manifest().application_format
             ))
         })?;
-        let path = database.root().to_owned();
+        let path = database.anchored_root().clone();
         Ok(Self {
             path,
             open_evidence: RrflowKvOpenEvidence {
@@ -311,32 +319,38 @@ impl RrflowKvStore {
     /// Opens an existing rrflowKV database or creates one when `path` is absent.
     /// An existing but invalid directory fails closed rather than being
     /// silently reinitialized.
-    pub fn open(path: &Path) -> Result<Self> {
+    pub fn open(path: &(impl crate::filesystem::AnchorInput + ?Sized)) -> Result<Self> {
         Self::open_with_options(path, DatabaseOptions::default())
     }
 
     /// Opens with explicit rrflowKV cache and mutable-state bounds. Persistent
     /// format identity is unchanged; these are process-local operating limits.
-    pub fn open_with_options(path: &Path, options: DatabaseOptions) -> Result<Self> {
+    pub fn open_with_options(
+        path: &(impl crate::filesystem::AnchorInput + ?Sized),
+        options: DatabaseOptions,
+    ) -> Result<Self> {
+        let path = &path.anchor()?;
         let total_started = Instant::now();
-        if !path.exists() {
+        if !path.try_exists()? {
             if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)
+                parent
+                    .create_dir_all()
                     .map_err(|error| Error::Substrate(error.to_string()))?;
             }
         }
-        let empty = path.exists()
-            && path.is_dir()
-            && std::fs::read_dir(path)
+        let empty = path.try_exists()?
+            && path.metadata()?.is_dir()
+            && path
+                .entries()
                 .map_err(|error| Error::Substrate(error.to_string()))?
                 .next()
                 .is_none();
-        let created = !path.exists() || empty;
+        let created = !path.try_exists()? || empty;
         let database_started = Instant::now();
         let mut database = if created {
-            Database::create_with_application_format(path, options, keyspaces::RRFLOW_KV_FORMAT)?
+            Database::create_anchored(path, options, Some(keyspaces::RRFLOW_KV_FORMAT))?
         } else {
-            Database::open_with_options(path, options).map_err(|error| {
+            Database::open_anchored(path, options).map_err(|error| {
                 Error::Substrate(format!(
                     "cannot open rrflowKV database {}: {error}",
                     path.display()
@@ -400,7 +414,7 @@ impl RrflowKvStore {
             total_ms = total_started.elapsed().as_millis() as u64,
             "rrflowKV store open phases completed"
         );
-        let path = database.root().to_owned();
+        let path = database.anchored_root().clone();
         Ok(Self {
             path,
             database: Mutex::new(database),
@@ -410,6 +424,10 @@ impl RrflowKvStore {
     }
 
     pub fn path(&self) -> &Path {
+        self.path.diagnostic_path()
+    }
+
+    pub fn anchored_path(&self) -> &AnchoredPath {
         &self.path
     }
 
@@ -478,8 +496,12 @@ impl RrflowKvStore {
 }
 
 impl RrflowKvInspector {
-    pub fn open(path: &Path) -> Result<Self> {
-        let database = ReadOnlyDatabase::open(path).map_err(Error::from)?;
+    pub fn open(path: &(impl crate::filesystem::AnchorInput + ?Sized)) -> Result<Self> {
+        Self::open_anchored(&path.anchor()?)
+    }
+
+    pub fn open_anchored(path: &AnchoredPath) -> Result<Self> {
+        let database = ReadOnlyDatabase::open_anchored(path).map_err(Error::from)?;
         if keyspaces::RrflowKvKeyCodec::from_application_format(
             database.manifest().application_format,
         )
@@ -867,11 +889,13 @@ impl crate::access::runtime_state::AccessRead for RrflowKvSnapshotRead<'_> {
 /// Creates an empty database in the rrflowKV application format for an owner
 /// that applies rrflowKV commits through the `&Database` functions below,
 /// such as the Raft application bridge's canonical state.
-pub fn create_rrflow_kv_database(root: &Path) -> Result<Database> {
-    Ok(Database::create_with_application_format(
-        root,
+pub fn create_rrflow_kv_database(
+    root: &(impl crate::filesystem::AnchorInput + ?Sized),
+) -> Result<Database> {
+    Ok(Database::create_anchored(
+        &root.anchor()?,
         DatabaseOptions::default(),
-        keyspaces::RRFLOW_KV_FORMAT,
+        Some(keyspaces::RRFLOW_KV_FORMAT),
     )?)
 }
 

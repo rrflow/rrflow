@@ -12,8 +12,8 @@
 //! publication receipt.
 
 use super::estate_layout::{
-    instance_operation_root, reject_existing_symlink_path, safe_join, BACKUPS_DIRECTORY_NAME,
-    RESTORES_DIRECTORY_NAME, STORAGE_DIRECTORY,
+    instance_operation_root, reject_existing_symlink_path, safe_join, EstateFilesystem,
+    BACKUPS_DIRECTORY_NAME, RESTORES_DIRECTORY_NAME, STORAGE_DIRECTORY,
 };
 use super::installation::{
     canonical_prefixed, decode_control, estate_configuration_key, json_sha256, read_locator,
@@ -21,7 +21,10 @@ use super::installation::{
     DefaultInstallProfile, InstallationVerificationStatus, InstalledEstateRecord, ProjectLocator,
     INSTALLED_RECORD_KEY,
 };
-use super::token_key::{read_private_bounded, read_token_key, write_private_new, TOKEN_KEY_BYTES};
+use super::token_key::{
+    read_private_anchored as read_private_bounded, read_token_key_anchored as read_token_key,
+    write_private_anchored as write_private_new, TOKEN_KEY_BYTES,
+};
 use super::*;
 use rrd_contract::{
     restore_publication_plan_sha256, restore_publication_result_sha256, RestorePublicationAction,
@@ -29,6 +32,7 @@ use rrd_contract::{
     RestorePublicationResult, RestoreRootEvidence, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
     RESTORE_PUBLICATION_ACTIONS,
 };
+use rrd_store::filesystem::{AnchoredPath, OpenOptions};
 use rrd_store::RrflowKvInspector;
 use std::fs;
 
@@ -49,7 +53,7 @@ impl PublicationLease {
     fn acquire(paths: &PublicationPaths) -> Result<Self> {
         let path = paths.restores.join(PUBLICATION_LEASE_FILE);
         reject_existing_symlink_path(&paths.project, &path)?;
-        let file = fs::OpenOptions::new()
+        let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -145,13 +149,13 @@ struct PublicationReceipt {
 }
 
 struct PublicationPaths {
-    project: PathBuf,
-    active: PathBuf,
-    candidate: PathBuf,
-    quarantine: PathBuf,
-    intent: PathBuf,
-    restores: PathBuf,
-    backups: PathBuf,
+    project: EstateFilesystem,
+    active: AnchoredPath,
+    candidate: AnchoredPath,
+    quarantine: AnchoredPath,
+    intent: AnchoredPath,
+    restores: AnchoredPath,
+    backups: AnchoredPath,
 }
 
 impl RrdEngine {
@@ -175,13 +179,13 @@ impl RrdEngine {
         let executable_sha256 = require_distribution_binding(&locator, executable)?;
         let paths = publication_paths(&project, &locator, restore_id)?;
         let storage_root_id = storage_root_id(&locator)?;
-        if fs::symlink_metadata(&paths.intent).is_ok() {
+        if paths.intent.metadata().is_ok() {
             return Err(ServiceError::Contract(
                 "a restore publication is already in progress for this restore; apply its plan"
                     .into(),
             ));
         }
-        if fs::symlink_metadata(&paths.quarantine).is_ok() {
+        if paths.quarantine.metadata().is_ok() {
             return Err(ServiceError::Contract(
                 "the quarantine location for this restore already exists".into(),
             ));
@@ -367,7 +371,7 @@ impl RrdEngine {
         }
         let _lease = PublicationLease::acquire(&paths)?;
 
-        let mut intent = match fs::symlink_metadata(&paths.intent) {
+        let mut intent = match paths.intent.metadata() {
             Ok(_) => {
                 let intent = read_intent(&paths.intent)?;
                 intent.validate(plan)?;
@@ -452,12 +456,15 @@ impl RrdEngine {
         // records which restore replaced it. It is never overwritten.
         if intent.stage < PublicationStage::ActiveQuarantined {
             match (
-                fs::symlink_metadata(&paths.active).is_ok(),
-                fs::symlink_metadata(&paths.quarantine).is_ok(),
+                paths.active.metadata().is_ok(),
+                paths.quarantine.metadata().is_ok(),
             ) {
                 (true, false) => {
                     reject_existing_symlink_path(&paths.project, &paths.quarantine)?;
-                    fs::rename(&paths.active, &paths.quarantine).map_err(storage_error)?;
+                    paths
+                        .active
+                        .rename_new_to(&paths.quarantine)
+                        .map_err(storage_error)?;
                     sync_parent(&paths.active)?;
                     sync_parent(&paths.quarantine)?;
                 }
@@ -477,11 +484,14 @@ impl RrdEngine {
         // so the locator selects it without being rewritten.
         if intent.stage < PublicationStage::CandidatePublished {
             match (
-                fs::symlink_metadata(&paths.candidate).is_ok(),
-                fs::symlink_metadata(&paths.active).is_ok(),
+                paths.candidate.metadata().is_ok(),
+                paths.active.metadata().is_ok(),
             ) {
                 (true, false) => {
-                    fs::rename(&paths.candidate, &paths.active).map_err(storage_error)?;
+                    paths
+                        .candidate
+                        .rename_new_to(&paths.active)
+                        .map_err(storage_error)?;
                     sync_parent(&paths.candidate)?;
                     sync_parent(&paths.active)?;
                 }
@@ -527,7 +537,11 @@ impl RrdEngine {
         };
         let receipt_key = publication_receipt_key(&locator.identity.instance_id, &plan.id);
         let receipt_bytes = encode(&receipt)?;
-        let engine = RrdEngine::open_installed(&paths.project, executable)?;
+        let engine = RrdEngine::open_installed_anchored(
+            &paths.project,
+            executable,
+            &super::clock::HostSystemClock,
+        )?;
         match engine.storage.control().get(&receipt_key)? {
             Some(existing) if existing == receipt_bytes => {}
             Some(_) => return Err(ServiceError::IdempotencyConflict),
@@ -545,7 +559,12 @@ impl RrdEngine {
             }
         }
         drop(engine);
-        let report = RrdEngine::inspect_installed(&paths.project, executable)?;
+        let report = RrdEngine::inspect_installed_anchored(
+            &paths.project,
+            executable,
+            &super::clock::HostSystemClock,
+            "restore.publication.verify",
+        )?;
         if report.status != InstallationVerificationStatus::Passed {
             return Err(ServiceError::Storage(
                 "published estate failed quick verification".into(),
@@ -572,9 +591,9 @@ struct RootReading {
 }
 
 impl RootReading {
-    fn open(root: &Path, locator: &ProjectLocator) -> Result<Self> {
+    fn open(root: &AnchoredPath, locator: &ProjectLocator) -> Result<Self> {
         super::core::validate_existing_object_layout(root)?;
-        let inspector = RrflowKvInspector::open(root)?;
+        let inspector = RrflowKvInspector::open_anchored(root)?;
         let installed: InstalledEstateRecord =
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
         installed.validate()?;
@@ -606,7 +625,7 @@ enum TokenKeyState {
 }
 
 fn publication_paths(
-    project: &Path,
+    project: &EstateFilesystem,
     locator: &ProjectLocator,
     restore_id: &CanonicalId,
 ) -> Result<PublicationPaths> {
@@ -635,8 +654,9 @@ fn storage_root_id(locator: &ProjectLocator) -> Result<CanonicalId> {
     CanonicalId::new(name).map_err(|_| ServiceError::ProjectBindingMismatch)
 }
 
-fn relative(project: &Path, path: &Path) -> Result<String> {
-    path.strip_prefix(project)
+fn relative(project: &EstateFilesystem, path: &AnchoredPath) -> Result<String> {
+    path.diagnostic_path()
+        .strip_prefix(project.project().diagnostic_path())
         .map_err(|_| ServiceError::ProjectBindingMismatch)?
         .components()
         .map(|component| {
@@ -661,8 +681,8 @@ pub(super) fn require_distribution_binding(
     Ok(executable_sha256)
 }
 
-fn require_directory(path: &Path, label: &str) -> Result<()> {
-    match fs::symlink_metadata(path) {
+fn require_directory(path: &AnchoredPath, label: &str) -> Result<()> {
+    match path.metadata() {
         Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => Ok(()),
         Ok(_) => Err(ServiceError::Contract(format!(
             "{label} is not a directory"
@@ -674,7 +694,10 @@ fn require_directory(path: &Path, label: &str) -> Result<()> {
     }
 }
 
-fn catalogued_backup(backups: &Path, backup_sha256: &str) -> Result<rrd_store::BackupEntry> {
+fn catalogued_backup(
+    backups: &AnchoredPath,
+    backup_sha256: &str,
+) -> Result<rrd_store::BackupEntry> {
     let catalogue = rrd_store::verify_backup_catalogue(backups)?;
     let entry = catalogue
         .backups
@@ -689,7 +712,10 @@ fn catalogued_backup(backups: &Path, backup_sha256: &str) -> Result<rrd_store::B
     Ok(entry)
 }
 
-fn active_token_key_sha256(active: &Path, installed: &InstalledEstateRecord) -> Result<String> {
+fn active_token_key_sha256(
+    active: &AnchoredPath,
+    installed: &InstalledEstateRecord,
+) -> Result<String> {
     let token_key = read_token_key(&active.join(TOKEN_KEY_FILE)).map_err(storage_error)?;
     let token_key_sha256 = digest::sha256_hex(&token_key);
     if token_key_sha256 != installed.token_key_sha256 {
@@ -698,9 +724,12 @@ fn active_token_key_sha256(active: &Path, installed: &InstalledEstateRecord) -> 
     Ok(token_key_sha256)
 }
 
-fn candidate_token_key_state(candidate: &Path, expected_sha256: &str) -> Result<TokenKeyState> {
+fn candidate_token_key_state(
+    candidate: &AnchoredPath,
+    expected_sha256: &str,
+) -> Result<TokenKeyState> {
     let path = candidate.join(TOKEN_KEY_FILE);
-    match fs::symlink_metadata(&path) {
+    match path.metadata() {
         Ok(_) => {
             let token_key = read_token_key(&path).map_err(storage_error)?;
             if digest::sha256_hex(&token_key) != expected_sha256 {
@@ -724,12 +753,10 @@ fn published_receipt(
     locator: &ProjectLocator,
     plan: &RestorePublicationPlan,
 ) -> Result<Option<PublicationReceipt>> {
-    if fs::symlink_metadata(&paths.candidate).is_ok()
-        || fs::symlink_metadata(&paths.quarantine).is_err()
-    {
+    if paths.candidate.metadata().is_ok() || paths.quarantine.metadata().is_err() {
         return Ok(None);
     }
-    let inspector = RrflowKvInspector::open(&paths.active)?;
+    let inspector = RrflowKvInspector::open_anchored(&paths.active)?;
     let key = publication_receipt_key(&locator.identity.instance_id, &plan.id);
     let Some(bytes) = inspector.control_record(&key)? else {
         return Ok(None);
@@ -752,7 +779,12 @@ fn replay_result(
     receipt: &PublicationReceipt,
     executable: &Path,
 ) -> Result<RestorePublicationResult> {
-    let report = RrdEngine::inspect_installed(&paths.project, executable)?;
+    let report = RrdEngine::inspect_installed_anchored(
+        &paths.project,
+        executable,
+        &super::clock::HostSystemClock,
+        "restore.publication.verify",
+    )?;
     if report.status != InstallationVerificationStatus::Passed {
         return Err(ServiceError::Storage(
             "published estate failed quick verification".into(),
@@ -809,30 +841,33 @@ fn build_result(
     Ok(result)
 }
 
-fn advance(path: &Path, intent: &mut PublicationIntent, stage: PublicationStage) -> Result<()> {
+fn advance(
+    path: &AnchoredPath,
+    intent: &mut PublicationIntent,
+    stage: PublicationStage,
+) -> Result<()> {
     intent.stage = stage;
     intent.intent_sha256 = intent.calculated_sha256()?;
     let bytes = encode(intent)?;
     let temporary = path.with_extension("json.pending");
-    let _ = fs::remove_file(&temporary);
+    let _ = temporary.remove_file();
     write_private_new(&temporary, &bytes).map_err(storage_error)?;
-    let parent = path.parent().ok_or(ServiceError::ProjectBindingMismatch)?;
-    rrd_store::publish_durable_rename(parent, &temporary, path).map_err(storage_error)?;
+    temporary.rename_to(path).map_err(storage_error)?;
     if read_intent(path)? != *intent {
         return Err(ServiceError::ProjectBindingMismatch);
     }
     Ok(())
 }
 
-fn acknowledge_intent(path: &Path, expected: &PublicationIntent) -> Result<()> {
+fn acknowledge_intent(path: &AnchoredPath, expected: &PublicationIntent) -> Result<()> {
     if read_intent(path)? != *expected {
         return Err(ServiceError::ProjectBindingMismatch);
     }
-    fs::remove_file(path).map_err(storage_error)?;
+    path.remove_file().map_err(storage_error)?;
     sync_parent(path)
 }
 
-fn read_intent(path: &Path) -> Result<PublicationIntent> {
+fn read_intent(path: &AnchoredPath) -> Result<PublicationIntent> {
     let bytes = read_private_bounded(path, MAX_PUBLICATION_INTENT_BYTES).map_err(storage_error)?;
     let intent: PublicationIntent = serde_json::from_slice(&bytes).map_err(contract_json)?;
     if encode(&intent)? != bytes || intent.intent_sha256 != intent.calculated_sha256()? {
@@ -845,12 +880,12 @@ fn encode<T: Serialize>(value: &T) -> Result<Vec<u8>> {
     serde_json::to_vec(value).map_err(contract_json)
 }
 
-fn sync_parent(path: &Path) -> Result<()> {
-    sync_directory(path.parent().ok_or(ServiceError::ProjectBindingMismatch)?)
+fn sync_parent(path: &AnchoredPath) -> Result<()> {
+    sync_directory(&path.parent().ok_or(ServiceError::ProjectBindingMismatch)?)
 }
 
-fn sync_directory(path: &Path) -> Result<()> {
-    rrd_store::sync_directory_metadata(path).map_err(storage_error)
+fn sync_directory(path: &AnchoredPath) -> Result<()> {
+    path.sync_directory().map_err(storage_error)
 }
 
 fn is_lower_hex_sha256(value: &str) -> bool {

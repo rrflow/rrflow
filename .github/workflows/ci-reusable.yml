@@ -37,6 +37,10 @@ jobs:
         with:
           shared-key: linux-topology
           cache-on-failure: true
+      - name: Test native filesystem containment and publication
+        run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Qualify bind-mount denial in a private native namespace
+        run: python3 scripts/ci/run_filesystem_containment.py
       - name: Test the real install, serve, authenticate, stop, reopen lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
       - name: Qualify the staged binary without checkout, toolchain sources or outbound network
@@ -75,6 +79,10 @@ jobs:
         run: cargo test -p rrd-server --bin rrd-server --locked
       - name: Test native secret file permissions and handle identity
         run: cargo test -p rrd-engine --lib engine::token_key --locked
+      - name: Test native filesystem containment and publication
+        run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test installation ancestor replacement at durable boundaries
+        run: cargo test -p rrd-engine --lib anchored_installation --locked
       - name: Test native installed primary lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
       - name: Deny installed lifecycle test warnings

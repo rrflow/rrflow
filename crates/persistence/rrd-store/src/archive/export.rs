@@ -7,11 +7,10 @@ use super::receipt::{
     export_paths, load_receipt, remove_export_artifacts, remove_receipt, write_receipt,
     ExportReceipt,
 };
+use crate::filesystem::AnchorInput;
 use crate::{Error, Result, StorageEngine};
 use rrd_core::{AuditEnvelope, Claim, RuntimeChange, RuntimeCommit, RuntimeMutation};
 use std::collections::VecDeque;
-use std::fs;
-use std::path::Path;
 
 const PAGE_SIZE: usize = 1_024;
 
@@ -29,8 +28,9 @@ struct SourceSummary {
 
 pub fn export_logical_archive<E: StorageEngine>(
     engine: &E,
-    destination: &Path,
+    destination: &(impl AnchorInput + ?Sized),
 ) -> Result<LogicalArchiveInventory> {
+    let destination = &destination.anchor().map_err(archive_io)?;
     export_logical_archive_with_progress(engine, destination, |_| Ok(()))
 }
 
@@ -40,17 +40,20 @@ pub fn export_logical_archive<E: StorageEngine>(
 /// artifacts for the next call to reconcile and resume.
 pub fn export_logical_archive_with_progress<E: StorageEngine>(
     engine: &E,
-    destination: &Path,
+    destination: &(impl AnchorInput + ?Sized),
     mut progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
 ) -> Result<LogicalArchiveInventory> {
-    if destination.exists() {
+    let destination = &destination.anchor().map_err(archive_io)?;
+    if destination.try_exists().map_err(archive_io)? {
         return Err(Error::Archive(format!(
             "archive target already exists: {}",
             destination.display()
         )));
     }
-    let parent = destination.parent().unwrap_or_else(|| Path::new("."));
-    fs::create_dir_all(parent).map_err(archive_io)?;
+    let parent = destination
+        .parent()
+        .ok_or_else(|| Error::Archive("filesystem root has no parent".into()))?;
+    parent.create_dir_all().map_err(archive_io)?;
 
     // The first bounded pass validates the complete source and determines the
     // immutable header without retaining the log. The second pass either
@@ -62,12 +65,14 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
         action_count: expected.action_count,
     };
     let (partial_path, receipt_path) = export_paths(destination)?;
-    if receipt_path.exists() && !partial_path.exists() {
+    if receipt_path.try_exists().map_err(archive_io)?
+        && !partial_path.try_exists().map_err(archive_io)?
+    {
         return Err(Error::Archive(
             "logical export receipt exists without its partial archive".into(),
         ));
     }
-    if partial_path.exists() {
+    if partial_path.try_exists().map_err(archive_io)? {
         if let Ok(inventory) = super::format::inspect_logical_archive(&partial_path) {
             if !inventory_matches_source(&inventory, &expected) {
                 remove_export_artifacts(&partial_path, &receipt_path)?;
@@ -75,12 +80,14 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
                     "finalized logical export no longer matches the source cut".into(),
                 ));
             }
-            rrd_lsm::publish_rename(parent, &partial_path, destination).map_err(archive_io)?;
+            partial_path
+                .rename_new_to(destination)
+                .map_err(archive_io)?;
             remove_receipt(&receipt_path)?;
             return Ok(inventory);
         }
     }
-    if !partial_path.exists() {
+    if !partial_path.try_exists().map_err(archive_io)? {
         let mut writer = ArchiveWriter::create(&partial_path, header)?;
         writer.sync()?;
         let prefix = writer.prefix_inventory()?;
@@ -102,7 +109,7 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
             "logical export source watermarks changed; discarded the stale partial cut".into(),
         ));
     }
-    if !receipt_path.exists() {
+    if !receipt_path.try_exists().map_err(archive_io)? {
         write_receipt(
             &receipt_path,
             &ExportReceipt::from_prefix(
@@ -201,7 +208,9 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
         claim_sequence: inventory.claim_sequence,
         runtime_cursor: inventory.runtime_cursor,
     })?;
-    rrd_lsm::publish_rename(parent, &partial_path, destination).map_err(archive_io)?;
+    partial_path
+        .rename_new_to(destination)
+        .map_err(archive_io)?;
     remove_receipt(&receipt_path)?;
     Ok(inventory)
 }

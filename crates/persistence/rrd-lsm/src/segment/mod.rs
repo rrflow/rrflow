@@ -8,6 +8,7 @@ use self::format::{
     ParsedMetadata, RowGroupDescriptor, RowGroupFilter, FOOTER_BYTES, INDEX_HEADER_BYTES,
     MAX_KEY_BYTES, MAX_SEGMENT_BYTES, MAX_VALUE_BYTES, SEGMENT_HEADER_BYTES,
 };
+use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SelectedIo, SharedIoContext};
 use crate::{Error, Memtable, Result, SegmentDescriptor, SegmentIoPolicy, VersionedValue};
 use arrow_buffer::{alloc::Allocation, Buffer, MutableBuffer};
@@ -16,8 +17,8 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
 use std::fmt;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::File;
+use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -731,29 +732,31 @@ impl Segment {
         table: &Memtable,
         compression_policy: SegmentCompressionPolicy,
     ) -> Result<(Self, PathBuf)> {
-        Self::write_from_memtable_with_cache(
-            directory,
+        let directory = AnchoredPath::from_path(directory)?;
+        let (segment, path) = Self::write_from_memtable_with_cache(
+            &directory,
             table,
             SegmentRowGroupBudget::default(),
             compression_policy,
             new_page_cache(DEFAULT_PAGE_CACHE_BYTES),
             IoContext::new(SegmentIoPolicy::default())?,
-        )
+        )?;
+        Ok((segment, path.diagnostic_path().to_owned()))
     }
 
     pub(crate) fn write_from_memtable_with_cache(
-        directory: &Path,
+        directory: &AnchoredPath,
         table: &Memtable,
         row_group_budget: SegmentRowGroupBudget,
         compression_policy: SegmentCompressionPolicy,
         cache: SharedPageCache,
         io: SharedIoContext,
-    ) -> Result<(Self, PathBuf)> {
+    ) -> Result<(Self, AnchoredPath)> {
         let encoded = encode(table, row_group_budget, compression_policy)?;
         let write_evidence = encoded.evidence;
         let path = directory.join(format!("{}.seg", encoded.checksum));
-        std::fs::create_dir_all(directory)?;
-        if path.exists() {
+        directory.create_dir_all()?;
+        if path.try_exists()? {
             let segment = Self::open_with_cache_and_io(&path, cache, io)?;
             if segment.descriptor.id != encoded.checksum {
                 return invalid("existing content-addressed segment has another identity");
@@ -789,9 +792,9 @@ impl Segment {
         if let Err(error) = (|| -> std::io::Result<()> {
             file.write_all(&encoded.bytes)?;
             file.sync_all()?;
-            crate::publish_rename(directory, &temporary, &path)
+            temporary.rename_to(&path)
         })() {
-            let _ = std::fs::remove_file(&temporary);
+            let _ = temporary.remove_file();
             return Err(Error::Io(error));
         }
         let segment = Self::open_with_cache_and_io(&path, cache, io)?;
@@ -816,23 +819,23 @@ impl Segment {
 
     pub fn open(path: &Path) -> Result<Self> {
         Self::open_with_cache_and_io(
-            path,
+            &AnchoredPath::from_path(path)?,
             new_page_cache(DEFAULT_PAGE_CACHE_BYTES),
             IoContext::new(SegmentIoPolicy::default())?,
         )
     }
 
     pub(crate) fn open_with_cache_and_io(
-        path: &Path,
+        path: &AnchoredPath,
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<Self> {
-        let physical_bytes = validate_physical_file(path)?;
+        let mut file = path.open_read()?;
+        let physical_bytes = validate_physical_file(&mut file)?;
         let total_started = Instant::now();
         let verify_started = Instant::now();
-        let checksum = verify_file_digest(path, physical_bytes)?;
+        let checksum = verify_file_digest(&mut file, physical_bytes)?;
         let verify_ms = verify_started.elapsed().as_millis() as u64;
-        let mut file = File::open(path)?;
         let metadata_started = Instant::now();
         let metadata = parse_metadata(&mut file, physical_bytes, checksum)?;
         let metadata_ms = metadata_started.elapsed().as_millis() as u64;
@@ -874,20 +877,20 @@ impl Segment {
     }
 
     pub(crate) fn open_expected_with_cache_and_io(
-        path: &Path,
+        path: &AnchoredPath,
         expected: &SegmentDescriptor,
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<Self> {
-        let physical_bytes = validate_physical_file(path)?;
+        let mut file = path.open_read()?;
+        let physical_bytes = validate_physical_file(&mut file)?;
         if physical_bytes != expected.bytes {
             return invalid("segment physical size differs from its manifest descriptor");
         }
-        let checksum = verify_file_digest(path, physical_bytes)?;
+        let checksum = verify_file_digest(&mut file, physical_bytes)?;
         if checksum != expected.checksum || checksum != expected.id {
             return invalid("segment content digest differs from its manifest descriptor");
         }
-        let mut file = File::open(path)?;
         let metadata = parse_metadata(&mut file, physical_bytes, checksum)?;
         let open_evidence = SegmentOpenEvidence::for_metadata(physical_bytes, &metadata, false)?;
         let source = open_page_source(file, io)?;
@@ -944,16 +947,16 @@ impl Segment {
     }
 
     pub(crate) fn install_snapshot_bytes_with_cache(
-        directory: &Path,
+        directory: &AnchoredPath,
         expected: &SegmentDescriptor,
         bytes: &[u8],
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<Self> {
         Self::validate_snapshot_bytes(expected, bytes)?;
-        std::fs::create_dir_all(directory)?;
+        directory.create_dir_all()?;
         let path = directory.join(format!("{}.seg", expected.id));
-        if path.exists() {
+        if path.try_exists()? {
             let existing = Self::open_expected_with_cache_and_io(&path, expected, cache, io)?;
             if !file_equals_bytes(&path, bytes)? {
                 return invalid(format!(
@@ -976,9 +979,9 @@ impl Segment {
         if let Err(error) = (|| -> std::io::Result<()> {
             file.write_all(bytes)?;
             file.sync_all()?;
-            crate::publish_rename(directory, &temporary, &path)
+            temporary.rename_to(&path)
         })() {
-            let _ = std::fs::remove_file(&temporary);
+            let _ = temporary.remove_file();
             return Err(Error::Io(error));
         }
         Self::open_expected_with_cache_and_io(&path, expected, cache, io)
@@ -1857,12 +1860,12 @@ fn build_segment(
     })
 }
 
-fn validate_physical_file(path: &Path) -> Result<u64> {
-    let physical_bytes = std::fs::metadata(path)?.len();
+fn validate_physical_file(file: &mut File) -> Result<u64> {
+    let physical_bytes = file.metadata()?.len();
     if physical_bytes > MAX_SEGMENT_BYTES {
         return invalid("segment exceeds the 1 GiB physical safety limit");
     }
-    let mut file = File::open(path)?;
+    file.seek(std::io::SeekFrom::Start(0))?;
     let mut prefix = [0; 10];
     file.read_exact(&mut prefix)
         .map_err(|_| Error::InvalidSegment("segment has no complete format header".into()))?;
@@ -2169,11 +2172,11 @@ fn validate_validity(validity: &[u8], rows: usize) -> Result<()> {
     Ok(())
 }
 
-fn verify_file_digest(path: &Path, physical_bytes: u64) -> Result<String> {
+fn verify_file_digest(file: &mut File, physical_bytes: u64) -> Result<String> {
     let content_bytes = physical_bytes
         .checked_sub(FOOTER_BYTES as u64)
         .ok_or_else(|| Error::InvalidSegment("segment footer underflow".into()))?;
-    let mut file = File::open(path)?;
+    file.seek(std::io::SeekFrom::Start(0))?;
     let mut hasher = ring::digest::Context::new(&ring::digest::SHA256);
     let mut buffer = vec![0; COPY_BUFFER_BYTES];
     let mut remaining = content_bytes;
@@ -2204,11 +2207,11 @@ fn digest_hex(digest: &[u8]) -> String {
     String::from_utf8(encoded).expect("hex digest is ASCII")
 }
 
-fn file_equals_bytes(path: &Path, expected: &[u8]) -> Result<bool> {
-    if std::fs::metadata(path)?.len() != expected.len() as u64 {
+fn file_equals_bytes(path: &AnchoredPath, expected: &[u8]) -> Result<bool> {
+    let mut file = path.open_read()?;
+    if file.metadata()?.len() != expected.len() as u64 {
         return Ok(false);
     }
-    let mut file = File::open(path)?;
     let mut buffer = vec![0; COPY_BUFFER_BYTES];
     let mut cursor = 0;
     while cursor < expected.len() {
@@ -2487,7 +2490,7 @@ mod tests {
         let io = IoContext::new(SegmentIoPolicy::default()).unwrap();
         let table = two_key_sample_memtable();
         let (segment, _path) = Segment::write_from_memtable_with_cache(
-            &segments,
+            &AnchoredPath::from_path(&segments).unwrap(),
             &table,
             SegmentRowGroupBudget::default(),
             DEFAULT_SEGMENT_COMPRESSION_POLICY,
@@ -2521,7 +2524,7 @@ mod tests {
         let io = IoContext::new(SegmentIoPolicy::default()).unwrap();
         let table = two_key_sample_memtable();
         let (segment, _path) = Segment::write_from_memtable_with_cache(
-            &segments,
+            &AnchoredPath::from_path(&segments).unwrap(),
             &table,
             SegmentRowGroupBudget::default(),
             DEFAULT_SEGMENT_COMPRESSION_POLICY,
@@ -2553,7 +2556,7 @@ mod tests {
         let io = IoContext::new(SegmentIoPolicy::default()).unwrap();
         let table = mixed_family_memtable();
         let (segment, _path) = Segment::write_from_memtable_with_cache(
-            &segments,
+            &AnchoredPath::from_path(&segments).unwrap(),
             &table,
             SegmentRowGroupBudget::default(),
             DEFAULT_SEGMENT_COMPRESSION_POLICY,
@@ -2587,7 +2590,7 @@ mod tests {
         let io = IoContext::new(SegmentIoPolicy::default()).unwrap();
         let table = mixed_family_memtable();
         let (segment, _path) = Segment::write_from_memtable_with_cache(
-            &segments,
+            &AnchoredPath::from_path(&segments).unwrap(),
             &table,
             SegmentRowGroupBudget::default(),
             DEFAULT_SEGMENT_COMPRESSION_POLICY,
