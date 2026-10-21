@@ -346,6 +346,61 @@ fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
 }
 
 #[test]
+fn installed_open_and_verify_never_repair_a_torn_or_missing_active_wal() {
+    use std::io::Write as _;
+
+    for missing in [false, true] {
+        let project = tempfile::tempdir().unwrap();
+        std::fs::write(project.path().join("README.md"), b"project-owned\n").unwrap();
+        let preview = plan(project.path());
+        let executable = test_executable();
+        RrdEngine::apply_installation_at(
+            project.path(),
+            InstallationTargetKind::ExistingProject,
+            &preview,
+            &preview.installation.plan_sha256,
+            1_800_000_000_000,
+            &executable,
+        )
+        .unwrap();
+        let storage = project.path().join(
+            &preview
+                .installation
+                .managed_path(rrd_contract::InstallationManagedPathKind::StorageRoot)
+                .relative_path,
+        );
+        let files = std::fs::read_dir(storage.join("wal"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(files.len(), 1, "fixture must have one committed active WAL");
+        if missing {
+            std::fs::remove_file(&files[0]).unwrap();
+        } else {
+            let mut wal = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&files[0])
+                .unwrap();
+            wal.write_all(b"incomplete-tail").unwrap();
+            wal.sync_all().unwrap();
+        }
+        let damaged = inventory(project.path());
+        assert!(open_at(project.path(), &executable, 1_800_000_000_001).is_err());
+        assert_eq!(
+            inventory(project.path()),
+            damaged,
+            "installed open repaired WAL"
+        );
+        assert!(inspect_at(project.path(), &executable, 1_800_000_000_001).is_err());
+        assert_eq!(
+            inventory(project.path()),
+            damaged,
+            "verification repaired WAL"
+        );
+    }
+}
+
+#[test]
 fn unavailable_or_rolled_back_clock_blocks_effects_but_not_read_only_diagnosis() {
     let project = tempfile::tempdir().unwrap();
     std::fs::write(project.path().join("README.md"), "clock boundary\n").unwrap();

@@ -308,3 +308,9 @@ ACL restoration, followed by an IPv6 network-unreachable result. The probe now
 uses a configured non-loopback link-local scope without changing host routes;
 explicit IPv6 permission denial remains mandatory. Product execution and final
 candidate acceptance remain pending.
+
+
+The [installed WAL denial characterization](../../evidence/change-journals/gate-d/d-01-installed-wal-denial.md)
+adds direct installed-open and verification evidence for torn/missing active
+WAL preservation. Both cases pass locally without production changes; the final
+native candidate must execute the added test before D-01 acceptance closes.
