@@ -16,6 +16,10 @@ owner/permission/path/mount denial, exclusive install recovery and both actual
 primary-binary lifecycle modes. POAM-006 remains **Open** for the later D/J
 requirements below. Dated entries retain the gaps and results observed at their
 recorded revisions; they do not override this current assessment.
+The [reference-alignment journal](../../evidence/change-journals/gate-d/d-01-acceptance-reference-alignment.md)
+records correction of stale D-01 qualification/specialization statements and
+duplicated roadmap counts; those documentation defects do not reopen the
+accepted native implementation or close the broader lifecycle gaps.
 
 The source-built primary `rrflow` binary now owns deterministic install plan/apply,
 installed serve, authenticated ready, read-only quick verify, and version. Exact-plan

@@ -242,7 +242,8 @@ Dynamic time and secret inputs are obtained only during authorized apply through
 the existing engine clock and OS entropy authority. Actual installed/transaction,
 credential and manifest digests remain in existing receipts. The attunement job
 remains pending; this bootstrap is not verified source indexing or provider
-configuration. D-01.5/.6 still own native qualification and complete acceptance.
+configuration. The [D-01 accepted matrix](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+binds native qualification and foundation acceptance to exact candidate evidence.
 
 ## Install apply
 
@@ -330,8 +331,8 @@ it. The clock substrate proves only relative rollback against a sealed anchor:
 it does not authenticate or correct UTC, detect every forward error or drift,
 or establish runtime-wide timestamp high-water rules. Platform synchronization
 diagnosis, explicitly authorized correction, and native clock qualification
-remain open. Complete native filesystem and ACL
-qualification, configuration plan/apply, attunement phase execution, full
+remain open. D-01's bounded native filesystem and ACL qualification is accepted
+in the linked matrix. Configuration plan/apply, attunement phase execution, full
 verify/repair/restore/uninstall, service integration, release assembly, and
 clean-machine qualification remain separate packages. The staged rationale and
 exit proofs are in the
@@ -357,11 +358,14 @@ security enforcement fails closed; no runtime ACL utility is required.
 
 These private-object checks compose with retained filesystem authority below.
 They do not establish an atomic project snapshot, resistance to every
-same-owner race, a credential migration facility, or complete native ACL
-qualification. Privileged foreign-owner scenarios remain unqualified. The
+same-owner race, a credential migration facility, or qualification for arbitrary
+filesystems. Privileged foreign-owner cases now pass explicitly on Linux,
+macOS and Windows in the
+[D-01 accepted matrix](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21).
+The
 [native secret boundary journal](../../evidence/change-journals/gate-d/d-01-native-secret-boundary.md)
 records real filesystem denial and retained installation/recovery evidence.
-D-01 remains open.
+D-01's installed foundation is accepted; wider operational and release gates remain open.
 
 ## Open, serve, and readiness
 
@@ -413,8 +417,8 @@ enforcement is an error, with no pathname fallback.
 The [containment journal](../../evidence/change-journals/gate-d/d-01-anchored-filesystem.md)
 records platform-specific tests and qualification limits. These operations do
 not make mutable project content an atomic snapshot or protect against every
-same-owner modification. Whole-install exclusivity, complete bootstrap and the
-full supported-filesystem/offline matrix remain D-01.3 through D-01.5. Network
+same-owner modification. Whole-install exclusivity, bounded installed bootstrap
+and the native offline matrix are accepted in D-01.3 through D-01.6. Network
 filesystems and arbitrary filesystem implementations are not qualified by the
 local native runner results.
 

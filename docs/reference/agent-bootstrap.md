@@ -1,6 +1,6 @@
 # Provider-neutral agent bootstrap and specialization
 
-**Status:** active target reference; checkout forwarding exists, installed specialization does not
+**Status:** active reference; bundled installed specialization subset implemented, full attunement and provider qualification remain open
 **Coordinate:** `rrflow://rrflow-instance/data/reference/agent-bootstrap`
 **Owner:** provider-neutral AI instruction, installation, and specialization boundary
 
@@ -71,7 +71,8 @@ current effect and recovery contract.
 
 The generic template has no built-in persona or provider. A specialization may
 select a durable primary seat and propose provider identities that can represent
-it. This repository's planned specialization must select **Clyffy**. Clyffy is
+it. The bundled `clyffy` profile explicitly selects **Clyffy**; the default
+profile remains generic. Clyffy is
 a seat, not another product, kernel, repository, daemon, database, model, or
 lifecycle. Changing Claude, OpenAI, Gemini, Grok, LFG, or another provider does
 not replace that identity.
