@@ -71,6 +71,40 @@ fn executable() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
 }
 
+#[test]
+fn shared_sdk_corpus_identity_matches_bundled_installation() {
+    let anchor =
+        include_bytes!("../../../../../../fixtures/rrflow-sdk-conformance-install-anchor-v1.bin");
+    let corpus: rrd_contract::SdkConformanceCorpus = serde_json::from_slice(include_bytes!(
+        "../../../../../../fixtures/rrd-sdk-conformance-v1.json"
+    ))
+    .unwrap();
+    corpus.validate().unwrap();
+    let temporary = tempfile::tempdir().unwrap();
+    let distribution = temporary.path().join("install-anchor.bin");
+    std::fs::write(&distribution, anchor).unwrap();
+    let project = temporary.path().join("project");
+    std::fs::create_dir(&project).unwrap();
+    let preview = RrdEngine::plan_installation(
+        &project,
+        InstallationTargetKind::FreshProject,
+        &digest::sha256_hex(anchor),
+        "default",
+        None,
+        &distribution,
+    )
+    .unwrap();
+    assert_eq!(
+        preview.installation.target.instance_id,
+        corpus.identity.instance
+    );
+    assert_eq!(
+        preview.installation.target.estate_id,
+        corpus.identity.estate
+    );
+    assert!(paths(&project).is_empty());
+}
+
 fn preview_for(project: &Path, profile: &str) -> crate::InstallationPreview {
     RrdEngine::plan_installation(
         project,
