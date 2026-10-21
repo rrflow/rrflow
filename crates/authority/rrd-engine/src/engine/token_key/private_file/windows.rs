@@ -21,10 +21,11 @@ use windows_sys::Win32::Security::{
     PSID, SECURITY_ATTRIBUTES, SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, GetFileInformationByHandle, GetFileType, BY_HANDLE_FILE_INFORMATION, CREATE_NEW,
-    FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT,
-    FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, FILE_TYPE_DISK, OPEN_EXISTING,
-    SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
+    CreateDirectoryW, CreateFileW, GetFileInformationByHandle, GetFileType,
+    BY_HANDLE_FILE_INFORMATION, CREATE_NEW, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
+    FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+    FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TYPE_DISK,
+    OPEN_EXISTING, READ_CONTROL, SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -128,6 +129,69 @@ fn descriptor(sddl: &str) -> io::Result<LocalAllocation> {
     Ok(LocalAllocation(raw))
 }
 
+pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
+    let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+    if wide.contains(&0) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "directory path contains NUL",
+        ));
+    }
+    wide.push(0);
+    if create {
+        let user = CurrentUser::query()?.text()?;
+        // Descendants inherit only owner/System grants. Each of the four estate
+        // directories gets its own protected descriptor rather than relying on
+        // the project parent's ACL. Store-owned descendants retain their owner.
+        let security = descriptor(&format!("O:{user}D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)"))?;
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: security.0,
+            bInheritHandle: 0,
+        };
+        // SAFETY: path and descriptor remain live; creation never replaces an existing object.
+        if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    // SAFETY: live terminated path; OPEN_REPARSE_POINT inspects the leaf itself.
+    // These short-lived metadata handles do not claim ancestor exclusion.
+    let raw = unsafe {
+        CreateFileW(
+            wide.as_ptr(),
+            READ_CONTROL | FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS
+                | FILE_FLAG_OPEN_REPARSE_POINT
+                | SECURITY_SQOS_PRESENT
+                | SECURITY_IDENTIFICATION,
+            null_mut(),
+        )
+    };
+    if raw == INVALID_HANDLE_VALUE {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: successful CreateFileW transfers one real handle to File.
+    Ok(unsafe { File::from_raw_handle(raw) })
+}
+
+pub(super) fn validate_directory(file: &File) -> io::Result<()> {
+    let mut information = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: file owns the live handle and information is writable.
+    if unsafe { GetFileType(file.as_raw_handle()) } != FILE_TYPE_DISK
+        || unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) } == 0
+        || information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY == 0
+        || information.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    {
+        return Err(denied(
+            "estate directory must be a native non-reparse directory",
+        ));
+    }
+    validate_security(file, true)
+}
+
 pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
     let wide: Vec<u16> = path.as_os_str().encode_wide().collect();
     if wide.contains(&0) {
@@ -191,11 +255,17 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
             "secret must be a regular non-reparse file with exactly one link",
         ));
     }
+    validate_security(file, false)?;
+    file.metadata()
+}
+
+fn validate_security(file: &File, directory: bool) -> io::Result<()> {
+    let handle = file.as_raw_handle();
     let user = CurrentUser::query()?;
     let mut owner = null_mut();
     let mut dacl: *mut ACL = null_mut();
     let mut raw = null_mut();
-    // SAFETY: file grants READ_CONTROL via GENERIC_READ; outputs point into raw,
+    // SAFETY: the handle grants READ_CONTROL; outputs point into raw,
     // a LocalFree-owned security descriptor retained through all ACL inspection.
     let status = unsafe {
         GetSecurityInfo(
@@ -228,14 +298,14 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
     };
     if !valid {
         return Err(denied(
-            "secret requires the current owner and a protected non-null DACL",
+            "private object requires the current owner and a protected non-null DACL",
         ));
     }
     // SAFETY: IsValidAcl validated the header and security keeps it alive.
     let count = unsafe { (*dacl).AceCount };
     if count == 0 || count > 2 {
         return Err(denied(
-            "secret DACL must grant only its owner and optional LocalSystem",
+            "private DACL must grant only its owner and optional LocalSystem",
         ));
     }
     let mut owner_grant = false;
@@ -251,10 +321,10 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
         // ACCESS_ALLOWED_ACE_TYPE is the Win32 basic allow ACE (0). Object,
         // conditional, inherited and unknown ACE forms are not this contract.
         if header.AceType != 0
-            || header.AceFlags != 0
+            || header.AceFlags != if directory { 3 } else { 0 }
             || usize::from(header.AceSize) < sid_offset + 8
         {
-            return Err(denied("unsupported secret DACL entry"));
+            return Err(denied("unsupported private DACL entry"));
         }
         // SAFETY: the checked ACE size contains a SID header at the fixed offset.
         let sid = unsafe { ace.cast::<u8>().add(sid_offset).cast() };
@@ -263,19 +333,39 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
         if unsafe { GetLengthSid(sid) } as usize > usize::from(header.AceSize) - sid_offset
             || unsafe { IsValidSid(sid) } == 0
         {
-            return Err(denied("invalid secret DACL identity"));
+            return Err(denied("invalid private DACL identity"));
         }
         // SAFETY: both SIDs are valid and their owners remain alive.
         let is_owner = unsafe { EqualSid(sid, user.sid()) } != 0;
         if !is_owner && unsafe { IsWellKnownSid(sid, WinLocalSystemSid) } == 0 {
-            return Err(denied("secret DACL grants another principal access"));
+            return Err(denied("private DACL grants another principal access"));
         }
         owner_grant |= is_owner;
     }
     if !owner_grant {
-        return Err(denied("secret DACL lacks its owner grant"));
+        return Err(denied("private DACL lacks its owner grant"));
     }
-    file.metadata()
+    Ok(())
+}
+
+#[cfg(test)]
+pub(super) fn make_directory_permissive_for_test(path: &Path) {
+    let user = CurrentUser::query().unwrap().text().unwrap();
+    tests::replace_dacl(
+        path,
+        &format!("D:P(A;OICI;FA;;;{user})(A;OICI;FR;;;WD)"),
+        true,
+    );
+}
+
+#[cfg(test)]
+pub(super) fn restore_private_directory_for_test(path: &Path) {
+    let user = CurrentUser::query().unwrap().text().unwrap();
+    tests::replace_dacl(
+        path,
+        &format!("D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)"),
+        true,
+    );
 }
 
 #[cfg(test)]
@@ -290,7 +380,7 @@ mod tests {
     };
     use windows_sys::Win32::Storage::FileSystem::{READ_CONTROL, WRITE_DAC};
 
-    fn replace_dacl(path: &Path, text: &str, protected: bool) {
+    pub(super) fn replace_dacl(path: &Path, text: &str, protected: bool) {
         let sd = descriptor(text).unwrap();
         let mut present = 0;
         let mut dacl = null_mut();
@@ -302,6 +392,7 @@ mod tests {
         );
         let file = std::fs::OpenOptions::new()
             .access_mode(READ_CONTROL | WRITE_DAC)
+            .custom_flags(windows_sys::Win32::Storage::FileSystem::FILE_FLAG_BACKUP_SEMANTICS)
             .open(path)
             .unwrap();
         let flag = if protected {
@@ -352,5 +443,28 @@ mod tests {
     #[test]
     fn device_handles_are_not_secret_files() {
         assert!(read_private_bounded(Path::new("NUL"), 32).is_err());
+    }
+
+    #[test]
+    fn directory_acl_denials_preserve_contents_and_do_not_repair() {
+        let root = tempfile::tempdir().unwrap();
+        let user = CurrentUser::query().unwrap().text().unwrap();
+        for (index, text, protected) in [
+            (0, format!("D:P(A;OICI;FA;;;{user})(A;OICI;FR;;;WD)"), true),
+            (1, format!("D:(A;OICI;FA;;;{user})"), false),
+            (2, "D:NO_ACCESS_CONTROL".into(), true),
+            (3, format!("D:P(A;;FA;;;{user})"), true),
+        ] {
+            let path = root.path().join(format!("directory-{index}"));
+            let directory = open_directory(&path, true).unwrap();
+            validate_directory(&directory).unwrap();
+            write_private_new(&path.join("retained"), b"unchanged").unwrap();
+            replace_dacl(&path, &text, protected);
+            assert!(validate_directory(&directory).is_err());
+            assert!(validate_directory(&open_directory(&path, false).unwrap()).is_err());
+            assert_eq!(std::fs::read(path.join("retained")).unwrap(), b"unchanged");
+            restore_private_directory_for_test(&path);
+            validate_directory(&directory).unwrap();
+        }
     }
 }

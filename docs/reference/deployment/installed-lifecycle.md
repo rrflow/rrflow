@@ -323,6 +323,32 @@ D-01 remains open.
 
 ## Open, serve, and readiness
 
+### Private estate-directory admission
+
+The four engine-owned boundaries `.rrflow`, `.rrflow/rrd`,
+`.rrflow/rrd/roots` and `.rrflow/credentials` are created with private native
+security. Unix creation requests mode `0700`; admission requires that mode
+and effective-user ownership on the opened directory. Windows creation
+supplies a protected owner/LocalSystem DACL with object/container inheritance;
+admission inspects the directory handle's owner, DACL and non-reparse disk
+attributes. The default project-parent ACL is not used as the security policy.
+
+Apply and recovery validate every present boundary before reading recovery
+secrets or advancing store work. Installed locator, credential, open and
+inspection operations require all four boundaries. Missing paths are allowed
+only during new or interrupted apply. A changed mode, unsupported ACL or
+non-directory object is refused without permission repair; project-owned
+parents are never tightened. Creation does not replace an existing object.
+
+These checks extend the private-object boundary; they do not retain ancestor
+handles, prevent mount/path replacement between operations, validate every
+store-owned descendant or qualify all privileged foreign-owner scenarios.
+Those requirements remain in D-01's later containment and native-qualification
+packages. Existing pre-alpha estates with incompatible directory permissions
+are refused rather than silently upgraded.
+
+### Installed engine admission
+
 Normal open is `open_existing`, never create-or-open. A read-only inspector
 first resolves the project locator, validates the installed closure, and
 assesses the engine-owned host observation against the installed clock anchor
