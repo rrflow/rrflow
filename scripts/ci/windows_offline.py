@@ -5,6 +5,7 @@ verified for every inventoried object, including direct descendant access.
 Every resource below belongs to this invocation on an ephemeral hosted runner.
 """
 import ctypes as c
+import base64
 from ctypes import wintypes as w
 from contextlib import ExitStack
 import os
@@ -18,7 +19,7 @@ import sys
 import time
 import uuid
 
-from run_offline_lifecycle import require
+from run_offline_lifecycle import require, run
 
 
 P = c.c_void_p
@@ -377,12 +378,37 @@ def probe_runtime_access(token, stage):
         boolean(api(adv, "RevertToSelf", w.BOOL)(), "restore qualification caller token")
 
 
+def ipv6_probe_scope():
+    """Read native interface identity; never change routes or addresses."""
+    script = """
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$connected = @(Get-NetIPInterface -AddressFamily IPv6 -ConnectionState Connected |
+    Select-Object -ExpandProperty InterfaceIndex)
+$candidate = Get-NetIPAddress -AddressFamily IPv6 -AddressState Preferred |
+    Where-Object { $_.IPAddress -like 'fe80::*' -and $_.InterfaceIndex -in $connected } |
+    Sort-Object InterfaceIndex | Select-Object -First 1
+if ($null -eq $candidate) { throw 'No connected native IPv6 link-local interface' }
+[uint32]$candidate.InterfaceIndex | ConvertTo-Json -Compress
+"""
+    executable = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    scope = json.loads(run(str(executable), "-NoProfile", "-NonInteractive", "-EncodedCommand",
+                           encoded, timeout=30, output_limit=4096).stdout)
+    require(type(scope) is int and 0 < scope < 2 ** 32, "invalid native IPv6 interface scope")
+    return scope
+
+
 def run_isolated(stage: Path, masks: list[Path]):
     require(sys.platform == "win32" and os.environ.get("GITHUB_ACTIONS") == "true"
             and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted",
             "Windows account and native policy qualification requires an ephemeral hosted CI runner")
     require(stage.is_relative_to(Path(os.environ["PUBLIC"]).resolve()) and stage.name.startswith("rrflow-offline-"),
             "qualification stage must be an owned public-parent fixture")
+    scope = ipv6_probe_scope()
+    configuration = json.loads((stage / "isolation.json").read_text())
+    configuration["ipv6_probe_scope_id"] = scope
+    (stage / "isolation.json").write_text(json.dumps(configuration), encoding="utf-8")
     with ExitStack() as stack:
         sid, sid_text, token, impersonation = principal(stack)
         desktop = private_desktop(stack, sid_text)
@@ -399,7 +425,7 @@ def run_isolated(stage: Path, masks: list[Path]):
         code = launch(token, stage, "startup", 15, desktop, probe=True)
         (stage / "startup.json").write_text(json.dumps([
             {"case": "standard_user_complete_source_acl", "exit_status": f"0x{code:08x}",
-             "source_object_counts": counts}]), encoding="utf-8")
+             "source_object_counts": counts, "ipv6_probe_scope_id": scope}]), encoding="utf-8")
         try:
             launch(token, stage, "--windows-inside", 600, desktop)
         finally:

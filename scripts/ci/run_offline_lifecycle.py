@@ -319,6 +319,18 @@ def macos_profile(mask_count: int) -> str:
     ])
 
 
+def native_probe_targets(configuration: dict) -> list[tuple]:
+    ipv6 = ("2001:db8::1", 9)
+    if sys.platform == "win32":
+        scope = configuration.get("ipv6_probe_scope_id")
+        require(type(scope) is int and 0 < scope < 2 ** 32,
+                "native Windows IPv6 probe requires a configured interface scope")
+        # A non-loopback link-local destination reaches IPv6 classification even
+        # on hosted runners without a global IPv6 route. Never accept unreachable.
+        ipv6 = ("fe80::ffff:ffff:fffe", 9, 0, scope)
+    return [(socket.AF_INET, ("192.0.2.1", 9)), (socket.AF_INET6, ipv6)]
+
+
 def native_denial_probes(stage: Path) -> None:
     configuration = json.loads((stage / "isolation.json").read_text())
     for root in configuration["masks"]:
@@ -337,10 +349,10 @@ def native_denial_probes(stage: Path) -> None:
                 pass
             else:
                 raise RuntimeError("a known source file remains readable or writable")
-    for family, address in [(socket.AF_INET, "192.0.2.1"), (socket.AF_INET6, "2001:db8::1")]:
+    for family, address in native_probe_targets(configuration):
         with socket.socket(family, socket.SOCK_STREAM) as probe:
             probe.settimeout(1)
-            code = probe.connect_ex((address, 9))
+            code = probe.connect_ex(address)
             require(code in {errno.EPERM, errno.EACCES, getattr(errno, "WSAEACCES", 10013)},
                     f"native outbound policy for {address} returned {code}, not an explicit permission denial")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:

@@ -14,6 +14,16 @@ import run_offline_lifecycle as runner
 
 
 class OfflineLifecyclePolicyTests(unittest.TestCase):
+    def test_windows_ipv6_probe_requires_a_native_nonzero_scope(self):
+        with patch.object(runner.sys, "platform", "win32"):
+            for scope in [None, False, 0, -1, "12", 2 ** 32]:
+                with self.subTest(scope=scope), self.assertRaises(RuntimeError):
+                    runner.native_probe_targets({"ipv6_probe_scope_id": scope})
+            targets = runner.native_probe_targets({"ipv6_probe_scope_id": 12})
+            self.assertEqual(targets[1][1], ("fe80::ffff:ffff:fffe", 9, 0, 12))
+        with patch.object(runner.sys, "platform", "darwin"):
+            self.assertEqual(runner.native_probe_targets({})[1][1], ("2001:db8::1", 9))
+
     def test_preflight_and_cleanup_failures_cannot_lose_or_preserve_success_receipts(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "receipts" / "result.json"

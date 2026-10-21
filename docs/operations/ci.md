@@ -109,7 +109,10 @@ require inherited denial, protected-child bypass rejection and exact ACL
 restoration. A complete post-cleanup inventory verifies original ACL digests.
 Traversal bypass is retained for Windows process startup; source isolation
 depends on verified object ACLs, never a root-only deny. A dynamic WFP session denies
-its non-loopback IPv4/IPv6 connections. The child starts suspended and enters a
+its non-loopback IPv4/IPv6 connections. The Windows IPv6 probe uses a preferred
+link-local address scope from a connected native interface, discovered read-only,
+so missing global IPv6 routing cannot substitute for a permission-denial result.
+No route or address is changed. The child starts suspended and enters a
 kill-on-close job before execution. After all owned descendants terminate, the
 same principal removes its private test home/temp trees; exact source ACLs,
 WFP objects and account are cleaned up. Missing privilege, blocked cleanup or

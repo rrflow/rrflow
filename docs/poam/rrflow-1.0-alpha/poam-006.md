@@ -300,3 +300,11 @@ denial verified for every bounded inventoried source object, protected-child
 bypass rejection and full ACL restoration. This changes the qualification
 mechanism, not the required source/network denial. Hosted acceptance remains
 pending and this deficiency stays open.
+
+
+The [IPv6 probe correction](../../evidence/change-journals/gate-d/d-01-native-windows-ipv6-probe.md)
+records successful Windows startup, complete 34,064-object source denial and
+ACL restoration, followed by an IPv6 network-unreachable result. The probe now
+uses a configured non-loopback link-local scope without changing host routes;
+explicit IPv6 permission denial remains mandatory. Product execution and final
+candidate acceptance remain pending.
