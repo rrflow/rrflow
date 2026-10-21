@@ -122,9 +122,11 @@ cargo fmt --all --check
 python3 scripts/ci/run_offline_lifecycle.py
 ```
 
-The last command currently requires Linux namespaces; it is not a Windows or
-macOS offline command. D-01.5 must publish the exact native enforcement commands
-with its runner changes. A contract-changing .4 PR additionally runs the
+The D-01.5 [qualification candidate](../../evidence/change-journals/gate-d/d-01-native-qualification-candidate.md)
+extends the last command with exact native enforcement and receipt requirements.
+Windows policy setup is restricted to ephemeral hosted CI; macOS requires its
+inherited native profile. These paths require actual candidate CI acceptance
+before they qualify either platform. A contract-changing .4 PR additionally runs the
 `rrd-contract` suite, generated-surface and affected SDK conformance checks.
 Every package runs documentation/navigation/inventory checks and the full
 candidate pipeline before merge. These are prospective acceptance commands,

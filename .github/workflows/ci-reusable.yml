@@ -43,15 +43,27 @@ jobs:
         run: python3 scripts/ci/run_filesystem_containment.py
       - name: Test the real install, serve, authenticate, stop, reopen lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Test bounded native lifecycle capture
+        run: cargo test -p rrflow-cli --test lifecycle_process --locked
+      - name: Require native foreign-owner denial
+        run: python3 scripts/ci/run_private_owner.py
       - name: Qualify the staged binary without checkout, toolchain sources or outbound network
-        run: python3 scripts/ci/run_offline_lifecycle.py
+        run: python3 scripts/ci/run_offline_lifecycle.py --receipt "${{ runner.temp }}/rrflow-offline.json"
+      - name: Retain sanitized native qualification receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: offline-linux
+          path: ${{ runner.temp }}/rrflow-offline.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Capture clean primary build provenance
         run: python3 scripts/build_rrflow.py --profile dev --output "$RUNNER_TEMP/rrflow-build-receipt.json"
 
   estate-portability:
     name: estate process (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
@@ -81,14 +93,26 @@ jobs:
         run: cargo test -p rrd-engine --lib engine::token_key --locked
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
-      - name: Test installation ancestor replacement at durable boundaries
-        run: cargo test -p rrd-engine --lib anchored_installation --locked
-      - name: Test native installation exclusion and process recovery
-        run: cargo test -p rrd-engine --lib installation_concurrency --locked -- --nocapture
+      - name: Test native installation, bootstrap, ancestor replacement and process recovery
+        run: cargo test -p rrd-engine --lib installation --locked -- --nocapture
+      - name: Require native foreign-owner denial
+        run: python scripts/ci/run_private_owner.py
+      - name: Test bounded native lifecycle capture
+        run: cargo test -p rrflow-cli --test lifecycle_process --locked
+      - name: Qualify native staged binary without source or outbound access
+        run: python scripts/ci/run_offline_lifecycle.py --receipt "${{ runner.temp }}/rrflow-offline.json"
+      - name: Retain sanitized native qualification receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: offline-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-offline.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Test native installed primary lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
       - name: Deny installed lifecycle test warnings
-        run: cargo clippy -p rrflow-cli --test installed_lifecycle --locked -- -D warnings
+        run: cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings
       - name: Build cross-package controller fixture
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test process fault injection (not product-readiness evidence)

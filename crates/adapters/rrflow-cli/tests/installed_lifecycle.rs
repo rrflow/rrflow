@@ -15,10 +15,14 @@ use rrd_contract::{
 };
 use rrd_engine::RrdEngine;
 use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Command, Output};
 use std::time::Duration;
+
+#[path = "support/process.rs"]
+mod process;
+// Authenticated readiness includes the generated discovery catalogue (>4 MiB).
+const OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
 #[cfg(unix)]
 use std::time::Instant;
 
@@ -41,7 +45,8 @@ impl StandaloneDistribution {
         } else {
             "rrflow"
         });
-        std::fs::copy(&source, &executable).expect("stage the actual primary executable");
+        process::stage_executable(&source, &executable)
+            .expect("stage the actual primary executable");
         for directory in ["working", "home", "temporary", "empty-path"] {
             std::fs::create_dir(root.path().join(directory)).unwrap();
         }
@@ -189,7 +194,25 @@ async fn verify_parquet_export(
 }
 
 fn invoke(args: &[&str]) -> Output {
-    product_command().args(args).output().expect("run rrflow")
+    let mut command = product_command();
+    let mut process = process::Process::start(
+        command.args(args),
+        Duration::from_secs(120),
+        OUTPUT_LIMIT,
+        None,
+    )
+    .expect("run rrflow");
+    let output = process
+        .finish()
+        .unwrap_or_else(|error| panic!("bounded rrflow command {:?}: {error}", args.get(1)));
+    if args.contains(&"ready") {
+        eprintln!(
+            "native readiness output stdout_bytes={} stderr_bytes={}",
+            output.stdout.len(),
+            output.stderr.len()
+        );
+    }
+    output
 }
 
 fn assert_success(output: &Output, operation: &str) {
@@ -201,6 +224,10 @@ fn assert_success(output: &Output, operation: &str) {
 }
 
 fn capture_output(output: &Output, captured: &mut Vec<u8>) {
+    assert!(
+        captured.len() + output.stdout.len() + output.stderr.len() <= 128 * 1024 * 1024,
+        "lifecycle output exceeded its aggregate limit"
+    );
     captured.extend_from_slice(&output.stdout);
     captured.extend_from_slice(&output.stderr);
 }
@@ -230,20 +257,20 @@ fn inventory(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 }
 
 #[cfg(unix)]
-fn stop_gracefully(child: &mut Child) {
-    let signal = Command::new("kill")
-        .args(["-INT", &child.id().to_string()])
-        .status()
+fn stop_gracefully(child: &process::Process) {
+    let mut command = Command::new("kill");
+    command.args(["-INT", &child.id().to_string()]);
+    let mut signal = process::Process::start(&mut command, Duration::from_secs(5), 4096, None)
         .expect("send SIGINT to the exact rrflow child");
-    assert!(signal.success());
+    assert!(signal
+        .finish()
+        .expect("bounded signal helper")
+        .status
+        .success());
     let deadline = Instant::now() + Duration::from_secs(10);
-    loop {
-        if let Some(status) = child.try_wait().unwrap() {
-            assert!(status.success(), "rrflow serve exited with {status}");
-            return;
-        }
+    while child.running() {
         if Instant::now() >= deadline {
-            child.kill().unwrap();
+            child.terminate();
             panic!("rrflow serve did not complete graceful SIGINT shutdown");
         }
         std::thread::sleep(Duration::from_millis(10));
@@ -253,43 +280,29 @@ fn stop_gracefully(child: &mut Child) {
 // Test-owned handles are always reaped, including assertion/startup failures.
 // No PID search or process-name kill may affect another installed engine.
 struct RunningEngine {
-    child: Child,
-    output: Vec<std::thread::JoinHandle<Vec<u8>>>,
+    child: process::Process,
+    finished: bool,
 }
 
 impl RunningEngine {
     fn start(project: &Path, captured: &mut Vec<u8>) -> (Self, String) {
-        let mut child = product_command()
+        let mut command = product_command();
+        command
             .args(["--json", "serve", "--project"])
             .arg(project)
-            .args(["--bind", "127.0.0.1:0"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("start installed rrflow service");
-        let stdout = child.stdout.take().unwrap();
-        let mut stderr = child.stderr.take().unwrap();
-        let mut process = Self {
-            child,
-            output: Vec::new(),
-        };
+            .args(["--bind", "127.0.0.1:0"]);
         let (send, receive) = std::sync::mpsc::sync_channel(1);
-        process.output.push(std::thread::spawn(move || {
-            let mut reader = BufReader::new(stdout);
-            let mut announcement = String::new();
-            let result = reader
-                .read_line(&mut announcement)
-                .map(|_| announcement.clone());
-            let _ = send.send(result);
-            let mut bytes = announcement.into_bytes();
-            reader.read_to_end(&mut bytes).unwrap();
-            bytes
-        }));
-        process.output.push(std::thread::spawn(move || {
-            let mut bytes = Vec::new();
-            stderr.read_to_end(&mut bytes).unwrap();
-            bytes
-        }));
+        let mut process = Self {
+            child: process::Process::start(
+                &mut command,
+                Duration::from_secs(480),
+                OUTPUT_LIMIT,
+                Some(send),
+            )
+            .expect("start bounded installed rrflow service"),
+            finished: false,
+        };
+        assert!(process.child.id() > 0);
         let announcement = receive
             .recv_timeout(Duration::from_secs(60))
             .expect("installed engine must announce readiness within 60 seconds")
@@ -298,7 +311,7 @@ impl RunningEngine {
             process.stop(captured);
             panic!("serve exited before its listening announcement");
         }
-        let announcement: serde_json::Value = serde_json::from_str(&announcement).unwrap();
+        let announcement: serde_json::Value = serde_json::from_slice(&announcement).unwrap();
         assert_eq!(announcement["status"], "listening");
         let locator = RrdEngine::read_project_locator(project).unwrap();
         assert_eq!(
@@ -325,36 +338,30 @@ impl RunningEngine {
     }
 
     fn terminate(&mut self, captured: &mut Vec<u8>) {
-        self.child.kill().expect("terminate owned rrflow process");
-        self.child.wait().expect("reap owned rrflow process");
-        self.stop(captured);
+        self.child.terminate();
+        let output = self.child.finish().expect("reap bounded rrflow process");
+        capture_output(&output, captured);
+        self.finished = true;
     }
 
     fn stop(&mut self, captured: &mut Vec<u8>) {
-        if self.child.try_wait().unwrap().is_none() {
+        if self.finished {
+            return;
+        }
+        if self.child.running() {
             #[cfg(unix)]
-            stop_gracefully(&mut self.child);
+            stop_gracefully(&self.child);
             #[cfg(not(unix))]
-            {
-                self.child.kill().expect("terminate owned rrflow process");
-                self.child.wait().expect("reap owned rrflow process");
-            }
+            self.child.terminate();
         }
-        for output in self.output.drain(..) {
-            captured.extend(output.join().expect("capture child output"));
-        }
-    }
-}
-
-impl Drop for RunningEngine {
-    fn drop(&mut self) {
-        if !matches!(self.child.try_wait(), Ok(Some(_))) {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
-        }
-        for output in self.output.drain(..) {
-            let _ = output.join();
-        }
+        let output = self.child.finish().expect("capture bounded rrflow service");
+        #[cfg(unix)]
+        assert!(
+            output.status.success(),
+            "rrflow serve failed during shutdown"
+        );
+        capture_output(&output, captured);
+        self.finished = true;
     }
 }
 
@@ -791,9 +798,9 @@ max_elapsed_ms = 20000
         installed_before_verify,
         "denied verify changed state"
     );
-    assert_eq!(
-        std::fs::read(&alias).unwrap(),
-        std::fs::read(&credential_path).unwrap()
+    assert!(
+        std::fs::read(&alias).unwrap() == std::fs::read(&credential_path).unwrap(),
+        "denial changed credential bytes"
     );
     std::fs::remove_file(&alias).unwrap();
     let verified = invoke(&[
@@ -1261,4 +1268,26 @@ max_elapsed_ms = 20000
     // Neither successful nor rejected lifecycle stdout/stderr may contain the
     // generated credential.
     assert!(!String::from_utf8_lossy(&lifecycle_output).contains(credential.credential()));
+    println!(
+        "native_lifecycle_receipt={}",
+        serde_json::json!({
+            "mode": mode,
+            "build": {
+                "executable_sha256": version["build"]["executable_sha256"],
+                "metadata_sha256": version["build"]["metadata_sha256"],
+                "public_contract_sha256": version["build"]["public_contract_sha256"],
+                "signal_catalogue_sha256": version["build"]["signal_catalogue_sha256"],
+            },
+            "installation_plan_sha256": plan_sha256,
+            "restore_plan_sha256": publication_sha256,
+            "backup_sha256": backup_sha256,
+            "installed_runtime_cursor": applied["runtime_cursor"],
+            "reopened_runtime_cursor": reopened["runtime_cursor"],
+            "restored_runtime_cursor": after_publication["runtime_cursor"],
+            "committed_claim_sequence": committed_claim_sequence,
+            "restored_read_manifest_sha256": restored_query.read_manifest_sha256,
+            "captured_output_bytes": lifecycle_output.len(),
+            "stream_limit_bytes": OUTPUT_LIMIT,
+        })
+    );
 }

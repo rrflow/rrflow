@@ -1,0 +1,196 @@
+//! Bounded, test-owned process capture. This is qualification tooling only.
+
+use std::io::{self, Read};
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    mpsc, Arc, Mutex,
+};
+use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
+
+// A concurrent fork can inherit another thread's writable executable descriptor
+// until exec (rust-lang/rust#114554). Cover copies AND every spawn, not test runs.
+static SPAWN_ADMISSION: Mutex<()> = Mutex::new(());
+
+pub fn stage_executable(source: &std::path::Path, target: &std::path::Path) -> io::Result<u64> {
+    let _admission = SPAWN_ADMISSION.lock().unwrap();
+    std::fs::copy(source, target)
+}
+
+pub fn spawn(command: &mut Command) -> io::Result<Child> {
+    let _admission = SPAWN_ADMISSION.lock().unwrap();
+    command.spawn()
+}
+
+type Capture = (mpsc::Receiver<io::Result<Vec<u8>>>, JoinHandle<()>);
+
+pub struct Process {
+    child: Arc<Mutex<Child>>,
+    cancel: Arc<AtomicBool>,
+    failure: Arc<Mutex<Option<&'static str>>>,
+    monitor: Option<JoinHandle<()>>,
+    capture: Vec<Capture>,
+}
+
+impl Process {
+    pub fn start(
+        command: &mut Command,
+        deadline: Duration,
+        limit: usize,
+        announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
+    ) -> io::Result<Self> {
+        let mut child = spawn(command.stdout(Stdio::piped()).stderr(Stdio::piped()))?;
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let child = Arc::new(Mutex::new(child));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let failure = Arc::new(Mutex::new(None));
+        let mut process = Self {
+            child: child.clone(),
+            cancel: cancel.clone(),
+            failure: failure.clone(),
+            monitor: None,
+            capture: Vec::new(),
+        };
+        process.capture(stdout, limit, announcement);
+        process.capture(stderr, limit, None);
+        process.monitor = Some(thread::spawn(move || {
+            let end = Instant::now() + deadline;
+            loop {
+                let mut child = child.lock().unwrap();
+                match child.try_wait() {
+                    Ok(Some(_)) => break,
+                    Err(_) => {
+                        *failure.lock().unwrap() = Some("child status unavailable");
+                        cancel.store(true, Ordering::Release);
+                    }
+                    Ok(None) => {}
+                }
+                if Instant::now() >= end {
+                    *failure.lock().unwrap() = Some("child exceeded its deadline");
+                    cancel.store(true, Ordering::Release);
+                }
+                if cancel.load(Ordering::Acquire) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
+                }
+                drop(child);
+                thread::sleep(Duration::from_millis(10));
+            }
+        }));
+        Ok(process)
+    }
+
+    fn capture(
+        &mut self,
+        mut stream: impl Read + Send + 'static,
+        limit: usize,
+        announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
+    ) {
+        let (send, receive) = mpsc::sync_channel(1);
+        let cancel = self.cancel.clone();
+        let failure = self.failure.clone();
+        let reader = thread::spawn(move || {
+            let result = (|| {
+                let mut bytes = Vec::new();
+                if let Some(announcement) = announcement {
+                    // No unbounded read_line allocation before readiness.
+                    let mut byte = [0];
+                    while bytes.len() < limit.min(65_536) {
+                        if stream.read(&mut byte)? == 0 {
+                            break;
+                        }
+                        bytes.push(byte[0]);
+                        if byte[0] == b'\n' {
+                            break;
+                        }
+                    }
+                    if !bytes.ends_with(b"\n") {
+                        return Err(io::Error::other(
+                            "missing or oversized readiness announcement",
+                        ));
+                    }
+                    let _ = announcement.send(Ok(bytes.clone()));
+                }
+                let remaining = limit.saturating_sub(bytes.len()) + 1;
+                stream.take(remaining as u64).read_to_end(&mut bytes)?;
+                if bytes.len() > limit {
+                    return Err(io::Error::other("child exceeded its output limit"));
+                }
+                Ok(bytes)
+            })();
+            if result.is_err() {
+                *failure.lock().unwrap() =
+                    Some("child output capture failed or exceeded its limit");
+                cancel.store(true, Ordering::Release);
+            }
+            let _ = send.send(result);
+        });
+        self.capture.push((receive, reader));
+    }
+
+    pub fn id(&self) -> u32 {
+        self.child.lock().unwrap().id()
+    }
+
+    pub fn terminate(&self) {
+        self.cancel.store(true, Ordering::Release);
+    }
+
+    pub fn running(&self) -> bool {
+        self.child
+            .lock()
+            .unwrap()
+            .try_wait()
+            .expect("read child status")
+            .is_none()
+    }
+
+    pub fn finish(&mut self) -> Result<Output, String> {
+        if let Some(monitor) = self.monitor.take() {
+            monitor.join().map_err(|_| "child monitor panicked")?;
+        }
+        let mut streams = Vec::new();
+        for (receive, reader) in self.capture.drain(..) {
+            // A leaked descendant pipe cannot hang cleanup or allocate forever.
+            let bytes = receive
+                .recv_timeout(Duration::from_secs(2))
+                .map_err(|_| "child output did not close within its deadline")?
+                .map_err(|error| format!("child output capture failed: {error}"))?;
+            reader.join().map_err(|_| "child capture panicked")?;
+            streams.push(bytes);
+        }
+        if let Some(failure) = *self.failure.lock().unwrap() {
+            return Err(failure.into());
+        }
+        if streams.len() != 2 {
+            return Err("child output already consumed".into());
+        }
+        Ok(Output {
+            status: self
+                .child
+                .lock()
+                .unwrap()
+                .wait()
+                .map_err(|_| "reap child")?,
+            stderr: streams.pop().unwrap(),
+            stdout: streams.pop().unwrap(),
+        })
+    }
+}
+
+impl Drop for Process {
+    fn drop(&mut self) {
+        self.terminate();
+        if let Some(monitor) = self.monitor.take() {
+            let _ = monitor.join();
+        }
+        for (receive, reader) in self.capture.drain(..) {
+            if receive.recv_timeout(Duration::from_secs(2)).is_ok() {
+                let _ = reader.join();
+            }
+        }
+    }
+}

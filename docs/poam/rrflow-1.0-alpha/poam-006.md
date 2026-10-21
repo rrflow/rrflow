@@ -253,3 +253,10 @@ case, provided the fresh/existing pair remains. The expanded native runner
 must require every declared case and its executed result. Windows/macOS
 outbound/source isolation, privileged foreign-owner cases, bounded capture and
 concurrent executable staging remain within D-01.5; no parent status closes.
+
+The [D-01.5 qualification candidate](../../evidence/change-journals/gate-d/d-01-native-qualification-candidate.md)
+repairs corpus admission and adds bounded process capture, closed durable
+receipts, explicit privileged ownership fixtures and native isolation runners.
+Local Windows lifecycle and helper results are evidence for their named tests;
+Linux/macOS enforcement and Windows hosted-principal isolation still require
+candidate CI. No D-01 acceptance row or parent alpha outcome is closed here.

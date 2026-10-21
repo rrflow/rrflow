@@ -103,6 +103,54 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "required native CI explicitly runs the privileged ownership fixture"]
+    fn foreign_owner_is_denied_without_repair() {
+        use std::os::fd::AsRawFd;
+        assert_eq!(
+            std::env::var("RRFLOW_PRIVATE_OWNER_FIXTURE").as_deref(),
+            Ok("1")
+        );
+        // SAFETY: geteuid has no preconditions. Missing privilege is a failure.
+        assert_eq!(unsafe { libc::geteuid() }, 0, "fixture requires root");
+        let root = tempfile::tempdir().unwrap();
+        let directory_path = root.path().join("private");
+        let directory = open_directory(&directory_path, true).unwrap();
+        let path = directory_path.join("secret");
+        write_private_new(&path, b"unchanged ownership fixture").unwrap();
+        let file = open(&path, false).unwrap();
+        validate_directory(&directory).unwrap();
+        validate(&file).unwrap();
+        struct Restore<'a>(&'a File);
+        impl Drop for Restore<'_> {
+            fn drop(&mut self) {
+                // SAFETY: this guard borrows only its retained test-owned handle.
+                unsafe { libc::fchown(self.0.as_raw_fd(), 0, !0) };
+            }
+        }
+        let _restore_directory = Restore(&directory);
+        let _restore_file = Restore(&file);
+        for object in [&directory, &file] {
+            // SAFETY: live test-owned descriptors; UID 1 is deliberately not root.
+            assert_eq!(unsafe { libc::fchown(object.as_raw_fd(), 1, !0) }, 0);
+        }
+        let directory_mode = directory.metadata().unwrap().mode();
+        let file_mode = file.metadata().unwrap().mode();
+        for _ in 0..2 {
+            assert!(validate_directory(&directory).is_err());
+            assert!(validate(&file).is_err());
+            assert!(read_private_bounded(&path, 64).is_err());
+            assert_eq!(directory.metadata().unwrap().uid(), 1);
+            assert_eq!(file.metadata().unwrap().uid(), 1);
+            assert_eq!(directory.metadata().unwrap().mode(), directory_mode);
+            assert_eq!(file.metadata().unwrap().mode(), file_mode);
+            assert_eq!(
+                std::fs::read(&path).unwrap(),
+                b"unchanged ownership fixture"
+            );
+        }
+    }
+
+    #[test]
     fn directory_modes_and_symlink_leaves_are_denied_without_repair() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("directory");

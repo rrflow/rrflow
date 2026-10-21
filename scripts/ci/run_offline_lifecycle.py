@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
-"""Qualify the real installed lifecycle in Linux mount/network/PID namespaces.
+"""Qualify the real installed lifecycle with asserted native offline enforcement.
 
 This is a test runner, not an installer or a sandbox for hostile code. Build
 inputs are acquired before isolation. Only the primary binary and test harness
 enter the staged payload; ordinary operating-system libraries remain available.
-Isolation setup failure is fatal. No host mount or firewall is changed.
+Isolation setup failure is fatal. Windows qualification uses a disposable hosted
+CI principal, scoped ACLs and a dynamic WFP session; no global firewall rule is changed.
 """
 
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 import errno
 import hashlib
 import json
 import os
+import re
+import signal
+import platform
+import plistlib
 from pathlib import Path
 import shutil
 import socket
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 
 def require(condition: bool, message: str) -> None:
@@ -49,6 +57,8 @@ def mask_paths(paths: list[Path], stage: Path) -> list[Path]:
     resolved = sorted({path.resolve(strict=True) for path in paths}, key=lambda path: len(path.parts))
     selected: list[Path] = []
     protected = [Path(p).resolve() for p in ["/", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/proc", "/dev", "/sys", "/tmp", "/var"]]
+    if sys.platform == "win32":
+        protected.extend(Path(os.environ[name]).resolve() for name in ["SystemRoot", "ProgramFiles", "PUBLIC"] if name in os.environ)
     for path in resolved:
         require(path.is_dir(), f"mask target is not a directory: {path}")
         require(len(path.parts) >= 3, f"refuse broad mask target: {path}")
@@ -67,15 +77,148 @@ def sha256(path: Path) -> str:
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
+def filesystem_profile(path: Path) -> dict:
+    if sys.platform == "linux":
+        kind = run("findmnt", "--noheadings", "--output", "FSTYPE", "--target", str(path)).stdout.strip()
+    elif sys.platform == "darwin":
+        mount = run("df", "-P", str(path)).stdout.splitlines()[-1].split(None, 5)[5]
+        data = plistlib.loads(run("diskutil", "info", "-plist", mount).stdout.encode())
+        kind = data.get("FilesystemType", data.get("FilesystemName"))
+    else:
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        volume, name = ctypes.create_unicode_buffer(1024), ctypes.create_unicode_buffer(128)
+        get_path = kernel.GetVolumePathNameW
+        get_path.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        get_path.restype = wintypes.BOOL
+        require(get_path(str(path), volume, len(volume)), "native volume path unavailable")
+        get_info = kernel.GetVolumeInformationW
+        get_info.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD, ctypes.c_void_p,
+                            ctypes.c_void_p, ctypes.c_void_p, wintypes.LPWSTR, wintypes.DWORD]
+        get_info.restype = wintypes.BOOL
+        require(get_info(volume, None, 0, None, None, None, name, len(name)), "native filesystem identity unavailable")
+        kind = name.value
+    require(isinstance(kind, str) and 0 < len(kind) < 128, "filesystem identity is absent or unbounded")
+    return {"type": kind, "device": os.stat(path).st_dev}
+
+
+REQUIRED_CASES = frozenset({
+    "primary_help_exposes_only_the_installed_product_lifecycle",
+    "raw_database_and_development_commands_fail_during_argument_parsing",
+    "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
+    "fresh_installed_engine_survives_restart_and_restore",
+    "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
+})
+
+
 def require_lifecycle_tests(output: str) -> None:
-    cases = {line.removesuffix(": test") for line in output.splitlines() if line.endswith(": test")}
-    require({"fresh_installed_engine_survives_restart_and_restore",
-             "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens"} <= cases,
-            "harness must contain both fresh and existing installed-process cases")
+    cases = [line.removesuffix(": test") for line in output.splitlines() if line.endswith(": test")]
+    require(len(cases) == len(REQUIRED_CASES) and set(cases) == REQUIRED_CASES, "harness must contain exactly the five required lifecycle cases")
+
+
+def require_lifecycle_results(output: str) -> list[str]:
+    cases = re.findall(r"(?m)^test (\w+) \.\.\. ok$", output)
+    summaries = re.findall(r"(?m)^test result: (.+)$", output)
+    require(len(cases) == len(REQUIRED_CASES) and set(cases) == REQUIRED_CASES,
+            "every required lifecycle case must execute exactly once and pass")
+    require(len(summaries) == 1 and re.fullmatch(
+        r"ok\. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in [0-9.]+s",
+        summaries[0]) is not None, "lifecycle summary must have no failures, omissions or skips")
+    return sorted(cases)
+
+
+def lifecycle_receipts(output: str) -> list[dict]:
+    receipts = [json.loads(line.removeprefix("native_lifecycle_receipt="))
+                for line in output.splitlines() if line.startswith("native_lifecycle_receipt=")]
+    require(len(receipts) == 2 and {receipt.get("mode") for receipt in receipts} == {"fresh", "existing"},
+            "both lifecycle modes must publish their own accepted receipt")
+    fields = {"mode", "build", "installation_plan_sha256", "restore_plan_sha256", "backup_sha256",
+              "installed_runtime_cursor", "reopened_runtime_cursor", "restored_runtime_cursor",
+              "committed_claim_sequence", "restored_read_manifest_sha256", "captured_output_bytes", "stream_limit_bytes"}
+    for receipt in receipts:
+        require(set(receipt) == fields, "lifecycle receipt has unknown or missing fields")
+        for field in ["installation_plan_sha256", "restore_plan_sha256", "backup_sha256", "restored_read_manifest_sha256"]:
+            require(re.fullmatch("[0-9a-f]{64}", receipt.get(field, "")) is not None, "lifecycle receipt digest is missing")
+        require([receipt.get(field) for field in ["installed_runtime_cursor", "reopened_runtime_cursor", "restored_runtime_cursor"]]
+                == [2, 4, 3], "lifecycle receipt does not bind the asserted durable outcomes")
+        build = receipt.get("build")
+        require(isinstance(build, dict) and set(build) == {"executable_sha256", "metadata_sha256", "public_contract_sha256", "signal_catalogue_sha256"}, "lifecycle receipt lacks closed build identity")
+        require(all(isinstance(value, str) and re.fullmatch("[0-9a-f]{64}", value) for value in build.values()), "build identity digest is invalid")
+        require(type(receipt["captured_output_bytes"]) is int and 0 < receipt["captured_output_bytes"] <= 128 * 1024 * 1024
+                and receipt["stream_limit_bytes"] == 16 * 1024 * 1024
+                and type(receipt["committed_claim_sequence"]) is int and receipt["committed_claim_sequence"] > 0,
+                "lifecycle receipt resource or commit bounds are invalid")
+    return receipts
 
 
 def run(*arguments: str, **kwargs: object) -> subprocess.CompletedProcess:
-    return subprocess.run(arguments, check=True, timeout=60, **kwargs)
+    """Capture a finite amount without communicate()'s unbounded allocation.
+
+    The privileged outer runner owns the PID namespace and its descendants.
+    This helper kills/reaps only the exact child it started. Never log arbitrary
+    product output: it can include credentials if a redaction assertion fails.
+    """
+    check = kwargs.pop("check", True)
+    timeout = kwargs.pop("timeout", 60)
+    limit = kwargs.pop("output_limit", 8 * 1024 * 1024)
+    kwargs.pop("capture_output", None)
+    kwargs.pop("text", None)
+    process_group = kwargs.pop("process_group", False)
+    if process_group:
+        require(os.name == "posix", "native process group is unavailable")
+        kwargs["start_new_session"] = True
+    child = subprocess.Popen(arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+    streams = [bytearray(), bytearray()]
+    exceeded = threading.Event()
+    failures = []
+
+    def capture(pipe, destination):
+        try:
+            while chunk := pipe.read(65536):
+                if len(destination) + len(chunk) > limit:
+                    exceeded.set()
+                    return
+                destination.extend(chunk)
+        except OSError:
+            failures.append("capture failed")
+            exceeded.set()
+        finally:
+            pipe.close()
+
+    readers = [threading.Thread(target=capture, args=(pipe, destination), daemon=True)
+               for pipe, destination in zip([child.stdout, child.stderr], streams)]
+    for reader in readers:
+        reader.start()
+    deadline = time.monotonic() + timeout
+    error = None
+    try:
+        while child.poll() is None:
+            if exceeded.is_set():
+                error = "command exceeded its output limit or capture failed"
+                break
+            if time.monotonic() >= deadline:
+                error = "command exceeded its deadline"
+                break
+            time.sleep(0.01)
+    finally:
+        if process_group:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        elif child.poll() is None:
+            child.kill()
+        child.wait(timeout=10)
+        for reader in readers:
+            reader.join(timeout=2)
+    require(not any(reader.is_alive() for reader in readers), "command output did not close")
+    require(error is None and not exceeded.is_set() and not failures, error or "command output limit exceeded")
+    if check:
+        require(child.returncode == 0, f"qualification command failed with exit status {child.returncode}")
+    return subprocess.CompletedProcess(arguments, child.returncode,
+                                       streams[0].decode("utf-8", errors="replace"),
+                                       streams[1].decode("utf-8", errors="replace"))
 
 
 def inside(stage: Path) -> None:
@@ -92,6 +235,7 @@ def inside(stage: Path) -> None:
     for path in masks:
         run("/usr/bin/mount", "-t", "tmpfs", "-o", "ro,size=4k,mode=0755", "tmpfs", str(path))
         require(not any(path.iterdir()), f"source root remains visible: {path}")
+    require(all(not Path(path).exists() for path in configuration["source_probes"]), "known source file escaped masking")
     ip = shutil.which("ip")
     require(ip is not None, "iproute2 is required to enable isolated loopback")
     run(ip, "link", "set", "lo", "up")
@@ -104,13 +248,21 @@ def inside(stage: Path) -> None:
         probe.settimeout(1)
         require(probe.connect_ex(("192.0.2.1", 9)) == errno.ENETUNREACH,
                 "outbound IPv4 must fail with ENETUNREACH")
+    with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as probe:
+        probe.settimeout(1)
+        require(probe.connect_ex(("2001:db8::1", 9)) == errno.ENETUNREACH,
+                "outbound IPv6 must fail with ENETUNREACH")
     # Run the actual product and harness as the original unprivileged user.
     os.setgroups([])
     os.setgid(configuration["gid"])
     os.setuid(configuration["uid"])
     require(os.geteuid() != 0, "product qualification must not run as root")
-    binary = stage / "rrflow"
-    harness = stage / "installed_lifecycle"
+    qualify_payload(stage, configuration)
+
+
+def qualify_payload(stage: Path, configuration: dict) -> None:
+    binary = stage / configuration.get("binary_name", "rrflow")
+    harness = stage / configuration.get("harness_name", "installed_lifecycle")
     for artifact in [binary, harness]:
         require(sha256(artifact) == configuration["sha256"][artifact.name], "staged artifact changed")
     environment = {
@@ -120,61 +272,204 @@ def inside(stage: Path) -> None:
         "LANG": "C",
         "RRFLOW_TEST_BINARY": str(binary),
     }
+    if sys.platform == "win32":
+        environment.update({name: os.environ[name] for name in ["SystemRoot", "WINDIR"]})
+        environment.update({"USERPROFILE": environment["HOME"], "TEMP": environment["TMPDIR"], "TMP": environment["TMPDIR"]})
     listing = run(str(harness), "--list", "--format=terse", cwd=stage,
                   env=environment, capture_output=True, text=True)
     require_lifecycle_tests(listing.stdout)
-    print(json.dumps({"isolation": "checkout-hidden-network-loopback-only", "uid": os.geteuid(),
-                      "masked_roots": [str(path) for path in masks], "sha256": configuration["sha256"]}), flush=True)
     # The two independent project fixtures may run together; serial execution
     # duplicates their full restore/verification latency inside one deadline.
-    subprocess.run([str(harness), "--nocapture", "--test-threads=2"], cwd=stage,
-                   env=environment, check=True, timeout=540)
+    result = run(str(harness), "--nocapture", "--test-threads=2", cwd=stage,
+                 env=environment, timeout=540, check=False)
+    observed = re.findall(r"(?m)^test (\w+) \.\.\. (ok|FAILED|ignored[^\n]*)$", result.stdout)
+    outcomes = [{"case": name, "status": status.split()[0]} for name, status in observed if name in REQUIRED_CASES]
+    (stage / "receipt.json").write_text(json.dumps({"schema_version": 1, "status": "failed",
+        "platform": sys.platform, "sha256": configuration["sha256"], "cases": outcomes,
+        "exit_status": result.returncode, "isolation": configuration["isolation"]}, indent=2), encoding="utf-8")
+    cases = require_lifecycle_results(result.stdout)
+    require(result.returncode == 0, "lifecycle reported success with a failing process status")
+    durable = lifecycle_receipts(result.stdout)
+    require(all(receipt["build"]["executable_sha256"] == configuration["sha256"][binary.name] for receipt in durable), "lifecycle receipt names a different executable")
+    receipt = {"schema_version": 1, "status": "passed", "platform": sys.platform,
+               "os_release": platform.release(), "architecture": platform.machine(),
+               "sha256": configuration["sha256"], "passed_cases": cases,
+               "filesystem": configuration["filesystem"], "durable_receipts": durable,
+               "failed": 0, "ignored": 0, "outbound_denials": ["ipv4", "ipv6"],
+               "masked_roots": configuration["masks"], "isolation": configuration["isolation"]}
+    (stage / "receipt.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    print(json.dumps(receipt), flush=True)
+
+
+
+def macos_profile(mask_count: int) -> str:
+    require(mask_count > 0, "native isolation requires source masks")
+    return "\n".join([
+        "(version 1)", "(allow default)", "(deny network*)",
+        '(allow network-bind (local ip "localhost:*"))',
+        '(allow network-inbound (local ip "localhost:*"))',
+        '(allow network-outbound (remote ip "localhost:*"))',
+        *[f'(deny file-read* file-write* (subpath (param "MASK{index}")))' for index in range(mask_count)],
+    ])
+
+
+def native_denial_probes(stage: Path) -> None:
+    configuration = json.loads((stage / "isolation.json").read_text())
+    for root in configuration["masks"]:
+        try:
+            list(Path(root).iterdir())
+        except PermissionError:
+            pass
+        else:
+            raise RuntimeError("source root remains accessible")
+    for path in configuration["source_probes"]:
+        for mode in ["rb", "r+b"]:
+            try:
+                with open(path, mode):
+                    pass
+            except PermissionError:
+                pass
+            else:
+                raise RuntimeError("a known source file remains readable or writable")
+    for family, address in [(socket.AF_INET, "192.0.2.1"), (socket.AF_INET6, "2001:db8::1")]:
+        with socket.socket(family, socket.SOCK_STREAM) as probe:
+            probe.settimeout(1)
+            code = probe.connect_ex((address, 9))
+            require(code in {errno.EPERM, errno.EACCES, getattr(errno, "WSAEACCES", 10013)},
+                    f"native outbound policy for {address} returned {code}, not an explicit permission denial")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        listener.settimeout(2)
+        with socket.create_connection(listener.getsockname(), timeout=2), listener.accept()[0]:
+            pass
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inside", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--mac-inside", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--windows-inside", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--probe", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--cleanup-owned", type=Path, help=argparse.SUPPRESS)
     arguments = parser.parse_args()
-    require(sys.platform == "linux", "offline namespace qualification requires Linux; it cannot skip")
+    require(sys.platform in {"linux", "darwin", "win32"}, "native offline enforcement unavailable; it cannot skip")
+    if arguments.cleanup_owned:
+        stage = arguments.cleanup_owned.resolve(strict=True)
+        require(sys.platform == "win32" and stage.name.startswith("rrflow-offline-")
+                and stage.parent == Path(os.environ["PUBLIC"]).resolve(), "invalid cleanup fixture")
+        for name in ["home", "temporary"]:
+            path = stage / name
+            require(path.resolve(strict=True) == path and not (path.lstat().st_file_attributes & 0x400), "cleanup fixture escaped its stage")
+            shutil.rmtree(path)
+        return
+    if arguments.probe:
+        native_denial_probes(arguments.probe.resolve(strict=True))
+        return
+    if arguments.mac_inside or arguments.windows_inside:
+        stage = (arguments.mac_inside or arguments.windows_inside).resolve(strict=True)
+        native_denial_probes(stage)
+        run(sys.executable, str(stage / "runner.py"), "--probe", str(stage), cwd=stage)
+        qualify_payload(stage, json.loads((stage / "isolation.json").read_text()))
+        return
     if arguments.inside:
         inside(arguments.inside.resolve(strict=True))
         return
-    require(os.geteuid() != 0, "invoke as an unprivileged runner with noninteractive sudo")
+    if sys.platform != "win32":
+        require(os.geteuid() != 0, "invoke as an unprivileged runner with noninteractive sudo")
+    if sys.platform == "win32":
+        require(os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted", "native Windows isolation requires an ephemeral hosted CI runner")
     root = Path(__file__).resolve().parents[2]
-    for command in ["sudo", "unshare", "timeout", "mount", "ip"]:
+    for command in (["sudo", "unshare", "timeout", "mount", "ip", "findmnt"] if sys.platform == "linux" else ["sandbox-exec"] if sys.platform == "darwin" else []):
         require(shutil.which(command) is not None, f"required isolation tool is missing: {command}")
-    build = subprocess.run(["cargo", "test", "--locked", "-p", "rrflow-cli", "--test",
-                            "installed_lifecycle", "--no-run", "--message-format=json"],
-                           cwd=root, check=True, stdout=subprocess.PIPE, text=True, timeout=900)
+    build = run("cargo", "test", "--locked", "-p", "rrflow-cli", "--test",
+                "installed_lifecycle", "--no-run", "--message-format=json", cwd=root, timeout=900)
     binary, harness = artifact_paths(build.stdout)
-    with tempfile.TemporaryDirectory(prefix="rrflow-offline-", dir="/tmp") as temporary:
-        stage = Path(temporary)
+    stage_parent = "/tmp" if sys.platform == "linux" else os.environ["PUBLIC"] if sys.platform == "win32" else None
+    with tempfile.TemporaryDirectory(prefix="rrflow-offline-", dir=stage_parent) as temporary, ExitStack() as probes:
+        stage = Path(temporary).resolve()
         candidates = [root.parent]
         for name, default in [("CARGO_HOME", Path.home() / ".cargo"), ("RUSTUP_HOME", Path.home() / ".rustup")]:
             path = Path(os.environ.get(name, str(default)))
             if path.exists():
                 candidates.append(path)
         masks = mask_paths(candidates, stage)
-        source_hashes = {"rrflow": sha256(binary), "installed_lifecycle": sha256(harness)}
-        for source, name in [(binary, "rrflow"), (harness, "installed_lifecycle"), (Path(__file__), "runner.py")]:
+        source_probes = []
+        for mask in masks:
+            with tempfile.NamedTemporaryFile(prefix="rrflow-denial-", dir=mask, delete=False) as probe:
+                probe.write(b"non-secret native source denial fixture")
+                source_probes.append(probe.name)
+            probes.callback(Path(probe.name).unlink)
+        binary_name, harness_name = (("rrflow.exe", "installed_lifecycle.exe") if sys.platform == "win32" else ("rrflow", "installed_lifecycle"))
+        source_hashes = {binary_name: sha256(binary), harness_name: sha256(harness)}
+        for source, name in [(binary, binary_name), (harness, harness_name), (Path(__file__), "runner.py")]:
             shutil.copy2(source, stage / name)
         for name, expected in source_hashes.items():
             require(sha256(stage / name) == expected, f"staging changed the source artifact: {name}")
         for name in ["home", "temporary"]:
             (stage / name).mkdir()
-        configuration = {"uid": os.getuid(), "gid": os.getgid(),
-                         "namespaces": {kind: os.readlink(f"/proc/self/ns/{kind}") for kind in ["net", "mnt", "pid"]},
+        configuration = {"uid": os.getuid() if sys.platform != "win32" else None,
+                         "gid": os.getgid() if sys.platform != "win32" else None,
+                         "binary_name": binary_name, "harness_name": harness_name,
+                         "namespaces": ({kind: os.readlink(f"/proc/self/ns/{kind}") for kind in ["net", "mnt", "pid"]} if sys.platform == "linux" else {}),
+                         "isolation": "linux-private-namespaces" if sys.platform == "linux" else "macos-inherited-seatbelt" if sys.platform == "darwin" else "windows-principal-job-wfp",
                          "masks": [str(path) for path in masks],
+                         "source_probes": source_probes,
+                         "filesystem": filesystem_profile(stage),
                          "sha256": source_hashes}
         (stage / "isolation.json").write_text(json.dumps(configuration), encoding="utf-8")
-        # timeout is privileged too, so it can reap the namespace initializer.
-        # Killing that PID namespace's initializer reaps every test-owned child.
-        subprocess.run(["sudo", "-n", "/usr/bin/timeout", "--signal=TERM", "--kill-after=10s", "600s",
-                        "/usr/bin/unshare", "--mount", "--net", "--pid", "--fork", "--kill-child=KILL",
-                        "--mount-proc", "--propagation", "private", "/usr/bin/python3", str(stage / "runner.py"),
-                        "--inside", str(stage)], cwd=stage, check=True, timeout=630)
+        try:
+            if sys.platform == "linux":
+                # Privileged timeout owns the namespace initializer, whose exit
+                # reaps every descendant, even if the unprivileged wrapper fails.
+                result = run("sudo", "-n", "/usr/bin/timeout", "--signal=TERM", "--kill-after=10s", "600s",
+                             "/usr/bin/unshare", "--mount", "--net", "--pid", "--fork", "--kill-child=KILL",
+                             "--mount-proc", "--propagation", "private", "/usr/bin/python3", str(stage / "runner.py"),
+                             "--inside", str(stage), cwd=stage, timeout=630)
+            elif sys.platform == "darwin":
+                profile = stage / "qualification.sb"
+                profile.write_text(macos_profile(len(masks)), encoding="utf-8")
+                parameters = [item for index, path in enumerate(masks) for item in ["-D", f"MASK{index}={path}"]]
+                result = run("/usr/bin/sandbox-exec", *parameters, "-f", str(profile), sys.executable,
+                             str(stage / "runner.py"), "--mac-inside", str(stage), cwd=stage,
+                             timeout=600, process_group=True)
+            else:
+                from windows_offline import run_isolated
+                run_isolated(stage, masks)
+                result = subprocess.CompletedProcess([], 0, "")
+            require((stage / "receipt.json").is_file(), "isolated execution produced no qualification receipt")
+            print((stage / "receipt.json").read_text(encoding="utf-8"))
+        finally:
+            if arguments.receipt:
+                arguments.receipt.parent.mkdir(parents=True, exist_ok=True)
+                if (stage / "receipt.json").is_file():
+                    shutil.copyfile(stage / "receipt.json", arguments.receipt)
+                else:
+                    arguments.receipt.write_text(json.dumps({"schema_version": 1, "status": "failed",
+                        "platform": sys.platform, "sha256": source_hashes,
+                        "isolation": configuration["isolation"],
+                        "diagnostic": "native qualification failed before complete acceptance",
+                        "native_failure": (json.loads((stage / "failure.json").read_text()) if (stage / "failure.json").is_file() else None)}, indent=2), encoding="utf-8")
         print("Offline installed lifecycle passed; no alpha or signed-distribution qualification claimed.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        # Only structural diagnostic data escapes an isolated Windows helper.
+        # Product output and test-owned credentials are never serialized here.
+        inside_flag = next((flag for flag in ["--windows-inside", "--mac-inside", "--inside"] if flag in sys.argv), None)
+        if "--receipt" in sys.argv:
+            output = Path(sys.argv[sys.argv.index("--receipt") + 1])
+            if output.is_file():
+                receipt = json.loads(output.read_text(encoding="utf-8"))
+                receipt["status"] = "failed"
+                receipt["outer_failure"] = {"type": type(error).__name__, "diagnostic": str(error)[:1024]}
+                output.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+        if inside_flag:
+            stage = Path(sys.argv[sys.argv.index(inside_flag) + 1])
+            (stage / "failure.json").write_text(json.dumps({"status": "failed", "error_type": type(error).__name__,
+                "diagnostic": str(error)[:1024]}), encoding="utf-8")
+        raise

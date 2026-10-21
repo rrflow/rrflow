@@ -61,19 +61,61 @@ search directory. Only Windows OS-discovery variables survive from the parent;
 provider credentials, proxy settings and Cargo/developer configuration do not.
 Its child guards retain the fixture until the process is reaped.
 
-Linux additionally runs `python3 scripts/ci/run_offline_lifecycle.py`. After
-building, the runner copies only the binary, test harness and isolation helper
-into `/tmp`. Noninteractive sudo creates private mount, network and PID
-namespaces, masks the checkout parent (including siblings) and Cargo/Rustup
-source roots, and enables only loopback. It verifies namespace separation,
-empty masked directories, no default routes, outbound `ENETUNREACH` and exact
-artifact SHA-256 before dropping to the original non-root user and running all
-five lifecycle cases. Setup failure fails the candidate; it never skips. A
-bounded privileged timeout and PID-namespace teardown cover stranded children.
-The runner requires Linux util-linux, iproute2, Python and sudo at qualification
-time; these are test infrastructure, not product dependencies. System libraries
-remain available. This proves neither hostile-code containment, offline Windows/
-macOS operation nor a signed clean-machine release bundle.
+All three native lanes require `python scripts/ci/run_offline_lifecycle.py
+--receipt <runner-temp>/rrflow-offline.json` (Linux uses `python3`). The runner
+requires exactly five declared cases and exactly five passing results with no
+ignored or filtered cases. Fresh/existing receipts bind the actual executable,
+build metadata, public-contract and signal digests, installation/restore plans,
+backup, read manifest and asserted durable cursors. Unknown receipt fields are
+rejected. Retained artifacts contain these bounded, non-secret receipts and
+sanitized failure status; raw estates and credential-bearing output are never
+uploaded. CI still must pass on an exact candidate before these new paths are
+accepted as native evidence.
+
+Linux copies the binary, test harness and isolation helper into `/tmp`.
+Noninteractive sudo creates private mount, network and PID namespaces, masks
+the checkout parent (including siblings) and Cargo/Rustup roots, and enables
+only loopback. Namespace separation, empty masked directories, known source
+file absence, absent default routes and IPv4/IPv6 `ENETUNREACH` are required.
+The actual product runs as the original non-root user. Privileged timeout and
+PID-namespace teardown cover descendants. util-linux, iproute2, Python and sudo
+are qualification infrastructure, not product dependencies.
+
+macOS requires an inherited `sandbox-exec` profile. Directory listing and
+known-source read/write probes must deny; direct and descendant IPv4/IPv6
+connections must return permission denial while loopback works. The fixed
+profile receives source roots as parameters. Missing enforcement fails; it
+cannot downgrade to an ordinary staged test. An owned process group bounds
+cleanup. This deprecated OS utility is a test prerequisite, not an RRFlow
+installation dependency.
+
+Windows enforcement runs only on ephemeral GitHub-hosted runners. A disposable
+local principal receives a token with traversal bypass removed. Deny ACLs cover
+only that principal at declared source roots; a dynamic WFP session denies
+its non-loopback IPv4/IPv6 connections. The child starts suspended and enters a
+kill-on-close job before execution. After all owned descendants terminate, the
+same principal removes its private test home/temp trees; exact source ACLs,
+WFP objects and account are cleaned up. Missing privilege, blocked cleanup or
+failed direct/descendant probes fail qualification. No policy/account changes
+run on the developer workstation.
+
+The CLI qualification helper bounds ordinary commands to 120 seconds, service
+lifetime to 480 seconds, readiness to 60 seconds/64 KiB, each output stream to
+16 MiB and each lifecycle's collected output to 128 MiB. The discovery catalogue
+currently exceeds 4 MiB; the measured Windows response is 5,598,305 bytes.
+Real helper cases exercise timeout, output flood, oversized readiness, finite
+capture and concurrent copy/launch. One short admission lock covers executable
+copy and every child spawn, while lifecycle tests continue concurrently. This
+addresses the documented inherited writable-descriptor mechanism without a
+retry sleep; it does not by itself prove the cause of an earlier CI failure.
+
+`python scripts/ci/run_private_owner.py` explicitly executes the privileged
+foreign-owner file/directory case on each OS. Unix requires root; Windows
+requires `SeRestorePrivilege` and restores the previous token state. Missing
+privilege fails, and the ordinary suite's ignored marker is never acceptance.
+Native installation suites include bootstrap, concurrency and recovery together.
+OS libraries remain available. These checks do not prove hostile-code
+containment, a signed clean-machine bundle, graph/vector scale or alpha.
 
 The Linux installed-lifecycle job also runs the
 [primary build-provenance helper](../reference/release/build-identity.md) on
