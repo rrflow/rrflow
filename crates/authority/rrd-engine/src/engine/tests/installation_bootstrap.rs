@@ -75,6 +75,11 @@ fn executable() -> PathBuf {
 fn shared_sdk_corpus_identity_matches_bundled_installation() {
     let anchor =
         include_bytes!("../../../../../../fixtures/rrflow-sdk-conformance-install-anchor-v1.bin");
+    assert_eq!(
+        digest::sha256_hex(anchor),
+        "d42417daff2c8032efa0c090f1f7d6fb18525f3c2813aa8e1730ff935dd01ee7",
+        "the SDK identity anchor must not undergo checkout newline conversion"
+    );
     let corpus: rrd_contract::SdkConformanceCorpus = serde_json::from_slice(include_bytes!(
         "../../../../../../fixtures/rrd-sdk-conformance-v1.json"
     ))

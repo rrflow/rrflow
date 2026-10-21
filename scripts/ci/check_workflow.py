@@ -552,6 +552,8 @@ def main() -> None:
     )
 
     for native in ["topology-smoke", "estate-portability"]:
+        require("scripts/ci/run_filesystem_containment.py" in jobs[native],
+                f"{native} must execute native mount containment qualification")
         require("scripts/ci/run_private_owner.py" in jobs[native]
                 and "scripts/ci/run_offline_lifecycle.py --receipt" in jobs[native]
                 and "cargo test -p rrflow-cli --test lifecycle_process --locked" in jobs[native]

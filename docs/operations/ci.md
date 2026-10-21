@@ -89,6 +89,13 @@ cannot downgrade to an ordinary staged test. An owned process group bounds
 cleanup. This deprecated OS utility is a test prerequisite, not an RRFlow
 installation dependency.
 
+The filesystem runner also requires a macOS APFS image mounted below a retained
+project anchor. It asserts a changed device identity and denial of read,
+truncate, create, publication and removal. The runner detaches only its exact
+owned image before removing the fixture, including after bounded child failure.
+Linux keeps the private-namespace bind-mount adversary; Windows keeps the native
+junction corpus. These cases require their respective native CI results.
+
 Windows enforcement runs only on ephemeral GitHub-hosted runners. A disposable
 local principal receives a token with traversal bypass removed. Deny ACLs cover
 only that principal at declared source roots; a dynamic WFP session denies

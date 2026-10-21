@@ -1,6 +1,59 @@
 use rrd_lsm::filesystem::{AnchoredPath, OpenOptions};
 use std::io::{Read, Write};
 
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "required native CI attaches and cleans a test-owned APFS image"]
+fn mounted_volume_crossing_is_denied_before_any_effect() {
+    use std::os::unix::fs::MetadataExt;
+    assert_eq!(
+        std::env::var("RRFLOW_PRIVATE_MOUNT_FIXTURE").as_deref(),
+        Ok("1")
+    );
+    let fixture = std::path::PathBuf::from(std::env::var_os("RRFLOW_MAC_MOUNT_FIXTURE").unwrap());
+    let root = fixture.join("project");
+    let mount = root.join("mounted");
+    let anchor = AnchoredPath::open_root(&root).unwrap();
+    let device = std::fs::metadata(&root).unwrap().dev();
+    // The outer runner owns bounded execution and detaches this exact image,
+    // including on panic or process death. No developer volume is involved.
+    assert!(std::process::Command::new("/usr/bin/hdiutil")
+        .args([
+            "attach",
+            "-nobrowse",
+            "-noautoopen",
+            "-owners",
+            "on",
+            "-mountpoint"
+        ])
+        .arg(&mount)
+        .arg("-quiet")
+        .arg(fixture.join("fixture.sparseimage"))
+        .status()
+        .unwrap()
+        .success());
+    assert_ne!(std::fs::metadata(&mount).unwrap().dev(), device);
+    let sentinel = mount.join("sentinel");
+    std::fs::write(&sentinel, b"outside").unwrap();
+    let target = anchor.join("mounted/sentinel");
+    assert_eq!(
+        target.open_read().unwrap_err().kind(),
+        std::io::ErrorKind::PermissionDenied
+    );
+    assert!(OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&target)
+        .is_err());
+    assert!(anchor.join("mounted/new").create_dir().is_err());
+    assert!(target.remove_file().is_err());
+    std::fs::write(root.join("pending"), b"owned").unwrap();
+    assert!(anchor.join("pending").rename_to(&target).is_err());
+    assert_eq!(std::fs::read(&sentinel).unwrap(), b"outside");
+    assert!(!mount.join("new").exists());
+    assert_eq!(anchor.join("pending").read().unwrap(), b"owned");
+}
+
 #[test]
 fn lexical_escape_and_hard_link_denial_preserve_outside_bytes() {
     let fixture = tempfile::tempdir().unwrap();

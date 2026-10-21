@@ -95,6 +95,9 @@ jobs:
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
       - name: Test native installation, bootstrap, ancestor replacement and process recovery
         run: cargo test -p rrd-engine --lib installation --locked -- --nocapture
+      - name: Qualify native macOS mounted-volume denial
+        if: runner.os == 'macOS'
+        run: python3 scripts/ci/run_filesystem_containment.py
       - name: Require native foreign-owner denial
         run: python scripts/ci/run_private_owner.py
       - name: Test bounded native lifecycle capture

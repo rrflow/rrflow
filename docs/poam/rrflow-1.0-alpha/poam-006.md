@@ -260,3 +260,15 @@ receipts, explicit privileged ownership fixtures and native isolation runners.
 Local Windows lifecycle and helper results are evidence for their named tests;
 Linux/macOS enforcement and Windows hosted-principal isolation still require
 candidate CI. No D-01 acceptance row or parent alpha outcome is closed here.
+
+The [native coverage completion record](../../evidence/change-journals/gate-d/d-01-native-coverage-completion.md)
+records two additional verified qualification gaps: process-death recovery
+omitted four of eleven typed boundaries, and macOS lacked an explicit mounted
+volume adversary. The candidate expands those cases without changing production
+behavior. Native acceptance remains open; local Windows results cannot close
+the macOS mounted-volume requirement.
+
+The same native run exposed checkout newline conversion of the inert SDK
+identity anchor on Windows. The linked coverage record retains the failing
+identity and Git filter reproduction. The fixture is now byte-preserved and
+asserts its canonical hash; native candidate requalification is still required.
