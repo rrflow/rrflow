@@ -8,6 +8,28 @@ This chapter is part of the canonical RRFlow 1.0 roadmap. The parent
 record owns release order and completion status; this file cannot change
 either independently.
 
+## D-01 bounded baseline (2026-10-21)
+
+The [remaining D-01 packages](gate-d.md#d-01-remaining-closure-packages)
+start from development `main` at
+`1815af32a53e161bc5f3d7f0f7b4365462cd9f7a`. These merged packages supply
+bounded evidence to preserve, not complete D-01 acceptance:
+
+| Package | Exact candidate and candidate CI | Accepted scope and limit |
+|---|---|---|
+| [PR 43: standalone offline qualification](https://github.com/rrflow/rrflow-development/pull/43) | `f0312a59a1403379a4e94b7ecacc994fc3c3901a`; [run 39529214804](https://github.com/rrflow/rrflow-development/actions/runs/39529214804), 17 successful checks | Actual staged executable and scrubbed environment; Linux checkout/toolchain masks, private namespaces and network denial with asserted hashes. Native Windows/macOS staging is not offline enforcement proof. |
+| [PR 44: independent installation identities](https://github.com/rrflow/rrflow-development/pull/44) | `27eaff4a7b59f0a385ca4800521ec979d52ece4e`; [run 39530221595](https://github.com/rrflow/rrflow-development/actions/runs/39530221595), 17 successful checks | Explicit identity and initial-root binding in plan contract v2; distinct identical-content projects, foreign-plan denial, exact retry and installed relocation. No plan-v1 migration claim. |
+| [PR 45: native secret leaf-file boundary](https://github.com/rrflow/rrflow-development/pull/45) | `7267553ff8c315b22a056b836dd4225156562cf6`; [run 39535526639](https://github.com/rrflow/rrflow-development/actions/runs/39535526639), 17 successful checks | Same-handle bounded secret reads, Unix owner/private-mode and Windows protected-DACL handling, hard-link/nonregular-file denial and retained recovery. No complete parent, mount, race or foreign-owner qualification. |
+
+The linked immutable journals record
+[offline qualification](../../evidence/change-journals/gate-d/d-01-offline-installed-qualification.md),
+[identity implementation](../../evidence/change-journals/gate-d/d-01-independent-installation-identities.md)
+and [secret-file implementation](../../evidence/change-journals/gate-d/d-01-native-secret-boundary.md).
+Historical passing runs cannot substitute for the complete matrix on the final
+D-01 candidate. Directory security, filesystem containment, install-wide
+exclusivity, complete bootstrap and native qualification remain open. Neither
+D-01, OBJ-07 nor alpha status changes with this evidence reconciliation.
+
 ## D-11 partial evidence (2026-10-18): backup completeness and restore publication
 
 - An application-complete backup of an installed estate carries the estate's

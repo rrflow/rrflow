@@ -17,8 +17,8 @@ authority, and the pre-canonical manifest, raw product CLI, development supervis
 standalone security initializer, and server initializer are removed. The lifecycle is
 still missing execution of its persisted pending attunement job, a committed deterministic
 project-tree inventory, generic bundle-resident scaffolding and adapter bindings, real attunement phase
-executors, configuration apply, full verify, canonical installed backup resolution,
-repair, restore, ownership-safe uninstall, service installation, and a signed offline
+executors, configuration apply, full verify, repair, ownership-safe uninstall,
+service installation, and a signed offline
 platform distribution. Public apply no longer accepts installation time: the engine
 seals one versioned `host_system_time` / `unverified` observation, exact retry preserves
 it, recovery/replay/open enforce the format-2 rollback policy, and read-only verification
@@ -33,9 +33,12 @@ such a catalogue is refused.
 ## Impact
 
 RRFlow has a coherent local pre-release startup spine, but it is not yet a repeatable
-turnkey distribution. It cannot discover and attune a project durably, repair or restore
-damaged state, remove only owned integration, or prove clean offline and cross-platform
-operation. Unqualified process and Kubernetes controllers can still overstate readiness
+turnkey distribution. It cannot discover and attune a project durably, perform the full
+repair lifecycle or remove only owned integration. Installed backup resolution and staged
+restore publication have [bounded D-11 evidence](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-11-partial-evidence-2026-10-18-backup-completeness-and-restore-publication).
+Native staged processes and isolated Linux offline execution have bounded proof;
+complete native filesystem qualification and signed clean-machine bundles remain open.
+Unqualified process and Kubernetes controllers can still overstate readiness
 or maintain lifecycle state outside the finished engine contract.
 
 ## Owning gates
@@ -77,7 +80,7 @@ requires private mount/network/PID namespaces, masked checkout and toolchain
 source paths, loopback-only networking and verified artifact hashes. The
 candidate result is attached to that package PR; native staging alone is not
 proof of offline isolation. The [D-01 closure table](../../roadmap/rrflow-1.0/gate-d.md#d-01-remaining-closure-packages)
-keeps filesystem/ACL, independent installation identity and full preview
+keeps directory/filesystem/ACL, install-wide exclusivity and full preview
 qualification explicit before the dependency spine advances.
 
 The first native candidate exposed an overlapping-invocation defect: rejected
@@ -133,3 +136,25 @@ binds results and cross-platform candidate checks.
 Ancestor-directory replacement, mount containment, complete native ACL and
 hostile-race qualification, signed packaging and the wider D-01 matrix remain
 open. No alpha outcome or parent POA&M item closes on this bounded repair.
+
+## Remaining D-01 implementation order (2026-10-21)
+
+The [D-01 closure packages](../../roadmap/rrflow-1.0/gate-d.md#d-01-remaining-closure-packages)
+now bind the next work to the current implementation and native failure oracles.
+Inspection at `1815af32` verifies that estate-directory creation still uses
+default Windows permissions, managed-path helpers return names after checking
+them, and publication/cleanup and non-secret reads use later path operations.
+The installation contract validates eight fixed managed paths, with no complete
+bundle-template/specialization effect description. These are remaining gaps
+within this item, not additional lifecycle authorities.
+
+Install-wide lease/concurrency coverage is also unqualified: create-new intent
+publication and the later storage writer lock do not establish the required
+whole-operation proof. This planning review did not execute a competing-process
+regression and does not claim a demonstrated concurrency exploit.
+
+Implement directory security first, then anchored filesystem operations,
+exclusive installation/recovery, complete bootstrap, native qualification and
+exact-candidate reconciliation. Retain PR 43/44/45's bounded successes. The
+roadmap owns the detailed order and acceptance; this ledger remains open for
+the unresolved D-01 requirements and the later D/J lifecycle work.
