@@ -77,6 +77,13 @@ the reviewed UI revision independently. The
 [workbench guide](https://github.com/rrflow/connectome-development/blob/main/docs/native-workbench.md)
 owns build and desktop-use instructions.
 
+Newer RRFlow installation-plan contract v2 requires an explicit identity from
+`rrflow install identity`, retained across preview regeneration and supplied
+with `install plan --identity`. The pinned workbench above uses its named older
+engine/SDK pair; it is not qualification of that new installation contract.
+Updating its engine bundle requires updating and testing this adapter input as
+described in the [implementation guide](connectome-implementation-guide.md#run-the-current-installed-engine).
+
 The desktop shows the native installation preview, requires its exact accepted
 digest, and regenerates the plan before apply. Existing estates reopen through
 the same installed lifecycle. Data models display the authenticated catalogue,

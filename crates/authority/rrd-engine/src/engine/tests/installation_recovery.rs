@@ -27,6 +27,7 @@ fn plan(project: &Path, executable: &Path) -> InstallationPreview {
     RrdEngine::plan_installation(
         project,
         InstallationTargetKind::ExistingProject,
+        &"1".repeat(64),
         "default",
         None,
         executable,
@@ -132,6 +133,50 @@ fn materialized_secret_evidence(project: &Path, preview: &InstallationPreview) -
         digest::sha256_hex(&token),
         digest::sha256_hex(credential.credential().as_bytes()),
     )
+}
+
+#[test]
+fn interrupted_installation_cannot_resume_at_a_different_root() {
+    let container = tempfile::tempdir().unwrap();
+    let original = container.path().join("original");
+    let moved = container.path().join("moved");
+    std::fs::create_dir(&original).unwrap();
+    let executable = test_executable();
+    let preview = plan(&original, &executable);
+    assert!(RrdEngine::apply_installation_with_failure(
+        &original,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS,
+        &executable,
+        InstallApplyStage::IntentPublished,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("test installation failpoint"));
+    std::fs::rename(&original, &moved).unwrap();
+    let before = file_inventory(&moved);
+    assert!(RrdEngine::apply_installation_at(
+        &moved,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 1,
+        &executable,
+    )
+    .is_err());
+    assert_eq!(file_inventory(&moved), before);
+    std::fs::rename(&moved, &original).unwrap();
+    RrdEngine::apply_installation_at(
+        &original,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 2,
+        &executable,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -317,6 +362,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
     assert!(RrdEngine::plan_installation(
         project.path(),
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,

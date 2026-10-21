@@ -36,6 +36,7 @@ fn plan(project: &Path) -> InstallationPreview {
     RrdEngine::plan_installation(
         project,
         InstallationTargetKind::ExistingProject,
+        &"1".repeat(64),
         "default",
         None,
         &test_executable(),
@@ -57,6 +58,158 @@ fn inspect_at(
     at_unix_ms: u64,
 ) -> crate::Result<InstallationVerificationReport> {
     RrdEngine::inspect_installed_with_clock(project, executable, &FixedClock::at(at_unix_ms))
+}
+
+#[test]
+fn independent_installations_do_not_reuse_content_identity() {
+    for mode in [
+        InstallationTargetKind::FreshProject,
+        InstallationTargetKind::ExistingProject,
+    ] {
+        let first = tempfile::tempdir().unwrap();
+        let second = tempfile::tempdir().unwrap();
+        if mode == InstallationTargetKind::ExistingProject {
+            for project in [first.path(), second.path()] {
+                std::fs::write(project.join("README.md"), "identical source\n").unwrap();
+            }
+        }
+        let executable = test_executable();
+        let first_plan = RrdEngine::plan_installation(
+            first.path(),
+            mode,
+            &RrdEngine::generate_installation_identity().unwrap(),
+            "default",
+            None,
+            &executable,
+        )
+        .unwrap();
+        let second_plan = RrdEngine::plan_installation(
+            second.path(),
+            mode,
+            &RrdEngine::generate_installation_identity().unwrap(),
+            "default",
+            None,
+            &executable,
+        )
+        .unwrap();
+        assert_eq!(
+            first_plan.installation.project_precondition_sha256,
+            second_plan.installation.project_precondition_sha256
+        );
+        assert_ne!(
+            first_plan.installation.target, second_plan.installation.target,
+            "distinct projects with identical content must not share an estate identity"
+        );
+        let before = inventory(second.path());
+        assert!(matches!(
+            RrdEngine::apply_installation_at(
+                second.path(),
+                mode,
+                &first_plan,
+                &first_plan.installation.plan_sha256,
+                1_800_000_000_000,
+                &executable,
+            ),
+            Err(ServiceError::ProjectBindingMismatch)
+        ));
+        assert_eq!(
+            inventory(second.path()),
+            before,
+            "foreign plan must have no effects"
+        );
+        for (project, preview) in [(first.path(), &first_plan), (second.path(), &second_plan)] {
+            RrdEngine::apply_installation_at(
+                project,
+                mode,
+                preview,
+                &preview.installation.plan_sha256,
+                1_800_000_000_000,
+                &executable,
+            )
+            .unwrap();
+            let reopened = open_at(project, &executable, 1_800_000_000_001).unwrap();
+            assert_eq!(
+                reopened.installed_estate_identity(),
+                Some(&preview.installation.target)
+            );
+        }
+        let first_key = RrdEngine::read_installed_api_key(first.path()).unwrap();
+        let second_key = RrdEngine::read_installed_api_key(second.path()).unwrap();
+        assert_ne!(first_key.credential(), second_key.credential());
+        let engine = open_at(second.path(), &executable, 1_800_000_000_001).unwrap();
+        let session = rrd_contract::CreateSession {
+            limits: rrd_contract::SessionLimits {
+                idle_timeout_ms: 30_000,
+                absolute_timeout_ms: 60_000,
+                max_open_transactions: 1,
+            },
+        };
+        assert!(engine
+            .create_authenticated_session(
+                &first_key.principal_id,
+                first_key.credential().as_bytes(),
+                &session,
+                &id("foreign-session"),
+                1_800_000_000_002,
+                "foreign-request",
+                "foreign-operation",
+            )
+            .is_err());
+        assert!(engine
+            .create_authenticated_session(
+                &second_key.principal_id,
+                second_key.credential().as_bytes(),
+                &session,
+                &id("own-session"),
+                1_800_000_000_003,
+                "own-request",
+                "own-operation",
+            )
+            .is_ok());
+    }
+}
+
+#[test]
+fn installation_identity_and_root_are_bound_before_effects() {
+    let project = tempfile::tempdir().unwrap();
+    let executable = test_executable();
+    for invalid in [
+        String::new(),
+        "0".repeat(63),
+        "A".repeat(64),
+        "z".repeat(64),
+    ] {
+        assert!(RrdEngine::plan_installation(
+            project.path(),
+            InstallationTargetKind::FreshProject,
+            &invalid,
+            "default",
+            None,
+            &executable
+        )
+        .is_err());
+        assert!(inventory(project.path()).is_empty());
+    }
+    let preview = plan(project.path());
+    for change_identity in [true, false] {
+        let mut forged = preview.clone();
+        if change_identity {
+            forged.installation.installation_identity = "2".repeat(64);
+        } else {
+            forged.installation.project_root_sha256 = "2".repeat(64);
+        }
+        forged.installation.plan_sha256 = installation_plan_sha256(&forged.installation).unwrap();
+        assert!(RrdEngine::apply_installation_at(
+            project.path(),
+            InstallationTargetKind::ExistingProject,
+            &forged,
+            &forged.installation.plan_sha256,
+            1_800_000_000_000,
+            &executable
+        )
+        .is_err());
+        assert!(inventory(project.path()).is_empty());
+    }
 }
 
 #[test]
@@ -390,6 +543,7 @@ fn fresh_project_apply_and_exact_replay_are_supported() {
     let preview = RrdEngine::plan_installation(
         project.path(),
         InstallationTargetKind::FreshProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -458,6 +612,7 @@ max_elapsed_ms = 5000
     let preview = RrdEngine::plan_installation(
         project.path(),
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         Some(input.path()),
         &executable,
@@ -519,6 +674,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
     let preview = RrdEngine::plan_installation(
         &original,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -542,6 +698,17 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
     );
     drop(relocated);
 
+    let replay = RrdEngine::apply_installation_at(
+        &moved,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        1_800_000_000_001,
+        &executable,
+    )
+    .unwrap();
+    assert!(replay.idempotent_replay);
+
     let nested = moved.join("nested");
     std::fs::create_dir(&nested).unwrap();
     assert!(open_at(&nested, &executable, 1_800_000_000_001).is_err());
@@ -551,6 +718,7 @@ fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state(
     let foreign_preview = RrdEngine::plan_installation(
         &foreign,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -586,6 +754,7 @@ fn pre_canonical_rrflow_state_blocks_a_parallel_installation_authority() {
     assert!(RrdEngine::plan_installation(
         project.path(),
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &test_executable(),

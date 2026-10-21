@@ -48,7 +48,9 @@ $project = Join-Path $env:TEMP ('rrflowdb-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $project | Out-Null
 $project
 $planFile = "$project-install-plan.json"
-$plan = & .\target\debug\rrflow.exe install plan --project $project --mode fresh
+$identity = & .\target\debug\rrflow.exe install identity | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Installation identity generation failed' }
+$plan = & .\target\debug\rrflow.exe install plan --project $project --identity $identity.installation_identity --mode fresh
 if ($LASTEXITCODE -ne 0) { throw 'Installation planning failed' }
 $plan | Set-Content -LiteralPath $planFile -Encoding utf8NoBOM
 $preview = Get-Content -Raw $planFile | ConvertFrom-Json

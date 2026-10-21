@@ -153,6 +153,7 @@ fn install_instance(state_root: &Path, instance_id: &str) {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         executable,

@@ -13,6 +13,7 @@ fn install(project: &Path, executable: &Path) {
     let preview = RrdEngine::plan_installation(
         project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         executable,

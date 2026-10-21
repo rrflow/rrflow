@@ -54,7 +54,8 @@ The target command vocabulary is:
 
 ```text
 rrflow version
-rrflow install plan   --project <root> --mode fresh|existing --profile <id> [--configuration <toml>]
+rrflow install identity
+rrflow install plan   --project <root> --identity <256-bit-hex> --mode fresh|existing --profile <id> [--configuration <toml>]
 rrflow install apply  --project <root> --plan <file> --expect <sha256>
 rrflow install status --project <root>
 rrflow attune status|resume|cancel ...
@@ -155,6 +156,14 @@ state; they never manufacture a transition.
 
 ## Install plan
 
+First obtain one explicit identity input with `rrflow install identity`. It
+returns `installation_identity`, generated from the OS entropy source, and
+writes no project or engine state. Retain that input across previews of this
+installation; obtain a new value for each independent project. The identity
+is not a credential and must not be reused to claim that two independent
+estates are one. A UI can allocate it once when beginning installation and
+retain it with its pending preview, requiring no extra user entry.
+
 `rrflow install plan` is pure. It may read project metadata and bundle content,
 but it does not create a database, generate/read a credential, write a file,
 invoke a project command, contact a provider, bind a socket, or activate an
@@ -177,6 +186,20 @@ adapter. The plan is canonical serialized data whose SHA-256 covers:
 
 Repeated planning over unchanged inputs is byte-identical. A stale plan fails
 before mutation.
+
+Installation-plan contract version 2 seals the explicit identity input and
+`project_root_sha256`, a digest of the initial canonical root. Identical project
+content does not allocate an estate identity. New apply and interrupted recovery
+must match that root before effects. Once the installed locator and record are
+published, relocation, reopen and exact completed replay retain the persisted
+identity; the live path is not its permanent identity. Unbound version-1 plans
+are rejected. Attunement and result envelopes retain their independent version
+1; product version remains `1.0.0`. This is not a binary-upgrade or estate-
+migration facility: retain the executable that created an existing pre-alpha
+estate until its qualified upgrade path exists.
+`rrflow --json version` advertises `installation_plan_contract_version` so
+clients can check the installation boundary without treating the frozen
+product version as a capability signal.
 
 ## Install apply
 

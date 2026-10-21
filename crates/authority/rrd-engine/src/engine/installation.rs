@@ -16,7 +16,7 @@ use rrd_contract::{
     InstallationActionKind, InstallationActionResult, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationResult, InstallationTargetKind,
     InstalledEstateIdentity, MemorySeatDefinition, PersistMemoryEstate, StorageProfileKind,
-    ATTUNEMENT_PHASES, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+    ATTUNEMENT_PHASES, INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
 };
 use rrd_core::digest::Sha256 as IncrementalSha256;
 use rrd_security::{Principal, PrincipalKind, ResourceGrant, SecurityState, SECURITY_FORMAT};
@@ -336,13 +336,28 @@ pub struct InstallationVerificationReport {
 }
 
 impl RrdEngine {
+    /// Allocate one explicit, non-secret identity input before deterministic
+    /// planning. Callers retain it across previews and generate a new value for
+    /// each independent estate; allocation creates no project or engine state.
+    pub fn generate_installation_identity() -> Result<String> {
+        let entropy = crate::engine::token_key::generate_token_key()
+            .map_err(|error| ServiceError::Storage(error.to_string()))?;
+        Ok(digest::sha256_hex(&entropy))
+    }
+
     pub fn plan_installation(
         project: &Path,
         target_kind: InstallationTargetKind,
+        installation_identity: &str,
         profile_id: &str,
         configuration_path: Option<&Path>,
         executable: &Path,
     ) -> Result<InstallationPreview> {
+        if !is_sha256(installation_identity) {
+            return Err(ServiceError::Contract(
+                "installation identity must contain 64 lowercase hexadecimal characters".into(),
+            ));
+        }
         let project = canonical_project(project, target_kind)?;
         reject_existing_estate(&project)?;
         let (profile, profile_sha256) = DefaultInstallProfile::load(profile_id)?;
@@ -350,6 +365,7 @@ impl RrdEngine {
         let executable_sha256 = sha256_file(executable)?;
         let project_precondition_sha256 = project_inventory_sha256(&project, &profile)?;
         let identity_seed = installation_identity_seed(
+            installation_identity,
             target_kind,
             &project_precondition_sha256,
             &profile_sha256,
@@ -401,7 +417,9 @@ impl RrdEngine {
             profile.credential_bytes,
         )?;
         let mut installation = InstallationPlan {
-            contract_version: INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+            contract_version: INSTALLATION_PLAN_CONTRACT_VERSION,
+            installation_identity: installation_identity.into(),
+            project_root_sha256: initial_project_root_sha256(&project)?,
             id: install_id.clone(),
             target,
             target_kind,
@@ -596,6 +614,12 @@ impl RrdEngine {
             Err(error) => return Err(ServiceError::Storage(error.to_string())),
         }
 
+        // A completed estate is portable and was handled above from its
+        // persisted authority. A new or interrupted installation is still bound
+        // to the root explicitly previewed before any filesystem effect.
+        if initial_project_root_sha256(&project)? != preview.installation.project_root_sha256 {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
         let existing_intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
         let intent = if let Some(intent) = existing_intent {
             let clock_assessment = assess(
@@ -1278,6 +1302,7 @@ impl RrdEngine {
 }
 
 fn installation_identity_seed(
+    installation_identity: &str,
     target_kind: InstallationTargetKind,
     project_precondition_sha256: &str,
     profile_sha256: &str,
@@ -1285,13 +1310,21 @@ fn installation_identity_seed(
     configuration_sha256: &str,
 ) -> Result<String> {
     json_sha256(&(
-        "rrflow-installed-estate-v2",
+        "rrflow-installed-estate-v3",
+        installation_identity,
         target_kind,
         project_precondition_sha256,
         profile_sha256,
         executable_sha256,
         configuration_sha256,
     ))
+}
+
+fn initial_project_root_sha256(project: &Path) -> Result<String> {
+    let canonical = project
+        .to_str()
+        .ok_or(ServiceError::ProjectBindingMismatch)?;
+    json_sha256(&("rrflow-initial-project-root-v1", canonical))
 }
 
 fn installation_actions(
@@ -1343,6 +1376,7 @@ fn validate_sealed_preview(
 ) -> Result<()> {
     let installation = &preview.installation;
     let seed = installation_identity_seed(
+        &installation.installation_identity,
         installation.target_kind,
         &installation.project_precondition_sha256,
         profile_sha256,
