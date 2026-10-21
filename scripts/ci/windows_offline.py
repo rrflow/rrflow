@@ -8,6 +8,7 @@ import ctypes as c
 from ctypes import wintypes as w
 from contextlib import ExitStack
 import os
+import encodings
 from pathlib import Path
 import secrets
 import subprocess
@@ -26,6 +27,7 @@ adv = c.WinDLL("advapi32", use_last_error=True)
 kernel = c.WinDLL("kernel32", use_last_error=True)
 net = c.WinDLL("netapi32", use_last_error=True)
 wfp = c.WinDLL("fwpuclnt", use_last_error=True)
+user32 = c.WinDLL("user32", use_last_error=True)
 
 
 def api(library, name, result, *arguments):
@@ -121,6 +123,10 @@ class Startup(c.Structure):
 
 class Information(c.Structure):
     _fields_ = [("process", P), ("thread", P), ("pid", U32), ("tid", U32)]
+
+
+class SecurityAttributes(c.Structure):
+    _fields_ = [("size", U32), ("descriptor", P), ("inherit", w.BOOL)]
 
 
 class BasicLimits(c.Structure):
@@ -234,6 +240,56 @@ def outbound_policy(stack, sid_text):
         checked(add(engine, c.byref(rule), None, None), "add scoped outbound filter")
 
 
+def private_desktop(stack, sid_text):
+    """Own every GUI namespace object without changing a shared desktop ACL."""
+    descriptor = P()
+    boolean(api(adv, "ConvertStringSecurityDescriptorToSecurityDescriptorW", w.BOOL, w.LPCWSTR, U32, P, P)(
+        f"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;{sid_text})", 1, c.byref(descriptor), None), "encode private desktop security")
+    stack.callback(free, descriptor)
+    attributes = SecurityAttributes(c.sizeof(SecurityAttributes), descriptor, False)
+    old_station = api(user32, "GetProcessWindowStation", P)()
+    thread_id = api(kernel, "GetCurrentThreadId", U32)()
+    old_desktop = api(user32, "GetThreadDesktop", P, U32)(thread_id)
+    boolean(old_station and old_desktop, "retain parent desktop context")
+    set_station = api(user32, "SetProcessWindowStation", w.BOOL, P)
+    name = "rrflow_" + secrets.token_hex(12)
+    try:
+        station = api(user32, "CreateWindowStationW", P, w.LPCWSTR, U32, U32, P)(
+            name, 1, 0x000F037F, c.byref(attributes))  # create-only, standard + station rights
+        boolean(station, "create owned noninteractive window station")
+        stack.callback(lambda: boolean(api(user32, "CloseWindowStation", w.BOOL, P)(station), "close owned window station"))
+        boolean(set_station(station), "select owned station for desktop creation")
+        desktop = api(user32, "CreateDesktopW", P, w.LPCWSTR, P, P, U32, U32, P)(
+            "default", None, None, 0, 0x000F01FF, c.byref(attributes))
+        boolean(desktop, "create owned noninteractive desktop")
+        stack.callback(lambda: boolean(api(user32, "CloseDesktop", w.BOOL, P)(desktop), "close owned desktop"))
+    finally:
+        boolean(set_station(old_station), "restore parent window station")
+        boolean(api(user32, "SetThreadDesktop", w.BOOL, P)(old_desktop), "restore parent thread desktop")
+    return name + "\\default"
+
+
+def probe_runtime_access(token, stage):
+    """Check only known qualification dependencies under the actual token."""
+    paths = [Path(sys.executable), Path(encodings.__file__), stage / "runner.py"]
+    module_name = api(kernel, "GetModuleFileNameW", U32, P, w.LPWSTR, U32)
+    for handle in [sys.dllhandle, kernel._handle, adv._handle, user32._handle]:
+        buffer = c.create_unicode_buffer(32768)
+        length = module_name(handle, buffer, len(buffer))
+        require(0 < length < len(buffer), "qualification runtime module path unavailable")
+        paths.append(Path(buffer.value))
+    boolean(api(adv, "ImpersonateLoggedOnUser", w.BOOL, P)(token), "inspect restricted runtime access")
+    try:
+        for path in paths:
+            try:
+                with path.open("rb") as source:
+                    require(bool(source.read(64)), "qualification runtime dependency is empty")
+            except OSError as error:
+                raise RuntimeError(f"qualification runtime access denied for {path.name}") from error
+    finally:
+        boolean(api(adv, "RevertToSelf", w.BOOL)(), "restore qualification caller token")
+
+
 def run_isolated(stage: Path, masks: list[Path]):
     require(sys.platform == "win32" and os.environ.get("GITHUB_ACTIONS") == "true"
             and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted",
@@ -242,19 +298,21 @@ def run_isolated(stage: Path, masks: list[Path]):
             "qualification stage must be an owned public-parent fixture")
     with ExitStack() as stack:
         sid, sid_text, token = principal(stack)
+        desktop = private_desktop(stack, sid_text)
         access(stack, stage, sid, False)
         for mask in masks:
             access(stack, mask, sid, True)
         outbound_policy(stack, sid_text)
+        probe_runtime_access(token, stage)
         try:
-            launch(token, stage, "--windows-inside", 600)
+            launch(token, stage, "--windows-inside", 600, desktop)
         finally:
             # The same principal removes only its owned home/temp fixtures after
             # the first job has reaped all descendants. No recursive host ACL repair.
-            launch(token, stage, "--cleanup-owned", 60)
+            launch(token, stage, "--cleanup-owned", 60, desktop)
 
 
-def launch(token, stage, mode, timeout):
+def launch(token, stage, mode, timeout, desktop):
     with ExitStack() as stack:
         job = api(kernel, "CreateJobObjectW", P, P, w.LPCWSTR)(None, None)
         boolean(job, "create owned qualification job")
@@ -272,6 +330,7 @@ def launch(token, stage, mode, timeout):
         command = c.create_unicode_buffer(subprocess.list2cmdline([sys.executable, str(stage / "runner.py"), mode, str(stage)]))
         startup, information = Startup(), Information()
         startup.size = c.sizeof(startup)
+        startup.desktop = desktop
         create = api(adv, "CreateProcessWithTokenW", w.BOOL, P, U32, w.LPCWSTR, w.LPWSTR, U32, P, w.LPCWSTR, P, P)
         boolean(create(token, 0, sys.executable, command, 0x08000404, block, str(stage), c.byref(startup), c.byref(information)), "create suspended qualification process")
         stack.callback(close, information.process)
@@ -287,7 +346,7 @@ def launch(token, stage, mode, timeout):
             require(time.monotonic() < deadline, "Windows qualification exceeded its deadline")
         code = U32()
         boolean(api(kernel, "GetExitCodeProcess", w.BOOL, P, P)(information.process, c.byref(code)), "read qualification exit")
-        require(code.value == 0, f"Windows isolated qualification failed with exit status {code.value}")
+        require(code.value == 0, f"Windows isolated {mode} failed with exit status 0x{code.value:08x}")
 
 
 def quiesce_job(job):

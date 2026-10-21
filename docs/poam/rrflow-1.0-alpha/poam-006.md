@@ -279,3 +279,9 @@ rejected the hosted Windows checkout before isolation setup. A current-drive
 regression now passes with platform-specific protected roots. Preflight failure
 also retains a bounded receipt. Actual Windows principal/WFP enforcement and
 the final candidate pipeline remain required; no status is closed.
+
+The [Windows process-context candidate](../../evidence/change-journals/gate-d/d-01-native-windows-process-context.md)
+records interpreter initialization failure 0xC0000142 after policy setup. The
+runner now supplies an owned noninteractive desktop and probes restricted-token
+access to its runtime dependencies. This requires native requalification;
+policy setup alone is not proof of isolation or a running product.

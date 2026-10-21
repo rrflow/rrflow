@@ -99,6 +99,9 @@ Linux keeps the private-namespace bind-mount adversary; Windows keeps the native
 junction corpus. These cases require their respective native CI results.
 
 Windows enforcement runs only on ephemeral GitHub-hosted runners. A disposable
+principal uses an owned noninteractive window station/desktop with explicit
+access; restricted-token runtime-file probes precede launch. Those objects are
+qualification infrastructure, not product UI or installation dependencies. The
 local principal receives a token with traversal bypass removed. Deny ACLs cover
 only that principal at declared source roots; a dynamic WFP session denies
 its non-loopback IPv4/IPv6 connections. The child starts suspended and enters a
