@@ -192,8 +192,9 @@ this planning package.
 
 ## Storage, analytical and multimodal optimization
 
-Finish the installed C-07 failure/lifetime proof and the already recorded
-C-04 vector-catalogue replay gap. Then E supplies incremental graph, scalar,
+Finish the installed C-07 failure/lifetime proof and remaining C-04 closure
+evidence; the search-path vector-catalogue replay repair is already recorded
+under [POAM-028](../poam/rrflow-1.0-alpha/poam-028.md). Then E supplies incremental graph, scalar,
 BM25 and vector access. F consumes those paths at one stamp through bounded
 Arrow batches. Preserve an exact unoptimized oracle for every access path;
 measure ANN recall, filter selectivity and freshness rather than treating ANN
@@ -222,6 +223,59 @@ whole-result reconstruction; add selective native access; stream; measure
 contention; then tune batching/cache/compression/quantization on the same
 correctness corpus. A change that improves latency by omitting authorization,
 durability, failure samples or recall is rejected.
+
+## Graph, vector and knowledge research mapped to RRFlow
+
+Primary sources reviewed on 2026-10-20 support the following engineering
+choices. Vendor descriptions and benchmarks are design inputs, not measured
+RRFlow capability. The existing E/F/D/G/J gates own implementation and proof;
+this mapping neither starts a second roadmap nor changes the dependency spine.
+
+| Reference behavior | Canonical RRFlow application | Failure and qualification requirement |
+|---|---|---|
+| [HydraDB architecture](https://github.com/hydra-db/hydradb/blob/main/architecture.md): pinned snapshot; immutable topology plus bounded visible write overlay; shared request-local adjacency; canonical fallback | E-01 graph access and E-05 planning reuse temporal state within one authenticated `ReadStamp`. Any future compiled adjacency remains a disposable projection of rrflowKV versions. | Reordered identity histories, retirement, moved endpoints and expired versions must match chronological replay. Stale/missing projection cannot silently omit recent edges. Keep RRFlow storage/transaction authority; do not import SlateDB, object-store leases, GraphBLAS or HydraDB's cell topology. |
+| [SurrealDB index documentation](https://surrealdb.com/docs/reference/query-language/statements/define/indexes): tunable HNSW, separate graph/vector cache costs, disk-backed ANN tradeoffs, explain metrics | E-04 compares native exact/HNSW and later disk/quantized candidates; E-05 reports the actually selected access path. F-04 accounts for graph, vectors, candidates, decoded pages and output together. | A bounded vector cache does not bound a resident HNSW graph. Compare filtered recall, exact rerank, update/delete, reopen, build amplification and total memory at equal quality before changing defaults. No SurrealDB source or defaults are copied. |
+| [Pinecone slab architecture](https://www.pinecone.io/learn/slab-architecture/): immutable partitions plus recent writes, metadata prefiltering, storage/cache hierarchy | E-04's native generation plus exact delta and E-05's selectivity-aware planning; retain C-06's accepted segment/cache implementation. | Bind vector identity, collection/named vector, source cursor and filter eligibility at the same stamp. Measure selective-filter quality and delete freshness; post-filtering top-k alone can underfill results. No new slab backend, bitmap codec or distributed router is selected here. |
+| [Pinecone Nexus GA](https://www.pinecone.io/blog/pinecone-nexus-generally-available/): incrementally compiled, domain-scoped knowledge with typed answers and citations | D-03/D-04 supply code/source identity; D-05 owns derived knowledge; G-03/G-04 consume admitted context and evidence. Existing connector schemas govern optional external acquisition. | Changed/deleted sources invalidate dependent evidence, edges and embeddings. Retain source digest, extractor/model/recipe identity, valid time, conflict evidence and authorization. Reuse verified derived artifacts without treating generated summaries or model confidence as ground truth. Nexus is a knowledge product, distinct from Pinecone Database's storage design. |
+
+[HydraDB's integration entry point](https://hydradb.com/ai) explicitly separates
+its open-source graph engine from its hosted context API. Evaluate connector
+readiness and context quality independently from the graph engine's published
+architecture. An integration guide or successful HTTP call is not a benchmark
+or a qualified RRFlow connector.
+
+The relationship is one logical database over one native transactional store:
+
+```mermaid
+flowchart TD
+    Q["rrflowQL: stamped query and explain"] --> R["rrflowDB: canonical records, relations, evidence"]
+    Q --> G["Temporal adjacency access"]
+    Q --> V["Vector candidates and exact rerank"]
+    R --> K["rrflowKV: atomic versions and index deltas"]
+    G --> K
+    V --> K
+    S["Authorized source revision and content digest"] --> R
+    R --> D["Rebuildable lexical, vector and knowledge projections"]
+    D --> G
+    D --> V
+```
+
+This describes the intended full integration; the objective/POA&M owners retain
+its partial status. Semantic graph edges express relationships with evidence.
+HNSW links are an ANN acceleration structure and cannot become those semantic
+relationships. Vector dimensions, distance, named collection/vector, model and
+source identity belong to the existing typed contracts; client configuration
+cannot silently reinterpret vectors or authorize cross-project retrieval.
+
+The [incremental graph reduction repair](../evidence/change-journals/gate-e/e-01-incremental-graph-reduction.md)
+applies request-local reuse to the existing rrflowQL traversal. It replaces
+per-depth replay with one cursor-aware reducer shared by expansion and row
+projection. It retains an expired/retired identity's cursor to prevent an older
+version arriving in a later read step from reviving it. It does not add a
+persistent index, compiled graph, vector algorithm or cross-request cache.
+Storage still accumulates authenticated selected history, row projection still
+materializes results, and path construction remains depth-sensitive. The
+mutation-visit test measures this reduction only, not total query time or RSS.
 
 ## SQL compatibility and optional synchronization
 

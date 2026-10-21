@@ -52,8 +52,8 @@ const ALLOWED_USES: &[AllowedUse] = &[
     AllowedUse {
         path: "crates/compute/rrd-query/tests/graph_traversal.rs",
         kind: SensitiveReadUse::CausalLogPage,
-        count: 2,
-        operation: "exact breadth-first graph traversal oracle",
+        count: 3,
+        operation: "exact breadth-first graph traversal and durable-reopen oracles",
     },
     AllowedUse {
         path: "crates/compute/rrd-query/tests/query.rs",
