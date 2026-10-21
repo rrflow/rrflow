@@ -27,6 +27,13 @@ def require(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def lifecycle_timeouts() -> tuple[int, int]:
+    """Return (harness_timeout_seconds, namespace_wrapper_timeout_seconds)."""
+    harness = 720
+    wrapper = harness + 60
+    return harness, wrapper
+
+
 def artifact_paths(output: str) -> tuple[Path, Path]:
     binaries: set[Path] = set()
     tests: set[Path] = set()
@@ -127,8 +134,9 @@ def inside(stage: Path) -> None:
                       "masked_roots": [str(path) for path in masks], "sha256": configuration["sha256"]}), flush=True)
     # The two independent project fixtures may run together; serial execution
     # duplicates their full restore/verification latency inside one deadline.
+    harness_timeout, _ = lifecycle_timeouts()
     subprocess.run([str(harness), "--nocapture", "--test-threads=2"], cwd=stage,
-                   env=environment, check=True, timeout=540)
+                   env=environment, check=True, timeout=harness_timeout)
 
 
 def main() -> None:
@@ -169,10 +177,11 @@ def main() -> None:
         (stage / "isolation.json").write_text(json.dumps(configuration), encoding="utf-8")
         # timeout is privileged too, so it can reap the namespace initializer.
         # Killing that PID namespace's initializer reaps every test-owned child.
-        subprocess.run(["sudo", "-n", "/usr/bin/timeout", "--signal=TERM", "--kill-after=10s", "600s",
+        _, wrapper_timeout = lifecycle_timeouts()
+        subprocess.run(["sudo", "-n", "/usr/bin/timeout", "--signal=TERM", "--kill-after=10s", f"{wrapper_timeout}s",
                         "/usr/bin/unshare", "--mount", "--net", "--pid", "--fork", "--kill-child=KILL",
                         "--mount-proc", "--propagation", "private", "/usr/bin/python3", str(stage / "runner.py"),
-                        "--inside", str(stage)], cwd=stage, check=True, timeout=630)
+                        "--inside", str(stage)], cwd=stage, check=True, timeout=wrapper_timeout + 30)
         print("Offline installed lifecycle passed; no alpha or signed-distribution qualification claimed.")
 
 

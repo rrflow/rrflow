@@ -10,6 +10,11 @@ import run_offline_lifecycle as runner
 
 
 class OfflineLifecyclePolicyTests(unittest.TestCase):
+    def test_timeout_budget_keeps_namespace_wrapper_above_harness_deadline(self):
+        harness, wrapper = runner.lifecycle_timeouts()
+        self.assertGreaterEqual(harness, 540)
+        self.assertGreater(wrapper, harness)
+
     def test_zero_or_partial_lifecycle_corpus_is_not_a_pass(self):
         fresh = "fresh_installed_engine_survives_restart_and_restore: test"
         existing = "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens: test"
