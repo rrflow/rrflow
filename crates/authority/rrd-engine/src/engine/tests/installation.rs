@@ -220,7 +220,7 @@ fn planning_is_byte_identical_and_has_no_project_effect() {
     let first = plan(project.path());
     let second = plan(project.path());
     assert_eq!(first.installation.initial_grants, SecurityAction::ALL);
-    assert_eq!(first.installation.managed_paths.len(), 9);
+    assert_eq!(first.installation.managed_paths.len(), 13);
     assert!(serde_json::to_value(&first.installation)
         .unwrap()
         .get("project_root")
@@ -578,6 +578,7 @@ fn rehashed_profile_field_forgery_fails_before_any_project_effect() {
     std::fs::write(project.path().join("README.md"), "walking product\n").unwrap();
     let mut forged = plan(project.path());
     forged.installation.credential_bytes = 64;
+    forged.installation.bootstrap.credential_entropy_bytes = 64;
     forged.installation.plan_sha256 = installation_plan_sha256(&forged.installation).unwrap();
     forged.validate().unwrap();
 

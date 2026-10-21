@@ -256,7 +256,26 @@ impl StorageTransaction for RrflowKvTransaction<'_> {
     }
 }
 
+/// Read-only projection of the formats owned by the initial rrflowKV writer.
+/// Installation can bind these without copying physical-format constants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RrflowKvInitializationFormats {
+    pub application_format: u64,
+    pub manifest_format: u16,
+    pub wal_format: u16,
+    pub batch_format: u16,
+}
+
 impl RrflowKvStore {
+    pub const fn initialization_formats() -> RrflowKvInitializationFormats {
+        RrflowKvInitializationFormats {
+            application_format: keyspaces::RRFLOW_KV_FORMAT,
+            manifest_format: rrd_lsm::MANIFEST_FORMAT_VERSION,
+            wal_format: rrd_lsm::WAL_FORMAT_VERSION,
+            batch_format: rrd_lsm::BATCH_FORMAT_VERSION,
+        }
+    }
+
     /// Creates exactly one new rrflowKV root. Parent-directory creation is an
     /// installer effect and therefore remains outside this constructor.
     pub fn create_new(path: &Path) -> Result<Self> {

@@ -18,8 +18,8 @@ use rrd_contract::{
     EstateConfiguration, EstateConfigurationInput, InstallationActionDisposition,
     InstallationActionKind, InstallationActionResult, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationResult, InstallationTargetKind,
-    InstalledEstateIdentity, MemorySeatDefinition, PersistMemoryEstate, StorageProfileKind,
-    ATTUNEMENT_PHASES, INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+    InstalledEstateIdentity, PersistMemoryEstate, StorageProfileKind, ATTUNEMENT_PHASES,
+    INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
 };
 use rrd_core::digest::Sha256 as IncrementalSha256;
 use rrd_security::{Principal, PrincipalKind, ResourceGrant, SecurityState, SECURITY_FORMAT};
@@ -29,10 +29,11 @@ use serde::de::DeserializeOwned;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read, Write};
 
-const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v1.json");
+const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v2.json");
 const DEFAULT_CONFIGURATION_BYTES: &[u8] =
     include_bytes!("../../assets/install/default-estate-configuration-v2.toml");
-const INSTALL_PROFILE_FORMAT: u16 = 1;
+const CLYFFY_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/clyffy-profile-v2.json");
+const INSTALL_PROFILE_FORMAT: u16 = 2;
 const LOCATOR_FORMAT: u16 = 1;
 const INSTALLED_RECORD_FORMAT: u16 = 2;
 const INSTALL_CHECKPOINT_FORMAT: u16 = 2;
@@ -42,6 +43,7 @@ pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
 const MAX_CONFIGURATION_BYTES: u64 = 64 * 1024;
 
 mod admission;
+mod bootstrap;
 mod inventory;
 mod lease;
 pub(super) mod recovery;
@@ -60,7 +62,8 @@ pub struct DefaultInstallProfile {
     pub id: CanonicalId,
     pub configuration_asset: String,
     pub deployment: DeploymentProfile,
-    pub initial_seat: MemorySeatDefinition,
+    pub template_asset: String,
+    pub specialization: rrd_contract::InstallationSpecialization,
     pub initial_principal_id: CanonicalId,
     pub credential_bytes: u16,
     pub initial_grant_policy: CanonicalId,
@@ -83,19 +86,27 @@ pub struct DefaultAttunementPhase {
 
 impl DefaultInstallProfile {
     pub(super) fn load(requested: &str) -> Result<(Self, String)> {
-        if requested != "default" {
-            return Err(ServiceError::Contract(format!(
-                "unsupported installation profile {requested:?}"
-            )));
-        }
-        let profile: Self = serde_json::from_slice(INSTALL_PROFILE_BYTES).map_err(contract_json)?;
+        let bytes = match requested {
+            "default" => INSTALL_PROFILE_BYTES,
+            "clyffy" => CLYFFY_PROFILE_BYTES,
+            _ => {
+                return Err(ServiceError::Contract(format!(
+                    "unsupported installation profile {requested:?}"
+                )))
+            }
+        };
+        let profile: Self = serde_json::from_slice(bytes).map_err(contract_json)?;
         profile.validate()?;
-        Ok((profile, digest::sha256_hex(INSTALL_PROFILE_BYTES)))
+        if profile.id.as_str() != requested {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        Ok((profile, digest::sha256_hex(bytes)))
     }
 
     fn validate(&self) -> Result<()> {
         if self.format_version != INSTALL_PROFILE_FORMAT
-            || self.id.as_str() != "default"
+            || !matches!(self.id.as_str(), "default" | "clyffy")
+            || self.template_asset != "templates/generic-project-v1.md"
             || self.configuration_asset != "default-estate-configuration-v2.toml"
             || self.initial_grant_policy.as_str() != "local-owner-all-actions"
             || !(32..=4_096).contains(&self.credential_bytes)
@@ -107,7 +118,7 @@ impl DefaultInstallProfile {
                 "default installation profile has invalid bounds or identity".into(),
             ));
         }
-        self.initial_seat
+        self.specialization
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
         self.deployment
@@ -400,6 +411,7 @@ impl RrdEngine {
         let layout = EstateLayout::new(&install_id, &profile.initial_principal_id)?;
         let absent = digest::sha256_hex(b"rrflow-install-managed-path-absent-v1");
         let managed_paths = layout.managed_paths(&absent);
+        let bootstrap = bootstrap::build(&profile, &layout)?;
         let actions = installation_actions(
             &configuration.configuration_sha256,
             &attunement.plan_sha256,
@@ -420,7 +432,8 @@ impl RrdEngine {
             project_precondition_sha256,
             storage_root_id: install_id,
             configuration,
-            initial_seat: profile.initial_seat,
+            initial_seat: profile.specialization.seat.clone(),
+            bootstrap,
             initial_principal_id: profile.initial_principal_id,
             initial_grants: SecurityAction::ALL.to_vec(),
             credential_bytes: profile.credential_bytes,
@@ -705,6 +718,24 @@ impl RrdEngine {
             None,
             observer,
         )?;
+        bootstrap::materialize(&project, &layout, preview, &mut || {
+            observe_install_stage(
+                preview,
+                started,
+                InstallApplyStage::BootstrapStaged,
+                InstallRecoveryState::OwnedIntent,
+                None,
+                observer,
+            )
+        })?;
+        observe_install_stage(
+            preview,
+            started,
+            InstallApplyStage::BootstrapReady,
+            InstallRecoveryState::OwnedIntent,
+            None,
+            observer,
+        )?;
         let storage_root = safe_join(&project, &storage_relative)?;
         let token_path = safe_join(&project, &token_relative)?;
         let credential_path = safe_join(&project, &credential_relative)?;
@@ -923,6 +954,7 @@ impl RrdEngine {
                 "attunement.job.created",
             )?,
         ]);
+        bootstrap::validate_transaction(preview, &runtime_commit, &transitions)?;
         let committed_before = store_state == InstallRecoveryState::Committed;
         if !committed_before {
             require_empty_installation(&engine, &transitions)?;
@@ -1061,6 +1093,7 @@ impl RrdEngine {
         let installed: InstalledEstateRecord = decode_json(&bytes, "installed estate record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        bootstrap::verify(&project, &installed.installation)?;
         if locator.identity.instance_id != preflight.instance_id
             || locator.plan_sha256 != preflight.plan_sha256
             || installed.clock_anchor != preflight.clock.anchor
@@ -1170,6 +1203,14 @@ impl RrdEngine {
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        bootstrap::verify(&project, &installed.installation)?;
+        let layout = EstateLayout::new(
+            &installed.installation.storage_root_id,
+            &installed.installation.initial_principal_id,
+        )?;
+        if installed.installation.bootstrap != bootstrap::build(&profile, &layout)? {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
         let configuration: EstateConfiguration = decode_control(
             &inspector,
             &estate_configuration_key(&locator.identity.instance_id),
@@ -1345,9 +1386,11 @@ fn installation_actions(
     let action_kinds = [
         InstallationActionKind::ValidateProject,
         InstallationActionKind::AcquireInstallationLease,
-        InstallationActionKind::CreateEstateDirectories,
-        InstallationActionKind::CreateStorageRoot,
         InstallationActionKind::PrepareCredentials,
+        InstallationActionKind::CreateEstateDirectories,
+        InstallationActionKind::MaterializeBootstrap,
+        InstallationActionKind::CreateStorageRoot,
+        InstallationActionKind::DeliverCredentials,
         InstallationActionKind::InitializeInstance,
         InstallationActionKind::CreateAttunementJob,
         InstallationActionKind::PublishProjectLocator,
@@ -1355,7 +1398,9 @@ fn installation_actions(
     let estimates = [
         0,
         0,
+        u64::from(credential_bytes) * 2 + 4_096,
         0,
+        64 * 1024,
         4_096,
         u64::from(credential_bytes) * 2 + 512,
         16_384,
@@ -1432,7 +1477,12 @@ fn validate_sealed_preview(
         || installation.profile_sha256 != profile_sha256
         || installation.storage_root_id != installation.id
         || installation.configuration.revision != 1
-        || installation.initial_seat != profile.initial_seat
+        || installation.initial_seat != profile.specialization.seat
+        || installation.bootstrap
+            != bootstrap::build(
+                profile,
+                &EstateLayout::new(&install_id, &profile.initial_principal_id)?,
+            )?
         || installation.initial_principal_id != profile.initial_principal_id
         || installation.initial_grants != SecurityAction::ALL
         || installation.credential_bytes != profile.credential_bytes
@@ -1628,6 +1678,15 @@ fn read_locator_anchored(
 }
 
 fn publish_new_file(path: &AnchoredPath, temporary: &AnchoredPath, bytes: &[u8]) -> Result<()> {
+    publish_new_file_with_stage(path, temporary, bytes, &mut || Ok(()))
+}
+
+fn publish_new_file_with_stage(
+    path: &AnchoredPath,
+    temporary: &AnchoredPath,
+    bytes: &[u8],
+    staged: &mut dyn FnMut() -> Result<()>,
+) -> Result<()> {
     let parent = path.parent().ok_or(ServiceError::ProjectBindingMismatch)?;
     if bytes.len() as u64 > MAX_LOCATOR_BYTES {
         return Err(ServiceError::ProjectBindingMismatch);
@@ -1670,6 +1729,7 @@ fn publish_new_file(path: &AnchoredPath, temporary: &AnchoredPath, bytes: &[u8])
         }
     }
 
+    staged()?;
     match temporary.rename_new_to(path) {
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -1778,7 +1838,9 @@ fn build_installation_result(
                 .installation
                 .managed_path(InstallationManagedPathKind::InstallationLease),
         )?,
+        credential_sha256.into(),
         json_sha256(&preview.installation.managed_paths[..4])?,
+        preview.installation.bootstrap.instructions_sha256.clone(),
         json_sha256(&(
             &preview.installation.storage_root_id,
             preview

@@ -611,7 +611,7 @@ max_elapsed_ms = 20000
     assert_success(&version, "version");
     let version: serde_json::Value = serde_json::from_slice(&version.stdout).unwrap();
     assert_eq!(version["product_version"], "1.0.0");
-    assert_eq!(version["installation_plan_contract_version"], 3);
+    assert_eq!(version["installation_plan_contract_version"], 4);
     assert_eq!(version["release_stage"], "pre-release");
 
     let before = inventory(&project);
@@ -649,7 +649,7 @@ max_elapsed_ms = 20000
     assert_eq!(first.stdout, second.stdout, "preview must be byte stable");
     assert_eq!(inventory(&project), before, "preview mutated the project");
     let preview: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
-    assert_eq!(preview["installation"]["contract_version"], 3);
+    assert_eq!(preview["installation"]["contract_version"], 4);
     assert_eq!(preview["installation"]["installation_identity"], identity);
     assert_eq!(
         preview["installation"]["configuration"]["reasoning"]["max_run_elapsed_ms"],
@@ -664,7 +664,15 @@ max_elapsed_ms = 20000
         "single_node_server"
     );
     let managed_paths = preview["installation"]["managed_paths"].as_array().unwrap();
-    assert_eq!(managed_paths.len(), 9);
+    assert_eq!(managed_paths.len(), 13);
+    let bootstrap: rrd_contract::InstallationBootstrap =
+        serde_json::from_value(preview["installation"]["bootstrap"].clone()).unwrap();
+    bootstrap.validate().unwrap();
+    assert_eq!(bootstrap.specialization.id.as_str(), "generic");
+    assert!(bootstrap.specialization.endpoint_profile.is_none());
+    assert!(bootstrap.process_invocations.is_empty());
+    assert!(bootstrap.network_endpoints.is_empty());
+
     assert!(managed_paths
         .iter()
         .any(|path| path["relative_path"] == ".rrflow/config.toml"));
@@ -735,6 +743,18 @@ max_elapsed_ms = 20000
     ]);
     capture_output(&applied, &mut lifecycle_output);
     assert_success(&applied, "install apply");
+    assert_eq!(
+        std::fs::read(project.join(".rrflow/bootstrap.md")).unwrap(),
+        bootstrap.rendered_instructions().as_bytes()
+    );
+    for (relative, bytes) in &before {
+        assert_eq!(
+            std::fs::read(project.join(relative)).unwrap(),
+            *bytes,
+            "installation changed project-owned content"
+        );
+    }
+
     let applied: serde_json::Value = serde_json::from_slice(&applied.stdout).unwrap();
     assert_eq!(applied["plan_sha256"], plan_sha256);
     assert_eq!(applied["runtime_cursor"], 2);

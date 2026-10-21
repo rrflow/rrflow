@@ -184,6 +184,8 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
     let stages = [
         InstallApplyStage::IntentPublished,
         InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
         InstallApplyStage::StorageReady,
         InstallApplyStage::TokenReady,
         InstallApplyStage::CredentialReady,
@@ -715,6 +717,8 @@ fn anchored_installation_preserves_outside_state_at_durable_boundaries() {
     for stage in [
         InstallApplyStage::IntentPublished,
         InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
         InstallApplyStage::LocatorPublished,
     ] {
         let fixture = tempfile::tempdir().unwrap();

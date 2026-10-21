@@ -171,6 +171,8 @@ fn competing_plans_and_recovery_are_excluded_at_every_installation_boundary() {
         InstallApplyStage::LeaseAcquired,
         InstallApplyStage::IntentPublished,
         InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
         InstallApplyStage::StorageReady,
         InstallApplyStage::TokenReady,
         InstallApplyStage::CredentialReady,
@@ -216,6 +218,8 @@ fn process_death_releases_admission_without_regenerating_prepared_secrets() {
     for stage in [
         InstallApplyStage::LeaseAcquired,
         InstallApplyStage::IntentPublished,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
         InstallApplyStage::EngineCommitted,
         InstallApplyStage::LocatorPublished,
         InstallApplyStage::IntentAcknowledged,

@@ -187,12 +187,12 @@ adapter. The plan is canonical serialized data whose SHA-256 covers:
 Repeated planning over unchanged inputs is byte-identical. A stale plan fails
 before mutation.
 
-Installation-plan contract version 3 seals the explicit identity input and
+Installation-plan contract version 4 seals the explicit identity input and
 `project_root_sha256`, a digest of the initial canonical root. Identical project
 content does not allocate an estate identity. New apply and interrupted recovery
 must match that root before effects. Once the installed locator and record are
 published, relocation, reopen and exact completed replay retain the persisted
-identity; the live path is not its permanent identity. Prior version-1/2 plans
+identity; the live path is not its permanent identity. Prior version-1/2/3 plans
 are rejected. Attunement and result envelopes retain their independent version
 1; product version remains `1.0.0`. This is not a binary-upgrade or estate-
 migration facility: retain the executable that created an existing pre-alpha
@@ -201,7 +201,7 @@ estate until its qualified upgrade path exists.
 clients can check the installation boundary without treating the frozen
 product version as a capability signal.
 
-Version 3 additionally previews `acquire_installation_lease` and the ninth
+The plan also previews `acquire_installation_lease` and the ninth
 managed path, `.rrflow-install.lock`. Its precondition means absent or a
 validated private, empty, single-link regular file; its removal rule is
 `retain_for_exclusion`. File presence does not mean an installation is active
@@ -216,6 +216,34 @@ new-install preconditions are checked before creation, then checked again
 under the lock. This local native-file contract establishes no network-share
 locking qualification.
 
+Version 4 seals the linked generic template bytes and selected specialization
+in `InstallationBootstrap`, persisted within the installed binding. `--profile
+default` selects a provider-neutral seat; `--profile clyffy` explicitly selects
+the bundled Clyffy seat. Both keep endpoint candidates absent and external
+process, network invocation and activated-provider lists empty. Installation
+never activates a provider or rewrites project-owned instructions.
+
+The thirteen managed paths include the lease, intent, locator staging file,
+`.rrflow/bootstrap.md` and its staging file. Ten ordered actions distinguish
+credential generation in the intent from later credential delivery. The plan
+binds the ten initial logical records (seat schema/record, security policy/audit/
+head, configuration, installed binding, checkpoint and pending attunement
+plan/job), owner-only directories and secret files, entropy sizes, and the
+rrflowKV owner's format coordinates. Initial semantic payloads are bounded to
+one MiB each and four MiB together; these are semantic admission limits, not a
+claim that physical storage uses exactly that number of bytes. Template and
+rendered instruction text are each limited to 64 KiB.
+
+Owned assets pin LF checkout bytes. Preview seals their exact digests; apply
+rejects altered or rehashed bundle input before effects. Instructions publish
+through an exact-content staging file. Recovery checks its bytes, and installed
+inspection/open/replay reject instruction drift without silently repairing it.
+Dynamic time and secret inputs are obtained only during authorized apply through
+the existing engine clock and OS entropy authority. Actual installed/transaction,
+credential and manifest digests remain in existing receipts. The attunement job
+remains pending; this bootstrap is not verified source indexing or provider
+configuration. D-01.5/.6 still own native qualification and complete acceptance.
+
 ## Install apply
 
 `rrflow install apply` accepts only the named plan and expected digest. It:
@@ -224,15 +252,13 @@ locking qualification.
 2. acquires a nonblocking native lock on the previewed private empty
    `.rrflow-install.lock` file without following an unreviewed link or mount
    change; retains that handle through final acknowledgement;
-3. creates a plan-addressed staging root and uses a create-new rrflowKV API;
-4. commits the installed binding, initial seat, security authority, install
-   checkpoint, audit, outbox, and commit evidence through `RrdEngine`;
-5. performs credential delivery through a capability-scoped, create-new,
-   idempotency-aware sink and records prepared/effect/observation/receipt state;
-6. fsyncs the staged root and atomically publishes the minimal locator only
-   after the committed instance is self-verifying;
-7. acknowledges the exact receipt; and
-8. creates the durable attunement job without treating an event as completion.
+3. prepares the accepted clock anchor and secrets once in the private intent;
+4. creates the private estate directories and publishes exact bundled instructions;
+5. creates the plan-addressed rrflowKV root and delivers the prepared credentials;
+6. commits the installed binding, initial seat, security authority, checkpoint,
+   audit, configuration and pending attunement plan/job through `RrdEngine`;
+7. verifies the committed instance and atomically publishes its minimal locator; and
+8. acknowledges the exact intent without treating file presence as job completion.
 
 Every crash boundary resumes the same plan or fails closed. It cannot create a
 second credential, policy, estate, instance, audit outcome, or project edit.
@@ -254,8 +280,8 @@ startup slice without claiming the complete target above:
   maxima, assigned revision 1, and sealed into the plan;
 - apply never rereads that mutable input. It consumes the sealed value and
   creates, in declared order, `.rrflow/`, `.rrflow/rrd/`,
-  `.rrflow/rrd/roots/`, `.rrflow/credentials/`, one create-new storage root,
-  token key, credential document, and `.rrflow/config.toml`;
+  `.rrflow/rrd/roots/`, `.rrflow/credentials/`, bundled bootstrap instructions,
+  one create-new storage root, token key, credential document and `.rrflow/config.toml`;
 - the active configuration is committed inside rrflowDB at
   `server/state/<instance>/configuration/active` before locator publication;
 - installed open validates locator, installed record, configuration revision
@@ -276,9 +302,9 @@ startup slice without claiming the complete target above:
   credential, one semantic installation commit, pending locator, and active
   locator. It classifies empty, committed, published, and complete states and
   removes only the exact pending locator and acknowledged intent it owns;
-- deterministic test-only observation stops before or after each of the eight
-  durable stages: intent, directories, store, token, credential, engine commit,
-  locator publication, and intent acknowledgement. Retrying the same plan
+- deterministic test-only observation covers lease acquisition and ten
+  durable stages: intent, directories, bootstrap staging/publication, store,
+  token, credential, engine commit, locator publication and intent acknowledgement. Retrying the same plan
   preserves the first clock anchor and leaves one token, credential, installed
   record, policy, audit/checkpoint result, attunement plan/job, and locator;
 - recovery, exact replay, and installed open compare a fresh observation with

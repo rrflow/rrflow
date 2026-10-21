@@ -38,8 +38,9 @@ completed the same plan while its creator was paused before storage admission.
 The storage writer lock does not protect the whole installation interval.
 The [D-01.3 repair candidate](../../evidence/change-journals/gate-d/d-01-exclusive-installation.md)
 now retains a native project lease through acknowledgement, with competing-plan,
-process-death and live-recovery tests. Candidate CI and the broader D-01.5 native
-qualification remain required; this does not close the parent gap.
+process-death and live-recovery tests. Its exact candidate passed the full CI
+pipeline as recorded below. Broader D-01.5 native qualification remains required;
+this does not close the parent gap.
 
 RRFlow has a coherent local pre-release startup spine, but it is not yet a repeatable
 turnkey distribution. It cannot discover and attune a project durably, perform the full
@@ -212,3 +213,29 @@ after all six filesystem fixtures passed. The
 [checkout correction receipt](../../evidence/change-journals/gate-d/d-01-canonical-manifest-checkout.md)
 pins that fixture to LF without weakening the serializer oracle. A new full
 candidate is required; no D-01 acceptance is inferred from local tests.
+
+
+## Complete bootstrap preview (2026-10-21)
+
+D-01.3 candidate `3817cb5ae6d9d100cb6a9a5768c67608cbaeef6a` passed all
+17 jobs in run `39647536747`, including native Windows/macOS, Linux offline,
+engine suites, SDK conformance and the final gate; PR 50 merged as `6ba9dc5a`.
+The broader D-01 matrix remains open.
+
+The [D-01.4 observed-effect oracle](../../evidence/change-journals/gate-d/d-01-bootstrap-preview-oracle.md)
+then demonstrated that intent publication creates a path missing from the
+accepted installation preview. A separate current-baseline Git checkout
+experiment reproduced LF/CRLF conversion of both embedded installation
+assets, changing the raw profile digest at the same source revision. D-01.4
+must supply actual bundled templates/specialization manifests, close the
+file/record/effect preview and pin owned asset bytes. The regression is
+intentionally failing until that implementation; no parent status closes.
+
+
+The D-01.4 [implementation journal](../../evidence/change-journals/gate-d/d-01-bundled-bootstrap.md)
+records plan version 4, actual linked generic/Clyffy assets, complete managed
+transient paths, bounded initial record declarations and verified instruction
+publication/recovery. Default provider bindings remain inactive and project-owned
+instructions remain unchanged. Native D-01.5 qualification, exact-candidate
+D-01.6 reconciliation and the later attunement/adapter lifecycle remain open.
+Candidate CI must pass before this package is accepted; POAM-006 stays open.
