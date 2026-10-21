@@ -32,6 +32,12 @@ such a catalogue is refused.
 
 ## Impact
 
+The [D-01.3 real-process oracle](../../evidence/change-journals/gate-d/d-01-install-exclusion-oracle.md)
+reproduced concurrent recovery of a live install intent: a second process
+completed the same plan while its creator was paused before storage admission.
+The storage writer lock does not protect the whole installation interval.
+Project-wide native exclusion through acknowledgement remains required.
+
 RRFlow has a coherent local pre-release startup spine, but it is not yet a repeatable
 turnkey distribution. It cannot discover and attune a project durably, perform the full
 repair lifecycle or remove only owned integration. Installed backup resolution and staged

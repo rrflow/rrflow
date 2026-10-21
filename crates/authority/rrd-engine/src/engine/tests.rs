@@ -89,6 +89,7 @@ mod flight;
 mod function;
 mod index_foundation;
 mod installation;
+mod installation_concurrency;
 mod installation_recovery;
 mod lifecycle;
 mod memory_estate;
