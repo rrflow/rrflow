@@ -10,8 +10,8 @@ mod private_file;
 #[cfg(test)]
 pub(in crate::engine) use private_file::write_private_new;
 pub(in crate::engine) use private_file::{
-    create_private_directory_anchored, pin_private_directory, read_private_anchored,
-    write_private_anchored,
+    create_private_directory_anchored, open_private_empty_anchored, pin_private_directory,
+    read_private_anchored, write_private_anchored,
 };
 
 pub const TOKEN_KEY_BYTES: usize = 32;

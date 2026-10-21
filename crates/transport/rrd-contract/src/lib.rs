@@ -38,10 +38,11 @@ pub use attunement::{
     CancelAttunement, InstallationActionDisposition, InstallationActionKind,
     InstallationActionResult, InstallationManagedPath, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationRemovalRule, InstallationResult,
-    InstallationTargetKind, ResumeAttunement, ATTUNEMENT_PHASES,
-    INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
-    MAX_ATTUNEMENT_CANCEL_REASON_BYTES, MAX_ATTUNEMENT_FAILURE_BYTES, MAX_ATTUNEMENT_PHASES,
-    MAX_ATTUNEMENT_VERIFICATION_CHECKS, MAX_INSTALLATION_ACTIONS,
+    InstallationTargetKind, ResumeAttunement, ATTUNEMENT_PHASES, INSTALLATION_LEASE_PATH,
+    INSTALLATION_LEASE_PRECONDITION, INSTALLATION_PLAN_CONTRACT_VERSION,
+    INSTALL_ATTUNEMENT_CONTRACT_VERSION, MAX_ATTUNEMENT_CANCEL_REASON_BYTES,
+    MAX_ATTUNEMENT_FAILURE_BYTES, MAX_ATTUNEMENT_PHASES, MAX_ATTUNEMENT_VERIFICATION_CHECKS,
+    MAX_INSTALLATION_ACTIONS,
 };
 pub use capability_surface::{
     ProductCapability, ProductCapabilityCatalogue, ProductSurface, SurfaceBinding,

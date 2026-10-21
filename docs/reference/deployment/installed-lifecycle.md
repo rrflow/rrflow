@@ -187,12 +187,12 @@ adapter. The plan is canonical serialized data whose SHA-256 covers:
 Repeated planning over unchanged inputs is byte-identical. A stale plan fails
 before mutation.
 
-Installation-plan contract version 2 seals the explicit identity input and
+Installation-plan contract version 3 seals the explicit identity input and
 `project_root_sha256`, a digest of the initial canonical root. Identical project
 content does not allocate an estate identity. New apply and interrupted recovery
 must match that root before effects. Once the installed locator and record are
 published, relocation, reopen and exact completed replay retain the persisted
-identity; the live path is not its permanent identity. Unbound version-1 plans
+identity; the live path is not its permanent identity. Prior version-1/2 plans
 are rejected. Attunement and result envelopes retain their independent version
 1; product version remains `1.0.0`. This is not a binary-upgrade or estate-
 migration facility: retain the executable that created an existing pre-alpha
@@ -201,13 +201,29 @@ estate until its qualified upgrade path exists.
 clients can check the installation boundary without treating the frozen
 product version as a capability signal.
 
+Version 3 additionally previews `acquire_installation_lease` and the ninth
+managed path, `.rrflow-install.lock`. Its precondition means absent or a
+validated private, empty, single-link regular file; its removal rule is
+`retain_for_exclusion`. File presence does not mean an installation is active
+or complete. The native handle lock is the only admission owner. Apply and
+recovery retain it through locator publication and intent acknowledgement;
+contenders fail immediately with a storage conflict. Closing the handle or
+process termination releases ownership without unlinking the file. Lease
+contents are never repaired, PID/age never permits takeover, and unrelated
+projects have independent admission. Read-only preview creates nothing and
+excludes this path from project inventory only after validating it. Invalid
+new-install preconditions are checked before creation, then checked again
+under the lock. This local native-file contract establishes no network-share
+locking qualification.
+
 ## Install apply
 
 `rrflow install apply` accepts only the named plan and expected digest. It:
 
 1. resolves and revalidates the exact bundle and project preconditions;
-2. acquires an exclusive create-new lease without following an unreviewed link
-   or mount change;
+2. acquires a nonblocking native lock on the previewed private empty
+   `.rrflow-install.lock` file without following an unreviewed link or mount
+   change; retains that handle through final acknowledgement;
 3. creates a plan-addressed staging root and uses a create-new rrflowKV API;
 4. commits the installed binding, initial seat, security authority, install
    checkpoint, audit, outbox, and commit evidence through `RrdEngine`;

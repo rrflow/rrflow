@@ -41,7 +41,9 @@ const INSTALL_CHECKPOINT_KEY: &str = "server/state/install/checkpoint";
 pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
 const MAX_CONFIGURATION_BYTES: u64 = 64 * 1024;
 
+mod admission;
 mod inventory;
+mod lease;
 pub(super) mod recovery;
 
 use inventory::{project_inventory_sha256, project_inventory_sha256_excluding};
@@ -586,13 +588,33 @@ impl RrdEngine {
             &preview.installation.storage_root_id,
             &preview.installation.initial_principal_id,
         )?;
-        let locator_path = safe_join(&project, LOCATOR_RELATIVE_PATH)?;
         validate_sealed_preview(preview, &profile, &profile_sha256, &executable_sha256)?;
 
-        match locator_path.metadata() {
-            Ok(_) => {
-                let intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
-                let result = replay_installation_result(&project, preview, executable, clock)?;
+        // Refused preconditions must not create even an empty admission file.
+        // Existing leases are locked before reading mutable recovery state.
+        let _lease = match lease::InstallationLease::existing(project.project())? {
+            Some(lease) => lease,
+            None => {
+                admission::inspect(&project, &layout, preview, &profile, executable, clock)?;
+                lease::InstallationLease::create_or_acquire(project.project())?
+            }
+        };
+        // Recheck every mutable precondition under the retained native owner.
+        // Re-admit private descendants in case another owner completed between
+        // the initial read-only preflight and this successful acquisition.
+        project.admit_missing_private_directories(true)?;
+        let admitted = admission::inspect(&project, &layout, preview, &profile, executable, clock)?;
+        observe_install_stage(
+            preview,
+            started,
+            InstallApplyStage::LeaseAcquired,
+            InstallRecoveryState::Admitted,
+            None,
+            observer,
+        )?;
+
+        let intent = match admitted {
+            admission::Admission::Published { intent, result } => {
                 if let Some(intent) = intent {
                     let (_, _, locator_bytes) = read_locator_anchored(&project)?;
                     validate_recovery_estate(&project, &layout)?;
@@ -615,88 +637,46 @@ impl RrdEngine {
                         observer,
                     )?;
                 }
-                return Ok(result);
+                return Ok(*result);
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(ServiceError::Storage(error.to_string())),
-        }
-
-        // A completed estate is portable and was handled above from its
-        // persisted authority. A new or interrupted installation is still bound
-        // to the root explicitly previewed before any filesystem effect.
-        if initial_project_root_sha256(&project)? != preview.installation.project_root_sha256 {
-            return Err(ServiceError::ProjectBindingMismatch);
-        }
-        let existing_intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
-        let intent = if let Some(intent) = existing_intent {
-            let clock_assessment = assess(
-                clock.observe(),
-                intent.clock_anchor(),
-                &preview.installation.configuration.clock,
-                "install.apply.recover",
-            )?;
-            require_accepted(&clock_assessment)?;
-            validate_recovery_estate(&project, &layout)?;
-            if project_inventory_sha256_excluding(
-                project.project(),
-                &profile,
-                Some(Path::new(&layout.install_intent)),
-            )? != preview.installation.project_precondition_sha256
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
+            admission::Admission::Recover(intent) => {
+                observe_install_stage(
+                    preview,
+                    started,
+                    InstallApplyStage::IntentPublished,
+                    InstallRecoveryState::OwnedIntent,
+                    None,
+                    observer,
+                )?;
+                *intent
             }
-            observe_install_stage(
-                preview,
-                started,
-                InstallApplyStage::IntentPublished,
-                InstallRecoveryState::OwnedIntent,
-                None,
-                observer,
-            )?;
-            intent
-        } else {
-            reject_existing_estate(&project)?;
-            validate_installation_target(&project, target_kind)?;
-            if project_inventory_sha256(project.project(), &profile)?
-                != preview.installation.project_precondition_sha256
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            for managed in &preview.installation.managed_paths {
-                if project
-                    .managed(&managed.relative_path)?
-                    .try_exists()
-                    .map_err(storage_error)?
+            admission::Admission::New(clock_anchor) => {
+                let (intent, recovery_state) = load_or_create_intent(
+                    &project,
+                    &layout,
+                    preview,
+                    &clock_anchor,
+                    &executable_sha256,
+                )?;
+                if project_inventory_sha256_excluding(
+                    project.project(),
+                    &profile,
+                    Some(Path::new(&layout.install_intent)),
+                )? != preview.installation.project_precondition_sha256
                 {
                     return Err(ServiceError::ProjectBindingMismatch);
                 }
+                validate_recovery_estate(&project, &layout)?;
+                observe_install_stage(
+                    preview,
+                    started,
+                    InstallApplyStage::IntentPublished,
+                    recovery_state,
+                    None,
+                    observer,
+                )?;
+                intent
             }
-            let clock_anchor = observe_required(clock, "install.apply.new")?;
-            let (intent, recovery_state) = load_or_create_intent(
-                &project,
-                &layout,
-                preview,
-                &clock_anchor,
-                &executable_sha256,
-            )?;
-            if project_inventory_sha256_excluding(
-                project.project(),
-                &profile,
-                Some(Path::new(&layout.install_intent)),
-            )? != preview.installation.project_precondition_sha256
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            validate_recovery_estate(&project, &layout)?;
-            observe_install_stage(
-                preview,
-                started,
-                InstallApplyStage::IntentPublished,
-                recovery_state,
-                None,
-                observer,
-            )?;
-            intent
         };
 
         let storage_relative = preview
@@ -1364,6 +1344,7 @@ fn installation_actions(
 ) -> Result<Vec<InstallationPlanAction>> {
     let action_kinds = [
         InstallationActionKind::ValidateProject,
+        InstallationActionKind::AcquireInstallationLease,
         InstallationActionKind::CreateEstateDirectories,
         InstallationActionKind::CreateStorageRoot,
         InstallationActionKind::PrepareCredentials,
@@ -1372,6 +1353,7 @@ fn installation_actions(
         InstallationActionKind::PublishProjectLocator,
     ];
     let estimates = [
+        0,
         0,
         0,
         4_096,
@@ -1488,15 +1470,16 @@ fn validate_installation_target(
     project: &EstateFilesystem,
     target_kind: InstallationTargetKind,
 ) -> Result<()> {
-    if target_kind == InstallationTargetKind::FreshProject
-        && project
-            .project()
-            .entries()
-            .map_err(storage_error)?
-            .next()
-            .is_some()
-    {
-        return Err(ServiceError::ProjectBindingMismatch);
+    if target_kind == InstallationTargetKind::FreshProject {
+        let admitted_lease = lease::admit_existing(project.project())?;
+        for entry in project.project().entries().map_err(storage_error)? {
+            let entry = entry.map_err(storage_error)?;
+            if admitted_lease.is_some() && entry.relative_path() == Path::new(lease::RELATIVE_PATH)
+            {
+                continue;
+            }
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
     }
     Ok(())
 }
@@ -1790,6 +1773,11 @@ fn build_installation_result(
 ) -> Result<InstallationResult> {
     let outputs = [
         preview.installation.project_precondition_sha256.clone(),
+        json_sha256(
+            preview
+                .installation
+                .managed_path(InstallationManagedPathKind::InstallationLease),
+        )?,
         json_sha256(&preview.installation.managed_paths[..4])?,
         json_sha256(&(
             &preview.installation.storage_root_id,

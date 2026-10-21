@@ -83,6 +83,8 @@ jobs:
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
       - name: Test installation ancestor replacement at durable boundaries
         run: cargo test -p rrd-engine --lib anchored_installation --locked
+      - name: Test native installation exclusion and process recovery
+        run: cargo test -p rrd-engine --lib installation_concurrency --locked -- --nocapture
       - name: Test native installed primary lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
       - name: Deny installed lifecycle test warnings

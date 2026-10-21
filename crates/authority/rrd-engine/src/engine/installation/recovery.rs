@@ -11,6 +11,7 @@ const MAX_INSTALL_INTENT_BYTES: u64 = 32 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(in crate::engine) enum InstallApplyStage {
+    LeaseAcquired,
     IntentPublished,
     EstateDirectoriesReady,
     StorageReady,
@@ -24,6 +25,7 @@ pub(in crate::engine) enum InstallApplyStage {
 impl InstallApplyStage {
     pub(super) const fn as_str(self) -> &'static str {
         match self {
+            Self::LeaseAcquired => "lease_acquired",
             Self::IntentPublished => "intent_published",
             Self::EstateDirectoriesReady => "estate_directories_ready",
             Self::StorageReady => "storage_ready",
@@ -38,6 +40,7 @@ impl InstallApplyStage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::engine) enum InstallRecoveryState {
+    Admitted,
     NewIntent,
     OwnedIntent,
     EmptyStore,
@@ -49,6 +52,7 @@ pub(in crate::engine) enum InstallRecoveryState {
 impl InstallRecoveryState {
     pub(super) const fn as_str(self) -> &'static str {
         match self {
+            Self::Admitted => "admitted",
             Self::NewIntent => "new_intent",
             Self::OwnedIntent => "owned_intent",
             Self::EmptyStore => "empty_store",

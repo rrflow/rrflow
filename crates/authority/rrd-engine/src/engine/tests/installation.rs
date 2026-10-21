@@ -220,7 +220,7 @@ fn planning_is_byte_identical_and_has_no_project_effect() {
     let first = plan(project.path());
     let second = plan(project.path());
     assert_eq!(first.installation.initial_grants, SecurityAction::ALL);
-    assert_eq!(first.installation.managed_paths.len(), 8);
+    assert_eq!(first.installation.managed_paths.len(), 9);
     assert!(serde_json::to_value(&first.installation)
         .unwrap()
         .get("project_root")

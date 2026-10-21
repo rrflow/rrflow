@@ -15,7 +15,9 @@ use std::collections::BTreeSet;
 pub const INSTALL_ATTUNEMENT_CONTRACT_VERSION: u16 = 1;
 /// Independent identity and initial-root binding are mandatory for new plans.
 /// Attunement and installation-result envelopes retain their own version.
-pub const INSTALLATION_PLAN_CONTRACT_VERSION: u16 = 2;
+pub const INSTALLATION_PLAN_CONTRACT_VERSION: u16 = 3;
+pub const INSTALLATION_LEASE_PATH: &str = ".rrflow-install.lock";
+pub const INSTALLATION_LEASE_PRECONDITION: &str = "rrflow-install-lease-absent-or-private-empty-v1";
 pub const MAX_INSTALLATION_ACTIONS: usize = 16;
 pub const MAX_ATTUNEMENT_PHASES: usize = 32;
 pub const MAX_ATTUNEMENT_FAILURE_BYTES: usize = 4_096;
@@ -90,6 +92,7 @@ pub enum InstallationTargetKind {
 #[serde(rename_all = "snake_case")]
 pub enum InstallationActionKind {
     ValidateProject,
+    AcquireInstallationLease,
     CreateEstateDirectories,
     CreateStorageRoot,
     PrepareCredentials,
@@ -140,6 +143,7 @@ pub enum InstallationManagedPathKind {
     TokenKey,
     OperatorCredential,
     ProjectLocator,
+    InstallationLease,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -148,6 +152,8 @@ pub enum InstallationRemovalRule {
     RemoveIfOwnedDigestMatches,
     RemoveIfOwnedTreeDigestMatches,
     RemoveIfOwnedAndEmpty,
+    /// Retain the empty native admission inode; unlinking it can split owners.
+    RetainForExclusion,
 }
 
 /// One RRFlow-owned path whose state is bound by the preview. The path is
@@ -163,7 +169,13 @@ pub struct InstallationManagedPath {
 
 impl InstallationManagedPath {
     fn validate(&self) -> Result<()> {
-        validate_project_relative_path(&self.relative_path)?;
+        if self.kind == InstallationManagedPathKind::InstallationLease {
+            if self.relative_path != INSTALLATION_LEASE_PATH {
+                return invalid("installation lease must use its fixed project-relative path");
+            }
+        } else {
+            validate_project_relative_path(&self.relative_path)?;
+        }
         validate_sha256(
             &self.precondition_sha256,
             "installation managed path precondition_sha256",
@@ -207,7 +219,7 @@ pub struct InstallationPlan {
 impl InstallationPlan {
     pub fn validate(&self) -> Result<()> {
         if self.contract_version != INSTALLATION_PLAN_CONTRACT_VERSION {
-            return invalid("unsupported installation plan contract version; expected 2");
+            return invalid("unsupported installation plan contract version; expected 3");
         }
         validate_sha256(&self.installation_identity, "installation identity")?;
         validate_sha256(
@@ -272,6 +284,10 @@ impl InstallationPlan {
                 InstallationManagedPathKind::ProjectLocator,
                 InstallationRemovalRule::RemoveIfOwnedDigestMatches,
             ),
+            (
+                InstallationManagedPathKind::InstallationLease,
+                InstallationRemovalRule::RetainForExclusion,
+            ),
         ];
         if self.managed_paths.len() != expected_paths.len() {
             return invalid("installation plan must bind every managed path exactly once");
@@ -281,6 +297,15 @@ impl InstallationPlan {
             self.managed_paths.iter().zip(expected_paths)
         {
             managed.validate()?;
+            if managed.kind == InstallationManagedPathKind::InstallationLease
+                && (managed.relative_path != INSTALLATION_LEASE_PATH
+                    || managed.precondition_sha256
+                        != sha256_bytes(INSTALLATION_LEASE_PRECONDITION.as_bytes()))
+            {
+                return invalid(
+                    "installation lease must bind the canonical empty-file admission rule",
+                );
+            }
             if managed.kind != expected_kind
                 || managed.removal_rule != expected_rule
                 || !paths.insert(&managed.relative_path)
@@ -297,6 +322,7 @@ impl InstallationPlan {
         }
         let expected = [
             InstallationActionKind::ValidateProject,
+            InstallationActionKind::AcquireInstallationLease,
             InstallationActionKind::CreateEstateDirectories,
             InstallationActionKind::CreateStorageRoot,
             InstallationActionKind::PrepareCredentials,
@@ -342,6 +368,7 @@ impl InstallationPlan {
             InstallationManagedPathKind::TokenKey => 5,
             InstallationManagedPathKind::OperatorCredential => 6,
             InstallationManagedPathKind::ProjectLocator => 7,
+            InstallationManagedPathKind::InstallationLease => 8,
         };
         &self.managed_paths[index]
     }

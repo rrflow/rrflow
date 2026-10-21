@@ -39,17 +39,29 @@ impl EstateFilesystem {
             project,
             private: BTreeMap::new(),
         };
+        filesystem.admit_missing_private_directories(allow_missing)?;
+        Ok(filesystem)
+    }
+
+    /// Discover newly created descendants without replacing any directory
+    /// capability already admitted by this operation.
+    pub fn admit_missing_private_directories(&mut self, allow_missing: bool) -> Result<()> {
         for relative in PRIVATE_ESTATE_DIRECTORIES {
-            let path = filesystem.managed(relative)?;
+            if let Some(directory) = self.private.get(relative) {
+                super::token_key::pin_private_directory(directory)
+                    .map_err(|error| ServiceError::Storage(error.to_string()))?;
+                continue;
+            }
+            let path = self.managed(relative)?;
             match super::token_key::pin_private_directory(&path) {
                 Ok(directory) => {
-                    filesystem.private.insert(relative, directory);
+                    self.private.insert(relative, directory);
                 }
                 Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => return Err(ServiceError::Storage(error.to_string())),
             }
         }
-        Ok(filesystem)
+        Ok(())
     }
 
     pub fn project(&self) -> &AnchoredPath {
@@ -169,13 +181,24 @@ impl EstateLayout {
                 LOCATOR_RELATIVE_PATH.to_owned(),
                 InstallationRemovalRule::RemoveIfOwnedDigestMatches,
             ),
+            (
+                InstallationManagedPathKind::InstallationLease,
+                rrd_contract::INSTALLATION_LEASE_PATH.to_owned(),
+                InstallationRemovalRule::RetainForExclusion,
+            ),
         ]
         .into_iter()
         .map(
             |(kind, relative_path, removal_rule)| InstallationManagedPath {
                 kind,
                 relative_path,
-                precondition_sha256: absent_sha256.to_owned(),
+                precondition_sha256: if kind == InstallationManagedPathKind::InstallationLease {
+                    rrd_core::digest::sha256_hex(
+                        rrd_contract::INSTALLATION_LEASE_PRECONDITION.as_bytes(),
+                    )
+                } else {
+                    absent_sha256.to_owned()
+                },
                 removal_rule,
             },
         )
@@ -336,7 +359,9 @@ pub(super) fn validate_managed_relative(relative: &str) -> Result<()> {
         || relative
             .split('/')
             .any(|segment| segment.is_empty() || matches!(segment, "." | ".."))
-        || !(relative == ESTATE_DIRECTORY || relative.starts_with(".rrflow/"))
+        || !(relative == ESTATE_DIRECTORY
+            || relative.starts_with(".rrflow/")
+            || relative == rrd_contract::INSTALLATION_LEASE_PATH)
     {
         return Err(ServiceError::ProjectBindingMismatch);
     }

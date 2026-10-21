@@ -161,6 +161,12 @@
       {
         "disposition": "create",
         "estimated_write_bytes": 0,
+        "input_sha256": "0000000000000000000000000000000000000000000000000000000000000033",
+        "kind": "acquire_installation_lease"
+      },
+      {
+        "disposition": "create",
+        "estimated_write_bytes": 0,
         "input_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
         "kind": "create_estate_directories"
       },
@@ -225,7 +231,7 @@
       },
       "revision": 1
     },
-    "contract_version": 2,
+    "contract_version": 3,
     "credential_bytes": 32,
     "deployment": {
       "contract_version": 1,
@@ -300,9 +306,15 @@
         "precondition_sha256": "0000000000000000000000000000000000000000000000000000000000000032",
         "relative_path": ".rrflow/config.toml",
         "removal_rule": "remove_if_owned_digest_matches"
+      },
+      {
+        "kind": "installation_lease",
+        "precondition_sha256": "7ac5dd273f82b16d9ea5e7156e065f15fe0945faf5f6cf1b07e7ff9072489677",
+        "relative_path": ".rrflow-install.lock",
+        "removal_rule": "retain_for_exclusion"
       }
     ],
-    "plan_sha256": "396597e6ea8d03bb03b69289910e715a8fa13d0b356e279feceb2a05d7f0fe83",
+    "plan_sha256": "7594b67878dfd8c54847d8326836e17e684c520fa132620e936be5612d43b68b",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -323,28 +335,32 @@
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000014"
       },
       {
-        "kind": "create_estate_directories",
+        "kind": "acquire_installation_lease",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000015"
       },
       {
-        "kind": "create_storage_root",
+        "kind": "create_estate_directories",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000016"
       },
       {
-        "kind": "prepare_credentials",
+        "kind": "create_storage_root",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000017"
       },
       {
-        "kind": "initialize_instance",
+        "kind": "prepare_credentials",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000018"
       },
       {
-        "kind": "create_attunement_job",
+        "kind": "initialize_instance",
         "output_sha256": "0000000000000000000000000000000000000000000000000000000000000019"
       },
       {
-        "kind": "publish_project_locator",
+        "kind": "create_attunement_job",
         "output_sha256": "000000000000000000000000000000000000000000000000000000000000001a"
+      },
+      {
+        "kind": "publish_project_locator",
+        "output_sha256": "000000000000000000000000000000000000000000000000000000000000001b"
       }
     ],
     "applied_at_unix_ms": 1800000000010,
@@ -356,8 +372,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "396597e6ea8d03bb03b69289910e715a8fa13d0b356e279feceb2a05d7f0fe83",
-    "result_sha256": "2c81259111ca449bfd8298099e88259d130009d4aa6ad104dc31117c75be5a4a",
+    "plan_sha256": "7594b67878dfd8c54847d8326836e17e684c520fa132620e936be5612d43b68b",
+    "result_sha256": "e81241d641cdc79ea68b66160fb1c97b3fcc00f4a2d2668592952e7cf2c86aaa",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },

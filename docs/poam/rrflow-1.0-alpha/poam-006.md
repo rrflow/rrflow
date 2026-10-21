@@ -36,7 +36,10 @@ The [D-01.3 real-process oracle](../../evidence/change-journals/gate-d/d-01-inst
 reproduced concurrent recovery of a live install intent: a second process
 completed the same plan while its creator was paused before storage admission.
 The storage writer lock does not protect the whole installation interval.
-Project-wide native exclusion through acknowledgement remains required.
+The [D-01.3 repair candidate](../../evidence/change-journals/gate-d/d-01-exclusive-installation.md)
+now retains a native project lease through acknowledgement, with competing-plan,
+process-death and live-recovery tests. Candidate CI and the broader D-01.5 native
+qualification remain required; this does not close the parent gap.
 
 RRFlow has a coherent local pre-release startup spine, but it is not yet a repeatable
 turnkey distribution. It cannot discover and attune a project durably, perform the full
