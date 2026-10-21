@@ -56,14 +56,18 @@ def mask_paths(paths: list[Path], stage: Path) -> list[Path]:
     """Reject broad/system mounts and keep only non-overlapping source roots."""
     resolved = sorted({path.resolve(strict=True) for path in paths}, key=lambda path: len(path.parts))
     selected: list[Path] = []
-    protected = [Path(p).resolve() for p in ["/", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/proc", "/dev", "/sys", "/tmp", "/var"]]
     if sys.platform == "win32":
-        protected.extend(Path(os.environ[name]).resolve() for name in ["SystemRoot", "ProgramFiles", "PUBLIC"] if name in os.environ)
+        protected = [Path(os.environ[name]).resolve() for name in
+                     ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData", "PUBLIC"]
+                     if name in os.environ]
+    else:
+        protected = [Path(p).resolve() for p in
+                     ["/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc", "/proc", "/dev", "/sys", "/tmp", "/var"]]
     for path in resolved:
         require(path.is_dir(), f"mask target is not a directory: {path}")
         require(len(path.parts) >= 3, f"refuse broad mask target: {path}")
         require(not any(path == item or path.is_relative_to(item) or item.is_relative_to(path)
-                        for item in protected if item != Path("/")),
+                        for item in protected),
                 f"refuse operating-system mask target: {path}")
         require(not stage.is_relative_to(path) and not path.is_relative_to(stage),
                 f"payload and mask target overlap: {path}")
@@ -454,6 +458,15 @@ def main() -> None:
         print("Offline installed lifecycle passed; no alpha or signed-distribution qualification claimed.")
 
 
+def record_outer_failure(output: Path, error: Exception) -> None:
+    receipt = (json.loads(output.read_text(encoding="utf-8")) if output.is_file() else
+               {"schema_version": 1, "platform": sys.platform, "phase": "preflight"})
+    receipt["status"] = "failed"
+    receipt["outer_failure"] = {"type": type(error).__name__, "diagnostic": str(error)[:1024]}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+
+
 if __name__ == "__main__":
     try:
         main()
@@ -463,11 +476,7 @@ if __name__ == "__main__":
         inside_flag = next((flag for flag in ["--windows-inside", "--mac-inside", "--inside"] if flag in sys.argv), None)
         if "--receipt" in sys.argv:
             output = Path(sys.argv[sys.argv.index("--receipt") + 1])
-            if output.is_file():
-                receipt = json.loads(output.read_text(encoding="utf-8"))
-                receipt["status"] = "failed"
-                receipt["outer_failure"] = {"type": type(error).__name__, "diagnostic": str(error)[:1024]}
-                output.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+            record_outer_failure(output, error)
         if inside_flag:
             stage = Path(sys.argv[sys.argv.index(inside_flag) + 1])
             (stage / "failure.json").write_text(json.dumps({"status": "failed", "error_type": type(error).__name__,

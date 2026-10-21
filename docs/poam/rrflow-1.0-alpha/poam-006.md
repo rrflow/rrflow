@@ -272,3 +272,10 @@ The same native run exposed checkout newline conversion of the inert SDK
 identity anchor on Windows. The linked coverage record retains the failing
 identity and Git filter reproduction. The fixture is now byte-preserved and
 asserts its canonical hash; native candidate requalification is still required.
+
+The [Windows mask-policy correction](../../evidence/change-journals/gate-d/d-01-native-windows-mask-policy.md)
+records a second native qualification defect: resolved/unresolved root comparison
+rejected the hosted Windows checkout before isolation setup. A current-drive
+regression now passes with platform-specific protected roots. Preflight failure
+also retains a bounded receipt. Actual Windows principal/WFP enforcement and
+the final candidate pipeline remain required; no status is closed.

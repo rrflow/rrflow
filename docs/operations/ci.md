@@ -71,6 +71,8 @@ rejected. Retained artifacts contain these bounded, non-secret receipts and
 sanitized failure status; raw estates and credential-bearing output are never
 uploaded. CI still must pass on an exact candidate before these new paths are
 accepted as native evidence.
+Preflight failures retain a bounded failed receipt even before build hashes are
+available; cleanup failure always overrides any prior passed receipt.
 
 Linux copies the binary, test harness and isolation helper into `/tmp`.
 Noninteractive sudo creates private mount, network and PID namespaces, masks

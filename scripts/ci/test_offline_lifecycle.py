@@ -2,6 +2,7 @@
 
 import json
 import copy
+import os
 from pathlib import Path
 import tempfile
 import sys
@@ -13,6 +14,21 @@ import run_offline_lifecycle as runner
 
 
 class OfflineLifecyclePolicyTests(unittest.TestCase):
+    def test_preflight_and_cleanup_failures_cannot_lose_or_preserve_success_receipts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "receipts" / "result.json"
+            runner.record_outer_failure(output, RuntimeError("fixture failure" * 200))
+            receipt = json.loads(output.read_text())
+            self.assertEqual(receipt["status"], "failed")
+            self.assertEqual(receipt["phase"], "preflight")
+            self.assertEqual(len(receipt["outer_failure"]["diagnostic"]), 1024)
+            output.write_text(json.dumps({"status": "passed", "sha256": {"rrflow": "a" * 64}}))
+            runner.record_outer_failure(output, RuntimeError("cleanup failed"))
+            receipt = json.loads(output.read_text())
+            self.assertEqual(receipt["status"], "failed")
+            self.assertEqual(receipt["sha256"], {"rrflow": "a" * 64})
+            self.assertEqual(receipt["outer_failure"]["diagnostic"], "cleanup failed")
+
     def test_durable_receipts_reject_omission_tampering_and_unknown_fields(self):
         first = {"mode": "fresh", "build": {key: "b" * 64 for key in ["executable_sha256", "metadata_sha256", "public_contract_sha256", "signal_catalogue_sha256"]},
                  "installation_plan_sha256": "a" * 64, "restore_plan_sha256": "b" * 64,
@@ -111,11 +127,21 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
             for path in [Path(stage.anchor), stage, child]:
                 with self.subTest(path=path), self.assertRaises(RuntimeError):
                     runner.mask_paths([path], stage)
-            for system in ["/usr", "/etc", "/proc", "/tmp"]:
+            systems = ([os.environ[name] for name in
+                        ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData", "PUBLIC"]
+                        if name in os.environ] if sys.platform == "win32"
+                       else ["/usr", "/etc", "/proc", "/tmp"])
+            for system in systems:
                 path = Path(system)
                 if path.exists():
                     with self.subTest(path=path), self.assertRaises(RuntimeError):
                         runner.mask_paths([path], stage)
+
+    def test_current_drive_source_is_not_an_operating_system_root(self):
+        with tempfile.TemporaryDirectory(prefix="rrflow-mask-", dir=Path.cwd()) as source, \
+                tempfile.TemporaryDirectory() as payload:
+            root = Path(source).resolve()
+            self.assertEqual(runner.mask_paths([root], Path(payload).resolve()), [root])
 
     def test_hash_observes_changed_payload(self):
         with tempfile.TemporaryDirectory() as temporary:
