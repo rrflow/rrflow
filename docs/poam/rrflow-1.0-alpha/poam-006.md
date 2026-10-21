@@ -291,3 +291,12 @@ That candidate still exits before Python with 0xC0000142. The
 separates normal/restricted token and console-creation behavior using bounded
 no-op interpreters. Actual qualification retains the restricted token and all
 denial requirements; these diagnostics cannot close the native gap by themselves.
+
+
+The matrix passes the ordinary temporary user's interpreter and fails every
+traversal-stripped variant. The [source-object ACL replacement](../../evidence/change-journals/gate-d/d-01-native-windows-source-acl.md)
+therefore retains standard Windows startup privileges and requires inherited
+denial verified for every bounded inventoried source object, protected-child
+bypass rejection and full ACL restoration. This changes the qualification
+mechanism, not the required source/network denial. Hosted acceptance remains
+pending and this deficiency stays open.

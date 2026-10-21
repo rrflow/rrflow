@@ -1,14 +1,15 @@
 """CI-only Windows qualification principal, dynamic WFP filters and owned job.
 
-No product dependency. No machine-wide firewall rule. The temporary principal's
-token cannot bypass directory traversal, so a deny on each source root also
-denies direct descendant access. Every resource below belongs to this invocation.
+No product dependency. No machine-wide firewall rule. Source-tree ACL denial is
+verified for every inventoried object, including direct descendant access.
+Every resource below belongs to this invocation on an ephemeral hosted runner.
 """
 import ctypes as c
 from ctypes import wintypes as w
 from contextlib import ExitStack
 import os
 import encodings
+import hashlib
 import json
 from pathlib import Path
 import secrets
@@ -107,12 +108,8 @@ class Access(c.Structure):
     _fields_ = [("permissions", U32), ("mode", U32), ("inheritance", U32), ("trustee", Trustee)]
 
 
-class Luid(c.Structure):
-    _fields_ = [("low", U32), ("high", c.c_int32)]
-
-
-class Privilege(c.Structure):
-    _fields_ = [("luid", Luid), ("attributes", U32)]
+class GenericMapping(c.Structure):
+    _fields_ = [("read", U32), ("write", U32), ("execute", U32), ("all", U32)]
 
 
 class Startup(c.Structure):
@@ -184,22 +181,18 @@ def principal(stack):
     boolean(api(adv, "LogonUserW", w.BOOL, w.LPCWSTR, w.LPCWSTR, w.LPCWSTR, U32, U32, P)(
         name, ".", password, 2, 0, c.byref(token)), "log on qualification principal")
     stack.callback(close, token)
-    # Root-only ACL masks are sound only when traversal bypass is removed.
-    privilege = Privilege()
-    boolean(api(adv, "LookupPrivilegeValueW", w.BOOL, w.LPCWSTR, w.LPCWSTR, P)(
-        None, "SeChangeNotifyPrivilege", c.byref(privilege.luid)), "resolve traversal privilege")
-    restricted = P()
-    boolean(api(adv, "CreateRestrictedToken", w.BOOL, P, U32, U32, P, U32, P, U32, P, P)(
-        token, 0, 0, None, 1, c.byref(privilege), 0, None, c.byref(restricted)), "remove traversal bypass")
-    stack.callback(close, restricted)
-    return sid, sid_text, restricted, token
+    impersonation = P()
+    boolean(api(adv, "DuplicateToken", w.BOOL, P, U32, P)(
+        token, 2, c.byref(impersonation)), "duplicate qualification access-check token")
+    stack.callback(close, impersonation)
+    return sid, sid_text, token, impersonation
 
 
 def access(stack, path, sid, deny):
     original, original_acl = P(), P()
     checked(get_security(str(path), 1, 4, None, None, c.byref(original_acl), None, c.byref(original)), "read fixture ACL")
     stack.callback(free, original)
-    entry = Access(0x1F01FF, 3 if deny else 1, 0 if deny else 3, Trustee(None, 0, 0, 1, c.cast(sid, P)))
+    entry = Access(0x1F01FF, 3 if deny else 1, 3, Trustee(None, 0, 0, 1, c.cast(sid, P)))
     changed = P()
     checked(api(adv, "SetEntriesInAclW", U32, U32, P, P, P)(1, c.byref(entry), original_acl, c.byref(changed)), "compose fixture ACL")
     try:
@@ -207,6 +200,99 @@ def access(stack, path, sid, deny):
     finally:
         free(changed)
     stack.callback(lambda: checked(set_security(str(path), 1, 4, None, None, original_acl, None), "restore fixture ACL"))
+
+
+def source_inventory(root):
+    """Finite no-reparse snapshot; source writers must be quiescent during CI."""
+    deadline = time.monotonic() + 120
+    pending, records = [root], {}
+    while pending:
+        require(time.monotonic() < deadline and len(records) < 200000,
+                "source ACL inventory exceeded its time/object bound")
+        path = pending.pop()
+        attributes = path.lstat().st_file_attributes
+        require(not attributes & 0x400, "source ACL inventory refuses reparse objects")
+        records[path] = source_security(path)
+        if attributes & 0x10:
+            with os.scandir(path) as entries:
+                for entry in entries:
+                    require(len(pending) + len(records) < 200000,
+                            "source ACL inventory exceeded its object bound")
+                    pending.append(Path(entry.path))
+    return records
+
+
+def source_security(path, token=None):
+    descriptor, acl = P(), P()
+    checked(get_security(str(path), 1, 7, None, None, c.byref(acl), None, c.byref(descriptor)),
+            "read source security descriptor")
+    try:
+        require(bool(acl), "source object has an unrestricted null DACL")
+        # ACL header: revision, reserved, u16 size, u16 ACE count, reserved.
+        size = c.cast(acl, c.POINTER(c.c_uint16))[1]
+        require(8 <= size <= 65535, "invalid source ACL size")
+        digest = hashlib.sha256(c.string_at(acl, size)).hexdigest()
+        if token is not None:
+            mapping = GenericMapping(0x120089, 0x120116, 0x1200A0, 0x1F01FF)
+            privileges, length, granted, allowed = c.create_string_buffer(1024), U32(1024), U32(), w.BOOL()
+            boolean(api(adv, "AccessCheck", w.BOOL, P, P, U32, P, P, P, P, P)(
+                descriptor, token, 0x02000000, c.byref(mapping), privileges,
+                c.byref(length), c.byref(granted), c.byref(allowed)), "check complete source denial")
+            # Reject content, listing, execution, mutation, deletion and ACL/owner writes.
+            require(not granted.value & 0x000D01FF,
+                    "source object remains accessible after inherited denial")
+        return digest
+    finally:
+        free(descriptor)
+
+
+def mask_source(stack, root, sid, token):
+    before = source_inventory(root)
+    # Registered first: root ACL restoration runs before the complete readback.
+    def verify_restored():
+        require(source_inventory(root) == before, "source tree ACL restoration did not match its snapshot")
+    stack.callback(verify_restored)
+    access(stack, root, sid, True)
+    deadline = time.monotonic() + 120
+    for path in before:
+        require(time.monotonic() < deadline, "source ACL verification exceeded its deadline")
+        source_security(path, token)
+    return len(before)
+
+
+def qualify_source_mask(stage, sid, token):
+    """Native fixtures prove denial, protected-child rejection and restoration."""
+    fixture = stage / "acl-fixture"
+    fixture.mkdir()
+    nested = fixture / "nested"
+    nested.mkdir()
+    payload = nested / "payload"
+    payload.write_bytes(b"non-secret ACL fixture")
+    original = source_inventory(fixture)
+    with ExitStack() as scope:
+        require(mask_source(scope, fixture, sid, token) == 3, "incomplete ACL fixture")
+    require(source_inventory(fixture) == original, "ordinary fixture ACL was not restored")
+    descriptor, acl = P(), P()
+    checked(get_security(str(payload), 1, 4, None, None, c.byref(acl), None, c.byref(descriptor)), "read protected fixture ACL")
+    try:
+        # Protected inheritance retains the original explicit grant to the user.
+        checked(set_security(str(payload), 1, 0x80000004, None, None, acl, None), "protect fixture inheritance")
+        try:
+            with ExitStack() as scope:
+                mask_source(scope, fixture, sid, token)
+        except RuntimeError as error:
+            require(str(error) == "source object remains accessible after inherited denial",
+                    "protected fixture failed for an unexpected reason")
+        else:
+            raise RuntimeError("protected source ACL bypass was accepted")
+    finally:
+        checked(set_security(str(payload), 1, 0x20000004, None, None, acl, None), "restore fixture inheritance")
+        free(descriptor)
+    require(source_inventory(fixture) == original, "protected fixture ACL was not restored")
+    payload.unlink()
+    nested.rmdir()
+    fixture.rmdir()
+    print(json.dumps({"source_acl_fixtures": "passed"}), flush=True)
 
 
 def outbound_policy(stack, sid_text):
@@ -279,7 +365,7 @@ def probe_runtime_access(token, stage):
         length = module_name(handle, buffer, len(buffer))
         require(0 < length < len(buffer), "qualification runtime module path unavailable")
         paths.append(Path(buffer.value))
-    boolean(api(adv, "ImpersonateLoggedOnUser", w.BOOL, P)(token), "inspect restricted runtime access")
+    boolean(api(adv, "ImpersonateLoggedOnUser", w.BOOL, P)(token), "inspect qualification runtime access")
     try:
         for path in paths:
             try:
@@ -298,26 +384,22 @@ def run_isolated(stage: Path, masks: list[Path]):
     require(stage.is_relative_to(Path(os.environ["PUBLIC"]).resolve()) and stage.name.startswith("rrflow-offline-"),
             "qualification stage must be an owned public-parent fixture")
     with ExitStack() as stack:
-        sid, sid_text, token, normal_token = principal(stack)
+        sid, sid_text, token, impersonation = principal(stack)
         desktop = private_desktop(stack, sid_text)
         access(stack, stage, sid, False)
+        qualify_source_mask(stage, sid, impersonation)
+        counts = []
         for mask in masks:
-            access(stack, mask, sid, True)
+            counts.append(mask_source(stack, mask, sid, impersonation))
+        print(json.dumps({"source_acl_objects": counts}), flush=True)
         outbound_policy(stack, sid_text)
         probe_runtime_access(token, stage)
-        # These literal no-op launches characterize OS initialization only.
-        # The normal token is never used for source/network probes, cleanup or product tests.
-        startup_results = []
-        for name, probe_token, flags in [
-            ("normal_no_window", normal_token, 0x08000404),
-            ("restricted_no_window", token, 0x08000404),
-            ("restricted_inherited_console", token, 0x404),
-            ("restricted_hidden_new_console", token, 0x414),
-        ]:
-            code = launch(probe_token, stage, name, 15, desktop, flags=flags, probe=True)
-            startup_results.append({"case": name, "exit_status": f"0x{code:08x}"})
-            print(json.dumps({"native_startup": startup_results[-1]}), flush=True)
-            (stage / "startup.json").write_text(json.dumps(startup_results), encoding="utf-8")
+        # A no-op startup is diagnostic only; native denial probes and the actual
+        # five-case product harness below remain the qualification oracle.
+        code = launch(token, stage, "startup", 15, desktop, probe=True)
+        (stage / "startup.json").write_text(json.dumps([
+            {"case": "standard_user_complete_source_acl", "exit_status": f"0x{code:08x}",
+             "source_object_counts": counts}]), encoding="utf-8")
         try:
             launch(token, stage, "--windows-inside", 600, desktop)
         finally:

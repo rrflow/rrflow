@@ -100,10 +100,15 @@ junction corpus. These cases require their respective native CI results.
 
 Windows enforcement runs only on ephemeral GitHub-hosted runners. A disposable
 principal uses an owned noninteractive window station/desktop with explicit
-access; restricted-token runtime-file probes precede launch. Those objects are
-qualification infrastructure, not product UI or installation dependencies. The
-local principal receives a token with traversal bypass removed. Deny ACLs cover
-only that principal at declared source roots; a dynamic WFP session denies
+access; token-owned runtime-file probes precede launch. Those objects are
+qualification infrastructure, not product UI or installation dependencies.
+Inherited deny ACLs cover only that standard principal in declared source trees.
+A no-reparse inventory bounds each tree to 200,000 objects and 120 seconds;
+native access checks verify denial on every object before launch. Native fixtures
+require inherited denial, protected-child bypass rejection and exact ACL
+restoration. A complete post-cleanup inventory verifies original ACL digests.
+Traversal bypass is retained for Windows process startup; source isolation
+depends on verified object ACLs, never a root-only deny. A dynamic WFP session denies
 its non-loopback IPv4/IPv6 connections. The child starts suspended and enters a
 kill-on-close job before execution. After all owned descendants terminate, the
 same principal removes its private test home/temp trees; exact source ACLs,

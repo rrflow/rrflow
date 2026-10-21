@@ -451,6 +451,10 @@ def main() -> None:
                 arguments.receipt.parent.mkdir(parents=True, exist_ok=True)
                 if (stage / "receipt.json").is_file():
                     shutil.copyfile(stage / "receipt.json", arguments.receipt)
+                    if (stage / "startup.json").is_file():
+                        receipt = json.loads(arguments.receipt.read_text(encoding="utf-8"))
+                        receipt["startup_diagnostics"] = json.loads((stage / "startup.json").read_text())
+                        arguments.receipt.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
                 else:
                     arguments.receipt.write_text(json.dumps({"schema_version": 1, "status": "failed",
                         "platform": sys.platform, "sha256": source_hashes,
