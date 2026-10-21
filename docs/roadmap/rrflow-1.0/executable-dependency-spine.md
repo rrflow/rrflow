@@ -49,7 +49,10 @@ requires E/F access and streaming/budget evidence; H-08e requires the H-04
 public-capability foundation. The [H-08 package table](gate-h.md#h-08-postgresql-compatibility-packages)
 owns the remaining dependencies. A wire-only server cannot skip those exits.
 
-The active executable item is **C-07**. D-01 has
+The active executable item is **C-07**, following its
+[ordered durability and growth packages](gate-c-07.md#ordered-implementation-packages).
+C-07a is the first implementation package; the plan itself does not satisfy
+its executable acceptance. D-01 has
 [accepted installed-foundation evidence](gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
 through the actual primary executable on Linux, macOS and Windows. Accepted C-06 replaced
 row-record immutable segments with segment v6's ordered key/version spine,
