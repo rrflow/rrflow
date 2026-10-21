@@ -10,6 +10,17 @@ independently.
 
 ## Observed deficiency
 
+D-01's bounded installed foundation is now [accepted](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21).
+The native proof covers Linux, macOS and Windows source/outbound isolation,
+owner/permission/path/mount denial, exclusive install recovery and both actual
+primary-binary lifecycle modes. POAM-006 remains **Open** for the later D/J
+requirements below. Dated entries retain the gaps and results observed at their
+recorded revisions; they do not override this current assessment.
+The [reference-alignment journal](../../evidence/change-journals/gate-d/d-01-acceptance-reference-alignment.md)
+records correction of stale D-01 qualification/specialization statements and
+duplicated roadmap counts; those documentation defects do not reopen the
+accepted native implementation or close the broader lifecycle gaps.
+
 The source-built primary `rrflow` binary now owns deterministic install plan/apply,
 installed serve, authenticated ready, read-only quick verify, and version. Exact-plan
 retry recovers across typed durable stages, including bootstrap publication, without duplicating installation
@@ -39,15 +50,16 @@ The storage writer lock does not protect the whole installation interval.
 The [D-01.3 repair candidate](../../evidence/change-journals/gate-d/d-01-exclusive-installation.md)
 now retains a native project lease through acknowledgement, with competing-plan,
 process-death and live-recovery tests. Its exact candidate passed the full CI
-pipeline as recorded below. Broader D-01.5 native qualification remains required;
+pipeline as recorded below. D-01.5 now supplies accepted native qualification;
 this does not close the parent gap.
 
 RRFlow has a coherent local pre-release startup spine, but it is not yet a repeatable
 turnkey distribution. It cannot discover and attune a project durably, perform the full
 repair lifecycle or remove only owned integration. Installed backup resolution and staged
 restore publication have [bounded D-11 evidence](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-11-partial-evidence-2026-10-18-backup-completeness-and-restore-publication).
-Native staged processes and isolated Linux offline execution have bounded proof;
-complete native filesystem qualification and signed clean-machine bundles remain open.
+The bounded D-01 native filesystem and isolated-process matrix now passes on
+all three development platforms. Wider C-07 recovery/lifetime and signed
+clean-machine bundles remain open.
 Unqualified process and Kubernetes controllers can still overstate readiness
 or maintain lifecycle state outside the finished engine contract.
 

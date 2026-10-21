@@ -69,8 +69,10 @@ build metadata, public-contract and signal digests, installation/restore plans,
 backup, read manifest and asserted durable cursors. Unknown receipt fields are
 rejected. Retained artifacts contain these bounded, non-secret receipts and
 sanitized failure status; raw estates and credential-bearing output are never
-uploaded. CI still must pass on an exact candidate before these new paths are
-accepted as native evidence.
+uploaded. The [D-01 acceptance record](../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+binds the first accepted three-platform result to its exact candidate. Later
+changes still require their own candidate CI; this result cannot qualify a
+different revision or a signed platform bundle.
 Preflight failures retain a bounded failed receipt even before build hashes are
 available; cleanup failure always overrides any prior passed receipt.
 

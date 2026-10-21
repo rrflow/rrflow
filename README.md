@@ -253,8 +253,12 @@ zero under scan-resistant LRU, while recording 18,200 same-scope suppressions,
 semantic, and projected-row digests, and exact 1 MiB capacity compliance.
 Measured evidence rejects value separation, semantic-family cache partitions,
 Moka, TinyLFU, and caller-controlled cache bypass for this accepted format.
-D-01 remains open and is the active executable item. Its first bounded
-prerequisite now exists: a source-built primary `rrflow` 1.0.0 executable can
+D-01 is complete for the bounded installed-engine foundation. Its
+[acceptance matrix and native receipts](docs/roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+bind one candidate to successful Linux, macOS and Windows isolation, native
+filesystem/ownership denial, recovery and actual primary-binary lifecycle
+checks. C-07 is the active executable item. The original walking prerequisite
+remains: a source-built primary `rrflow` 1.0.0 executable can
 deterministically preview and apply a fresh or existing local-project
 installation, serve the generated public contract, complete an authenticated
 readiness challenge, and perform mutation-free quick verification. The linked
@@ -271,7 +275,8 @@ it. The linked
 [canonical-estate journal](docs/evidence/change-journals/gate-d/d-01-canonical-estate-layout-and-configuration.md)
 records the exact implementation and tests. A third bounded prerequisite now
 makes that sealed installation the only product startup authority. The same
-plan resumes after deterministic interruptions at each of eight durable stages
+plan resumes after deterministic interruptions at each of ten durable-effect
+stages, plus the pre-intent lease boundary,
 without changing its first-apply time or duplicating its token, credential,
 installed record, audit, checkpoint, or locator. The primary CLI, internal
 server process, embedded MCP mode, six-language SDK conformance daemon,
@@ -310,8 +315,10 @@ second supported operator command tree. Native primary-executable lifecycle
 tests now pass on Windows, Linux and macOS; the
 [native lifecycle journal](docs/evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
 records their bounded scope. No signed/offline-complete platform bundle has
-been qualified. D-01 owns the remaining single-executable
-walking lifecycle, D-11 owns complete repair/restore/uninstall, and Gate J owns
+been qualified. D-01 supplies the accepted single-executable installation
+foundation;
+C-07 owns wider installed storage recovery/lifetime, D-11 owns complete
+repair/restore/uninstall, and Gate J owns
 native signed platform distributions. See the
 [installed lifecycle](docs/reference/deployment/installed-lifecycle.md) and
 [POA&M](docs/poam/rrflow-1.0-alpha.md).

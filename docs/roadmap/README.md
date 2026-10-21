@@ -26,7 +26,10 @@ The completed C-06j work is recorded by the
 [scan-resistant cache integration plan](c06j-rrflowkv-scan-resistant-cache-engineering-plan.md).
 It specifies a configurable exact-byte production cache and a real persisted
 mixed-family differential. The canonical roadmap accepts C-06 from the complete
-C-06a-through-C-06j evidence corpus; D-01 is now active.
+C-06a-through-C-06j evidence corpus. The accepted
+[D-01 installed foundation](rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+and [dependency spine](rrflow-1.0/executable-dependency-spine.md) define the
+current handoff; this index does not maintain another active-item pointer.
 The completed C-06i compression slice is bound by the
 [adaptive page-compression plan](c06i-rrflowkv-adaptive-page-compression-engineering-plan.md).
 It specifies a direct segment-v6 replacement with authenticated per-page
@@ -46,7 +49,7 @@ status.
 
 | Release | Durable warp | Checkout record | State |
 |---|---|---|---|
-| RRFlow 1.0 | [`rrflow://rrflow-instance/data/roadmap/rrflow-1.0`](rrflow://rrflow-instance/data/roadmap/rrflow-1.0) | [`rrflow-1.0.md`](rrflow-1.0.md) | pre-alpha; Gates A and B complete, Gate C 6/7; C-06 accepted and D-01 active |
+| RRFlow 1.0 | [`rrflow://rrflow-instance/data/roadmap/rrflow-1.0`](rrflow://rrflow-instance/data/roadmap/rrflow-1.0) | [`rrflow-1.0.md`](rrflow-1.0.md) | [canonical completion checklist](rrflow-1.0.md#checklist-item-warps) and [active dependency spine](rrflow-1.0/executable-dependency-spine.md); maturity remains owned by the root README |
 
 | Supporting record | Durable warp | Checkout record | Authority |
 |---|---|---|---|
