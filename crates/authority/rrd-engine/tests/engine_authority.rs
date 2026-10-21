@@ -78,6 +78,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -604,6 +605,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,

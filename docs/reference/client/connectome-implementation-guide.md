@@ -81,7 +81,9 @@ export RRFLOW_PROJECT=/absolute/path/to/project
 export RRFLOW_PLAN=/absolute/path/to/rrflow-install-plan.json
 
 "$RRFLOW_BIN" --json version
+RRFLOW_INSTALL_IDENTITY="$("$RRFLOW_BIN" install identity | jq -er '.installation_identity')"
 "$RRFLOW_BIN" --json install plan \
+  --identity "$RRFLOW_INSTALL_IDENTITY" \
   --project "$RRFLOW_PROJECT" \
   --mode existing \
   --profile default > "$RRFLOW_PLAN"
@@ -99,6 +101,12 @@ RRFLOW_PLAN_SHA256="$(jq -r '.installation.plan_sha256' "$RRFLOW_PLAN")"
   --project "$RRFLOW_PROJECT" \
   --level quick
 ```
+
+The UI must retain this generated identity across preview regeneration and
+apply, and generate a new one for another independent project. It belongs to
+the pending preview, not a new client-owned durable lifecycle. Version-2 plans
+also bind the initial root; moving a partially installed project is refused.
+Already installed estates retain their identity through relocation and reopen.
 
 Start the installed service in a foreground terminal:
 

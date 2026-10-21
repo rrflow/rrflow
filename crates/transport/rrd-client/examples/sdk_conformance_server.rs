@@ -56,6 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::FreshProject,
+        // A fixed explicit identity keeps the single checked-in SDK corpus reproducible.
+        &digest::sha256_hex(INSTALL_ANCHOR_BYTES),
         "default",
         None,
         &distribution,

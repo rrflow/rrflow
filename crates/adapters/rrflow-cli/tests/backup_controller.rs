@@ -41,6 +41,7 @@ fn install_instance(state_root: &Path) -> PathBuf {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,

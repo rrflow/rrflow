@@ -42,6 +42,16 @@ Roadmap owners: [Gate A](../../roadmap/rrflow-1.0/gate-a.md),
 
 ## Closure evidence
 
+The [independent installation identity package](../../evidence/change-journals/gate-d/d-01-independent-installation-identities.md)
+adds an explicit OS-random identity input, deterministic version-2 plans and
+an initial-root digest checked before new apply or interrupted recovery.
+The same content no longer implicitly allocates one estate for distinct
+projects. Its tests cover foreign-plan/credential rejection, independent
+installed identities, relocation and eight-stage recovery. Caller reuse of an
+identity input is not authorized project sharing; a new independent project
+must allocate a new value. This repair does not close the topology vocabulary,
+fleet, cross-surface or synchronization deficiencies above.
+
 Freeze one project ↔ estate ↔ instance relationship graph and operation-specific resource
 grammar; retain only the implemented D-01 locator and engine-persisted installed-estate
 binding plus their strict identity, containment, digest, relocation, and foreign-state

@@ -225,7 +225,7 @@
       },
       "revision": 1
     },
-    "contract_version": 1,
+    "contract_version": 2,
     "credential_bytes": 32,
     "deployment": {
       "contract_version": 1,
@@ -251,6 +251,7 @@
       "id": "rrflow-local-seat",
       "purpose": "Provider-neutral reasoning and recall for this project."
     },
+    "installation_identity": "000000000000000000000000000000000000000000000000000000000000002e",
     "managed_paths": [
       {
         "kind": "estate_directory",
@@ -301,11 +302,12 @@
         "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "fba315f040319a49886538fc08cc3cb21833cc6a3f8622e595e25f5f72ab79ad",
+    "plan_sha256": "396597e6ea8d03bb03b69289910e715a8fa13d0b356e279feceb2a05d7f0fe83",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
     "project_precondition_sha256": "000000000000000000000000000000000000000000000000000000000000002a",
+    "project_root_sha256": "000000000000000000000000000000000000000000000000000000000000002f",
     "storage_root_id": "install-01",
     "target": {
       "estate_id": "developer-estate",
@@ -354,8 +356,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "fba315f040319a49886538fc08cc3cb21833cc6a3f8622e595e25f5f72ab79ad",
-    "result_sha256": "6fb93b1593c4bf27ddd03e952125e0095fa201e08d036bfe0ea4f23c7bb45e2a",
+    "plan_sha256": "396597e6ea8d03bb03b69289910e715a8fa13d0b356e279feceb2a05d7f0fe83",
+    "result_sha256": "2c81259111ca449bfd8298099e88259d130009d4aa6ad104dc31117c75be5a4a",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },

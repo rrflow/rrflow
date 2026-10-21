@@ -554,12 +554,28 @@ max_elapsed_ms = 20000
     assert_success(&version, "version");
     let version: serde_json::Value = serde_json::from_slice(&version.stdout).unwrap();
     assert_eq!(version["product_version"], "1.0.0");
+    assert_eq!(version["installation_plan_contract_version"], 2);
     assert_eq!(version["release_stage"], "pre-release");
 
     let before = inventory(&project);
+    let identity_output = invoke(&["install", "identity"]);
+    assert_success(&identity_output, "allocate explicit installation identity");
+    let identity: serde_json::Value = serde_json::from_slice(&identity_output.stdout).unwrap();
+    let identity = identity["installation_identity"].as_str().unwrap();
+    assert_eq!(identity.len(), 64);
+    let next_identity = invoke(&["install", "identity"]);
+    assert_success(&next_identity, "allocate another independent identity");
+    assert_ne!(identity_output.stdout, next_identity.stdout);
+    assert_eq!(
+        inventory(&project),
+        before,
+        "identity allocation wrote project state"
+    );
     let plan_arguments = [
         "install",
         "plan",
+        "--identity",
+        identity,
         "--mode",
         mode,
         "--project",
@@ -576,6 +592,8 @@ max_elapsed_ms = 20000
     assert_eq!(first.stdout, second.stdout, "preview must be byte stable");
     assert_eq!(inventory(&project), before, "preview mutated the project");
     let preview: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(preview["installation"]["contract_version"], 2);
+    assert_eq!(preview["installation"]["installation_identity"], identity);
     assert_eq!(
         preview["installation"]["configuration"]["reasoning"]["max_run_elapsed_ms"],
         720_000
@@ -601,6 +619,33 @@ max_elapsed_ms = 20000
         .unwrap()
         .to_owned();
     std::fs::write(&plan_file, &first.stdout).unwrap();
+
+    let foreign_project = root.path().join("foreign-project");
+    std::fs::create_dir(&foreign_project).unwrap();
+    for (relative, content) in &before {
+        std::fs::write(foreign_project.join(relative), content).unwrap();
+    }
+    let foreign = invoke(&[
+        "install",
+        "apply",
+        "--mode",
+        mode,
+        "--project",
+        foreign_project.to_str().unwrap(),
+        "--plan",
+        plan_arg,
+        "--expect",
+        &plan_sha256,
+    ]);
+    assert!(
+        !foreign.status.success(),
+        "a plan cannot initialize an identical foreign project"
+    );
+    assert_eq!(
+        inventory(&foreign_project),
+        before,
+        "foreign apply wrote managed state"
+    );
 
     let rejected = invoke(&[
         "install",

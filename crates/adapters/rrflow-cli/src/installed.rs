@@ -28,6 +28,7 @@ struct VersionReport {
     product_version: &'static str,
     protocol: &'static str,
     protocol_version: u16,
+    installation_plan_contract_version: u16,
     release_stage: &'static str,
     build: crate::build_identity::BuildReport,
 }
@@ -174,6 +175,7 @@ fn version(json: bool) -> Result<Execution, BoxError> {
         product_version: env!("CARGO_PKG_VERSION"),
         protocol: PROTOCOL,
         protocol_version: PROTOCOL_VERSION,
+        installation_plan_contract_version: rrd_contract::INSTALLATION_PLAN_CONTRACT_VERSION,
         release_stage: "pre-release",
         build: crate::build_identity::report()?,
     };
@@ -190,9 +192,14 @@ fn version(json: bool) -> Result<Execution, BoxError> {
 
 fn install(action: &InstallAction, json: bool) -> Result<Execution, BoxError> {
     match action {
+        InstallAction::Identity => Ok(serde_json::to_string_pretty(&serde_json::json!({
+            "installation_identity": RrdEngine::generate_installation_identity()?,
+        }))?
+        .into()),
         InstallAction::Plan {
             project,
             mode,
+            identity,
             profile,
             configuration,
             test_distribution_executable,
@@ -202,6 +209,7 @@ fn install(action: &InstallAction, json: bool) -> Result<Execution, BoxError> {
             let preview = RrdEngine::plan_installation(
                 project,
                 target_kind(*mode),
+                identity,
                 profile,
                 configuration.as_deref(),
                 &executable,

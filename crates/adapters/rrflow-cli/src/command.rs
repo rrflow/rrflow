@@ -110,12 +110,17 @@ pub enum RestoreAction {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum InstallAction {
+    /// Generate a new identity input without writing project or engine state.
+    Identity,
     /// Emit an exact, deterministic preview and perform no project writes.
     Plan {
         #[arg(long, default_value = ".")]
         project: std::path::PathBuf,
         #[arg(long, value_enum, default_value_t = InstallMode::Existing)]
         mode: InstallMode,
+        /// Identity from `install identity`; retain it across previews for this installation.
+        #[arg(long)]
+        identity: String,
         #[arg(long, default_value = "default")]
         profile: String,
         /// Operator-authored estate ceilings sealed into the installation plan.

@@ -90,6 +90,7 @@ async fn parquet_export_rejects_truncation_and_foreign_engine_sessions() {
         let plan = RrdEngine::plan_installation(
             project,
             InstallationTargetKind::FreshProject,
+            &RrdEngine::generate_installation_identity().unwrap(),
             "default",
             None,
             &executable(),
@@ -188,6 +189,7 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::FreshProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable(),

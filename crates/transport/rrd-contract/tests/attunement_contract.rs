@@ -9,7 +9,8 @@ use rrd_contract::{
     InstallationActionResult, InstallationManagedPath, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationRemovalRule, InstallationResult,
     InstallationTargetKind, InstalledEstateIdentity, MemorySeatDefinition, ResumeAttunement,
-    SecurityAction, StorageProfileKind, ATTUNEMENT_PHASES, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+    SecurityAction, StorageProfileKind, ATTUNEMENT_PHASES, INSTALLATION_PLAN_CONTRACT_VERSION,
+    INSTALL_ATTUNEMENT_CONTRACT_VERSION,
 };
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -90,7 +91,9 @@ fn attunement_plan() -> AttunementPlan {
 
 fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
     let mut plan = InstallationPlan {
-        contract_version: INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+        contract_version: INSTALLATION_PLAN_CONTRACT_VERSION,
+        installation_identity: digest(46),
+        project_root_sha256: digest(47),
         id: canonical_id("install-01"),
         target: target(),
         target_kind: InstallationTargetKind::ExistingProject,
@@ -534,6 +537,33 @@ fn install_and_attunement_contract_matches_golden_json() {
     );
     let reopened: GoldenAttunementContract = serde_json::from_value(expected).unwrap();
     assert_eq!(reopened, fixture);
+}
+
+#[test]
+fn installation_plan_requires_versioned_identity_and_root_binding() {
+    let plan = installation_plan(&attunement_plan());
+    for field in ["installation_identity", "project_root_sha256"] {
+        let mut value = serde_json::to_value(&plan).unwrap();
+        value.as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<InstallationPlan>(value).is_err());
+    }
+    let mut old = plan.clone();
+    old.contract_version = 1;
+    old.plan_sha256 = installation_plan_sha256(&old).unwrap();
+    assert!(old.validate().is_err());
+    for identity in [true, false] {
+        let mut changed = plan.clone();
+        if identity {
+            changed.installation_identity = digest(999);
+        } else {
+            changed.project_root_sha256 = digest(999);
+        }
+        assert_ne!(
+            installation_plan_sha256(&changed).unwrap(),
+            plan.plan_sha256
+        );
+        assert!(changed.validate().is_err());
+    }
 }
 
 #[test]

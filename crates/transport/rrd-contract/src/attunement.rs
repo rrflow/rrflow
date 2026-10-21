@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 pub const INSTALL_ATTUNEMENT_CONTRACT_VERSION: u16 = 1;
+/// Independent identity and initial-root binding are mandatory for new plans.
+/// Attunement and installation-result envelopes retain their own version.
+pub const INSTALLATION_PLAN_CONTRACT_VERSION: u16 = 2;
 pub const MAX_INSTALLATION_ACTIONS: usize = 16;
 pub const MAX_ATTUNEMENT_PHASES: usize = 32;
 pub const MAX_ATTUNEMENT_FAILURE_BYTES: usize = 4_096;
@@ -174,6 +177,10 @@ impl InstallationManagedPath {
 #[serde(deny_unknown_fields)]
 pub struct InstallationPlan {
     pub contract_version: u16,
+    /// Explicit 256-bit identity input, generated once per independent install.
+    pub installation_identity: String,
+    /// Initial canonical project root; not the permanent estate identity.
+    pub project_root_sha256: String,
     pub id: CanonicalId,
     pub target: InstalledEstateIdentity,
     pub target_kind: InstallationTargetKind,
@@ -199,7 +206,14 @@ pub struct InstallationPlan {
 
 impl InstallationPlan {
     pub fn validate(&self) -> Result<()> {
-        validate_contract_version(self.contract_version)?;
+        if self.contract_version != INSTALLATION_PLAN_CONTRACT_VERSION {
+            return invalid("unsupported installation plan contract version; expected 2");
+        }
+        validate_sha256(&self.installation_identity, "installation identity")?;
+        validate_sha256(
+            &self.project_root_sha256,
+            "installation project_root_sha256",
+        )?;
         self.target.validate()?;
         self.deployment.validate()?;
         validate_bounded_text(&self.product_version, "installation product_version", 64)?;
@@ -1074,10 +1088,12 @@ impl AttunementVerification {
 
 pub fn installation_plan_sha256(plan: &InstallationPlan) -> Result<String> {
     digest_json(
-        b"rrflow-installation-plan-v1",
+        b"rrflow-installation-plan-v2",
         &(
             (
                 plan.contract_version,
+                &plan.installation_identity,
+                &plan.project_root_sha256,
                 &plan.id,
                 &plan.target,
                 plan.target_kind,

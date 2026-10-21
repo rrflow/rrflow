@@ -296,6 +296,7 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
     let installation = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
