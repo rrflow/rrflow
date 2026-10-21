@@ -7,6 +7,7 @@ use super::security::AuditEvent;
 use super::*;
 use rrd_estate::{EstateBackupDriver, EstateDriver};
 use std::fs;
+#[cfg(debug_assertions)]
 use std::io::Write as _;
 
 const ESTATE_RECOVERY_OPERATION_FORMAT: u16 = 1;
