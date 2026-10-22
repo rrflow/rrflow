@@ -14,13 +14,49 @@ database path now. It is not yet a packaged DevPulse application.
 DevPulse is the owner's project development application. The required product
 experience includes provisioning local VMs or containers for projects, running
 their toolchains and UIs, and integrating each project with RRFlow. A user can
-stay local, connect to shippin.cloud, or connect to an operator-controlled
-homelab. Both remote choices require real bidirectional synchronization. A
+stay local, select an admitted managed service, or connect to an
+operator-controlled homelab. Both remote choices must support explicitly
+selected bidirectional synchronization; remote access alone enables no transfer. A
 hosted account is not a prerequisite for local or homelab operation.
 
 The available Windows development engine/Connectome bundle proves only the
 bounded local behavior in its receipt. It is not a qualified DevPulse package,
 managed database service, sync implementation, or competitive parity result.
+
+## Optional managed service roles
+
+The owner-directed delivery targets distinguish the following roles. These
+names describe intended experiences, not verified domain ownership, deployed
+endpoints, account federation or available service APIs:
+
+| Experience | Planned role | Independent qualification |
+|---|---|---|
+| Local RRFlow and Connectome | Open-source engine with one estate per project, usable without an account. Connectome offers guided operation and learning from visible evidence. | D-01/C-07 and H-06/J installed product and client acceptance. First-party licence texts/notices remain a J-05/POAM-013 release requirement. |
+| rrflow.ai | Optional managed access to hosted project engines and explicitly selected synchronization, including access from another authorized device. | H-07 account, instance, transfer and real-service acceptance; remote access is not proof of two-way synchronization. |
+| rroflow.ai | Optional service for authorized learning datasets, experiments and qualified improvement artifacts exposed through Connectome. | G-06/I-03/I-07 learning acceptance plus H-07 transfer/account controls for selected data. Upload and artifact activation require distinct authorization. |
+| shippin.cloud | Optional private development space that consumes RRFlow and can run project toolchains, containers/VMs and private UI previews. | H-07e/f/g project-runtime, file/environment and real-service acceptance. A synchronized database is not a working devspace. |
+| Operator-controlled homelab | Self-hosted engine and optional development/learning capabilities under the same admitted public profiles. | Independent identity, recovery and transfer qualification with managed services unavailable. |
+
+Use configured endpoint profiles, trust and credential references rather than
+hardcoded domains in engine or client dispatch. Show the actual service,
+account and destination estate for each operation. Linking one service does
+not imply that the others share its account, can read its data or can provision
+resources. If federation is later supported, its trust and audience must be
+qualified explicitly. Unknown or unsupported services remain unavailable.
+
+Connectome can offer these extensions after local operation is established.
+Account creation, remote engine access, bidirectional sync, cross-project
+context sharing, training export and compute provisioning are independent
+choices. They may share an understandable setup flow but retain separate
+previews, scopes and receipts. Default installation enables none. A failed or
+revoked service binding leaves local data and operation usable.
+
+RROFLOW may be prepared and used locally when its capabilities qualify; the
+cloud is not a prerequisite for learning. Conversely, a user may choose remote
+engine access without consenting to training. The
+[learning contract](../inference/learning/controller-training.md#staged-learning-and-feedback)
+owns candidate methods and promotion. H-07 may develop independently of Gate I;
+the combined learning-service experience requires both accepted boundaries.
 
 ## Guided installation and Windows-first DevPulse
 
@@ -83,7 +119,7 @@ flowchart TB
     Provision --> LocalRun[Local project runtime and private UI preview]
     DP --> Local[Local RRFlow estate]
     Local --> LocalKV[Local rrflowKV]
-    Local <-. selected native data and durable receipts .-> Cloud[shippin.cloud RRFlow estate]
+    Local <-. selected native data and durable receipts .-> Cloud[Selected managed RRFlow estate]
     Local <-. selected native data and durable receipts .-> Lab[Homelab RRFlow estate]
     DP -. managed account and project provisioning .-> CloudRun[Cloud VM/container devspace]
     DP -. operator-configured identity and provisioning .-> LabRun[Homelab VM/container devspace]
@@ -126,7 +162,7 @@ separation keeps project code execution outside the database authority.
 
 1. Start and use the local project without sign-in. The initial sync state is
    disabled; there is no account discovery request or background upload.
-2. Offer either managed shippin.cloud sign-in or an operator-configured homelab
+2. Offer an admitted managed-service sign-in or an operator-configured homelab
    endpoint and trust/credential binding. Creating an account or discovering a
    host alone does not authorize provisioning or data transfer.
 3. Preview the exact local project/estate, remote account and destination
@@ -232,8 +268,8 @@ configuration schema does not qualify either behavior.
 ### Optional login and maintained updates
 
 RRFlow authentication works locally through its configured identity authority.
-Offer shippin.cloud account linking as an explicit extension, alongside a
-homelab endpoint; never substitute hosted identity for local engine readiness.
+Offer configured managed-service account linking as an explicit extension,
+alongside a homelab endpoint; never substitute hosted identity for local engine readiness.
 Sign-in lists authorized service choices and prices but enables no upload,
 connector, provisioning, shared cache or paid model call by itself. Disconnect
 must leave local login and local data usable.
@@ -293,10 +329,11 @@ Conflict resolution is itself an authorized, replay-safe operation with a
 receipt, never an unrecorded UI choice or wall-clock overwrite policy.
 
 The current native snapshot-isolation transaction model and changefeed do not
-by themselves satisfy these requirements. There is no shippin.cloud account
-endpoint, sync binding, cross-instance reconciliation implementation or
-production credential configured by this package. Cloud code execution and
-private UI previews for Rust/Python/Go need their own isolated devspace service;
+by themselves satisfy these requirements. This contract establishes no
+rrflow.ai, rroflow.ai or shippin.cloud account endpoint, sync binding,
+cross-instance reconciliation implementation or production credential.
+Cloud code execution and private UI previews for Rust/Python/Go need their own
+isolated devspace service;
 they must not execute inside the database process.
 
 ## Service and homelab operation
