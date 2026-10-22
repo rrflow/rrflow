@@ -35,7 +35,81 @@ fn owned_child() {
             println!("bounded stdout");
             eprintln!("bounded stderr");
         }
+        #[cfg(feature = "crash-test")]
+        "partial" => {
+            std::io::stdout().write_all(b"partial event").unwrap();
+            std::io::stdout().flush().unwrap();
+            std::process::exit(0);
+        }
         other => panic!("unknown fixture {other}"),
+    }
+}
+
+#[cfg(feature = "crash-test")]
+fn observed_fixture(
+    mode: &str,
+    capacity: usize,
+) -> (
+    process::Process,
+    std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>,
+) {
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args(["--exact", "owned_child", "--ignored", "--nocapture"])
+        .env("RRFLOW_CAPTURE_FIXTURE", mode);
+    let (send, receive) = std::sync::mpsc::sync_channel(capacity);
+    let process = process::Process::start_observed(
+        &mut command,
+        Duration::from_secs(10),
+        1024 * 1024,
+        send,
+        b"null",
+    )
+    .unwrap();
+    (process, receive)
+}
+
+#[cfg(feature = "crash-test")]
+#[test]
+fn observed_events_preserve_complete_lines_and_both_streams() {
+    let (mut child, receive) = observed_fixture("exit", 32);
+    let output = child.finish().unwrap();
+    assert!(output.status.success());
+    let lines = receive.try_iter().map(Result::unwrap).collect::<Vec<_>>();
+    assert!(lines.len() > 1);
+    assert!(lines.iter().all(|line| line.ends_with(b"\n")));
+    assert_eq!(lines.concat(), output.stdout);
+    assert!(String::from_utf8_lossy(&output.stderr).contains("bounded stderr"));
+}
+
+#[cfg(feature = "crash-test")]
+#[test]
+fn observed_queue_and_line_failures_reap_only_the_owned_child() {
+    for (mode, capacity) in [("exit", 1), ("flood", 32), ("partial", 32)] {
+        let (mut child, _receive) = observed_fixture(mode, capacity);
+        let error = child.finish().unwrap_err();
+        assert!(
+            error.contains("output") || error.contains("diagnostic"),
+            "{error}"
+        );
+        assert!(!child.running());
+    }
+}
+
+#[cfg(feature = "crash-test")]
+#[test]
+fn diagnostic_input_is_bounded_before_any_child_can_spawn() {
+    let (send, _receive) = std::sync::mpsc::sync_channel(1);
+    let result = process::Process::start_observed(
+        &mut Command::new("must-not-spawn"),
+        Duration::from_secs(1),
+        1024,
+        send,
+        &vec![b'x'; 4097],
+    );
+    match result {
+        Err(error) => assert_eq!(error.to_string(), "diagnostic input exceeds bound"),
+        Ok(_) => panic!("oversized input admitted"),
     }
 }
 

@@ -245,6 +245,8 @@ impl WalWriter {
             }
         }
         let write_started = phases.is_some().then(PhaseClock::start);
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::boundary(crate::crash_test::Point::WalBeforeWrite, &self.path);
         let write = (|| -> std::io::Result<()> {
             let written = loop {
                 match file_io::write_vectored(
@@ -279,11 +281,15 @@ impl WalWriter {
             phases.as_mut().expect("phase recorder checked").write = started.finish();
         }
         if durability == Durability::Authoritative {
+            #[cfg(all(feature = "crash-test", not(test)))]
+            crate::crash_test::boundary(crate::crash_test::Point::WalAppended, &self.path);
             let sync_started = phases.is_some().then(PhaseClock::start);
             if let Err(error) = file_io::sync_data(&self.file, &self.path) {
                 self.poisoned = true;
                 return Err(Error::Io(error));
             }
+            #[cfg(all(feature = "crash-test", not(test)))]
+            crate::crash_test::boundary(crate::crash_test::Point::WalSynced, &self.path);
             if let Some(started) = sync_started {
                 phases.as_mut().expect("phase recorder checked").sync = started.finish();
             }

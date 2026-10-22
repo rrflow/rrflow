@@ -1,6 +1,6 @@
 //! Bounded, test-owned process capture. This is qualification tooling only.
 
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -40,7 +40,37 @@ impl Process {
         limit: usize,
         announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
     ) -> io::Result<Self> {
+        Self::start_inner(command, deadline, limit, announcement, None, None)
+    }
+
+    #[cfg(feature = "crash-test")]
+    #[allow(dead_code)] // Shared by integration targets; only the crash corpus uses it.
+    pub fn start_observed(
+        command: &mut Command,
+        deadline: Duration,
+        limit: usize,
+        lines: mpsc::SyncSender<io::Result<Vec<u8>>>,
+        input: &[u8],
+    ) -> io::Result<Self> {
+        Self::start_inner(command, deadline, limit, None, Some(lines), Some(input))
+    }
+
+    fn start_inner(
+        command: &mut Command,
+        deadline: Duration,
+        limit: usize,
+        announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
+        lines: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
+        input: Option<&[u8]>,
+    ) -> io::Result<Self> {
+        if let Some(input) = input {
+            if input.len() > 4096 {
+                return Err(io::Error::other("diagnostic input exceeds bound"));
+            }
+            command.stdin(Stdio::piped());
+        }
         let mut child = spawn(command.stdout(Stdio::piped()).stderr(Stdio::piped()))?;
+        let stdin = child.stdin.take();
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
         let child = Arc::new(Mutex::new(child));
@@ -53,8 +83,8 @@ impl Process {
             monitor: None,
             capture: Vec::new(),
         };
-        process.capture(stdout, limit, announcement);
-        process.capture(stderr, limit, None);
+        process.capture(stdout, limit, announcement, lines);
+        process.capture(stderr, limit, None, None);
         process.monitor = Some(thread::spawn(move || {
             let end = Instant::now() + deadline;
             loop {
@@ -80,6 +110,11 @@ impl Process {
                 thread::sleep(Duration::from_millis(10));
             }
         }));
+        if let Some(input) = input {
+            // The only writer sends at most one pipe buffer, then EOF. The
+            // process guard and monitor already own cleanup on any error.
+            stdin.expect("private diagnostic stdin").write_all(input)?;
+        }
         Ok(process)
     }
 
@@ -88,6 +123,7 @@ impl Process {
         mut stream: impl Read + Send + 'static,
         limit: usize,
         announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
+        lines: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
     ) {
         let (send, receive) = mpsc::sync_channel(1);
         let cancel = self.cancel.clone();
@@ -95,6 +131,28 @@ impl Process {
         let reader = thread::spawn(move || {
             let result = (|| {
                 let mut bytes = Vec::new();
+                if let Some(lines) = lines {
+                    let mut line = Vec::new();
+                    let mut byte = [0];
+                    while stream.read(&mut byte)? != 0 {
+                        bytes.push(byte[0]);
+                        line.push(byte[0]);
+                        if bytes.len() > limit || line.len() > 65_536 {
+                            return Err(io::Error::other(
+                                "bounded diagnostic line capture exceeded",
+                            ));
+                        }
+                        if byte[0] == b'\n' {
+                            lines.try_send(Ok(std::mem::take(&mut line))).map_err(|_| {
+                                io::Error::other("diagnostic event queue unavailable")
+                            })?;
+                        }
+                    }
+                    if !line.is_empty() {
+                        return Err(io::Error::other("incomplete diagnostic event"));
+                    }
+                    return Ok(bytes);
+                }
                 if let Some(announcement) = announcement {
                     // No unbounded read_line allocation before readiness.
                     let mut byte = [0];

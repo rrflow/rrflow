@@ -31,7 +31,9 @@ request or ref. The reusable workflow reduces every partition into one stable
 - one current shared SDK harness, isolated optional-feature checks, and a real
   PostgreSQL/pgvector integration;
 - installed lifecycle and daemon portability on GitHub-hosted Windows and
-  macOS runners; and
+  macOS runners;
+- separately identified installed domain-crash diagnostics and ordinary-build
+  exclusion on GitHub-hosted Linux, macOS and Windows; and
 - one always-evaluated gate which fails unless every partition succeeded.
 
 The topology and native portability jobs run `installed_lifecycle` against the
@@ -407,7 +409,47 @@ This corpus is instrumented native **storage-component** process-death proof.
 It is not the installed primary binary, a loss of OS/device caches, native
 ENOSPC, resource-envelope or sustained-load proof. The independent installed
 client histories and the remaining C-07c composition/profile requirements stay
-distinct. Both model and process facilities remain entirely under `cfg(test)`.
+distinct. The I/O model remains entirely under `cfg(test)`. The owned process
+rendezvous source is also reused by the explicit diagnostic primary below;
+ordinary dependency builds exclude it.
+
+The required `installed-crash` matrix runs on Linux, macOS and Windows. It
+first builds the **ordinary** primary and streams its bytes to verify absence
+of the crash protocol marker, retaining its SHA-256 and byte count in the log.
+It then builds `rrflow-cli --features crash-test` and runs:
+
+```text
+cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2
+cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
+```
+
+This separately identified diagnostic artifact requires a bounded private stdin
+schedule (or explicit null for an unarmed run). The root comes from the installed
+locator, and only the exact authorized operation digest arms the domain scope
+after intent persistence. Five points cover pre-WAL, complete append, native
+sync, visibility and persisted receipt before response. Each fresh/existing
+case also kills reopen before the first WAL frame is applied. Independent rows,
+cursors, prior ACK receipts and exact retries reconcile uncertainty without
+double application. Negative controls reject inadmissible schedules and prove
+an unrelated operation cannot trigger the selected boundary.
+
+The two estate histories retain six logical calls and 21 attempts each,
+including five uncertain client results; ten point/recovery hits per estate
+bind PID, nonce, point and build identity. The third parent test qualifies
+schedule admission. No parent is ignored. Native stdout/stderr capture is
+bounded to 1 MiB per stream, input to 4 KiB, observed event lines to 64 KiB and
+the event queue to four entries. Parent readiness/event waits are 60 seconds,
+child lifetimes 180 seconds, diagnostic admission 180 seconds and the armed
+native pause 30 seconds. The job allows 45 minutes including builds; the warm
+test step allows 20 minutes and two test threads. Existing ordinary lane
+limits are unchanged. `ci-gate` requires all three diagnostic jobs.
+
+The nondefault four-crate `crash-test` composition is owned by this dedicated
+job; other optional features retain their existing matrix. It must never be
+used to assemble the normal distribution. These tests do not close installed
+publication/GC composition, 100-cycle operating profiles, resource limits,
+retained buffers, real exhaustion, sustained capacity or the 24-hour soak.
 
 The
 [engine observability contract](../architecture/engine-data-flow.md#runtime-modes-build-profiles-and-build-identity)

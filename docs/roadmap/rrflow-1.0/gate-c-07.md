@@ -156,6 +156,17 @@ transactions and stable outcomes through the existing primary-binary harness,
 then run the declared profile corpus. No C-07c exit is waived by a component
 test; c remains open until that composition and its exact native CI pass.
 
+The [installed domain-crash record](../../evidence/change-journals/gate-c/c-07c-installed-domain-crashes.md)
+joins five internal domain boundaries to authenticated fresh/existing primary
+fixtures: pre-WAL, complete append, sync, visibility and persisted receipt
+before response. Each also kills recovery before WAL application. The explicit
+nondefault diagnostic build reuses the owned rendezvous; ordinary binaries
+exclude it. Independent rows, cursors and stable receipts reconcile 21 attempts
+per estate, with negative schedule/operation controls. Native candidate CI is
+required for this package. Installed publication/reclamation composition and
+100-cycle operating profiles still remain; neither this bounded history nor
+the component corpus closes C-07c, d-g or POAM-035.
+
 ### Remaining implementation contracts
 
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):

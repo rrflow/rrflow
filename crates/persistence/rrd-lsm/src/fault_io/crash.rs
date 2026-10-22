@@ -1,8 +1,8 @@
-//! Native process-death rendezvous, compiled only with the parent `cfg(test)`.
-//! The ignored child fixture is the only activation path. Normal libraries,
-//! installed binaries, environment, public requests and Cargo features cannot
-//! activate it. The controller owns the child's pipes, nonce and kill handle.
+//! Owned native process-death rendezvous. Unit fixtures use the cfg(test)
+//! parent; explicit `crash-test` diagnostic dependencies compile this same
+//! source through `crash_test`. Ordinary libraries and binaries exclude it.
 
+#[cfg(test)]
 use super::Kind;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-enum Point {
+pub enum Point {
     WalBeforeWrite,
     WalAppended,
     WalSynced,
@@ -25,6 +25,8 @@ enum Point {
     ReclaimRemoved,
     RecoveryRead,
     Acknowledged,
+    #[cfg(not(test))]
+    ReceiptPersisted,
     Unreachable,
 }
 
@@ -35,11 +37,13 @@ struct Schedule {
     nonce: String,
     point: Point,
     id: u16,
+    #[cfg(test)]
     owned: bool,
 }
 
 struct Armed {
     schedule: Schedule,
+    #[cfg(test)]
     recovery_reads: usize,
     deadline: Instant,
 }
@@ -74,6 +78,7 @@ fn arm(schedule: Schedule) {
         assert!(slot.is_none(), "native pause already armed");
         *slot = Some(Armed {
             schedule,
+            #[cfg(test)]
             recovery_reads: 0,
             deadline: Instant::now() + CHILD_DEADLINE,
         });
@@ -113,6 +118,7 @@ fn pause_if(matches: impl FnOnce(&mut Armed) -> bool) {
     panic!("owned controller did not terminate paused child before deadline");
 }
 
+#[cfg(test)]
 pub(crate) fn io(kind: Kind, path: &Path, after: bool) {
     pause_if(|active| {
         // Anonymous reads originate only from the WAL replay wrapper. The
@@ -151,8 +157,16 @@ pub(crate) fn io(kind: Kind, path: &Path, after: bool) {
     });
 }
 
+#[cfg(test)]
 pub(crate) fn visible(root: &Path) {
     pause_if(|active| active.schedule.point == Point::Visible && active.schedule.root == root);
 }
 
+#[cfg(test)]
 mod tests;
+
+#[cfg(not(test))]
+#[path = "crash/installed.rs"]
+mod installed;
+#[cfg(not(test))]
+pub use installed::{boundary, configure_from_stdin, enter_domain, enter_recovery, ScopeGuard};

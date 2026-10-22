@@ -7,6 +7,9 @@
 #[cfg(feature = "full")]
 mod capabilities;
 pub mod edge;
+#[cfg(feature = "crash-test")]
+#[doc(hidden)]
+pub use rrd_store::crash_test;
 #[cfg(feature = "full")]
 mod engine;
 #[cfg(feature = "full")]

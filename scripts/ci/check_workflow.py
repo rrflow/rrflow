@@ -82,12 +82,21 @@ def workspace_packages() -> set[str]:
 
 def optional_feature_packages() -> set[str]:
     packages = set()
+    diagnostic_packages = set()
     for manifest in (ROOT / "crates").rglob("Cargo.toml"):
         with manifest.open("rb") as source:
             document = tomllib.load(source)
         features = set(document.get("features", {})) - {"default"}
+        # This explicit diagnostic feature changes the primary's private stdin
+        # contract. Its separate native job owns the diagnostic corpus; ordinary
+        # installed suites continue to qualify the default artifact.
+        if "crash-test" in features:
+            diagnostic_packages.add(document["package"]["name"])
+            features.remove("crash-test")
         if features:
             packages.add(document["package"]["name"])
+    require(diagnostic_packages == {"rrd-lsm", "rrd-store", "rrd-engine", "rrflow-cli"},
+            "diagnostic feature must remain within its four-crate composition")
     return packages
 
 
@@ -516,6 +525,7 @@ def main() -> None:
     )
 
     expected_jobs = {
+        "installed-crash",
         "topology-smoke",
         "estate-portability",
         "verify",
@@ -540,6 +550,20 @@ def main() -> None:
             in jobs[job],
             f"{job} must exercise the installed primary executable lifecycle",
         )
+    diagnostic = jobs["installed-crash"]
+    for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
+        require(f"- {platform}" in diagnostic, f"diagnostic primary must qualify {platform}")
+    for command in [
+        "cargo build -p rrflow-cli --bin rrflow --locked",
+        "cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run",
+        "cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2",
+        "cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked",
+        "cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings",
+        "C07C_NATIVE_PAUSE_V1=",
+    ]:
+        require(command in diagnostic, f"installed diagnostic qualification missing: {command}")
+    require(diagnostic.index("Verify diagnostic protocol") < diagnostic.index("Build explicit diagnostic"),
+            "ordinary artifact exclusion must precede diagnostic compilation")
     require(
         "cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings"
         in jobs["estate-portability"],

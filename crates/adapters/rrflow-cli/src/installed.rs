@@ -286,6 +286,8 @@ fn serve(
     let executable = distribution_executable_path(test_distribution_executable)?;
     let locator = RrdEngine::read_project_locator(project)?;
     let project_root = std::fs::canonicalize(project)?.display().to_string();
+    #[cfg(feature = "crash-test")]
+    rrd_engine::crash_test::configure_from_stdin(&project.join(&locator.storage_root))?;
     let engine = RrdEngine::open_installed(project, &executable)?;
     let server = RrdHttpServer::bind(engine, bind)?;
     let address = server.local_addr();

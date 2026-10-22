@@ -1080,6 +1080,8 @@ impl RrdEngine {
         let storage_root = safe_join(&project, &locator.storage_root)?;
         let token_key = read_token_key(&token_path)
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
+        #[cfg(feature = "crash-test")]
+        let _recovery_crash = rrd_store::crash_test::enter_recovery(storage_root.diagnostic_path());
         let mut engine = RrdEngine::open_existing_anchored(
             &storage_root,
             locator.identity.instance_id.clone(),
