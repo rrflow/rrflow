@@ -39,6 +39,14 @@ jobs:
           cache-on-failure: true
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test encoded admission accounting boundaries
+        run: cargo test -p rrd-lsm --lib admission_tests --locked
+      - name: Test native staged write admission
+        run: cargo test -p rrd-lsm --test write_admission --locked
+      - name: Test composed store admission and semantic atomicity
+        run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
+      - name: Test engine rejected-commit recovery and reuse
+        run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
@@ -100,6 +108,14 @@ jobs:
         run: cargo test -p rrd-engine --lib engine::token_key --locked
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test encoded admission accounting boundaries
+        run: cargo test -p rrd-lsm --lib admission_tests --locked
+      - name: Test native staged write admission
+        run: cargo test -p rrd-lsm --test write_admission --locked
+      - name: Test composed store admission and semantic atomicity
+        run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
+      - name: Test engine rejected-commit recovery and reuse
+        run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership

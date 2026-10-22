@@ -8,7 +8,7 @@
 //! ranges: the contract is snapshot isolation with write conflict detection,
 //! not serializability.
 
-use crate::batch::{validate_key, validate_value};
+use crate::batch::{validate_key, WriteBatchSize};
 use crate::{AppendReceipt, Database, Error, Mutation, Result, Snapshot};
 use std::collections::BTreeMap;
 use std::ops::Bound::{Excluded, Included};
@@ -88,6 +88,7 @@ fn release_sequence(active: &mut BTreeMap<u64, usize>, sequence: u64) {
 pub struct Transaction {
     snapshot: Snapshot,
     writes: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    write_size: WriteBatchSize,
     owner: Arc<TransactionSnapshots>,
     released: bool,
 }
@@ -98,6 +99,7 @@ impl Transaction {
         Ok(Self {
             snapshot,
             writes: BTreeMap::new(),
+            write_size: WriteBatchSize::default(),
             owner,
             released: false,
         })
@@ -167,16 +169,25 @@ impl Transaction {
     /// Buffers a value. Repeated mutations of the same key collapse to the
     /// final transaction-local value before conflict validation and WAL write.
     pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        validate_key(&key)?;
-        validate_value(&value)?;
+        let size = self.write_size.with_replacement(
+            &key,
+            self.writes.get(&key).map(|value| value.as_deref()),
+            Some(&value),
+        )?;
         self.writes.insert(key, Some(value));
+        self.write_size = size;
         Ok(())
     }
 
     /// Buffers a tombstone for one key.
     pub fn delete(&mut self, key: Vec<u8>) -> Result<()> {
-        validate_key(&key)?;
+        let size = self.write_size.with_replacement(
+            &key,
+            self.writes.get(&key).map(|value| value.as_deref()),
+            None,
+        )?;
         self.writes.insert(key, None);
+        self.write_size = size;
         Ok(())
     }
 
@@ -206,6 +217,7 @@ impl Transaction {
     }
 
     pub(crate) fn take_mutations(&mut self) -> Vec<Mutation> {
+        self.write_size = WriteBatchSize::default();
         std::mem::take(&mut self.writes)
             .into_iter()
             .map(|(key, value)| match value {

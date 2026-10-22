@@ -359,6 +359,7 @@ impl RrdEngine {
                             if matches!(
                                 error,
                                 rrd_store::Error::Kernel(_)
+                                    | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::RuntimeConflict { .. }
                                     | rrd_store::Error::TransactionConflict { .. }
                                     | rrd_store::Error::DanglingRuntimeReference(_)

@@ -65,6 +65,23 @@ installed maintenance qualification; exact-candidate native CI is required.
 
 ## Impact
 
+### Encoded staging admission deficiency
+
+At accepted main `952ec21b03a9e701967f2f15c0a37e3d34051fed`, two valid
+individual values could exceed the existing 16 MiB encoded batch ceiling in
+native and profile-neutral staged maps. Final batch validation rejected them
+only at commit. A public semantic request with 4,096 claims also reproduced
+an internal-error classification. Inspection showed that this generic error
+retained prepared intent despite known pre-publication rejection. The [admission baseline](../../evidence/change-journals/gate-c/c-07d-write-admission-baseline.md)
+and [repair evidence](../../evidence/change-journals/gate-c/c-07d-write-admission.md)
+bind the reproduction, one format-owned incremental byte/count accountant,
+typed rejection and engine abort/reopen/reuse qualification.
+
+This bounded repair covers encoded staging and existing physical ceilings.
+Caller inputs, serialization copies, aggregate concurrent owners, installed
+configuration, waiting queues, maintenance headroom, replay and native RSS
+remain separate C-07d obligations. It does not close this POA&M row.
+
 ### Installed reclamation call-path observation
 
 At `cae8f3d9e3e0f733720a2f60ff5a8a3ab3094bf3`, ordinary writes already

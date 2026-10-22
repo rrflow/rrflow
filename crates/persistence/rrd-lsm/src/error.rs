@@ -22,6 +22,12 @@ pub enum Error {
     },
     InvalidConfiguration(String),
     InvalidBatch(String),
+    /// Admission failed before this batch could reach a native effect.
+    WriteBatchLimit {
+        resource: crate::batch::WriteBatchResource,
+        limit: u64,
+        observed: u64,
+    },
     InvalidManifest(String),
     ManifestConflict {
         expected: Option<String>,
@@ -91,6 +97,9 @@ impl fmt::Display for Error {
                 write!(formatter, "invalid RRD LSM configuration: {reason}")
             }
             Self::InvalidBatch(reason) => write!(formatter, "invalid WAL batch: {reason}"),
+            Self::WriteBatchLimit { resource, limit, observed } => write!(
+                formatter, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
+            ),
             Self::InvalidManifest(reason) => write!(formatter, "invalid manifest: {reason}"),
             Self::ManifestConflict { expected, actual } => write!(
                 formatter,
