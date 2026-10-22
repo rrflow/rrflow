@@ -40,7 +40,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("run") => run_trial(&args[2..]),
         Some("summarize") => summarize(Path::new(args.get(2).ok_or("result directory required")?)),
         Some("verify") => verify(Path::new(args.get(2).ok_or("summary file required")?)),
-        _ => Err("usage: rrflow-eval run <provider> <repo> <scenario> <arm> <expected> <prompt-file> <output-file> | summarize <result-dir> | verify <summary-file>".into()),
+        _ => Err("usage: rrflow-eval run <provider> <repo> <scenario> <arm> <expected> <prompt-file> <output-file> | summarize <result-dir> | verify <summary-file> | storage <schema|validate|verify>".into()),
     }
 }
 
