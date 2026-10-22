@@ -156,6 +156,92 @@ def lifecycle_receipts(output: str) -> list[dict]:
     return receipts
 
 
+def storage_history_receipts(output: str, durable: list[dict]) -> list[dict]:
+    """Admit bounded collector output, not another semantic history oracle.
+
+    The native fixture calls the canonical rrflow-eval ledger reconciler at
+    every reopen. Here we reject incomplete schedules and unknown/secret-bearing
+    fields before retaining its evidence; a producer summary alone is insufficient.
+    """
+    lines = [line.removeprefix("native_storage_history=") for line in output.splitlines()
+             if line.startswith("native_storage_history=")]
+    require(len(lines) == 2 and all(len(line) <= 64 * 1024 for line in lines),
+            "both bounded storage histories are required")
+    receipts = [json.loads(line) for line in lines]
+    require(all(isinstance(item, dict) for item in receipts)
+            and {item.get("mode") for item in receipts} == {"fresh", "existing"},
+            "storage history modes must be distinct")
+    builds = {item["mode"]: item["build"] for item in durable}
+    expected_report = {"logical_calls": 4, "attempts": 13, "acknowledged": 11,
+                       "rejected": 1, "uncertain": 1, "resolved_present": 3,
+                       "resolved_absent": 1, "unresolved": 0, "violations": []}
+    def fields(item, names):
+        require(isinstance(item, dict) and set(item) == set(names.split()),
+                "storage history has unknown or missing fields")
+    def hash_value(value):
+        require(isinstance(value, str) and re.fullmatch("[0-9a-f]{64}", value) is not None,
+                "storage history digest is invalid")
+    for receipt in receipts:
+        fields(receipt, "mode build forced_reopens expected_sha256 ledger report")
+        require(receipt["mode"] in builds and receipt["build"] == builds[receipt["mode"]],
+                "history build differs from installed lifecycle")
+        require(type(receipt["forced_reopens"]) is int and receipt["forced_reopens"] == 3,
+                "storage history reopen schedule is incomplete")
+        hash_value(receipt["expected_sha256"])
+        require(receipt["report"] == expected_report
+                and all(type(receipt["report"][key]) is int for key in expected_report if key != "violations"),
+                "storage history failed or omitted an outcome")
+        ledger = receipt["ledger"]
+        fields(ledger, "expected attempts readback")
+        for key, count in [("expected", 4), ("attempts", 13), ("readback", 4)]:
+            require(isinstance(ledger[key], list) and len(ledger[key]) == count,
+                    "storage history ledger is incomplete")
+        for item in ledger["expected"]:
+            fields(item, "logical_id request_sha256 effect_sha256 resolution")
+            require(item["logical_id"] in {"a", "b", "c", "d"}
+                    and item["resolution"] in {"present", "absent"}, "history expected identity")
+            hash_value(item["request_sha256"])
+            hash_value(item["effect_sha256"])
+        require({item["logical_id"] for item in ledger["expected"]} == {"a", "b", "c", "d"},
+                "history expected identities are duplicated or omitted")
+        for index, item in enumerate(ledger["attempts"]):
+            fields(item, "attempt_id logical_id request_sha256 started_ns finished_ns outcome")
+            require(item["attempt_id"] == f"attempt-{index}" and item["logical_id"] in {"a", "b", "c", "d"},
+                    "history attempt identity")
+            hash_value(item["request_sha256"])
+            require(type(item["started_ns"]) is int and type(item["finished_ns"]) is int
+                    and 0 <= item["started_ns"] <= item["finished_ns"] <= 600_000_000_000,
+                    "history timing bound")
+            outcome = item["outcome"]
+            require(isinstance(outcome, dict), "history outcome shape")
+            if outcome.get("kind") == "acknowledged":
+                fields(outcome, "kind receipt_sha256")
+                hash_value(outcome["receipt_sha256"])
+            else:
+                fields(outcome, "kind reason")
+                require((outcome["kind"], outcome["reason"]) in
+                        {("rejected", "stale-cursor"), ("uncertain", "response-lost")}, "history outcome kind")
+        for item in ledger["readback"]:
+            require(isinstance(item, dict), "history readback shape")
+            if item.get("kind") == "absent":
+                fields(item, "kind logical_id")
+                require(item["logical_id"] == "c", "history absent identity")
+            else:
+                fields(item, "kind logical_id request_sha256 effect_sha256 receipt_sha256 applications")
+                require(item["kind"] == "present" and item["logical_id"] in {"a", "b", "d"}
+                        and type(item["applications"]) is int and item["applications"] == 1,
+                        "history recovered identity")
+                for key in ["request_sha256", "effect_sha256", "receipt_sha256"]:
+                    hash_value(item[key])
+        require({item["logical_id"] for item in ledger["readback"]} == {"a", "b", "c", "d"},
+                "history readback identities are duplicated or omitted")
+        observed = {kind: sum(item["outcome"]["kind"] == kind for item in ledger["attempts"])
+                    for kind in ["acknowledged", "rejected", "uncertain"]}
+        require(all(observed[kind] == expected_report[kind] for kind in observed),
+                "history outcome counts disagree with the retained attempts")
+    return receipts
+
+
 def run(*arguments: str, **kwargs: object) -> subprocess.CompletedProcess:
     """Capture a finite amount without communicate()'s unbounded allocation.
 
@@ -294,11 +380,13 @@ def qualify_payload(stage: Path, configuration: dict) -> None:
     cases = require_lifecycle_results(result.stdout)
     require(result.returncode == 0, "lifecycle reported success with a failing process status")
     durable = lifecycle_receipts(result.stdout)
+    histories = storage_history_receipts(result.stdout, durable)
     require(all(receipt["build"]["executable_sha256"] == configuration["sha256"][binary.name] for receipt in durable), "lifecycle receipt names a different executable")
     receipt = {"schema_version": 1, "status": "passed", "platform": sys.platform,
                "os_release": platform.release(), "architecture": platform.machine(),
                "sha256": configuration["sha256"], "passed_cases": cases,
                "filesystem": configuration["filesystem"], "durable_receipts": durable,
+               "storage_histories": histories,
                "failed": 0, "ignored": 0, "outbound_denials": ["ipv4", "ipv6"],
                "masked_roots": configuration["masks"], "isolation": configuration["isolation"]}
     if sys.platform == "win32":

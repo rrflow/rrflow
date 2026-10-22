@@ -1,6 +1,8 @@
 //! Real subprocess failure oracles for the lifecycle qualification harness.
 #[path = "support/process.rs"]
 mod process;
+#[path = "support/response_loss.rs"]
+mod response_loss;
 
 use std::{
     io::Write,
@@ -117,4 +119,222 @@ fn concurrent_staging_preserves_executable_bytes() {
             });
         }
     });
+}
+
+fn answer_relay(listener: std::net::TcpListener) {
+    use std::io::Read;
+    listener.set_nonblocking(true).unwrap();
+    let end = Instant::now() + Duration::from_secs(3);
+    let mut server = loop {
+        match listener.accept() {
+            Ok((stream, _)) => break stream,
+            Err(error)
+                if error.kind() == std::io::ErrorKind::WouldBlock && Instant::now() < end =>
+            {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            Err(error) => panic!("bounded fixture accept: {:?}", error.kind()),
+        }
+    };
+    server.set_nonblocking(false).unwrap();
+    server
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    server
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let expected = b"POST /v1/transactions/fixture/commit HTTP/1.1\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{}";
+    let mut received = vec![0; expected.len()];
+    server.read_exact(&mut received).unwrap();
+    assert_eq!(received, expected);
+    server
+        .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\n{}")
+        .unwrap();
+}
+
+#[test]
+fn relay_normalizes_nonblocking_accept_before_fragmented_request() {
+    use std::io::Read;
+    use std::net::{TcpListener, TcpStream};
+    let front = TcpListener::bind("127.0.0.1:0").unwrap();
+    let mut client = TcpStream::connect(front.local_addr().unwrap()).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let (accepted, _) = front.accept().unwrap();
+    // Explicitly model inherited O_NONBLOCK on every host, without relying on
+    // which flags its accept implementation happens to inherit.
+    accepted.set_nonblocking(true).unwrap();
+    let backend = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = backend.local_addr().unwrap();
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    let worker = std::thread::spawn(move || {
+        send.send(response_loss::forward(
+            accepted,
+            address,
+            Instant::now() + Duration::from_secs(3),
+        ))
+        .unwrap();
+    });
+    for fragment in [
+        b"POST /v1/".as_slice(),
+        b"transactions/fixture/commit HTTP/1.1\r\ncontent-length: 2\r\n\r\n{",
+    ] {
+        assert!(
+            matches!(
+                receive.recv_timeout(Duration::from_millis(50)),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+            ),
+            "relay must wait for fragmented bytes"
+        );
+        client.write_all(fragment).unwrap();
+    }
+    assert!(matches!(
+        receive.recv_timeout(Duration::from_millis(50)),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+    ));
+    client.write_all(b"}").unwrap();
+    answer_relay(backend);
+    receive
+        .recv_timeout(Duration::from_secs(3))
+        .unwrap()
+        .unwrap();
+    worker.join().unwrap();
+    assert_eq!(
+        client.read(&mut [0; 1]).unwrap(),
+        0,
+        "response bytes escaped"
+    );
+}
+
+#[test]
+fn relay_suppresses_response_and_idle_drop_reaps_accept() {
+    use std::io::Read;
+    use std::net::{TcpListener, TcpStream};
+    let backend = TcpListener::bind("127.0.0.1:0").unwrap();
+    let relay = response_loss::ResponseLoss::start(backend.local_addr().unwrap());
+    let mut client = TcpStream::connect(relay.address).unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    client
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    client
+        .write_all(b"POST /v1/transactions/fixture/commit HTTP/1.1\r\ncontent-length: 2\r\n\r\n{}")
+        .unwrap();
+    answer_relay(backend);
+    relay.finish();
+    assert_eq!(client.read(&mut [0; 1]).unwrap(), 0);
+    let started = Instant::now();
+    let unused = TcpListener::bind("127.0.0.1:0").unwrap();
+    drop(response_loss::ResponseLoss::start(
+        unused.local_addr().unwrap(),
+    ));
+    assert!(started.elapsed() < Duration::from_secs(3));
+}
+
+#[test]
+fn relay_interruption_keeps_the_deadline_and_redacts_error_messages() {
+    use std::io::{Error, ErrorKind};
+    let mut attempts = 0;
+    let result =
+        response_loss::bounded_io(Instant::now() + Duration::from_secs(1), "fixture", |_| {
+            attempts += 1;
+            if attempts == 1 {
+                Err(Error::from(ErrorKind::Interrupted))
+            } else {
+                Ok(7)
+            }
+        });
+    assert_eq!(result.unwrap(), 7);
+    assert_eq!(attempts, 2);
+    let end = Instant::now() + Duration::from_millis(20);
+    let expired = response_loss::bounded_io::<()>(end, "fixture", |_| {
+        std::thread::sleep(Duration::from_millis(1));
+        Err(Error::from(ErrorKind::Interrupted))
+    })
+    .unwrap_err();
+    assert_eq!(expired, "fixture: deadline");
+    let denied =
+        response_loss::bounded_io::<()>(Instant::now() + Duration::from_secs(1), "fixture", |_| {
+            Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "sensitive wire message",
+            ))
+        })
+        .unwrap_err();
+    assert_eq!(denied, "fixture: PermissionDenied");
+}
+
+#[test]
+fn relay_stalled_header_expires_without_forwarding() {
+    use std::net::{TcpListener, TcpStream};
+    let front = TcpListener::bind("127.0.0.1:0").unwrap();
+    let _client = TcpStream::connect(front.local_addr().unwrap()).unwrap();
+    let (accepted, _) = front.accept().unwrap();
+    let backend = TcpListener::bind("127.0.0.1:0").unwrap();
+    backend.set_nonblocking(true).unwrap();
+    let started = Instant::now();
+    let error = response_loss::forward(
+        accepted,
+        backend.local_addr().unwrap(),
+        started + Duration::from_millis(30),
+    )
+    .unwrap_err();
+    assert!(error.starts_with("client header read: "));
+    assert!(
+        error.ends_with("TimedOut") || error.ends_with("WouldBlock") || error.ends_with("deadline")
+    );
+    assert!(started.elapsed() < Duration::from_secs(3));
+    assert_eq!(
+        backend.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+}
+
+#[test]
+fn relay_denies_ambiguous_or_oversized_requests_before_connecting() {
+    use std::net::{TcpListener, TcpStream};
+    let prefix = "POST /v1/transactions/fixture/commit HTTP/1.1\r\n";
+    let cases = [
+        (
+            format!("{prefix}content-length: 0\r\ncontent-length: 0\r\n\r\n"),
+            "relay duplicate content length",
+        ),
+        (
+            format!("{prefix}transfer-encoding: chunked\r\n\r\n"),
+            "relay requires bounded content length",
+        ),
+        (
+            format!("{prefix}content-length: 131073\r\n\r\n"),
+            "relay request bound",
+        ),
+        ("x".repeat(8193), "relay header limit"),
+    ];
+    for (request, expected) in cases {
+        let front = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(front.local_addr().unwrap()).unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let (accepted, _) = front.accept().unwrap();
+        let backend = TcpListener::bind("127.0.0.1:0").unwrap();
+        backend.set_nonblocking(true).unwrap();
+        client.write_all(request.as_bytes()).unwrap();
+        let error = response_loss::forward(
+            accepted,
+            backend.local_addr().unwrap(),
+            Instant::now() + Duration::from_secs(3),
+        )
+        .unwrap_err();
+        assert_eq!(error, expected);
+        assert_eq!(
+            backend.accept().unwrap_err().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+    }
 }

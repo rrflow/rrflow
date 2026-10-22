@@ -73,6 +73,23 @@ uploaded. The [D-01 acceptance record](../roadmap/rrflow-1.0/gate-d-evidence.md#
 binds the first accepted three-platform result to its exact candidate. Later
 changes still require their own candidate CI; this result cannot qualify a
 different revision or a signed platform bundle.
+The C-07c client-history extension runs after each fresh/existing restore
+fixture. A bounded test-owned relay forwards one commit and suppresses its
+entire response. The public client records uncertainty; three forced native
+kill/reopens require stable exact retries, six predeclared claim values, no
+rejected effects, quota recovery and an unchanged runtime head. Each mode
+retains four logical commit identities and 13 attempts (11 acknowledged,
+one rejected, one initially uncertain) checked by the existing `rrflow-eval`
+ledger. The runner requires both closed, build-bound `storage_histories`
+receipts and rejects omitted schedules or unknown nested fields. Production
+engine bytes have no fault switch. These three-cycle response-boundary cases
+do not replace C-07c's internal WAL/publication pauses or dedicated 100-cycle
+profile corpus, and do not qualify power loss or real capacity exhaustion.
+The existing `lifecycle_process` target also qualifies the relay with forced
+nonblocking accepted sockets, fragmented header/body input, interrupted I/O,
+native read expiry, bounded malformed-input denial, redacted errors and idle
+guard cleanup. These helper cases preserve the five-case installed corpus.
+
 Preflight failures retain a bounded failed receipt even before build hashes are
 available; cleanup failure always overrides any prior passed receipt.
 

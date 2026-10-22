@@ -131,6 +131,19 @@ remain the package acceptance boundary; the I/O model does not qualify native
 process death, capacity exhaustion, device caches or installed scale. C-07c is
 the next implementation package after that acceptance, while C-07 stays open.
 
+C-07c's [first installed-history record](../../evidence/change-journals/gate-c/c-07c-client-history.md)
+extends both fresh/existing primary-binary fixtures with a client-observed lost
+commit response, stale rejection/explicit abort, quota reuse and three forced
+reopens. Independent requested values, stable exact-retry receipts and runtime
+cursor ranges detect partial or duplicate application. The native CI collector
+requires both complete build-bound ledgers. This bounded transport history does
+not complete c: internal WAL/visibility/publication pauses, compound recovery
+and the dedicated 100-cycle profile corpus remain required below. Candidate CI
+and the linked PR bind acceptance; C-07 and POAM-035 remain open.
+The [relay portability correction](../../evidence/change-journals/gate-c/c-07c-relay-portability.md)
+retains the first candidate's macOS failure and its deterministic helper
+regression; passed isolated receipts cannot override a failing native lane.
+
 ### Remaining implementation contracts
 
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
