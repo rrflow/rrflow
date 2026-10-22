@@ -45,7 +45,7 @@ pub fn publish_rename(_directory: &Path, temporary: &Path, target: &Path) -> std
         .rename_to(&filesystem::AnchoredPath::from_path(target)?)
 }
 
-pub use batch::{Mutation, WriteBatch, BATCH_FORMAT_VERSION};
+pub use batch::{Mutation, WriteBatch, WriteBatchResource, WriteBatchSize, BATCH_FORMAT_VERSION};
 pub use database::{
     CompactionBoundary, CompactionOutcome, CompactionPolicy, Database, DatabaseOptions,
     FailureMode, FlushBoundary, GarbageCollectionReport, MaintenancePolicy, MaintenanceStats,
