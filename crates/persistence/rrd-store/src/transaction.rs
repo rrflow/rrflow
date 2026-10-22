@@ -8,7 +8,7 @@
 //! clients and adapters must not construct physical keys or invoke this port.
 
 use crate::{Durability, Error, Result};
-use rrd_lsm::{Mutation, WriteBatch};
+use rrd_lsm::{Mutation, WriteBatch, WriteBatchSize};
 use std::collections::BTreeMap;
 
 pub(crate) fn validate_read_key(key: &[u8]) -> Result<()> {
@@ -79,6 +79,7 @@ pub struct TransactionRollback {
 #[derive(Debug, Default)]
 pub(crate) struct TransactionWriteSet {
     writes: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    write_size: WriteBatchSize,
 }
 
 impl TransactionWriteSet {
@@ -91,23 +92,29 @@ impl TransactionWriteSet {
     }
 
     pub(crate) fn put(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        let mutation = Mutation::Put { key, value };
-        mutation.validate().map_err(Error::from)?;
-        let Mutation::Put { key, value } = mutation else {
-            unreachable!("constructed a put mutation")
-        };
+        let size = self.write_size.with_replacement(
+            &key,
+            self.writes.get(&key).map(|value| value.as_deref()),
+            Some(&value),
+        )?;
         self.writes.insert(key, Some(value));
+        self.write_size = size;
         Ok(())
     }
 
     pub(crate) fn delete(&mut self, key: Vec<u8>) -> Result<()> {
-        let mutation = Mutation::Delete { key };
-        mutation.validate().map_err(Error::from)?;
-        let Mutation::Delete { key } = mutation else {
-            unreachable!("constructed a delete mutation")
-        };
+        let size = self.write_size.with_replacement(
+            &key,
+            self.writes.get(&key).map(|value| value.as_deref()),
+            None,
+        )?;
         self.writes.insert(key, None);
+        self.write_size = size;
         Ok(())
+    }
+
+    pub(crate) fn into_mutations(self) -> BTreeMap<Vec<u8>, Option<Vec<u8>>> {
+        self.writes
     }
 
     pub(crate) fn mutations(&self) -> &BTreeMap<Vec<u8>, Option<Vec<u8>>> {

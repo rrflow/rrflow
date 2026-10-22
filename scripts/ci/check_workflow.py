@@ -546,6 +546,14 @@ def main() -> None:
         )
 
     for job in ["topology-smoke", "estate-portability"]:
+        for command in [
+            "cargo test -p rrd-lsm --lib admission_tests --locked",
+            "cargo test -p rrd-lsm --test write_admission --locked",
+            "cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked",
+            "cargo test -p rrd-engine --lib engine::tests::write_admission --locked",
+        ]:
+            require(jobs[job].count(command) == 1,
+                    f"{job} must require encoded staging and rejection recovery: {command}")
         require(
             "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
             in jobs[job],
