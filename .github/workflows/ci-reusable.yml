@@ -51,6 +51,12 @@ jobs:
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
         run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
       - name: Test bounded storage I/O model and compound recovery
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
@@ -120,6 +126,12 @@ jobs:
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
         run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
       - name: Test bounded storage I/O model and compound recovery
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture

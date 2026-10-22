@@ -1,4 +1,5 @@
 mod format;
+mod output;
 #[cfg(feature = "physical-policy-lab")]
 mod physical_policy_lab;
 mod reader;
@@ -31,6 +32,9 @@ pub use self::format::{
     DEFAULT_COMPRESSION_MINIMUM_SAVINGS_BASIS_POINTS, DEFAULT_ROW_GROUP_MAX_ROWS,
     DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY, SEGMENT_FORMAT_VERSION,
     SEGMENT_KEY_CODEC_DIGEST, SEGMENT_PAGE_FORMAT_DIGEST, SEGMENT_SCHEMA_DIGEST,
+};
+pub use self::output::{
+    ProjectedOutputMemory, ProjectedOutputStats, DEFAULT_PROJECTED_OUTPUT_BYTES,
 };
 #[cfg(feature = "physical-policy-lab")]
 pub use self::physical_policy_lab::{

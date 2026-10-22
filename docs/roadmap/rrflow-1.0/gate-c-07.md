@@ -178,6 +178,19 @@ capacity requirements remain open; this corpus cannot close C-07 independently.
 
 ### Remaining implementation contracts
 
+Native projected-output admission is a bounded d/e prerequisite. Its
+[baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
+binds a per-open-instance byte pool at the existing reader. An entire output
+batch reserves capacity before allocation; each immutable Arrow allocation
+retains its charge through clones/slices and releases it after its last owner.
+Source-view completion does not release retained output. This native pool is
+distinct from per-stream work limits and does not cover separate reopened
+instances, caller copies, source pages, merge temporaries or process RSS.
+Installed budget binding, aggregate live-owner admission and capacity evidence
+remain required; exact-candidate CI and the
+[implementation journal](../../evidence/change-journals/gate-c/c-07e-output-budget.md)
+own acceptance.
+
 The [encoded staging admission repair](../../evidence/change-journals/gate-c/c-07d-write-admission.md)
 is a bounded C-07d prerequisite: native transactions, rrflowMX and semantic
 plans admit their encoded physical effects before mutating staged maps.

@@ -96,6 +96,17 @@ or require a particular new public endpoint.
 
 ### Qualification impact
 
+At accepted `dde6ef86d278b8c59cf1f61ebc2d3923186396d5`, projected reads
+bound each batch and each stream's cumulative output but do not share output
+admission across successive streams. Retained batches and individual Arrow
+clones can outlive terminal streams. A policy-surface reproduction accepted a
+second 97-byte output while the first remained retained under a nominal
+97-byte pool, and accepted zero capacity. The
+[retained-output baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
+binds native preallocation reservation and last-allocation-owner release.
+Its per-open-instance output cap is not a bound on independent reopen pools,
+other memory families or installed total memory. C-07d/e remain open.
+
 Component success could be mistaken for safe production growth, a true
 disk-full result, power-loss durability or bounded multi-estate operation.
 Storage-level success cannot establish native graph/vector scale, complete

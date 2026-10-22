@@ -45,6 +45,14 @@ output surviving database/stream disposal. Weak-owner and registry checks
 cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
 ownership regressions, not aggregate RSS, installed reclamation or soak proof.
 
+Those same partitions separately require `projected_output_limits` and
+`segment::output::tests`. These qualify output-byte admission before allocation,
+last-owner release through buffer clones/slices, concurrent readers, failed
+batch construction and retained output through reclamation/reopen. The native
+pool is scoped to one database-open instance and excludes source pages, caller
+copies and allocator metadata; these checks do not establish total-memory or
+installed capacity limits.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable

@@ -98,6 +98,8 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Output allocation cap shared by projected streams of this open instance.
+    pub projected_output_bytes: usize,
     pub page_cache_bytes: usize,
     pub page_cache_policy: PageCachePolicy,
     pub segment_io: SegmentIoPolicy,
@@ -110,6 +112,7 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
             page_cache_policy: PageCachePolicy::default(),
             segment_io: SegmentIoPolicy::default(),
@@ -123,6 +126,11 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     fn validate(self) -> Result<Self> {
+        if self.projected_output_bytes == 0 {
+            return Err(Error::InvalidConfiguration(
+                "projected output byte capacity must be greater than zero".into(),
+            ));
+        }
         self.page_cache_policy
             .protected_capacity_bytes(self.page_cache_bytes)?;
         self.segment_io.validate()?;
@@ -306,6 +314,7 @@ pub struct Database {
     writer_requires_reopen: Option<&'static str>,
     transaction_snapshots: Arc<crate::transaction::TransactionSnapshots>,
     active_read_views: Arc<std::sync::Mutex<ActiveReadViews>>,
+    projected_output: crate::ProjectedOutputMemory,
     write_path_diagnostics: Option<WritePathCollector>,
 }
 
@@ -409,6 +418,7 @@ impl Database {
             writer_requires_reopen: None,
             transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
     }
@@ -540,6 +550,7 @@ impl Database {
             writer_requires_reopen: None,
             transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
     }
@@ -560,6 +571,10 @@ impl Database {
         Snapshot {
             sequence: self.memtable.maximum_sequence(),
         }
+    }
+
+    pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {
+        self.projected_output.clone()
     }
 
     /// Captures one immutable logical/physical read view and returns a bounded
@@ -629,6 +644,7 @@ impl Database {
             request.budget,
             cache_access,
             lease,
+            self.projected_output.clone(),
         ))
     }
 
