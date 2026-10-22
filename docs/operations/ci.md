@@ -60,11 +60,39 @@ resumes exact runtime/control/object evidence without duplicate effects.
 Denied replay preserves file bytes. These are component restore limits, not
 installed configuration binding, aggregate recovery memory or capacity proof.
 
+Those same partitions separately require `projected_output_limits` and
+`segment::output::tests`. These qualify output-byte admission before allocation,
+last-owner release through buffer clones/slices, concurrent readers, failed
+batch construction and retained output through reclamation/reopen. The native
+pool is scoped to one database-open instance and excludes source pages, caller
+copies and allocator metadata; these checks do not establish total-memory or
+installed capacity limits.
+
+The same native partitions require the `interleaved` filter in
+`projected_read_adversarial`, with a five-minute step limit. Nine fixed histories
+combine two reader stamps, a pinned transaction, mixed-family writes/deletes,
+checkpoint release, compaction, actual GC and reopen. A joined reader thread
+uses capacity-one channels and 30-second receive deadlines. Independent model
+rows and physical-file checks require retention before terminal release and
+reclamation afterward; copied Arrow batches and individual buffer clones
+survive database close and disposable-directory removal. Mapped raw, bounded
+raw and bounded adaptive-LZ4 paths must report that they were exercised. This
+is native component lifetime evidence, not installed reclamation or memory
+capacity qualification.
+
 The same three native partitions require `mutable_limits`: hard active-state
 byte/version admission, pre-effect rejection, hot-key pressure with held
 history, and writer/read-only WAL replay denial followed by exact recovery.
 This accounts active key/value/version charges; it does not establish aggregate
 heap/RSS, installed configuration binding or whole-startup work limits.
+
+The same three native partitions require `write_diagnostics` and
+`rrflow_kv_operator`. Uncontended timing may be zero; measured phases/waits
+must fit their independent outer duration and supplied lock context survives
+exactly, including zero and saturating values. Bounded sample/drop accounting,
+maintenance counters and durable readback remain required. Positive timing is
+not evidence of physical synchronization; the native durability/I/O suites
+retain that responsibility.
 
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.

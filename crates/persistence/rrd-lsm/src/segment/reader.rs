@@ -2,7 +2,7 @@ use super::format::PageKind;
 use super::{
     key_at, offset_at, sequence_at, valid_at, KeySpine, PageCacheAccess, PageLoadEvidence, Segment,
 };
-use crate::{Error, Manifest, Memtable, Result, Snapshot};
+use crate::{Error, Manifest, Memtable, ProjectedOutputMemory, Result, Snapshot};
 use arrow_buffer::{Buffer, MutableBuffer};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -210,6 +210,7 @@ pub enum ProjectedReadResource {
     OutputBufferBytes,
     BatchRows,
     BatchAllocatedBytes,
+    RetainedOutputBytes,
 }
 
 impl ProjectedReadResource {
@@ -226,6 +227,7 @@ impl ProjectedReadResource {
             Self::OutputBufferBytes => "output_buffer_bytes",
             Self::BatchRows => "batch_rows",
             Self::BatchAllocatedBytes => "batch_allocated_bytes",
+            Self::RetainedOutputBytes => "retained_output_bytes",
         }
     }
 }
@@ -282,6 +284,10 @@ pub struct ProjectedReadEvidence {
     pub outcome: ProjectedReadOutcome,
 }
 
+/// Immutable copied output. Clones and slices of its Arrow buffers keep the
+/// originating database-open instance's output reservation until the last
+/// allocation owner drops. These custom-owned buffers cannot be converted
+/// in place to mutable buffers; caller-created copies are outside that pool.
 #[derive(Debug, Clone)]
 pub struct ProjectedReadBatch {
     projection: ProjectedReadProjection,
@@ -529,6 +535,7 @@ pub struct ProjectedReadStream {
     initialized: bool,
     terminal: bool,
     lease: Option<ReadViewLease>,
+    output_memory: ProjectedOutputMemory,
 }
 
 impl ProjectedReadStream {
@@ -539,6 +546,7 @@ impl ProjectedReadStream {
         budget: ProjectedReadBudget,
         cache_access: PageCacheAccess,
         lease: ReadViewLease,
+        output_memory: ProjectedOutputMemory,
     ) -> Self {
         let ranges: Arc<[ProjectedReadRange]> = ranges.into();
         let mut cursors = Vec::with_capacity(
@@ -585,6 +593,7 @@ impl ProjectedReadStream {
             initialized: false,
             terminal: false,
             lease: Some(lease),
+            output_memory,
         }
     }
 
@@ -793,6 +802,7 @@ impl ProjectedReadStream {
     ) -> Result<ProjectedReadBatch> {
         let allocation =
             batch_allocation_bytes(rows.len(), key_bytes, value_bytes, self.projection)?;
+        let mut reservation = self.output_memory.reserve(allocation)?;
         self.meter.record_batch_allocation(allocation)?;
         let mut key_offsets = MutableBuffer::from_len_zeroed((rows.len() + 1) * 8);
         let mut key_data = MutableBuffer::from_len_zeroed(key_bytes);
@@ -840,10 +850,14 @@ impl ProjectedReadStream {
         let batch = ProjectedReadBatch {
             projection: self.projection,
             rows: rows.len(),
-            key_offsets: Buffer::from(key_offsets),
-            key_data: Buffer::from(key_data),
-            value_offsets: value_offsets.map(Buffer::from),
-            value_data: value_data.map(Buffer::from),
+            key_offsets: reservation.wrap(key_offsets)?,
+            key_data: reservation.wrap(key_data)?,
+            value_offsets: value_offsets
+                .map(|buffer| reservation.wrap(buffer))
+                .transpose()?,
+            value_data: value_data
+                .map(|buffer| reservation.wrap(buffer))
+                .transpose()?,
         };
         self.meter.record_emitted_batch(
             rows.len() as u64,
