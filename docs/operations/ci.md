@@ -36,6 +36,13 @@ request or ref. The reusable workflow reduces every partition into one stable
   exclusion on GitHub-hosted Linux, macOS and Windows; and
 - one always-evaluated gate which fails unless every partition succeeded.
 
+The Linux topology and Windows/macOS estate partitions also require
+`projected_lifetime` and `reader::lifetime_tests`: overlapping empty-reader
+admission, mixed generations and terminal source-owner release, with copied
+output surviving database/stream disposal. Weak-owner and registry checks
+cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
+ownership regressions, not aggregate RSS, installed reclamation or soak proof.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable

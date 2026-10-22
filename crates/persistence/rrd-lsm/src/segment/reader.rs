@@ -9,6 +9,10 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::{Arc, Mutex};
 
+#[cfg(test)]
+#[path = "reader_lifetime_tests.rs"]
+mod lifetime_tests;
+
 pub const PROJECTED_READ_CONTRACT_VERSION: u16 = 1;
 
 pub const DEFAULT_MAX_ACTIVE_READ_VIEWS: usize = 1_024;
@@ -476,7 +480,9 @@ impl ReadViewLease {
             .checked_sub(self.pinned_bytes)
             .ok_or(Error::PoisonedReadViewRegistry)?;
         let remove = next_references == 0;
-        if remove != (next_manifest_pinned == 0) {
+        // Empty views legitimately hold a reference with zero pinned bytes.
+        // Only the last reference requires all of this manifest's charge gone.
+        if remove && next_manifest_pinned != 0 {
             return Err(Error::PoisonedReadViewRegistry);
         }
         if remove {
@@ -854,6 +860,12 @@ impl ProjectedReadStream {
         }
         self.terminal = true;
         self.meter.evidence.outcome = outcome;
+        // Release captured generations and temporary buffers before the pin.
+        // Returned batches own copied buffers independently of these sources.
+        self.pending = None;
+        self.heads = Vec::new();
+        self.heap = BinaryHeap::new();
+        self.cursors = Vec::new();
         let release = self
             .lease
             .take()

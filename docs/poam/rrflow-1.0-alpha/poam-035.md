@@ -47,6 +47,22 @@ on reopen before reclamation. These are abstract I/O-loss and native-call-error
 fixtures, not observed device power failures. Exact-candidate CI is required
 for landing; this remediation does not close POAM-035 or reopen C-06/D-01.
 
+### C-07e reproduced projected reader ownership defects
+
+At `cae8f3d9e3e0f733720a2f60ff5a8a3ab3094bf3`, new public-reader fixtures
+reproduced `PoisonedReadViewRegistry` when completing/canceling one of two
+empty views, leaked admission after drop, and failure to release a populated
+view while an empty generation remained live. The registry incorrectly equated
+zero pinned bytes with zero remaining references. Independent weak-owner
+fixtures also proved terminal streams retained their source memtables after
+unregistering pins, for completion, cancellation and budget failure.
+
+The [reader ownership repair](../../evidence/change-journals/gate-c/c-07e-read-view-release.md)
+preserves zero-byte live references and drops captured generations/temporary
+buffers before releasing the lease. Copied output batches remain independent.
+Its focused local evidence does not close retained-buffer/native-memory or
+installed maintenance qualification; exact-candidate native CI is required.
+
 ## Impact
 
 Component success could be mistaken for safe production growth, a true

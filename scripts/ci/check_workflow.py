@@ -550,6 +550,11 @@ def main() -> None:
             in jobs[job],
             f"{job} must exercise the installed primary executable lifecycle",
         )
+        for command in [
+            "cargo test -p rrd-lsm --test projected_lifetime --locked",
+            "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
+        ]:
+            require(command in jobs[job], f"{job} must qualify reader ownership: {command}")
     diagnostic = jobs["installed-crash"]
     for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
         require(f"- {platform}" in diagnostic, f"diagnostic primary must qualify {platform}")

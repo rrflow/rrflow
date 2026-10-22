@@ -169,6 +169,14 @@ the component corpus closes C-07c, d-g or POAM-035.
 
 ### Remaining implementation contracts
 
+The [projected reader ownership repair](../../evidence/change-journals/gate-c/c-07e-read-view-release.md)
+addresses reproduced prerequisite defects in empty-view admission release and
+terminal stream source retention. It preserves the canonical registry/reader
+and copied output lifetimes; its native ownership fixtures do not establish
+installed GC, aggregate process memory limits or the complete e matrix.
+C-07c installed maintenance must consume correct reader ownership rather than
+building on falsely released pins. C-07 and POAM-035 remain open.
+
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
 candidate `88df70b39b0d73e91930a26d3017363c36c615f6`,
 [CI run 39705515593](https://github.com/rrflow/rrflow-development/actions/runs/39705515593),
