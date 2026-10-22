@@ -91,6 +91,26 @@ fn zero_output_capacity_rejects_before_creating_database() {
         Err(Error::InvalidConfiguration(_))
     ));
     assert!(!path.exists());
+    let mut database = Database::create(&path).unwrap();
+    put(&mut database, b"prior", b"acknowledged");
+    drop(database);
+    let policy = DatabaseOptions {
+        projected_output_bytes: 0,
+        ..DatabaseOptions::default()
+    };
+    assert!(matches!(
+        Database::open_with_options(&path, policy),
+        Err(Error::InvalidConfiguration(_))
+    ));
+    assert!(matches!(
+        rrd_lsm::ReadOnlyDatabase::open_with_options(&path, policy),
+        Err(Error::InvalidConfiguration(_))
+    ));
+    let reopened = Database::open(&path).unwrap();
+    assert_eq!(
+        reopened.get(b"prior", reopened.snapshot()).unwrap(),
+        Some(b"acknowledged".to_vec())
+    );
 }
 
 #[test]

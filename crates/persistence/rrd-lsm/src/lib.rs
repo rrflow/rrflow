@@ -23,6 +23,7 @@ mod inspection;
 mod io;
 mod manifest;
 mod memtable;
+mod mutable;
 mod segment;
 mod snapshot_bundle;
 mod transaction;
@@ -59,6 +60,7 @@ pub use manifest::{
     Checkpoint, CurrentPointer, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION,
 };
 pub use memtable::{Memtable, MemtableProfile, VersionedValue};
+pub use mutable::{MutableLimits, MutableResource};
 #[cfg(feature = "physical-policy-lab")]
 pub use segment::{
     run_physical_policy_trial, CachePolicyObservation, CandidateDecision, CodecObservation,
