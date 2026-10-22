@@ -551,6 +551,11 @@ def main() -> None:
             in jobs[job],
             f"{job} must exercise the installed primary executable lifecycle",
         )
+        for command in [
+            "cargo test -p rrd-lsm --test projected_lifetime --locked",
+            "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
+        ]:
+            require(command in jobs[job], f"{job} must qualify reader ownership: {command}")
     reopen = jobs["installed-reopen"]
     for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
         require(f"- {platform}" in reopen, f"ordinary reopen corpus must qualify {platform}")
