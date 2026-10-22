@@ -63,6 +63,12 @@ buffers before releasing the lease. Copied output batches remain independent.
 Its focused local evidence does not close retained-buffer/native-memory or
 installed maintenance qualification; exact-candidate native CI is required.
 
+The subsequent [interleaved history evidence](../../evidence/change-journals/gate-c/c-07e-interleaved-lifetimes.md)
+joins overlapping snapshot readers and transaction pins to checkpoint release,
+compaction/GC, terminal admission reuse and reopen using the existing independent
+model. Its bounded physical matrix does not close native memory, aggregate
+output admission or installed reclamation obligations.
+
 ## Impact
 
 ### Encoded staging admission deficiency

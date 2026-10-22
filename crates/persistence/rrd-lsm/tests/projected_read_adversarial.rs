@@ -7,6 +7,21 @@ use projected_read_model::{
 };
 
 #[test]
+fn interleaved_mapped_raw_lifetimes_preserve_history_and_reclaim() {
+    projected_read_model::run_interleaved_lifetime_matrix("mapped-raw");
+}
+
+#[test]
+fn interleaved_bounded_raw_lifetimes_preserve_history_and_reclaim() {
+    projected_read_model::run_interleaved_lifetime_matrix("bounded-raw");
+}
+
+#[test]
+fn interleaved_bounded_lz4_lifetimes_preserve_history_and_reclaim() {
+    projected_read_model::run_interleaved_lifetime_matrix("bounded-lz4");
+}
+
+#[test]
 fn fixed_seed_state_machine_matches_independent_model() {
     let report = run_seeded_scenarios(&ScenarioConfig {
         seed: 0xca81_5e11_7e57_0001,
