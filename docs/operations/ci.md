@@ -33,7 +33,9 @@ request or ref. The reusable workflow reduces every partition into one stable
 - installed lifecycle and daemon portability on GitHub-hosted Windows and
   macOS runners;
 - separately identified installed domain-crash diagnostics and ordinary-build
-  exclusion on GitHub-hosted Linux, macOS and Windows; and
+  exclusion on GitHub-hosted Linux, macOS and Windows;
+- ordinary-primary fresh/existing 100-cycle acknowledged kill/reopen histories
+  on those same three native platforms; and
 - one always-evaluated gate which fails unless every partition succeeded.
 
 The Linux topology and Windows/macOS estate partitions also require
@@ -94,6 +96,27 @@ receipts and rejects omitted schedules or unknown nested fields. Production
 engine bytes have no fault switch. These three-cycle response-boundary cases
 do not replace C-07c's internal WAL/publication pauses or dedicated 100-cycle
 profile corpus, and do not qualify power loss or real capacity exhaustion.
+
+The separate `installed-reopen` job explicitly selects both ignored long tests
+in `installed_reopen` with default features and the existing optimized
+`--release` Cargo profile. This is a source-built ordinary artifact, not a
+signed distribution or an official release. Each test freezes 100 independent
+two-claim requests before execution. Every ACK is followed by an owned process
+kill and reopen, exact full-history readback before retry, replay of every
+previous transaction with stable receipts, and another cursor/readback check.
+Each mode reconciles 5,150 attempts and records 100 kill/reap/restart chains
+plus final cleanup. Startup and request deadlines remain 60 seconds; the
+corpus has a one-hour deadline, each child a three-minute deadline, and bounded
+capture. The job's 90-minute budget includes compilation and qualification;
+it does not change the existing lifecycle or diagnostic job budgets.
+
+The actual ordinary artifact must exclude the diagnostic protocol marker.
+Build, installation-plan and effective configuration identities accompany the
+sanitized receipts. CI requires both complete receipts and retains them as
+artifacts; default-suite ignored results are not qualification. This is a
+small fixed correctness workload under default installed settings. It does
+not qualify J-04 constrained allocations, publication/reclamation boundaries,
+power loss, hard resource limits, disk exhaustion or a 24-hour soak.
 The existing `lifecycle_process` target also qualifies the relay with forced
 nonblocking accepted sockets, fragmented header/body input, interrupted I/O,
 native read expiry, bounded malformed-input denial, redacted errors and idle

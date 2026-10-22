@@ -399,6 +399,88 @@ jobs:
       - name: Deny PostgreSQL operator-knowledge warnings
         run: cargo clippy -p rrd-operator-knowledge --all-targets --all-features --locked -- -D warnings
 
+  installed-reopen:
+    name: installed 100-cycle reopen (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    env:
+      CARGO_BUILD_JOBS: "1"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: installed-reopen-${{ matrix.os }}
+          cache-on-failure: false
+      - name: Build ordinary primary and fixed reopen corpus
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
+      - name: Require fresh and existing 100-cycle histories
+        timeout-minutes: 65
+        env:
+          RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2
+      - name: Require both complete ordinary-primary receipts
+        shell: bash
+        env:
+          RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RRFLOW_REOPEN_RECEIPT_DIR'])
+          assert sorted(p.name for p in root.iterdir()) == ['existing.json', 'fresh.json']
+          builds = []
+          for mode in ['fresh', 'existing']:
+              path = root / (mode + '.json')
+              assert 0 < path.stat().st_size <= 8 * 1024 * 1024
+              receipt = json.loads(path.read_bytes())
+              assert receipt['mode'] == mode and receipt['instrumentation'] == 'none'
+              assert receipt['build']['compiler']['root_profile'] == 'release'
+              assert receipt['build']['compiler']['opt_level'] == '3'
+              assert receipt['build']['compiler']['debug_assertions'] is False
+              assert receipt['forced_reopens'] == 100 and len(receipt['cycles']) == 100
+              assert receipt['report'] == {'logical_calls': 100, 'attempts': 5150, 'acknowledged': 5150, 'rejected': 0, 'uncertain': 0, 'resolved_present': 100, 'resolved_absent': 0, 'unresolved': 0, 'violations': []}
+              assert len(receipt['ledger']['expected']) == len(receipt['ledger']['readback']) == 100
+              assert len(receipt['ledger']['attempts']) == 5150
+              previous = None
+              for index, cycle in enumerate(receipt['cycles']):
+                  assert cycle['cycle'] == index and cycle['checked_operations'] == index + 1
+                  assert cycle['runtime_cursor'] == 2 * (index + 1) + 2
+                  assert cycle['prior']['pid'] == cycle['termination']['pid']
+                  assert cycle['prior']['ready_ns'] <= cycle['termination']['killed_ns'] <= cycle['termination']['reaped_ns'] <= cycle['reopened']['started_ns'] <= cycle['reopened']['ready_ns']
+                  assert previous is None or cycle['prior'] == previous
+                  previous = cycle['reopened']
+              assert receipt['cleanup']['pid'] == previous['pid']
+              assert previous['ready_ns'] <= receipt['cleanup']['killed_ns'] <= receipt['cleanup']['reaped_ns']
+              builds.append(receipt['build'])
+          assert builds[0] == builds[1]
+          print('ordinary reopen evidence: 200 cycles, 10300 reconciled attempts, both estates cleaned up')
+          PY
+      - name: Retain sanitized ordinary reopen receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-reopen-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-reopen/*.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Deny reopen corpus warnings
+        run: cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings
+
   installed-crash:
     name: installed domain crash (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -467,6 +549,7 @@ jobs:
       - optional-features
       - pgvector-feature
       - installed-crash
+      - installed-reopen
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -480,6 +563,7 @@ jobs:
           OPTIONAL_FEATURES_RESULT: ${{ needs.optional-features.result }}
           PGVECTOR_FEATURE_RESULT: ${{ needs.pgvector-feature.result }}
           INSTALLED_CRASH_RESULT: ${{ needs.installed-crash.result }}
+          INSTALLED_REOPEN_RESULT: ${{ needs.installed-reopen.result }}
         run: |
           test "$TOPOLOGY_RESULT" = success
           test "$PORTABILITY_RESULT" = success
@@ -489,3 +573,4 @@ jobs:
           test "$OPTIONAL_FEATURES_RESULT" = success
           test "$PGVECTOR_FEATURE_RESULT" = success
           test "$INSTALLED_CRASH_RESULT" = success
+          test "$INSTALLED_REOPEN_RESULT" = success

@@ -525,6 +525,7 @@ def main() -> None:
     )
 
     expected_jobs = {
+        "installed-reopen",
         "installed-crash",
         "topology-smoke",
         "estate-portability",
@@ -555,6 +556,20 @@ def main() -> None:
             "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
         ]:
             require(command in jobs[job], f"{job} must qualify reader ownership: {command}")
+    reopen = jobs["installed-reopen"]
+    for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
+        require(f"- {platform}" in reopen, f"ordinary reopen corpus must qualify {platform}")
+    for command in [
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2",
+        "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
+        "RRFLOW_REOPEN_RECEIPT_DIR:",
+        "'attempts': 5150",
+        "actions/upload-artifact@",
+    ]:
+        require(command in reopen, f"ordinary reopen qualification missing: {command}")
+    require("--features" not in reopen and "--all-features" not in reopen,
+            "ordinary reopen corpus must not activate diagnostic features")
     diagnostic = jobs["installed-crash"]
     for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
         require(f"- {platform}" in diagnostic, f"diagnostic primary must qualify {platform}")

@@ -65,6 +65,20 @@ installed maintenance qualification; exact-candidate native CI is required.
 
 ## Impact
 
+### Installed reclamation call-path observation
+
+At `cae8f3d9e3e0f733720a2f60ff5a8a3ab3094bf3`, ordinary writes already
+reach automatic flush and compaction through `Database::prepare_write`.
+Native `Database::garbage_collect` is exposed by `RrflowKvStore`, but its
+remaining callers are tests and examples; no installed engine operation or
+automatic native write path invokes reclamation. Component GC success cannot
+therefore establish installed reclamation or bounded disk growth. C-07c/d/e
+must supply and qualify that composition with authorization, budgets, pins
+and recovery preserved. This observation does not select a second scheduler
+or require a particular new public endpoint.
+
+### Qualification impact
+
 Component success could be mistaken for safe production growth, a true
 disk-full result, power-loss durability or bounded multi-estate operation.
 Storage-level success cannot establish native graph/vector scale, complete
