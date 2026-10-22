@@ -186,6 +186,13 @@ installed GC, aggregate process memory limits or the complete e matrix.
 C-07c installed maintenance must consume correct reader ownership rather than
 building on falsely released pins. C-07 and POAM-035 remain open.
 
+The [overlapping lifetime history](../../evidence/change-journals/gate-c/c-07e-interleaved-lifetimes.md)
+composes the existing independent version model with two captured readers,
+pinned transactions, checkpoint removal, compaction and actual reclamation.
+Native candidate CI must qualify all physical/terminal cases. Copied output
+survival and native file removal do not establish aggregate retained-output
+admission, installed GC, measured RSS or the complete e matrix.
+
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
 candidate `88df70b39b0d73e91930a26d3017363c36c615f6`,
 [CI run 39705515593](https://github.com/rrflow/rrflow-development/actions/runs/39705515593),

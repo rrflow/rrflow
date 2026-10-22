@@ -554,6 +554,7 @@ def main() -> None:
         for command in [
             "cargo test -p rrd-lsm --test projected_lifetime --locked",
             "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
+            "cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture",
         ]:
             require(command in jobs[job], f"{job} must qualify reader ownership: {command}")
     reopen = jobs["installed-reopen"]

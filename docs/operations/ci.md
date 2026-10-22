@@ -45,6 +45,18 @@ output surviving database/stream disposal. Weak-owner and registry checks
 cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
 ownership regressions, not aggregate RSS, installed reclamation or soak proof.
 
+The same native partitions require the `interleaved` filter in
+`projected_read_adversarial`, with a five-minute step limit. Nine fixed histories
+combine two reader stamps, a pinned transaction, mixed-family writes/deletes,
+checkpoint release, compaction, actual GC and reopen. A joined reader thread
+uses capacity-one channels and 30-second receive deadlines. Independent model
+rows and physical-file checks require retention before terminal release and
+reclamation afterward; copied Arrow batches and individual buffer clones
+survive database close and disposable-directory removal. Mapped raw, bounded
+raw and bounded adaptive-LZ4 paths must report that they were exercised. This
+is native component lifetime evidence, not installed reclamation or memory
+capacity qualification.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable
