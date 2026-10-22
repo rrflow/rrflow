@@ -63,6 +63,12 @@ buffers before releasing the lease. Copied output batches remain independent.
 Its focused local evidence does not close retained-buffer/native-memory or
 installed maintenance qualification; exact-candidate native CI is required.
 
+The subsequent [interleaved history evidence](../../evidence/change-journals/gate-c/c-07e-interleaved-lifetimes.md)
+joins overlapping snapshot readers and transaction pins to checkpoint release,
+compaction/GC, terminal admission reuse and reopen using the existing independent
+model. Its bounded physical matrix does not close native memory, aggregate
+output admission or installed reclamation obligations.
+
 ### C-07d native mutable admission and replay gap
 
 At `f4e404be38a0c21a4a3665b1907bad2226f5c13a`, maintenance still exposes
@@ -88,6 +94,16 @@ bind typed propagation, absent-outcome intent cleanup and configured inspection.
 Its joined histories must preserve prior acknowledgements and permit later work.
 Installed startup/restore configuration, aggregate resource bounds and sustained
 capacity remain open; this repair does not qualify or close C-07.
+
+### Diagnostic timing oracle deficiency
+
+During the pending mutable-limit/accepted reader-history combination, the
+store diagnostics test rejected an observed zero uncontended mutex duration.
+Its strictly-positive assumption exceeds the monotonic clock contract. The
+[clock-oracle repair](../../evidence/change-journals/gate-c/c-07a-diagnostic-clock.md)
+retains actual timings and checks independent outer bounds, exact forwarded
+context and durable effects. It does not qualify contention performance,
+resource enforcement or close this POA&M item.
 
 ## Impact
 
@@ -121,6 +137,17 @@ and recovery preserved. This observation does not select a second scheduler
 or require a particular new public endpoint.
 
 ### Qualification impact
+
+At accepted `dde6ef86d278b8c59cf1f61ebc2d3923186396d5`, projected reads
+bound each batch and each stream's cumulative output but do not share output
+admission across successive streams. Retained batches and individual Arrow
+clones can outlive terminal streams. A policy-surface reproduction accepted a
+second 97-byte output while the first remained retained under a nominal
+97-byte pool, and accepted zero capacity. The
+[retained-output baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
+binds native preallocation reservation and last-allocation-owner release.
+Its per-open-instance output cap is not a bound on independent reopen pools,
+other memory families or installed total memory. C-07d/e remain open.
 
 Component success could be mistaken for safe production growth, a true
 disk-full result, power-loss durability or bounded multi-estate operation.

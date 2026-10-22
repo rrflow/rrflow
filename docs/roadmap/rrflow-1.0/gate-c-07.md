@@ -178,6 +178,19 @@ capacity requirements remain open; this corpus cannot close C-07 independently.
 
 ### Remaining implementation contracts
 
+Native projected-output admission is a bounded d/e prerequisite. Its
+[baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
+binds a per-open-instance byte pool at the existing reader. An entire output
+batch reserves capacity before allocation; each immutable Arrow allocation
+retains its charge through clones/slices and releases it after its last owner.
+Source-view completion does not release retained output. This native pool is
+distinct from per-stream work limits and does not cover separate reopened
+instances, caller copies, source pages, merge temporaries or process RSS.
+Installed budget binding, aggregate live-owner admission and capacity evidence
+remain required; exact-candidate CI and the
+[implementation journal](../../evidence/change-journals/gate-c/c-07e-output-budget.md)
+own acceptance.
+
 The [encoded staging admission repair](../../evidence/change-journals/gate-c/c-07d-write-admission.md)
 is a bounded C-07d prerequisite: native transactions, rrflowMX and semantic
 plans admit their encoded physical effects before mutating staged maps.
@@ -212,6 +225,13 @@ and copied output lifetimes; its native ownership fixtures do not establish
 installed GC, aggregate process memory limits or the complete e matrix.
 C-07c installed maintenance must consume correct reader ownership rather than
 building on falsely released pins. C-07 and POAM-035 remain open.
+
+The [overlapping lifetime history](../../evidence/change-journals/gate-c/c-07e-interleaved-lifetimes.md)
+composes the existing independent version model with two captured readers,
+pinned transactions, checkpoint removal, compaction and actual reclamation.
+Native candidate CI must qualify all physical/terminal cases. Copied output
+survival and native file removal do not establish aggregate retained-output
+admission, installed GC, measured RSS or the complete e matrix.
 
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
 candidate `88df70b39b0d73e91930a26d3017363c36c615f6`,
