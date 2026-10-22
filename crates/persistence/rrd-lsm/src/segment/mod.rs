@@ -18,7 +18,7 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
 use std::fmt;
 use std::fs::File;
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -761,6 +761,9 @@ impl Segment {
             if segment.descriptor.id != encoded.checksum {
                 return invalid("existing content-addressed segment has another identity");
             }
+            // A previous rename can have taken effect despite a failed parent
+            // barrier. Reuse is publication too: stabilize the existing name.
+            directory.sync_directory()?;
             tracing::debug!(
                 target: "rrd_lsm::segment_write",
                 compression_policy = compression_policy.kind(),
@@ -790,8 +793,12 @@ impl Segment {
             .create_new(true)
             .open(&temporary)?;
         if let Err(error) = (|| -> std::io::Result<()> {
-            file.write_all(&encoded.bytes)?;
-            file.sync_all()?;
+            crate::filesystem::file_io::write_all(
+                &mut file,
+                temporary.diagnostic_path(),
+                &encoded.bytes,
+            )?;
+            crate::filesystem::file_io::sync_all(&file, temporary.diagnostic_path())?;
             temporary.rename_to(&path)
         })() {
             let _ = temporary.remove_file();
@@ -964,6 +971,7 @@ impl Segment {
                     expected.id
                 ));
             }
+            directory.sync_directory()?;
             return Ok(existing);
         }
         let temporary = directory.join(format!(
@@ -977,8 +985,8 @@ impl Segment {
             .create_new(true)
             .open(&temporary)?;
         if let Err(error) = (|| -> std::io::Result<()> {
-            file.write_all(bytes)?;
-            file.sync_all()?;
+            crate::filesystem::file_io::write_all(&mut file, temporary.diagnostic_path(), bytes)?;
+            crate::filesystem::file_io::sync_all(&file, temporary.diagnostic_path())?;
             temporary.rename_to(&path)
         })() {
             let _ = temporary.remove_file();

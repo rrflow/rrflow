@@ -1,9 +1,9 @@
-use crate::filesystem::{AnchoredPath, OpenOptions};
+use crate::filesystem::{file_io, AnchoredPath, OpenOptions};
 use crate::write_diagnostics::{PhaseClock, WalAppendPhases};
 use crate::{Error, Result, WriteBatch};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{IoSlice, Read, Seek, SeekFrom, Write};
+use std::io::{IoSlice, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 pub const WAL_FORMAT_VERSION: u16 = 1;
@@ -117,8 +117,11 @@ impl WalWriter {
             .write(true)
             .create_new(true)
             .open(path)?;
-        file.write_all(&file_header())?;
-        file.sync_all()?;
+        file_io::write_all(&mut file, path.diagnostic_path(), &file_header())?;
+        file_io::sync_all(&file, path.diagnostic_path())?;
+        path.parent()
+            .ok_or_else(|| Error::InvalidBatch("WAL requires an anchored parent".into()))?
+            .sync_directory()?;
         Ok(Self {
             path: path.diagnostic_path().to_owned(),
             file,
@@ -153,6 +156,12 @@ impl WalWriter {
                 reason: "unpublished successor WAL contains data".into(),
             })
         })?;
+        // An earlier create may have failed its sync/name barrier. This WAL is
+        // about to become reachable, so a validated header alone is insufficient.
+        file_io::sync_all(&file, path.diagnostic_path())?;
+        path.parent()
+            .ok_or_else(|| Error::InvalidBatch("WAL requires an anchored parent".into()))?
+            .sync_directory()?;
         Self::from_recovered_file(path, file, summary)
     }
 
@@ -238,20 +247,27 @@ impl WalWriter {
         let write_started = phases.is_some().then(PhaseClock::start);
         let write = (|| -> std::io::Result<()> {
             let written = loop {
-                match self
-                    .file
-                    .write_vectored(&[IoSlice::new(&header), IoSlice::new(batch.payload)])
-                {
+                match file_io::write_vectored(
+                    &mut self.file,
+                    &self.path,
+                    &[IoSlice::new(&header), IoSlice::new(batch.payload)],
+                ) {
                     Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
                     result => break result?,
                 }
             };
+            if written == 0 {
+                return Err(std::io::ErrorKind::WriteZero.into());
+            }
             if written < header.len() {
-                self.file.write_all(&header[written..])?;
-                self.file.write_all(batch.payload)?;
+                file_io::write_all(&mut self.file, &self.path, &header[written..])?;
+                file_io::write_all(&mut self.file, &self.path, batch.payload)?;
             } else {
-                self.file
-                    .write_all(&batch.payload[written - header.len()..])?;
+                file_io::write_all(
+                    &mut self.file,
+                    &self.path,
+                    &batch.payload[written - header.len()..],
+                )?;
             }
             Ok(())
         })();
@@ -264,7 +280,7 @@ impl WalWriter {
         }
         if durability == Durability::Authoritative {
             let sync_started = phases.is_some().then(PhaseClock::start);
-            if let Err(error) = self.file.sync_data() {
+            if let Err(error) = file_io::sync_data(&self.file, &self.path) {
                 self.poisoned = true;
                 return Err(Error::Io(error));
             }
@@ -347,7 +363,10 @@ impl WalWriter {
         if self.poisoned {
             return Err(Error::PoisonedWriter);
         }
-        self.file.sync_data()?;
+        if let Err(error) = file_io::sync_data(&self.file, &self.path) {
+            self.poisoned = true;
+            return Err(error.into());
+        }
         Ok(self.next_sequence.saturating_sub(1))
     }
 }
@@ -408,7 +427,7 @@ where
         });
     }
     let mut file_header_bytes = [0u8; FILE_HEADER_BYTES];
-    file.read_exact(&mut file_header_bytes)?;
+    file_io::read_exact(file, &mut file_header_bytes)?;
     validate_file_header(&file_header_bytes)?;
 
     let mut offset = FILE_HEADER_BYTES as u64;
@@ -422,7 +441,7 @@ where
             break;
         }
         let mut header = [0u8; RECORD_HEADER_BYTES];
-        file.read_exact(&mut header)?;
+        file_io::read_exact(file, &mut header)?;
         let decoded = decode_record_header(&header, offset)?;
         if decoded.first_sequence != expected_sequence {
             return Err(Error::Corruption {
@@ -445,7 +464,7 @@ where
             break;
         }
         let mut payload = vec![0u8; decoded.payload_len];
-        file.read_exact(&mut payload)?;
+        file_io::read_exact(file, &mut payload)?;
         let actual = crc32c(&[&header[4..28], &payload]);
         if actual != decoded.checksum {
             return Err(Error::Corruption {

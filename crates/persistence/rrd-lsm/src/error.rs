@@ -132,7 +132,7 @@ impl fmt::Display for Error {
             ),
             Self::RecoveryRequired { boundary } => write!(
                 formatter,
-                "RRD LSM writer crossed {boundary} without applying its durable WAL frame; reopen is required"
+                "RRD LSM writer crossed {boundary} with unresolved durable state; reopen is required"
             ),
             Self::InvalidTransaction(reason) => {
                 write!(formatter, "invalid RRD LSM transaction: {reason}")
@@ -157,7 +157,7 @@ impl fmt::Display for Error {
             }
             Self::PoisonedWriter => write!(
                 formatter,
-                "WAL writer is poisoned after a failed append and must be reopened"
+                "WAL writer is poisoned after a failed write or sync and must be reopened"
             ),
             Self::InjectedFailure { mode, boundary } => {
                 write!(formatter, "injected {mode} failure at {boundary}")

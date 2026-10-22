@@ -52,8 +52,10 @@ owns the remaining dependencies. A wire-only server cannot skip those exits.
 The active executable item is **C-07**, following its
 [ordered durability and growth packages](gate-c-07.md#ordered-implementation-packages).
 C-07a's [bounded measurement contract and evidence](../../evidence/change-journals/gate-c/c-07a-storage-measurement-contract.md)
-establish the first implementation package. After its candidate CI and merge,
-C-07b is next; native fault and growth acceptance remain open. D-01 has
+establish the first implementation package. C-07b's
+[I/O fault and recovery oracle](../../evidence/change-journals/gate-c/c-07b-io-fault-oracle.md)
+adds bounded model evidence and publication repairs. After its exact-candidate
+CI and merge, C-07c is next; installed fault and growth acceptance remain open. D-01 has
 [accepted installed-foundation evidence](gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
 through the actual primary executable on Linux, macOS and Windows. Accepted C-06 replaced
 row-record immutable segments with segment v6's ordered key/version spine,

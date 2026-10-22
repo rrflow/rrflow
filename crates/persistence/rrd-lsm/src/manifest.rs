@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 pub const MANIFEST_FORMAT_VERSION: u16 = 3;
 const MANIFEST_CONTROL_FORMAT_VERSION: u16 = 1;
@@ -411,6 +411,7 @@ impl CurrentPointer {
 pub struct ManifestStore {
     root: AnchoredPath,
     _lock: File,
+    publication_uncertain: AtomicBool,
 }
 
 impl Drop for ManifestStore {
@@ -546,10 +547,37 @@ impl ManifestStore {
                 ));
             }
         }
-        Ok(Self {
+        let store = Self {
             root: root.to_owned(),
             _lock: lock,
-        })
+            publication_uncertain: AtomicBool::new(false),
+        };
+        if !create_new {
+            // Reopen may observe an earlier rename/unlink whose barrier failed.
+            // Stabilize the selected root and checkpoint names before allowing
+            // effects (especially GC) based on that observed reachability.
+            root.sync_directory()?;
+            root.join(CHECKPOINT_DIRECTORY).sync_directory()?;
+        }
+        Ok(store)
+    }
+
+    pub(crate) fn ensure_publication_ready(&self) -> Result<()> {
+        if self.publication_uncertain.load(Ordering::Acquire) {
+            return Err(Error::RecoveryRequired {
+                boundary: "uncertain manifest publication",
+            });
+        }
+        Ok(())
+    }
+
+    fn publication_result<T>(&self, result: Result<T>) -> Result<T> {
+        if result.is_err() {
+            // A failed rename or directory barrier may already have selected a
+            // different root. No dependent effect may use the old in-memory root.
+            self.publication_uncertain.store(true, Ordering::Release);
+        }
+        result
     }
 
     pub fn current(&self) -> Result<Option<(CurrentPointer, Manifest)>> {
@@ -612,6 +640,7 @@ impl ManifestStore {
     }
 
     pub fn publish(&self, manifest: &Manifest, expected: Option<&str>) -> Result<CurrentPointer> {
+        self.ensure_publication_ready()?;
         manifest.validate()?;
         let current = self.current()?;
         let actual = current
@@ -634,9 +663,9 @@ impl ManifestStore {
                 ))
             }
         }
-        self.persist_manifest(manifest)?;
+        self.publication_result(self.persist_manifest(manifest))?;
         let pointer = CurrentPointer::new(manifest);
-        self.publish_pointer(&pointer)?;
+        self.publication_result(self.publish_pointer(&pointer))?;
         Ok(pointer)
     }
 
@@ -646,6 +675,7 @@ impl ManifestStore {
         manifest_digest: &str,
         created_at: u64,
     ) -> Result<Checkpoint> {
+        self.ensure_publication_ready()?;
         let manifest = self.load(manifest_digest)?;
         let checkpoint = Checkpoint::new(name, &manifest, created_at)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
@@ -655,6 +685,7 @@ impl ManifestStore {
             let existing: Checkpoint = serde_json::from_slice(&path.read()?)?;
             existing.validate()?;
             if existing == checkpoint {
+                self.publication_result(directory.sync_directory().map_err(Error::Io))?;
                 return Ok(existing);
             }
             return Err(Error::InvalidManifest(format!(
@@ -665,7 +696,7 @@ impl ManifestStore {
             ".{name}.{}.tmp",
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
-        persist_rename(&directory, &temporary, &path, &bytes)?;
+        self.publication_result(persist_rename(&directory, &temporary, &path, &bytes))?;
         Ok(checkpoint)
     }
 
@@ -697,16 +728,17 @@ impl ManifestStore {
     }
 
     pub fn release_checkpoint(&self, name: &str) -> Result<bool> {
+        self.ensure_publication_ready()?;
         validate_checkpoint_name(name)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let path = directory.join(format!("{name}.json"));
         match path.remove_file() {
             Ok(()) => {
-                directory.sync_directory()?;
+                self.publication_result(directory.sync_directory().map_err(Error::Io))?;
                 Ok(true)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(error) => Err(error.into()),
+            Err(error) => self.publication_result(Err(error.into())),
         }
     }
 
@@ -726,6 +758,7 @@ impl ManifestStore {
                         "existing manifest identity has different bytes".into(),
                     ));
                 }
+                directory.sync_directory()?;
                 return Ok(());
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}

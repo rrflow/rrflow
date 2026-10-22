@@ -5,6 +5,9 @@
 //! incomplete tail bytes are reported for explicit repair, while corruption in
 //! a complete frame fails closed.
 
+#[cfg(test)]
+mod fault_io;
+
 mod batch;
 mod database;
 mod error;

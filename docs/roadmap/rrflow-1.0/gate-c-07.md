@@ -1,6 +1,6 @@
 # C-07 — installed durability and bounded growth
 
-**Status:** active canonical implementation plan; C-07a has bounded contract evidence, C-07b–h remain unimplemented or unqualified
+**Status:** active canonical implementation plan; C-07a/b have bounded contract and I/O-model evidence, C-07c–h remain unimplemented or unqualified
 **Coordinate:** `rrflow://rrflow-instance/data/roadmap/rrflow-1.0/gate-c-07`
 **Owner:** [Gate C](gate-c.md), under the [RRFlow 1.0 release roadmap](../rrflow-1.0.md)
 
@@ -119,6 +119,17 @@ The early J-04a measurement subset does not claim J-04a complete. C-07 uses
 the existing installed test harness; the complete multi-capability J-04b
 driver still follows the spine. This avoids a circular C-07/J-04 dependency
 and a second benchmark authority.
+
+C-07b's [I/O fault implementation record](../../evidence/change-journals/gate-c/c-07b-io-fault-oracle.md)
+binds a unit-test-only native-call fault facility, separate stable bytes and
+directory entries, independent requested/acknowledged values, compound recovery,
+and repairs at WAL/publication/reclamation owners. The fixed history sweeps
+every intercepted call and adds partial-header/payload, retry and reopen cases.
+The [candidate CI lanes](../../operations/ci.md#diagnostic-performance-and-fault-lanes)
+run this bounded oracle on all three native hosts. Exact-candidate CI and merge
+remain the package acceptance boundary; the I/O model does not qualify native
+process death, capacity exhaustion, device caches or installed scale. C-07c is
+the next implementation package after that acceptance, while C-07 stays open.
 
 ## Required failure and concurrency matrix
 

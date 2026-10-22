@@ -362,6 +362,17 @@ turn it into performance or competitive evidence.
 
 ## Diagnostic, performance, and fault lanes
 
+The Linux installed lane and Windows/macOS portability lanes run
+`cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture` with a five-minute
+step limit. This C-07b unit corpus wraps native file calls with deterministic
+faults, then reconstructs a temporary estate from an independent stable-byte
+and directory-entry model. Logs retain call/case counts and failing ordinals.
+The model has fixed byte/file/event bounds and exercises compound recovery
+failures. It is I/O-model evidence on each host, not native process-death,
+ENOSPC, OS-crash, device-cache or physical power-loss qualification. The fault
+controller is compiled only into `rrd-lsm` unit tests; no product feature or
+runtime setting enables it.
+
 The
 [engine observability contract](../architecture/engine-data-flow.md#runtime-modes-build-profiles-and-build-identity)
 defines one semantic engine with release, optimized-diagnostic,
