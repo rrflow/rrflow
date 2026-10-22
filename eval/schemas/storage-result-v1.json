@@ -1,0 +1,354 @@
+{
+  "$defs": {
+    "AcknowledgementLedger": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/Attempt"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        },
+        "expected": {
+          "items": {
+            "$ref": "#/$defs/ExpectedOperation"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        },
+        "readback": {
+          "items": {
+            "$ref": "#/$defs/Readback"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        }
+      },
+      "required": [
+        "expected",
+        "attempts",
+        "readback"
+      ],
+      "type": "object"
+    },
+    "Attempt": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "logical_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "outcome": {
+          "$ref": "#/$defs/AttemptOutcome"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "started_ns": {
+          "description": "Client monotonic offsets, including failed attempts, never host UTC.",
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "logical_id",
+        "request_sha256",
+        "started_ns",
+        "finished_ns",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "AttemptOutcome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "acknowledged",
+              "type": "string"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "receipt_sha256"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "rejected",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "uncertain",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CaseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "faults": {
+          "description": "Faults are retained even if recovery and the independent oracle pass.",
+          "items": {
+            "$ref": "#/$defs/Failure"
+          },
+          "maxItems": 256,
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "ledger": {
+          "$ref": "#/$defs/AcknowledgementLedger"
+        },
+        "limitation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seed": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/CaseStatus"
+        }
+      },
+      "required": [
+        "id",
+        "seed",
+        "status",
+        "faults",
+        "ledger"
+      ],
+      "type": "object"
+    },
+    "CaseStatus": {
+      "enum": [
+        "executed",
+        "failed",
+        "skipped",
+        "unimplemented"
+      ],
+      "type": "string"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ExpectedOperation": {
+      "additionalProperties": false,
+      "description": "Written by the workload oracle BEFORE execution, not reconstructed from\nthe engine's response. Digested into the required case in the manifest.",
+      "properties": {
+        "effect_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "logical_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "resolution": {
+          "$ref": "#/$defs/ExpectedResolution"
+        }
+      },
+      "required": [
+        "logical_id",
+        "request_sha256",
+        "effect_sha256",
+        "resolution"
+      ],
+      "type": "object"
+    },
+    "ExpectedResolution": {
+      "enum": [
+        "present",
+        "absent",
+        "either"
+      ],
+      "type": "string"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "code": {
+          "$ref": "#/$defs/Id"
+        },
+        "occurrence": {
+          "$ref": "#/$defs/Limit"
+        },
+        "phase": {
+          "$ref": "#/$defs/FailurePhase"
+        }
+      },
+      "required": [
+        "phase",
+        "code",
+        "occurrence",
+        "artifact_sha256"
+      ],
+      "type": "object"
+    },
+    "FailurePhase": {
+      "enum": [
+        "admission",
+        "append",
+        "sync",
+        "publication",
+        "recovery",
+        "readback",
+        "measurement",
+        "cleanup"
+      ],
+      "type": "string"
+    },
+    "Id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+      "type": "string"
+    },
+    "Limit": {
+      "format": "uint64",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Readback": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "applications": {
+              "$ref": "#/$defs/Limit"
+            },
+            "effect_sha256": {
+              "$ref": "#/$defs/Digest"
+            },
+            "kind": {
+              "const": "present",
+              "type": "string"
+            },
+            "logical_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            },
+            "request_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "logical_id",
+            "request_sha256",
+            "effect_sha256",
+            "receipt_sha256",
+            "applications"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A positive absence observation after authoritative recovery. Omission\nof a readback entry is unresolved, NOT proof of absence.",
+          "properties": {
+            "kind": {
+              "const": "absent",
+              "type": "string"
+            },
+            "logical_id": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "logical_id"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/CaseResult"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "type": "array"
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "manifest_sha256": {
+      "$ref": "#/$defs/Digest"
+    }
+  },
+  "required": [
+    "format_version",
+    "manifest_sha256",
+    "cases"
+  ],
+  "title": "StorageResult",
+  "type": "object"
+}

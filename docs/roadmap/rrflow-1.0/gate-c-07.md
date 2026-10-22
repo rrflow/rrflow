@@ -1,6 +1,6 @@
 # C-07 — installed durability and bounded growth
 
-**Status:** active canonical implementation plan; all C-07 packages remain unimplemented or unqualified
+**Status:** active canonical implementation plan; C-07a has bounded contract evidence, C-07b–h remain unimplemented or unqualified
 **Coordinate:** `rrflow://rrflow-instance/data/roadmap/rrflow-1.0/gate-c-07`
 **Owner:** [Gate C](gate-c.md), under the [RRFlow 1.0 release roadmap](../rrflow-1.0.md)
 
@@ -108,8 +108,13 @@ by this planning document.
 | **C-07g: installed capacity and sustained operation** | Extend the installed harness with storage workload manifests/results from a, reusing J-04's measurement owner and profiles. Measure native memory, queue/lock time, I/O, debt, restart and backup under constrained allocations. | Run the workload and repetition matrix below; reconcile every attempt. Safety and hard-cap violations fail regardless of mean throughput. Record the largest tested sustainable envelope and every failed operating point. No graph/ANN/provider or UI completion is inferred. |
 | **C-07h: acceptance and handoff** | Reconcile required cases, exact revisions/artifacts, native profiles, resource traces and retained failures in Gate C evidence; update the existing objective/ledger only when named exits pass. | Zero missing required cases, oracle mismatches, lost acknowledged writes or exposed partial batches. All required candidate CI plus native/soak evidence must pass. Keep C-04, E/F/G/H/I/J and parent alpha outcomes open where their own proof is absent. |
 
-C-07a is the first implementation PR. Its initial oracle is admission and
-receipt validation, followed by the existing maintenance/failure fixtures.
+C-07a's [measurement implementation record](../../evidence/change-journals/gate-c/c-07a-storage-measurement-contract.md)
+and [executable tool instructions](../../../eval/README.md) bind closed
+manifest/result schemas, six effective-policy projections, independent
+acknowledgement reconciliation and synthetic golden/negative fixtures. Its
+initial oracle is admission and receipt validation, followed by the existing
+maintenance/failure fixtures. Candidate CI and PR merge still bind acceptance
+to the exact implementation; these fixtures are not native storage receipts.
 The early J-04a measurement subset does not claim J-04a complete. C-07 uses
 the existing installed test harness; the complete multi-capability J-04b
 driver still follows the spine. This avoids a circular C-07/J-04 dependency
@@ -323,8 +328,9 @@ python -X utf8 scripts/ci/build_execution_inventory.py --check
 git diff --check
 ```
 
-The future fault/scale drivers, workload schemas and new case names are
-planned deliverables, not runnable commands today. Their owning PR must add
+The C-07a bounded history schemas and offline validation commands now exist.
+The future native fault/scale drivers, sustained workload collection and new
+native case names remain planned deliverables. Their owning PR must add
 the exact invocation and CI/run-manifest binding before claiming acceptance.
 Stop on any lost ACK, partial batch, stale authority, cap violation,
 unexplained growing live owner, unknown effect or changed format/authority.

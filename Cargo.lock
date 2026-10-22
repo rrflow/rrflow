@@ -4754,8 +4754,12 @@ dependencies = [
 name = "rrflow-eval"
 version = "1.0.0"
 dependencies = [
+ "rrd-contract",
+ "schemars",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]
