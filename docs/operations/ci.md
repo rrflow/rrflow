@@ -57,6 +57,14 @@ raw and bounded adaptive-LZ4 paths must report that they were exercised. This
 is native component lifetime evidence, not installed reclamation or memory
 capacity qualification.
 
+The same three native partitions require `write_diagnostics` and
+`rrflow_kv_operator`. Uncontended timing may be zero; measured phases/waits
+must fit their independent outer duration and supplied lock context survives
+exactly, including zero and saturating values. Bounded sample/drop accounting,
+maintenance counters and durable readback remain required. Positive timing is
+not evidence of physical synchronization; the native durability/I/O suites
+retain that responsibility.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable

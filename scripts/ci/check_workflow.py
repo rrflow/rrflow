@@ -560,6 +560,8 @@ def main() -> None:
             f"{job} must exercise the installed primary executable lifecycle",
         )
         for command in [
+            "cargo test -p rrd-lsm --test write_diagnostics --locked",
+            "cargo test -p rrd-store --test rrflow_kv_operator --locked",
             "cargo test -p rrd-lsm --test projected_lifetime --locked",
             "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
             "cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture",
