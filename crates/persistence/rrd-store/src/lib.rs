@@ -9,6 +9,9 @@
 //! callers select a profile only at the engine composition root.
 
 mod access;
+#[cfg(feature = "crash-test")]
+#[doc(hidden)]
+pub use rrd_lsm::crash_test;
 mod archive;
 mod backup;
 mod control;

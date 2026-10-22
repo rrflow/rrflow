@@ -8,6 +8,13 @@
 #[cfg(test)]
 mod fault_io;
 
+// The same owned rendezvous used by unit tests, explicitly compiled into a
+// diagnostic primary artifact only. Never enabled by a default dependency.
+#[cfg(all(feature = "crash-test", not(test)))]
+#[doc(hidden)]
+#[path = "fault_io/crash.rs"]
+pub mod crash_test;
+
 mod batch;
 mod database;
 mod error;

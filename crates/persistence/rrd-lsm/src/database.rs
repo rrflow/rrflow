@@ -480,6 +480,11 @@ impl Database {
         let wal_started = Instant::now();
         let mut wal_file = OpenOptions::new().read(true).write(true).open(&path)?;
         let recovery = replay_file(&mut wal_file, manifest.wal_start_sequence, |batch| {
+            #[cfg(all(feature = "crash-test", not(test)))]
+            crate::crash_test::boundary(
+                crate::crash_test::Point::RecoveryRead,
+                root.diagnostic_path(),
+            );
             memtable.apply_owned_recovered(batch)
         })?;
         if let Some(offset) = recovery.torn_tail {
@@ -998,6 +1003,11 @@ impl Database {
     ) -> Result<()> {
         #[cfg(test)]
         crate::fault_io::crash::visible(self.root.diagnostic_path());
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::boundary(
+            crate::crash_test::Point::Visible,
+            self.root.diagnostic_path(),
+        );
         let Some((WriteBoundary::Visible, mode)) = failure else {
             return Ok(());
         };

@@ -277,6 +277,10 @@ impl RrdEngine {
                 operation_id,
             )?;
         }
+        // Diagnostic scope starts after authorized intent persistence. Neither
+        // authentication nor the intent's own physical write can select it.
+        #[cfg(feature = "crash-test")]
+        let _domain_crash = rrd_store::crash_test::enter_domain(&request.operation_sha256);
         let accepted_receipt = if matches!(transaction_scope.as_str(), "claims" | "data") {
             let intent = state
                 .transactions
@@ -408,6 +412,13 @@ impl RrdEngine {
             request_id,
             operation_id,
         )?;
+        #[cfg(feature = "crash-test")]
+        if let Some(root) = &self.storage_root {
+            rrd_store::crash_test::boundary(
+                rrd_store::crash_test::Point::ReceiptPersisted,
+                root.diagnostic_path(),
+            );
+        }
         Ok(accepted_receipt)
     }
 

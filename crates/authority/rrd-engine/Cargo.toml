@@ -8,6 +8,7 @@ description = "RRFlow composition root and authoritative embedded RRD engine API
 
 [features]
 default = ["full"]
+crash-test = ["full", "rrd-store/crash-test"]
 cluster-transfer = ["full", "rrd-cluster/openraft-adapter"]
 edge = [
     "dep:rrd-core",

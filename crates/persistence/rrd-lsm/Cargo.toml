@@ -8,6 +8,7 @@ description = "Native RRD storage engine: versioned WAL, MVCC, segments, and man
 
 [features]
 default = []
+crash-test = []
 physical-policy-lab = ["dep:zstd"]
 
 [dependencies]

@@ -391,6 +391,62 @@ jobs:
       - name: Deny PostgreSQL operator-knowledge warnings
         run: cargo clippy -p rrd-operator-knowledge --all-targets --all-features --locked -- -D warnings
 
+  installed-crash:
+    name: installed domain crash (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: installed-crash-${{ matrix.os }}
+          cache-on-failure: false
+      - name: Build ordinary primary before diagnostic feature activation
+        run: cargo build -p rrflow-cli --bin rrflow --locked
+      - name: Verify diagnostic protocol is absent from ordinary artifact
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          path = Path('target/debug/rrflow' + ('.exe' if os.name == 'nt' else ''))
+          marker = b'C07C_NATIVE_PAUSE_V1='
+          digest, tail = hashlib.sha256(), b''
+          with path.open('rb') as source:
+              while block := source.read(1024 * 1024):
+                  if marker in tail + block:
+                      raise SystemExit('diagnostic protocol leaked into ordinary artifact')
+                  digest.update(block)
+                  tail = block[-len(marker):]
+          print('crash_distribution_receipt=' + json.dumps({'sha256': digest.hexdigest(), 'bytes': path.stat().st_size, 'protocol_absent': True}))
+          PY
+      - name: Build explicit diagnostic primary and installed oracle
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run
+      - name: Test bounded diagnostic process control
+        run: cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+      - name: Test exact installed domain boundaries and compound recovery
+        timeout-minutes: 20
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2
+      - name: Deny diagnostic-primary and oracle warnings
+        run: cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
+
   ci-gate:
     name: ci-gate
     if: ${{ always() }}
@@ -402,6 +458,7 @@ jobs:
       - sdk-conformance
       - optional-features
       - pgvector-feature
+      - installed-crash
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -414,6 +471,7 @@ jobs:
           SDK_CONFORMANCE_RESULT: ${{ needs.sdk-conformance.result }}
           OPTIONAL_FEATURES_RESULT: ${{ needs.optional-features.result }}
           PGVECTOR_FEATURE_RESULT: ${{ needs.pgvector-feature.result }}
+          INSTALLED_CRASH_RESULT: ${{ needs.installed-crash.result }}
         run: |
           test "$TOPOLOGY_RESULT" = success
           test "$PORTABILITY_RESULT" = success
@@ -422,3 +480,4 @@ jobs:
           test "$SDK_CONFORMANCE_RESULT" = success
           test "$OPTIONAL_FEATURES_RESULT" = success
           test "$PGVECTOR_FEATURE_RESULT" = success
+          test "$INSTALLED_CRASH_RESULT" = success
