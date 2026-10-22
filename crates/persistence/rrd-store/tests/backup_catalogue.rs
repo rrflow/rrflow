@@ -86,6 +86,58 @@ fn catalogues_multiple_cuts_and_restores_the_selected_backup() {
 }
 
 #[test]
+fn configured_logical_backup_rejects_before_publication_and_resumes() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
+    engine.claims().append_batch(&[claim("one", 10)]).unwrap();
+    let catalogue_root = root.path().join("catalogue");
+    let entry = create_logical_backup(&engine, &catalogue_root, "logical", 100).unwrap();
+    let before = directory_bytes(&catalogue_root);
+    let target = root.path().join("restored");
+    let low = rrd_store::DatabaseOptions {
+        mutable_limits: rrd_store::MutableLimits {
+            accounted_bytes: 1,
+            versions: 1,
+        },
+        ..Default::default()
+    };
+    assert!(matches!(
+        rrd_store::restore_catalogued_backup_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            200,
+            low
+        )
+        .unwrap_err(),
+        rrd_store::Error::MutableLimit { .. }
+    ));
+    assert!(!target.exists());
+    let admitted = rrd_store::DatabaseOptions {
+        mutable_limits: rrd_store::MutableLimits {
+            accounted_bytes: 128 * 1024,
+            versions: 1024,
+        },
+        ..Default::default()
+    };
+    let restored = rrd_store::restore_catalogued_backup_with_options(
+        &catalogue_root,
+        &entry.backup_id,
+        &target,
+        201,
+        admitted,
+    )
+    .unwrap();
+    assert!(restored.resumed && restored.reopened);
+    let engine = RrflowKvStore::open_existing_with_options(&target, admitted).unwrap();
+    assert_eq!(
+        engine.claims().claims_in_range(0, 2).unwrap(),
+        vec![claim("one", 10)]
+    );
+    assert_eq!(directory_bytes(&catalogue_root), before);
+}
+
+#[test]
 fn repeated_identical_backup_is_idempotent() {
     let root = tempfile::tempdir().unwrap();
     let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
@@ -335,6 +387,15 @@ fn application_backup_payload_corruption_fails_before_restore_publication() {
 
 #[test]
 fn application_backup_restores_object_catalogue_and_audit_closure() {
+    application_closure(false);
+}
+
+#[test]
+fn configured_application_restore_rejects_catalogue_then_resumes_closure() {
+    application_closure(true);
+}
+
+fn application_closure(configured: bool) {
     let root = tempfile::tempdir().unwrap();
     let runtime = DataRuntime::new(
         RrflowKvStore::open(&root.path().join("source")).unwrap(),
@@ -404,7 +465,11 @@ fn application_backup_restores_object_catalogue_and_audit_closure() {
         "server/state/vector-collection-catalogue/{}",
         scope.as_str()
     );
-    let catalogue_value = br#"{"collection":"documents","vector":"body"}"#.to_vec();
+    let catalogue_value = if configured {
+        serde_json::to_vec(&serde_json::json!({"collection": "documents", "vector": "body", "description": "x".repeat(256 * 1024)})).unwrap()
+    } else {
+        br#"{"collection":"documents","vector":"body"}"#.to_vec()
+    };
     runtime
         .engine()
         .control()
@@ -447,7 +512,89 @@ fn application_backup_restores_object_catalogue_and_audit_closure() {
     assert_eq!(entry.catalogue_manifest.as_ref().unwrap().record_count, 1);
 
     let target = root.path().join("restored");
-    restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 200).unwrap();
+    if configured {
+        let low = rrd_store::DatabaseOptions {
+            mutable_limits: rrd_store::MutableLimits {
+                accounted_bytes: 128 * 1024,
+                versions: 8192,
+            },
+            ..Default::default()
+        };
+        let error = rrd_store::restore_catalogued_backup_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            200,
+            low,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                rrd_store::Error::MutableLimit {
+                    resource: rrd_store::MutableResource::AccountedBytes,
+                    ..
+                }
+            ),
+            "{error}"
+        );
+        assert!(!target.exists());
+        let staging = root.path().join(format!(
+            ".restored.rrd-restore-{}.staging",
+            &entry.archive.archive_sha256[..16]
+        ));
+        let partial = RrflowKvStore::open_existing_with_options(&staging, low).unwrap();
+        assert_eq!(partial.runtime().cursor().unwrap(), 3);
+        assert_eq!(
+            partial
+                .runtime()
+                .read_stamp(&scope)
+                .unwrap()
+                .catalog_revision,
+            0
+        );
+        assert_eq!(partial.control().get(&catalogue_key).unwrap(), None);
+        drop(partial);
+        let admitted = rrd_store::DatabaseOptions {
+            mutable_limits: rrd_store::MutableLimits {
+                accounted_bytes: 8 * 1024 * 1024,
+                versions: 8192,
+            },
+            ..Default::default()
+        };
+        let report = rrd_store::restore_catalogued_backup_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            201,
+            admitted,
+        )
+        .unwrap();
+        assert!(report.resumed && report.reopened);
+        assert!(!staging.exists());
+        let before = directory_bytes(&target);
+        let denied = rrd_store::verify_restored_backup_objects_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            low,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(denied, rrd_store::Error::MutableLimit { .. }),
+            "{denied}"
+        );
+        assert_eq!(directory_bytes(&target), before);
+        rrd_store::verify_restored_backup_objects_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            admitted,
+        )
+        .unwrap();
+    } else {
+        restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 200).unwrap();
+    }
     let restored = RrflowKvStore::open(&target).unwrap();
     assert_eq!(
         restored.control().get(&catalogue_key).unwrap(),
@@ -478,6 +625,15 @@ fn application_backup_restores_object_catalogue_and_audit_closure() {
 
 #[test]
 fn application_backup_carries_and_replays_the_declared_control_journal() {
+    control_journal_closure(false);
+}
+
+#[test]
+fn configured_application_restore_retains_control_prefix_and_resumes_exactly() {
+    control_journal_closure(true);
+}
+
+fn control_journal_closure(configured: bool) {
     let root = tempfile::tempdir().unwrap();
     let engine = RrflowKvStore::open(&root.path().join("source")).unwrap();
     let objects = LocalObjectStore::open(root.path().join("source-objects")).unwrap();
@@ -488,7 +644,12 @@ fn application_backup_carries_and_replays_the_declared_control_journal() {
     // Installed control state: a record that is later replaced, a policy, an
     // audit chain whose head moves, and an attunement job that is deleted.
     let record_v1 = br#"{"installed":1}"#;
-    let record_v2 = br#"{"installed":2}"#;
+    let replacement = if configured {
+        vec![b'x'; 256 * 1024]
+    } else {
+        br#"{"installed":2}"#.to_vec()
+    };
+    let record_v2 = replacement.as_slice();
     let audit_one = br#"{"audit":"one"}"#;
     let audit_two = br#"{"audit":"two"}"#;
     let head_one = br#"{"head":"one"}"#;
@@ -625,7 +786,92 @@ fn application_backup_carries_and_replays_the_declared_control_journal() {
     assert_eq!(catalogue.format_version, BACKUP_CATALOGUE_VERSION);
 
     let target = root.path().join("restored");
-    restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 300).unwrap();
+    let original_archive = directory_bytes(&catalogue_root);
+    if configured {
+        let low = rrd_store::DatabaseOptions {
+            mutable_limits: rrd_store::MutableLimits {
+                accounted_bytes: 128 * 1024,
+                versions: 8192,
+            },
+            ..Default::default()
+        };
+        let error = rrd_store::restore_catalogued_backup_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            300,
+            low,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                rrd_store::Error::MutableLimit {
+                    resource: rrd_store::MutableResource::AccountedBytes,
+                    ..
+                }
+            ),
+            "{error}"
+        );
+        assert!(!target.exists());
+        let staging = root.path().join(format!(
+            ".restored.rrd-restore-{}.staging",
+            &entry.archive.archive_sha256[..16]
+        ));
+        let partial = RrflowKvStore::open_existing_with_options(&staging, low).unwrap();
+        let progress = control_restore_progress(&partial).unwrap().unwrap();
+        assert_eq!(progress.applied, 5);
+        assert!(!progress.complete);
+        assert_eq!(partial.control().sequence().unwrap(), 6);
+        assert_eq!(
+            partial
+                .control()
+                .get("server/state/install/record")
+                .unwrap(),
+            Some(record_v1.to_vec())
+        );
+        assert_eq!(partial.claims().sequence().unwrap(), 1);
+        drop(partial);
+        let admitted = rrd_store::DatabaseOptions {
+            mutable_limits: rrd_store::MutableLimits {
+                accounted_bytes: 8 * 1024 * 1024,
+                versions: 8192,
+            },
+            ..Default::default()
+        };
+        let report = rrd_store::restore_catalogued_backup_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            301,
+            admitted,
+        )
+        .unwrap();
+        assert!(report.resumed && report.reopened);
+        assert!(!staging.exists());
+        let before = directory_bytes(&target);
+        assert!(matches!(
+            rrd_store::verify_restored_backup_objects_with_options(
+                &catalogue_root,
+                &entry.backup_id,
+                &target,
+                low
+            )
+            .unwrap_err(),
+            rrd_store::Error::MutableLimit { .. }
+        ));
+        assert_eq!(directory_bytes(&target), before);
+        rrd_store::verify_restored_backup_objects_with_options(
+            &catalogue_root,
+            &entry.backup_id,
+            &target,
+            admitted,
+        )
+        .unwrap();
+    } else {
+        restore_catalogued_backup(&catalogue_root, &entry.backup_id, &target, 300).unwrap();
+    }
+    assert_eq!(directory_bytes(&catalogue_root), original_archive);
     let restored = RrflowKvStore::open_existing(&target).unwrap();
     for (key, expected) in [
         ("server/state/install/record", Some(record_v2.to_vec())),
@@ -781,4 +1027,29 @@ fn verification_reads_only_and_a_lost_catalogue_is_not_an_empty_one() {
     let untouched = load_backup_catalogue(&root.path().join("never-used")).unwrap();
     assert!(untouched.backups.is_empty());
     assert_eq!(untouched.revision, 0);
+}
+
+fn directory_bytes(
+    root: &std::path::Path,
+) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    fn visit(
+        root: &std::path::Path,
+        at: &std::path::Path,
+        files: &mut std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>,
+    ) {
+        for entry in std::fs::read_dir(at).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                visit(root, &path, files);
+            } else {
+                files.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    std::fs::read(path).unwrap(),
+                );
+            }
+        }
+    }
+    let mut files = std::collections::BTreeMap::new();
+    visit(root, root, &mut files);
+    files
 }

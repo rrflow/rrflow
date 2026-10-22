@@ -50,7 +50,15 @@ read-only reopen denial preserves typed byte/version errors and existing file
 bytes; admitted inspection recovers exact semantic and control identities. The
 existing semantic and engine admission suites include both native mutable
 resources through prior-ACK/rejection/reopen/replay/abort/next-work histories.
-These component tests do not qualify installed configuration or restore budgets.
+These component tests do not qualify installed configuration.
+
+The native partitions also require the `configured_` histories in
+`logical_archive_resilience` and `backup_catalogue`: one native policy follows
+logical/application restore, partial-prefix resume, catalogue/control replay
+and verification reopens. Rejected work stays private; an adequate policy
+resumes exact runtime/control/object evidence without duplicate effects.
+Denied replay preserves file bytes. These are component restore limits, not
+installed configuration binding, aggregate recovery memory or capacity proof.
 
 The same three native partitions require `mutable_limits`: hard active-state
 byte/version admission, pre-effect rejection, hot-key pressure with held

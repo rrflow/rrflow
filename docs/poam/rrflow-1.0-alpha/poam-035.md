@@ -89,6 +89,17 @@ Its joined histories must preserve prior acknowledgements and permit later work.
 Installed startup/restore configuration, aggregate resource bounds and sustained
 capacity remain open; this repair does not qualify or close C-07.
 
+### Restore policy bypass
+
+At the local PR 67 dependency, logical restore and nested application catalogue/
+control replay opened native stores with defaults. Characterization accepted
+work despite explicitly insufficient byte/version policies. The [restore
+policy evidence](../../evidence/change-journals/gate-c/c-07d-restore-limits.md)
+binds the reproduction and options-aware canonical restore/verify paths.
+Partial-prefix rejection, exact resume and post-population replay checks are
+component evidence. Installed configuration projection, aggregate recovery
+resources, real exhaustion and sustained capacity remain open.
+
 ## Impact
 
 ### Encoded staging admission deficiency

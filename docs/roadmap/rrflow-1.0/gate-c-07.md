@@ -205,6 +205,15 @@ reach store read-only inspection. Joined rejection/reopen/reuse histories must
 preserve graph, claim, index, audit, function receipt and control evidence; this
 component composition does not bind installed configuration or restore policy.
 
+The [configured restore prerequisite](../../evidence/change-journals/gate-c/c-07d-restore-limits.md)
+carries one native policy through logical/application restore, private staging,
+resumed replay and verification opens. Its rejection/resume histories preserve
+acknowledged prefixes, runtime relationships/provenance, catalogue revisions,
+objects and filtered control transitions. The public target remains absent on
+failure; adequate-budget resume must reproduce exact evidence. This component
+policy plumbing does not bind installed configuration, bound all restore work
+or qualify native exhaustion, capacity profiles or soak.
+
 The [projected reader ownership repair](../../evidence/change-journals/gate-c/c-07e-read-view-release.md)
 addresses reproduced prerequisite defects in empty-view admission release and
 terminal stream source retention. It preserves the canonical registry/reader

@@ -12,10 +12,11 @@ use crate::keyspaces::{self, Durability};
 use crate::repository::prepare_control_batch;
 use crate::{
     control_family_covers, control_family_of, export_logical_archive, inspect_control_archive,
-    inspect_logical_archive, read_control_archive, restore_logical_archive_to_new_root,
-    restore_logical_archive_to_new_root_with, validate_control_families, ControlArchiveInventory,
-    ControlTransition, Error, ImmutableObjectStore, LocalObjectStore, LogicalArchiveInventory,
-    LogicalRestoreReport, Result, RrflowKvStore, StorageEngine, CONTROL_ARCHIVE_VERSION,
+    inspect_logical_archive, read_control_archive,
+    restore_logical_archive_to_new_root_with_options, validate_control_families,
+    ControlArchiveInventory, ControlTransition, Error, ImmutableObjectStore, LocalObjectStore,
+    LogicalArchiveInventory, LogicalRestoreReport, Result, RrflowKvStore, StorageEngine,
+    CONTROL_ARCHIVE_VERSION,
 };
 use rrd_core::digest;
 use rrd_core::{ObjectReference, RuntimeMutation, ScopeId};
@@ -580,6 +581,23 @@ pub fn restore_catalogued_backup(
     target: &(impl AnchorInput + ?Sized),
     at: u64,
 ) -> Result<LogicalRestoreReport> {
+    restore_catalogued_backup_with_options(
+        catalogue_root,
+        backup_id,
+        target,
+        at,
+        Default::default(),
+    )
+}
+
+/// Restores using the same native policy for private staging and every reopen.
+pub fn restore_catalogued_backup_with_options(
+    catalogue_root: &(impl AnchorInput + ?Sized),
+    backup_id: &str,
+    target: &(impl AnchorInput + ?Sized),
+    at: u64,
+    options: crate::DatabaseOptions,
+) -> Result<LogicalRestoreReport> {
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     let target = &target.anchor().map_err(backup_io)?;
     let catalogue = verify_backup_catalogue(catalogue_root)?;
@@ -594,13 +612,27 @@ pub fn restore_catalogued_backup(
         let catalogue_manifest = load_catalogue_manifest_for_entry(catalogue_root, entry)?;
         let (control_archive, control_inventory) =
             load_control_archive_for_entry(catalogue_root, entry)?;
-        restore_logical_archive_to_new_root_with(&archive, target, at, |staging| {
-            restore_catalogues(&catalogue_manifest, staging)?;
-            restore_object_payloads(catalogue_root, &object_manifest, staging)?;
-            restore_control_journal(&control_archive, &control_inventory, staging)
-        })
+        restore_logical_archive_to_new_root_with_options(
+            &archive,
+            target,
+            at,
+            options,
+            |staging| {
+                restore_catalogues(&catalogue_manifest, staging, options)?;
+                restore_object_payloads(catalogue_root, &object_manifest, staging)?;
+                restore_control_journal(&control_archive, &control_inventory, staging, options)
+            },
+            |_| Ok(()),
+        )
     } else {
-        restore_logical_archive_to_new_root(&archive, target, at)
+        restore_logical_archive_to_new_root_with_options(
+            &archive,
+            target,
+            at,
+            options,
+            |_| Ok(()),
+            |_| Ok(()),
+        )
     }
 }
 
@@ -611,6 +643,21 @@ pub fn verify_restored_backup_objects(
     catalogue_root: &(impl AnchorInput + ?Sized),
     backup_id: &str,
     restored_root: &(impl AnchorInput + ?Sized),
+) -> Result<()> {
+    verify_restored_backup_objects_with_options(
+        catalogue_root,
+        backup_id,
+        restored_root,
+        Default::default(),
+    )
+}
+
+/// Verifies a published application restore under the caller's native policy.
+pub fn verify_restored_backup_objects_with_options(
+    catalogue_root: &(impl AnchorInput + ?Sized),
+    backup_id: &str,
+    restored_root: &(impl AnchorInput + ?Sized),
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     let restored_root = &restored_root.anchor().map_err(backup_io)?;
@@ -637,10 +684,10 @@ pub fn verify_restored_backup_objects(
         }
     }
     let catalogues = load_catalogue_manifest_for_entry(catalogue_root, entry)?;
-    verify_restored_catalogues(&catalogues, restored_root)?;
+    verify_restored_catalogues(&catalogues, restored_root, options)?;
     let (control_archive, control_inventory) =
         load_control_archive_for_entry(catalogue_root, entry)?;
-    verify_restored_control_journal(&control_archive, &control_inventory, restored_root)
+    verify_restored_control_journal(&control_archive, &control_inventory, restored_root, options)
 }
 
 /// Reads the control-journal replay progress a restore left in a root, if any.
@@ -679,6 +726,7 @@ fn restore_control_journal(
     archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
     staging_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
     let inspected = inspect_control_archive(archive)?;
     if &inspected != expected {
@@ -686,10 +734,10 @@ fn restore_control_journal(
             "control-journal archive inventory does not match its catalogue entry".into(),
         ));
     }
-    let engine = RrflowKvStore::open_existing_anchored(staging_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(staging_root, options)?;
     replay_control_entries(archive, expected, &engine, None)?;
     drop(engine);
-    verify_restored_control_journal(archive, expected, staging_root)
+    verify_restored_control_journal(archive, expected, staging_root, options)
 }
 
 /// Applies the archived entries after the recorded progress. `stop_after`
@@ -801,8 +849,9 @@ fn verify_restored_control_journal(
     archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
     restored_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
-    let engine = RrflowKvStore::open_existing_anchored(restored_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(restored_root, options)?;
     let progress = control_restore_progress(&engine)?.ok_or_else(|| {
         Error::Archive("restored root carries no control-journal replay marker".into())
     })?;
@@ -1286,9 +1335,13 @@ fn validate_catalogue_manifest(manifest: &CatalogueManifest) -> Result<()> {
     Ok(())
 }
 
-fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &AnchoredPath) -> Result<()> {
+fn restore_catalogues(
+    manifest: &CatalogueManifest,
+    staging_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
+) -> Result<()> {
     validate_catalogue_manifest(manifest)?;
-    let engine = RrflowKvStore::open_existing_anchored(staging_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(staging_root, options)?;
     for scope in &manifest.scopes {
         let records = manifest
             .records
@@ -1355,14 +1408,15 @@ fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &AnchoredPath)
         }
     }
     drop(engine);
-    verify_restored_catalogues(manifest, staging_root)
+    verify_restored_catalogues(manifest, staging_root, options)
 }
 
 fn verify_restored_catalogues(
     manifest: &CatalogueManifest,
     restored_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
-    let engine = RrflowKvStore::open_existing_anchored(restored_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(restored_root, options)?;
     for record in &manifest.records {
         if engine.control().get(&record.key)?.as_deref() != Some(record.value.as_slice()) {
             return Err(Error::Archive(format!(
@@ -2273,7 +2327,8 @@ mod tests {
             verify_restored_control_journal(
                 &archive,
                 &inventory,
-                &AnchoredPath::from_path(&target_root).unwrap()
+                &AnchoredPath::from_path(&target_root).unwrap(),
+                Default::default(),
             )
             .unwrap_err()
             .to_string()
@@ -2285,6 +2340,7 @@ mod tests {
             &archive,
             &inventory,
             &AnchoredPath::from_path(&target_root).unwrap(),
+            Default::default(),
         )
         .unwrap();
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
@@ -2316,6 +2372,7 @@ mod tests {
             &archive,
             &inventory,
             &AnchoredPath::from_path(&target_root).unwrap(),
+            Default::default(),
         )
         .unwrap();
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
@@ -2342,6 +2399,7 @@ mod tests {
             &archive,
             &inventory,
             &AnchoredPath::from_path(&target_root).unwrap(),
+            Default::default(),
         )
         .unwrap_err();
         assert!(error.to_string().contains("diverged at source sequence 1"));

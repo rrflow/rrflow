@@ -50,6 +50,9 @@ jobs:
       - name: Test typed mutable rejection and read-only replay admission
         timeout-minutes: 5
         run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
       - name: Test hard mutable admission and bounded WAL materialization
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test mutable_limits --locked
@@ -125,6 +128,9 @@ jobs:
       - name: Test typed mutable rejection and read-only replay admission
         timeout-minutes: 5
         run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
       - name: Test hard mutable admission and bounded WAL materialization
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test mutable_limits --locked
