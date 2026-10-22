@@ -22,6 +22,111 @@ struct PublicEvidence {
     function_receipt_sha256: String,
 }
 
+// This fixture has only canonical typed keys (all below 0xff). Capture every
+// physical row, including derived indexes and receipts, rather than accepting
+// an unchanged cursor as proof that a rejected plan published nothing.
+fn physical_rows(storage: &dyn StorageEngine) -> Vec<(Vec<u8>, Vec<u8>)> {
+    let transaction = storage.begin_transaction().unwrap();
+    let rows = transaction.scan(&[0], &[0xff], 65_536).unwrap();
+    assert!(
+        rows.len() < 65_536,
+        "oracle must cover the complete fixture"
+    );
+    rows
+}
+
+fn reject_oversized_plan(storage: &dyn StorageEngine) -> Vec<(Vec<u8>, Vec<u8>)> {
+    let seeded = commit(storage);
+    assert_eq!((seeded.records, seeded.relations), (2, 1));
+    let before = physical_rows(storage);
+    let claim = |index: usize, object: String| {
+        rrd_core::Claim::new(
+            rrd_core::Subject::new(format!("admission-{index}")).unwrap(),
+            rrd_core::Predicate::new("contains").unwrap(),
+            object,
+            200,
+            200,
+            rrd_core::Producer {
+                actor: "admission-oracle".into(),
+                on_behalf_of: None,
+                session: None,
+            },
+        )
+    };
+    let mut request = RuntimeCommit {
+        scope: ScopeId::new("project:semantic-commit-public").unwrap(),
+        at: 200,
+        actor: "admission-oracle".into(),
+        expected_cursor: seeded.cursor,
+        mutations: (0..4096)
+            .map(|index| RuntimeMutation::Claim {
+                claim: claim(index, "x".repeat(4096)),
+            })
+            .collect(),
+    };
+    request.validate().unwrap();
+    let rejected_id = request.digest();
+    assert!(matches!(storage.runtime().commit(&request),
+        Err(Error::WriteBatchLimit { resource: rrd_lsm::WriteBatchResource::EncodedBytes, limit, observed })
+            if limit == 16 * 1024 * 1024 && observed > limit));
+    assert_eq!(
+        physical_rows(storage),
+        before,
+        "rejection changed physical domain/index/audit/receipt state"
+    );
+    assert!(storage
+        .runtime()
+        .commit_outcome(&rejected_id)
+        .unwrap()
+        .is_none());
+    assert!(storage.runtime().audit(&rejected_id).unwrap().is_none());
+    // A fresh, valid semantic commit uses the same authority and remaining
+    // capacity after rejection; its graph and function receipt stay intact.
+    request.mutations = vec![RuntimeMutation::Claim {
+        claim: claim(0, "accepted-after-rejection".into()),
+    }];
+    let accepted = storage.runtime().commit(&request).unwrap();
+    assert_eq!(accepted.last_cursor, seeded.cursor + 1);
+    let snapshot = storage
+        .runtime()
+        .data_snapshot(&request.scope, 200, 8192)
+        .unwrap()
+        .snapshot;
+    assert_eq!((snapshot.records.len(), snapshot.relations.len()), (2, 1));
+    let claims = storage.claims().claims_in_range(0, 8192).unwrap();
+    assert_eq!(claims.len(), 1);
+    assert_eq!(claims[0].object, "accepted-after-rejection");
+    assert_eq!(
+        storage
+            .function_catalogue()
+            .invocation_receipt("semantic-commit-instance", &seeded.function_invocation_id)
+            .unwrap()
+            .unwrap()
+            .receipt_sha256,
+        seeded.function_receipt_sha256
+    );
+    physical_rows(storage)
+}
+
+#[test]
+fn oversized_semantic_plan_preserves_all_physical_effects_on_mx() {
+    reject_oversized_plan(&RrflowMxStore::new());
+}
+
+#[test]
+fn oversized_semantic_plan_preserves_all_physical_effects_on_kv_and_reopen() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("admission");
+    let expected = {
+        let storage = RrflowKvStore::open(&root).unwrap();
+        reject_oversized_plan(&storage)
+    };
+    assert_eq!(
+        physical_rows(&RrflowKvStore::open(&root).unwrap()),
+        expected
+    );
+}
+
 fn commit(storage: &dyn StorageEngine) -> PublicEvidence {
     let scope = ScopeId::new("project:semantic-commit-public").unwrap();
     let file = RuntimeType::new("file").unwrap();

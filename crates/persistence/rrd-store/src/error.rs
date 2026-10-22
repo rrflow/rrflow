@@ -8,6 +8,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// Propagated from the substrate.
     Substrate(String),
+    /// Known admission rejection before this batch's domain publication.
+    WriteBatchLimit {
+        resource: rrd_lsm::WriteBatchResource,
+        limit: u64,
+        observed: u64,
+    },
     /// Claim encoding or decoding failed.
     Codec(String),
     /// Propagated from the kernel.
@@ -78,6 +84,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
+            Error::WriteBatchLimit { resource, limit, observed } => write!(
+                f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
+            ),
             Error::Codec(m) => write!(f, "claim codec: {m}"),
             Error::Kernel(e) => write!(f, "kernel: {e}"),
             Error::SequenceOverflow => write!(f, "sequence allocation overflowed"),
@@ -162,6 +171,15 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::WriteBatchLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::WriteBatchLimit {
+                resource,
+                limit,
+                observed,
+            },
             rrd_lsm::Error::TransactionConflict {
                 snapshot_sequence,
                 conflicting_sequence,

@@ -178,6 +178,16 @@ capacity requirements remain open; this corpus cannot close C-07 independently.
 
 ### Remaining implementation contracts
 
+The [encoded staging admission repair](../../evidence/change-journals/gate-c/c-07d-write-admission.md)
+is a bounded C-07d prerequisite: native transactions, rrflowMX and semantic
+plans admit their encoded physical effects before mutating staged maps.
+Replacement and tombstone accounting use the existing format owner; known
+limit rejection remains distinct from uncertain I/O at the engine boundary.
+The joined rejection/reopen tests preserve existing graph, claim, derived,
+audit and receipt state and permit valid subsequent work. The linked journal
+and exact-candidate CI own the results. Configurable aggregate limits, queues,
+maintenance progress and installed capacity evidence remain open below.
+
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
 candidate `88df70b39b0d73e91930a26d3017363c36c615f6`,
 [CI run 39705515593](https://github.com/rrflow/rrflow-development/actions/runs/39705515593),
