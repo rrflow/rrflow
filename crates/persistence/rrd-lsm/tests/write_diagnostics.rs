@@ -69,8 +69,15 @@ fn raw_phases_distinguish_buffered_and_authoritative_wal_sync() {
     let mut database = Database::create(&root).unwrap();
     database.enable_write_path_diagnostics(2).unwrap();
 
-    write(&mut database, "buffered", Durability::Buffered);
-    write(&mut database, "authoritative", Durability::Authoritative);
+    let operation_ns = [
+        ("buffered", Durability::Buffered),
+        ("authoritative", Durability::Authoritative),
+    ]
+    .map(|(key, durability)| {
+        let started = std::time::Instant::now();
+        write(&mut database, key, durability);
+        u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX)
+    });
     let diagnostics = database.take_write_path_diagnostics().unwrap();
     assert_eq!(diagnostics.dropped_samples, 0);
     assert_eq!(diagnostics.samples.len(), 2);
@@ -80,8 +87,10 @@ fn raw_phases_distinguish_buffered_and_authoritative_wal_sync() {
     assert_eq!(buffered.durability, Durability::Buffered);
     assert_eq!(buffered.phases.wal_sync.wall_ns, 0);
     assert_eq!(authoritative.durability, Durability::Authoritative);
-    assert!(authoritative.phases.wal_sync.wall_ns > 0);
-    for sample in &diagnostics.samples {
+    // Durability and the I/O oracle establish sync semantics, not clock
+    // resolution. Even an executed phase can have a zero elapsed measurement.
+    for (sample, elapsed) in diagnostics.samples.iter().zip(operation_ns) {
+        assert!(sample.phases.physical_total.wall_ns <= elapsed);
         assert_eq!(sample.mutation_count, 1);
         assert!(sample.encoded_payload_bytes > 0);
         assert!(sample.wal_frame_bytes > sample.encoded_payload_bytes);
@@ -106,9 +115,9 @@ fn transaction_lock_context_and_automatic_maintenance_are_attributed() {
         ..DatabaseOptions::default()
     };
     let mut database = Database::create_with_options(&root, options).unwrap();
-    database.enable_write_path_diagnostics(2).unwrap();
+    database.enable_write_path_diagnostics(3).unwrap();
 
-    for (key, lock_wait) in [
+    let contexts = [
         (
             "first",
             WriteLockWait {
@@ -117,7 +126,15 @@ fn transaction_lock_context_and_automatic_maintenance_are_attributed() {
             },
         ),
         ("second", WriteLockWait::default()),
-    ] {
+        (
+            "third",
+            WriteLockWait {
+                begin_mutex_wait_ns: u64::MAX,
+                commit_mutex_wait_ns: u64::MAX,
+            },
+        ),
+    ];
+    for (key, lock_wait) in contexts {
         let mut transaction = database.begin_transaction().unwrap();
         transaction
             .put(key.as_bytes().to_vec(), b"value".to_vec())
@@ -132,12 +149,31 @@ fn transaction_lock_context_and_automatic_maintenance_are_attributed() {
     }
 
     let diagnostics = database.take_write_path_diagnostics().unwrap();
-    assert_eq!(diagnostics.samples.len(), 2);
-    assert_eq!(diagnostics.samples[0].lock_wait.begin_mutex_wait_ns, 11);
-    assert_eq!(diagnostics.samples[0].lock_wait.commit_mutex_wait_ns, 13);
+    assert_eq!(diagnostics.samples.len(), contexts.len());
+    assert_eq!(diagnostics.observed_samples, 3);
+    assert_eq!(diagnostics.dropped_samples, 0);
+    for (sample, (_, expected)) in diagnostics.samples.iter().zip(contexts) {
+        assert_eq!(sample.lock_wait, expected);
+    }
+    assert_eq!(diagnostics.samples[0].lock_wait.total_ns(), 24);
+    assert_eq!(diagnostics.samples[1].lock_wait.total_ns(), 0);
+    assert_eq!(diagnostics.samples[2].lock_wait.total_ns(), u64::MAX);
     assert_eq!(diagnostics.samples[0].maintenance.write_stalls, 0);
     assert_eq!(diagnostics.samples[1].maintenance.write_stalls, 1);
     assert_eq!(diagnostics.samples[1].maintenance.automatic_flushes, 1);
     assert_eq!(diagnostics.samples[1].maintenance.failed_flushes, 0);
-    assert!(diagnostics.samples[1].phases.maintenance.wall_ns > 0);
+    assert_eq!(diagnostics.samples[2].maintenance.write_stalls, 1);
+    assert_eq!(diagnostics.samples[2].maintenance.automatic_flushes, 1);
+    assert_eq!(diagnostics.samples[2].maintenance.failed_flushes, 0);
+    for sample in &diagnostics.samples {
+        assert!(sample.phases.measured_wall_ns() <= sample.phases.physical_total.wall_ns);
+    }
+    drop(database);
+    let reopened = Database::open(&root).unwrap();
+    for (key, _) in contexts {
+        assert_eq!(
+            reopened.get(key.as_bytes(), reopened.snapshot()).unwrap(),
+            Some(b"value".to_vec())
+        );
+    }
 }

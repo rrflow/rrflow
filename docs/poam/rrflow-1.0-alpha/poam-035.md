@@ -82,6 +82,16 @@ retained generations, allocator overhead and temporary decoding. Installed
 bootstrap/configuration binding, aggregate memory and maintenance/queue/work
 limits remain open; local native tests do not close this deficiency.
 
+### Diagnostic timing oracle deficiency
+
+During the pending mutable-limit/accepted reader-history combination, the
+store diagnostics test rejected an observed zero uncontended mutex duration.
+Its strictly-positive assumption exceeds the monotonic clock contract. The
+[clock-oracle repair](../../evidence/change-journals/gate-c/c-07a-diagnostic-clock.md)
+retains actual timings and checks independent outer bounds, exact forwarded
+context and durable effects. It does not qualify contention performance,
+resource enforcement or close this POA&M item.
+
 ## Impact
 
 ### Encoded staging admission deficiency
