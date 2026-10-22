@@ -131,6 +131,116 @@ remain the package acceptance boundary; the I/O model does not qualify native
 process death, capacity exhaustion, device caches or installed scale. C-07c is
 the next implementation package after that acceptance, while C-07 stays open.
 
+### Remaining implementation contracts
+
+C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
+candidate `88df70b39b0d73e91930a26d3017363c36c615f6`,
+[CI run 39705515593](https://github.com/rrflow/rrflow-development/actions/runs/39705515593),
+merge `ecfeea332e6d7a0138b2dbb6c393e0d734d50db9`. The next package is c.
+The contracts below make c-h executable review units; they do not waive a
+row above or create another completion ledger. Resolve exact current symbols
+in each PR rather than maintaining a parallel source-tree plan here.
+
+**c — installed acknowledgement histories.** Preserve the D-01 primary-binary
+harness and C-07a independent ledger. Freeze requested operation/effect digests
+before sending. Retain attempt start/end, client-observed ACK/rejection/unknown,
+stable transaction/idempotency identity and reconciled receipt. Retries use the
+same logical identity; effect count must stay one even if there are many
+attempts. A server-produced receipt intercepted before client delivery is an
+unknown client result, not an ACK. Unknown means neither absent nor rejected.
+Query independent expected values and durable outcome identity after restart;
+do not regenerate expected data from recovered rows. Include definite semantic
+rejection, explicit abort/quota release and next valid work from POAM-033.
+
+Use two complementary lanes: unmodified production binaries for transport
+disconnect/response-loss/ACK-kill-reopen histories, and explicitly identified
+test-instrumented builds for precise internal pauses. Internal pauses belong
+before WAL, after append, after durability, after visibility, during manifest
+publication/reclamation, and after durable receipt before response. The
+qualification controller may stop only its owned child. A bounded local
+one-use rendezvous needs owner/nonce/run identity and a deadline; it cannot be
+activated by a public header, prompt or ordinary configuration. Compile it
+out of distribution artifacts and verify that absence. Never label the
+instrumented artifact's evidence as an unmodified release-binary run.
+
+For both fresh/existing estates run each declared boundary, a compound
+kill-during-reopen lane, duplicate retry and at least 100 forced reopen cycles
+per admitted native profile. A naturally racing kill cannot claim it reached
+a particular internal boundary. Capture hit/kill/reap/restart identities and
+retain failed/unreached schedules. Ordinary recovery may deny a proven torn
+tail; preserve bytes and use the existing explicit repair boundary where
+admissible. Lost ACK, partial batch or inconsistent reconciliation stops c.
+
+**d — admission and progress.** First map each allocation/live owner to one
+reservation and release point. Bound encoding before constructing an oversized
+batch; reject count/bytes overflow before WAL effects. Include semantic staging
+and temporary copies, not only physical memtable bytes. Separate configured
+hard caps from soft maintenance triggers and effective restart rules through
+the existing installed configuration. Implement bounded request admission
+before waiting on the transaction gate; define queue bytes/count/deadline and
+cancellation outcomes. Reserve replacement and publication headroom before
+flush/compaction, and identify readers/checkpoints blocking reclamation.
+
+Test cap-minus-one/cap/cap-plus-one, integer overflow, one long hot-key history,
+overlapping compaction, stalled readers and burst/drain. Limit rejection must
+preserve domain state; uncertain post-effect failures retain their identity.
+Charge shared buffers once for process accounting and conservatively to
+request admission without calling those two totals equal. Recovery gets
+finite work/time/memory budgets and must reopen the frozen corpus within them.
+If bounded compaction cannot make progress with retained history, report the
+blocking owner and deny growth rather than delete required versions. Resource
+diagnostics and pressure tests ship with the enforcement, not after g.
+
+**e — retained owners.** At fixed read stamps interleave writer, reader,
+compaction, checkpoint removal and GC. Cover mapped raw pages and owned raw/LZ4
+decode, cloned batches, stream cancellation, database close and last-owner
+drop. Compare against an independent versioned map. Assert pins remain while
+any buffer is live, no retired file is reclaimed early, and reservations and
+unreachable files drain after the final owner disappears. Native memory
+sampling supplements ownership counters; sampling alone cannot prove safety.
+Run the matrix on Linux, macOS and Windows rather than citing Linux-only RSS.
+
+**f — real capacity and damage.** Add explicit disposable-runner commands for
+bounded ext4 loopback, APFS image and NTFS VHD/quota fixtures. Preflight must
+bind the owned volume/device, cap its maximum size and prove all writes stay
+inside it. Reject developer/system volumes. Require the actual native
+capacity error and the reached WAL/segment/publication phase in the receipt.
+Release capacity, reconcile acknowledged history and admit another valid
+commit; permanent non-readiness cannot pass a capacity-only case. Test missing,
+truncated and checksum-corrupt objects separately with before/after byte
+inventories. Always detach/reap owned resources, and make cleanup failure a
+failed result. Privilege or filesystem unavailability is not-run, never pass.
+
+**g — reproducible operation.** Extend the same installed driver; do not build
+a second workload/schema authority. Freeze C-07a manifest identities, exact
+operation mix below, effective limits, corpus/seed and success thresholds
+before execution. Distinguish correctness CI from dedicated capacity/24-hour
+jobs; neither a short CI run nor extrapolation satisfies the soak. Retain
+native current/peak private/RSS/mapped memory, disk, queue/debt and timing
+series with bounded sample/output storage. Include failed operating points,
+restart/backup/pin interference and post-burst drain. Inaccessible hardware
+leaves its profile unqualified, with the exact missing facility recorded.
+
+**h — acceptance.** Reconcile each required case against the manifest and
+actual tested binary/build/configuration on its native host. All attempts,
+including rejects, unresolved responses and cleanup failures, must appear.
+Require c-f negative oracles and g's repetitions/24-hour evidence together;
+a newer candidate needs rerun or explicit validated evidence applicability,
+never an unlabeled union of incompatible revisions. Only then update Gate C
+and POAM-035. Keep parent alpha, C-04 and downstream gates independently open.
+
+### DuckDB dependency boundary
+
+The owner-requested [DuckDB integration](../../reference/data/duckdb.md) follows
+C-07 under [D-06](gate-d.md#duckdb-interoperability-packages). It does not
+replace native durability or postpone c-h. DuckDB export conformance can reuse
+the already bounded Parquet endpoint; larger streaming/import/worker execution
+requires its explicit F/D dependencies. C-07d/e must make resource ownership
+usable by later adapters, but must not add speculative DuckDB configuration
+or a dormant executor. A DuckDB memory setting cannot prove an aggregate
+RRFlow process limit. DuckDB crash/SQL/extension isolation belongs to its
+adapter corpus; native WAL/manifest and buffer proof stays here.
+
 ## Required failure and concurrency matrix
 
 Every cell records native/profile applicability, executed case ID, seed,

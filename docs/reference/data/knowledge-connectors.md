@@ -191,6 +191,11 @@ streaming requirements.
 
 ### External knowledge services
 
+DuckDB analytical exchange, source import and optional bundled execution have
+a separate [interoperability contract](duckdb.md). Support is not implemented;
+the existing Parquet export is its starting boundary, not conformance evidence.
+Its ordered packages remain under D-06 and depend on C-07/F as specified there.
+
 HydraDB, Pinecone Nexus and Qdrant each require a separately implemented and
 qualified optional adapter; none is qualified by this document.
 Never advertise vendor support from a logo, schema stub or generic HTTP
