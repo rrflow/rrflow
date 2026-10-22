@@ -85,6 +85,10 @@ receipts and rejects omitted schedules or unknown nested fields. Production
 engine bytes have no fault switch. These three-cycle response-boundary cases
 do not replace C-07c's internal WAL/publication pauses or dedicated 100-cycle
 profile corpus, and do not qualify power loss or real capacity exhaustion.
+The existing `lifecycle_process` target also qualifies the relay with forced
+nonblocking accepted sockets, fragmented header/body input, interrupted I/O,
+native read expiry, bounded malformed-input denial, redacted errors and idle
+guard cleanup. These helper cases preserve the five-case installed corpus.
 
 Preflight failures retain a bounded failed receipt even before build hashes are
 available; cleanup failure always overrides any prior passed receipt.

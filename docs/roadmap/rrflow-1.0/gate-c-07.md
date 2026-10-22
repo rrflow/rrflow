@@ -140,6 +140,9 @@ requires both complete build-bound ledgers. This bounded transport history does
 not complete c: internal WAL/visibility/publication pauses, compound recovery
 and the dedicated 100-cycle profile corpus remain required below. Candidate CI
 and the linked PR bind acceptance; C-07 and POAM-035 remain open.
+The [relay portability correction](../../evidence/change-journals/gate-c/c-07c-relay-portability.md)
+retains the first candidate's macOS failure and its deterministic helper
+regression; passed isolated receipts cannot override a failing native lane.
 
 ### Remaining implementation contracts
 
