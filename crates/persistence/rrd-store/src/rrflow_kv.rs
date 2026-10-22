@@ -303,6 +303,9 @@ impl RrflowKvStore {
 
     pub fn open_existing_anchored(path: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
         let database = Database::open_anchored(path, options).map_err(|error| {
+            if matches!(error, rrd_lsm::Error::MutableLimit { .. }) {
+                return Error::from(error);
+            }
             Error::Substrate(format!(
                 "cannot open existing rrflowKV database {}: {error}",
                 path.display()
@@ -370,6 +373,9 @@ impl RrflowKvStore {
             Database::create_anchored(path, options, Some(keyspaces::RRFLOW_KV_FORMAT))?
         } else {
             Database::open_anchored(path, options).map_err(|error| {
+                if matches!(error, rrd_lsm::Error::MutableLimit { .. }) {
+                    return Error::from(error);
+                }
                 Error::Substrate(format!(
                     "cannot open rrflowKV database {}: {error}",
                     path.display()
@@ -516,11 +522,28 @@ impl RrflowKvStore {
 
 impl RrflowKvInspector {
     pub fn open(path: &(impl crate::filesystem::AnchorInput + ?Sized)) -> Result<Self> {
-        Self::open_anchored(&path.anchor()?)
+        Self::open_with_options(path, DatabaseOptions::default())
+    }
+
+    /// Inspect existing bytes using the same native replay limits as writer
+    /// open. This neither repairs storage nor changes persisted configuration.
+    pub fn open_with_options(
+        path: &(impl crate::filesystem::AnchorInput + ?Sized),
+        options: DatabaseOptions,
+    ) -> Result<Self> {
+        Self::open_anchored_with_options(&path.anchor()?, options)
     }
 
     pub fn open_anchored(path: &AnchoredPath) -> Result<Self> {
-        let database = ReadOnlyDatabase::open_anchored(path).map_err(Error::from)?;
+        Self::open_anchored_with_options(path, DatabaseOptions::default())
+    }
+
+    pub fn open_anchored_with_options(
+        path: &AnchoredPath,
+        options: DatabaseOptions,
+    ) -> Result<Self> {
+        let database =
+            ReadOnlyDatabase::open_anchored_with_options(path, options).map_err(Error::from)?;
         if keyspaces::RrflowKvKeyCodec::from_application_format(
             database.manifest().application_format,
         )

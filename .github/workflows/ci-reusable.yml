@@ -47,6 +47,12 @@ jobs:
         run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
       - name: Test engine rejected-commit recovery and reuse
         run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
@@ -116,6 +122,12 @@ jobs:
         run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
       - name: Test engine rejected-commit recovery and reuse
         run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership

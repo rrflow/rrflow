@@ -1,5 +1,6 @@
 use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SharedIoContext};
+use crate::mutable::MutableCharge;
 use crate::segment::{
     new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
     ReadView, SharedPageCache,
@@ -28,10 +29,10 @@ pub const DEFAULT_COMPACTION_MAX_INPUT_SEGMENTS: usize = 16;
 pub const DEFAULT_COMPACTION_TARGET_SEGMENT_BYTES: usize = 8 * 1024 * 1024;
 pub const DEFAULT_MAX_COMPACTION_LEVEL: u8 = 6;
 
-/// Synchronous write-path maintenance limits. Crossing either limit stalls the
-/// next writer while the existing WAL-backed memtable is published. This keeps
-/// recovery work and resident mutable state bounded without acknowledging a
-/// write whose maintenance publication failed.
+/// Synchronous soft write-path maintenance targets. Crossing either target
+/// stalls the next writer while the existing WAL-backed memtable is published.
+/// One batch may exceed a soft target, but must fit the separate hard mutable
+/// limits. Neither policy bounds retained generations or whole-process memory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaintenancePolicy {
     pub wal_payload_max_bytes: usize,
@@ -104,6 +105,7 @@ pub struct DatabaseOptions {
     pub segment_row_group_budget: SegmentRowGroupBudget,
     pub segment_compression: SegmentCompressionPolicy,
     pub maintenance: MaintenancePolicy,
+    pub mutable_limits: crate::MutableLimits,
     pub compaction: CompactionPolicy,
 }
 
@@ -116,19 +118,21 @@ impl Default for DatabaseOptions {
             segment_row_group_budget: SegmentRowGroupBudget::default(),
             segment_compression: SegmentCompressionPolicy::default(),
             maintenance: MaintenancePolicy::default(),
+            mutable_limits: crate::MutableLimits::default(),
             compaction: CompactionPolicy::default(),
         }
     }
 }
 
 impl DatabaseOptions {
-    fn validate(self) -> Result<Self> {
+    pub(crate) fn validate(self) -> Result<Self> {
         self.page_cache_policy
             .protected_capacity_bytes(self.page_cache_bytes)?;
         self.segment_io.validate()?;
         self.segment_row_group_budget.validate()?;
         self.segment_compression.validate()?;
         self.maintenance.validate()?;
+        self.mutable_limits.validate()?;
         self.compaction.validate()?;
         Ok(self)
     }
@@ -144,6 +148,7 @@ pub struct MaintenanceStats {
     pub oversized_batches: u64,
     pub peak_wal_payload_bytes: usize,
     pub peak_memtable_versions: usize,
+    pub peak_accounted_memtable_bytes: usize,
     pub automatic_compactions: u64,
     pub failed_compactions: u64,
     pub compaction_input_bytes: u64,
@@ -300,6 +305,7 @@ pub struct Database {
     segment_row_group_budget: SegmentRowGroupBudget,
     segment_compression: SegmentCompressionPolicy,
     maintenance: MaintenancePolicy,
+    mutable_limits: crate::MutableLimits,
     compaction: CompactionPolicy,
     maintenance_stats: MaintenanceStats,
     wal_payload_bytes: usize,
@@ -403,6 +409,7 @@ impl Database {
             segment_row_group_budget: options.segment_row_group_budget,
             segment_compression: options.segment_compression,
             maintenance: options.maintenance,
+            mutable_limits: options.mutable_limits,
             compaction: options.compaction,
             maintenance_stats: MaintenanceStats::default(),
             wal_payload_bytes: 0,
@@ -485,7 +492,7 @@ impl Database {
                 crate::crash_test::Point::RecoveryRead,
                 root.diagnostic_path(),
             );
-            memtable.apply_owned_recovered(batch)
+            memtable.apply_owned_recovered(batch, options.mutable_limits)
         })?;
         if let Some(offset) = recovery.torn_tail {
             return Err(Error::TornTail { offset });
@@ -495,6 +502,7 @@ impl Database {
         let maintenance_stats = MaintenanceStats {
             peak_wal_payload_bytes: wal_payload_bytes,
             peak_memtable_versions: memtable.version_count(),
+            peak_accounted_memtable_bytes: memtable.approximate_bytes(),
             ..MaintenanceStats::default()
         };
         let wal = WalWriter::from_recovered_file(&path, wal_file, recovery)?;
@@ -534,6 +542,7 @@ impl Database {
             segment_row_group_budget: options.segment_row_group_budget,
             segment_compression: options.segment_compression,
             maintenance: options.maintenance,
+            mutable_limits: options.mutable_limits,
             compaction: options.compaction,
             maintenance_stats,
             wal_payload_bytes,
@@ -820,8 +829,10 @@ impl Database {
         failure: Option<(WriteBoundary, FailureMode)>,
     ) -> Result<AppendReceipt> {
         self.ensure_writer_ready()?;
+        let charge = MutableCharge::batch(batch)?;
+        self.mutable_limits.check(charge)?;
         let payload = batch.encode()?;
-        self.prepare_write(batch, payload.len())?;
+        self.prepare_write(batch, payload.len(), charge)?;
         inject_write_failure(failure, WriteBoundary::Prepared)?;
         let append_durability = append_durability(durability, failure);
         let receipt = self
@@ -883,6 +894,8 @@ impl Database {
         mut diagnostics: Option<PendingWriteDiagnostics>,
     ) -> Result<AppendReceipt> {
         self.ensure_writer_ready()?;
+        let charge = MutableCharge::batch(&batch)?;
+        self.mutable_limits.check(charge)?;
         let mutation_count = batch.len();
         let encode_started = diagnostics.is_some().then(PhaseClock::start);
         let payload = batch.encode()?;
@@ -895,7 +908,7 @@ impl Database {
         }
         let payload_bytes = payload.len();
         let maintenance_started = diagnostics.is_some().then(PhaseClock::start);
-        self.prepare_write(&batch, payload.len())?;
+        self.prepare_write(&batch, payload.len(), charge)?;
         if let Some(started) = maintenance_started {
             diagnostics
                 .as_mut()
@@ -1027,13 +1040,21 @@ impl Database {
         }
     }
 
-    fn prepare_write(&mut self, batch: &WriteBatch, payload_bytes: usize) -> Result<()> {
+    fn prepare_write(
+        &mut self,
+        batch: &WriteBatch,
+        payload_bytes: usize,
+        charge: MutableCharge,
+    ) -> Result<()> {
         let projected_bytes = self.wal_payload_bytes.saturating_add(payload_bytes);
         let projected_versions = self.memtable.version_count().saturating_add(batch.len());
         let active = self.memtable.version_count() != 0;
         if active
             && (projected_bytes > self.maintenance.wal_payload_max_bytes
-                || projected_versions > self.maintenance.memtable_max_versions)
+                || projected_versions > self.maintenance.memtable_max_versions
+                || self
+                    .mutable_limits
+                    .needs_flush(self.memtable.charge(), charge))
         {
             self.maintenance_stats.write_stalls =
                 self.maintenance_stats.write_stalls.saturating_add(1);
@@ -1076,6 +1097,8 @@ impl Database {
                 }
             }
         }
+        self.mutable_limits
+            .check(self.memtable.charge().checked_add(charge)?)?;
         if payload_bytes > self.maintenance.wal_payload_max_bytes
             || batch.len() > self.maintenance.memtable_max_versions
         {
@@ -1086,6 +1109,10 @@ impl Database {
     }
 
     fn record_memtable_peak(&mut self) {
+        self.maintenance_stats.peak_accounted_memtable_bytes = self
+            .maintenance_stats
+            .peak_accounted_memtable_bytes
+            .max(self.memtable.approximate_bytes());
         self.maintenance_stats.peak_wal_payload_bytes = self
             .maintenance_stats
             .peak_wal_payload_bytes
@@ -2080,6 +2107,10 @@ impl Database {
 
     pub fn memtable(&self) -> &Memtable {
         &self.memtable
+    }
+
+    pub fn mutable_limits(&self) -> crate::MutableLimits {
+        self.mutable_limits
     }
 
     pub fn maintenance_policy(&self) -> MaintenancePolicy {

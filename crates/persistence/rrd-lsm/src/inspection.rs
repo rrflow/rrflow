@@ -68,11 +68,23 @@ impl Drop for ReadOnlyDatabase {
 }
 
 impl ReadOnlyDatabase {
+    pub fn open_with_options(root: &Path, options: DatabaseOptions) -> Result<Self> {
+        Self::open_anchored_with_options(&AnchoredPath::open_root(root)?, options)
+    }
+
     pub fn open(root: &Path) -> Result<Self> {
         Self::open_anchored(&AnchoredPath::open_root(root)?)
     }
 
     pub fn open_anchored(root: &AnchoredPath) -> Result<Self> {
+        Self::open_anchored_with_options(root, DatabaseOptions::default())
+    }
+
+    pub fn open_anchored_with_options(
+        root: &AnchoredPath,
+        options: DatabaseOptions,
+    ) -> Result<Self> {
+        let options = options.validate()?;
         let retained_root = root.pin_directory()?;
         let root = &retained_root;
         let metadata = root.metadata().map_err(|error| {
@@ -206,7 +218,6 @@ impl ReadOnlyDatabase {
             ));
         }
 
-        let options = DatabaseOptions::default();
         let page_cache =
             new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
         let io = IoContext::new(options.segment_io)?;
@@ -227,7 +238,7 @@ impl ReadOnlyDatabase {
         let active_wal_relative = active_wal.relative_path();
         require_regular_file(root, active_wal_relative)?;
         let recovery = replay_anchored(&active_wal, manifest.wal_start_sequence, |batch| {
-            memtable.apply_owned_recovered(batch)
+            memtable.apply_owned_recovered(batch, options.mutable_limits)
         })?;
         if let Some(offset) = recovery.torn_tail {
             return Err(Error::TornTail { offset });

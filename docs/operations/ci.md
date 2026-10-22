@@ -45,6 +45,19 @@ output surviving database/stream disposal. Weak-owner and registry checks
 cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
 ownership regressions, not aggregate RSS, installed reclamation or soak proof.
 
+The native partitions also require `mutable_admission`: configured writer and
+read-only reopen denial preserves typed byte/version errors and existing file
+bytes; admitted inspection recovers exact semantic and control identities. The
+existing semantic and engine admission suites include both native mutable
+resources through prior-ACK/rejection/reopen/replay/abort/next-work histories.
+These component tests do not qualify installed configuration or restore budgets.
+
+The same three native partitions require `mutable_limits`: hard active-state
+byte/version admission, pre-effect rejection, hot-key pressure with held
+history, and writer/read-only WAL replay denial followed by exact recovery.
+This accounts active key/value/version charges; it does not establish aggregate
+heap/RSS, installed configuration binding or whole-startup work limits.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable

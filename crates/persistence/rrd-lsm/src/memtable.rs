@@ -1,3 +1,4 @@
+use crate::mutable::{version_charge, MutableCharge};
 use crate::{Error, Mutation, ProjectedReadRange, RecoveredBatch, Result, WriteBatch};
 use serde::{Deserialize, Serialize};
 use std::collections::btree_map::Entry;
@@ -151,9 +152,13 @@ impl Memtable {
                 }
                 previous = value.sequence;
                 approximate_bytes = approximate_bytes
-                    .saturating_add(key.len())
-                    .saturating_add(value.value.as_ref().map_or(0, |value| value.len()))
-                    .saturating_add(std::mem::size_of::<VersionedValue>());
+                    .checked_add(version_charge(
+                        key.len(),
+                        value.value.as_ref().map_or(0, |value| value.len()),
+                    )?)
+                    .ok_or_else(|| {
+                        Error::InvalidSegment("compacted mutable byte accounting overflow".into())
+                    })?;
             }
             version_count = version_count
                 .checked_add(values.len())
@@ -175,8 +180,13 @@ impl Memtable {
         self.apply_write_batch(&batch, recovered.first_sequence, recovered.last_sequence)
     }
 
-    pub(crate) fn apply_owned_recovered(&mut self, recovered: RecoveredBatch) -> Result<()> {
+    pub(crate) fn apply_owned_recovered(
+        &mut self,
+        recovered: RecoveredBatch,
+        limits: crate::MutableLimits,
+    ) -> Result<()> {
         let batch = WriteBatch::decode(&recovered.payload)?;
+        limits.check(self.charge().checked_add(MutableCharge::batch(&batch)?)?)?;
         self.apply_owned_write_batch(batch, recovered.first_sequence, recovered.last_sequence)
     }
 
@@ -202,10 +212,7 @@ impl Memtable {
                 self.maximum_sequence
             )));
         }
-        let next_version_count = self
-            .version_count
-            .checked_add(batch.len())
-            .ok_or_else(|| Error::InvalidBatch("memtable version count overflow".into()))?;
+        let next_charge = self.charge().checked_add(MutableCharge::batch(batch)?)?;
         for (index, operation) in batch.operations.iter().enumerate() {
             let sequence = first_sequence + index as u64;
             let (key, value) = match operation {
@@ -214,15 +221,11 @@ impl Memtable {
                 }
                 Mutation::Delete { key } => (key.clone(), None),
             };
-            self.approximate_bytes = self
-                .approximate_bytes
-                .saturating_add(key.len())
-                .saturating_add(value.as_ref().map_or(0, |value| value.len()))
-                .saturating_add(std::mem::size_of::<VersionedValue>());
             self.insert_version(key.into_boxed_slice(), VersionedValue { sequence, value });
         }
         self.maximum_sequence = last_sequence;
-        self.version_count = next_version_count;
+        self.version_count = next_charge.versions;
+        self.approximate_bytes = next_charge.bytes;
         Ok(())
     }
 
@@ -245,25 +248,18 @@ impl Memtable {
                 batch.len(), self.maximum_sequence
             )));
         }
-        let next_version_count = self
-            .version_count
-            .checked_add(batch.len())
-            .ok_or_else(|| Error::InvalidBatch("memtable version count overflow".into()))?;
+        let next_charge = self.charge().checked_add(MutableCharge::batch(&batch)?)?;
         for (index, operation) in batch.operations.into_iter().enumerate() {
             let sequence = first_sequence + index as u64;
             let (key, value) = match operation {
                 Mutation::Put { key, value } => (key, Some(value.into_boxed_slice())),
                 Mutation::Delete { key } => (key, None),
             };
-            self.approximate_bytes = self
-                .approximate_bytes
-                .saturating_add(key.len())
-                .saturating_add(value.as_ref().map_or(0, |value| value.len()))
-                .saturating_add(std::mem::size_of::<VersionedValue>());
             self.insert_version(key.into_boxed_slice(), VersionedValue { sequence, value });
         }
         self.maximum_sequence = last_sequence;
-        self.version_count = next_version_count;
+        self.version_count = next_charge.versions;
+        self.approximate_bytes = next_charge.bytes;
         Ok(())
     }
 
@@ -412,6 +408,14 @@ impl Memtable {
         self.version_count
     }
 
+    pub(crate) fn charge(&self) -> MutableCharge {
+        MutableCharge {
+            bytes: self.approximate_bytes,
+            versions: self.version_count,
+        }
+    }
+
+    /// Per-version key/value/record charge; not allocator usage or RSS.
     pub fn approximate_bytes(&self) -> usize {
         self.approximate_bytes
     }
