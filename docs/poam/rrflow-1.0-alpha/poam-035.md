@@ -63,6 +63,19 @@ buffers before releasing the lease. Copied output batches remain independent.
 Its focused local evidence does not close retained-buffer/native-memory or
 installed maintenance qualification; exact-candidate native CI is required.
 
+### C-07d native mutable admission and replay gap
+
+At `f4e404be38a0c21a4a3665b1907bad2226f5c13a`, maintenance still exposes
+only soft targets. Behavioral characterization with a new unenforced policy
+surface accepted excessive atomic versions, grew hot-key state beyond its cap,
+and materialized WAL state beyond a configured budget. The
+[native mutable-limit record](../../evidence/change-journals/gate-c/c-07d-mutable-limits.md)
+binds the repair and exact tests. Both native open paths must deny excessive
+materialization without changing storage bytes. Active logical charge excludes
+retained generations, allocator overhead and temporary decoding. Installed
+bootstrap/configuration binding, aggregate memory and maintenance/queue/work
+limits remain open; local native tests do not close this deficiency.
+
 ## Impact
 
 ### Installed reclamation call-path observation

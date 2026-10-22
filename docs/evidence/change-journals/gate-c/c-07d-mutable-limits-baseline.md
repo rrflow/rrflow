@@ -1,6 +1,6 @@
 # C-07d native mutable limits baseline
 
-**Status:** implementation baseline; no acceptance or alpha claim
+**Status:** active implementation baseline; no acceptance or alpha claim
 **Coordinate:** `rrflow://rrflow-instance/data/evidence/change-journal/gate-c/c-07d-mutable-limits-baseline`
 **Owner:** OBJ-02 prerequisite, [C-07](../../../roadmap/rrflow-1.0/gate-c-07.md)
 

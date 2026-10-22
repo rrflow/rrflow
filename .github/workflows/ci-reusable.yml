@@ -39,6 +39,9 @@ jobs:
           cache-on-failure: true
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
@@ -100,6 +103,9 @@ jobs:
         run: cargo test -p rrd-engine --lib engine::token_key --locked
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership

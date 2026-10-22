@@ -45,6 +45,12 @@ output surviving database/stream disposal. Weak-owner and registry checks
 cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
 ownership regressions, not aggregate RSS, installed reclamation or soak proof.
 
+The same three native partitions require `mutable_limits`: hard active-state
+byte/version admission, pre-effect rejection, hot-key pressure with held
+history, and writer/read-only WAL replay denial followed by exact recovery.
+This accounts active key/value/version charges; it does not establish aggregate
+heap/RSS, installed configuration binding or whole-startup work limits.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable
