@@ -188,6 +188,15 @@ audit and receipt state and permit valid subsequent work. The linked journal
 and exact-candidate CI own the results. Configurable aggregate limits, queues,
 maintenance progress and installed capacity evidence remain open below.
 
+The [native mutable-limit implementation](../../evidence/change-journals/gate-c/c-07d-mutable-limits.md)
+adds a C-07d prerequisite: configured active-state accounted-byte/version caps,
+pre-WAL batch rejection, pressure-triggered synchronous flush and bounded WAL
+materialization for native writer/read-only open. Defaults are 128 MiB of
+key/value/version charge and 1,048,576 versions, separate from the soft targets.
+These are safeguards, not measured capacity profiles. Retained generations,
+allocator overhead, queue/maintenance debt, whole-startup work and installed
+configuration projection remain outside this bound and keep C-07d open.
+
 The [projected reader ownership repair](../../evidence/change-journals/gate-c/c-07e-read-view-release.md)
 addresses reproduced prerequisite defects in empty-view admission release and
 terminal stream source retention. It preserves the canonical registry/reader
