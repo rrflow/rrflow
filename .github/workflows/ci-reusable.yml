@@ -39,6 +39,9 @@ jobs:
           cache-on-failure: true
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test bounded storage I/O model and compound recovery
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
       - name: Qualify bind-mount denial in a private native namespace
         run: python3 scripts/ci/run_filesystem_containment.py
       - name: Test the real install, serve, authenticate, stop, reopen lifecycle
@@ -93,6 +96,9 @@ jobs:
         run: cargo test -p rrd-engine --lib engine::token_key --locked
       - name: Test native filesystem containment and publication
         run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test bounded storage I/O model and compound recovery
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
       - name: Test native installation, bootstrap, ancestor replacement and process recovery
         run: cargo test -p rrd-engine --lib installation --locked -- --nocapture
       - name: Qualify native macOS mounted-volume denial

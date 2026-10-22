@@ -1008,6 +1008,7 @@ impl Database {
     }
 
     fn ensure_writer_ready(&self) -> Result<()> {
+        self.manifests.ensure_publication_ready()?;
         match self.writer_requires_reopen {
             Some(boundary) => Err(Error::RecoveryRequired { boundary }),
             None => Ok(()),
@@ -1278,6 +1279,7 @@ impl Database {
         at: u64,
         failure: Option<(SnapshotInstallBoundary, FailureMode)>,
     ) -> Result<Manifest> {
+        self.ensure_writer_ready()?;
         self.ensure_no_active_transactions("snapshot installation")?;
         if bundle.source_manifest.application_format != self.manifest.application_format {
             return Err(Error::InvalidManifest(
@@ -1362,6 +1364,7 @@ impl Database {
         at: u64,
         failure: Option<(SnapshotInstallBoundary, FailureMode)>,
     ) -> Result<Manifest> {
+        self.ensure_writer_ready()?;
         self.ensure_no_active_transactions("snapshot installation")?;
         bundle.validate()?;
         if bundle.source_manifest.application_format != self.manifest.application_format {
@@ -1836,6 +1839,7 @@ impl Database {
     /// Removes physical objects unreachable from `CURRENT` or a named
     /// checkpoint. The inventory is fully validated before the first delete.
     pub fn garbage_collect(&self) -> Result<GarbageCollectionReport> {
+        self.ensure_writer_ready()?;
         let mut manifests = BTreeMap::new();
         manifests.insert(self.manifest.digest.clone(), self.manifest.clone());
         for manifest in ActiveReadViews::manifests(&self.active_read_views)? {

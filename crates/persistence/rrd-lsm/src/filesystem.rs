@@ -8,11 +8,16 @@ use cap_fs_ext::OpenOptionsFollowExt;
 use cap_primitives::fs as cap;
 use std::ffi::OsString;
 use std::fs::{File, Metadata};
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
+#[path = "filesystem/io.rs"]
+pub(crate) mod file_io;
 mod native;
+
+#[cfg(test)]
+use crate::fault_io::{Kind, Ticket};
 
 #[derive(Debug)]
 struct Root {
@@ -328,8 +333,12 @@ impl AnchoredPath {
     }
 
     pub fn read(&self) -> io::Result<Vec<u8>> {
+        #[cfg(test)]
+        let ticket = Ticket::begin(Kind::Read, self.diagnostic_path())?;
         let mut bytes = Vec::new();
         self.open_read()?.read_to_end(&mut bytes)?;
+        #[cfg(test)]
+        ticket.done()?;
         Ok(bytes)
     }
 
@@ -352,40 +361,74 @@ impl AnchoredPath {
     }
 
     pub fn sync_directory(&self) -> io::Result<()> {
-        native::sync_directory(&self.directory()?)
+        let directory = self.directory()?;
+        self.sync_directory_handle(&directory)
+    }
+
+    fn sync_directory_handle(&self, file: &File) -> io::Result<()> {
+        #[cfg(test)]
+        let ticket = Ticket::begin(Kind::DirectorySync, self.diagnostic_path())?;
+        native::sync_directory(file)?;
+        #[cfg(test)]
+        ticket.directory_synced()?;
+        Ok(())
     }
 
     pub fn remove_file(&self) -> io::Result<()> {
         let (parent, name, _ancestors) = self.parent_handle()?;
         // unlinkat semantics remove this directory entry, never its link target.
+        #[cfg(test)]
+        let ticket = Ticket::begin(Kind::Remove, self.diagnostic_path())?;
         cap::remove_file(&parent, Path::new(&name))?;
-        native::sync_directory(&parent)
+        #[cfg(test)]
+        ticket.removed()?;
+        self.parent()
+            .ok_or_else(invalid_path)?
+            .sync_directory_handle(&parent)
     }
 
     pub fn rename_new_to(&self, target: &Self) -> io::Result<()> {
         let (source_parent, source_name, _source_ancestors) = self.parent_handle()?;
         let (target_parent, target_name, _target_ancestors) = target.parent_handle()?;
+        #[cfg(test)]
+        let ticket = Ticket::begin(Kind::Rename, self.diagnostic_path())?;
         native::rename_new(
             &source_parent,
             Path::new(&source_name),
             &target_parent,
             Path::new(&target_name),
         )?;
-        native::sync_directory(&source_parent)?;
-        native::sync_directory(&target_parent)
+        #[cfg(test)]
+        ticket.renamed(target.diagnostic_path())?;
+        self.parent()
+            .ok_or_else(invalid_path)?
+            .sync_directory_handle(&source_parent)?;
+        target
+            .parent()
+            .ok_or_else(invalid_path)?
+            .sync_directory_handle(&target_parent)
     }
 
     pub fn rename_to(&self, target: &Self) -> io::Result<()> {
         let (source_parent, source_name, _source_ancestors) = self.parent_handle()?;
         let (target_parent, target_name, _target_ancestors) = target.parent_handle()?;
+        #[cfg(test)]
+        let ticket = Ticket::begin(Kind::Rename, self.diagnostic_path())?;
         native::rename(
             &source_parent,
             Path::new(&source_name),
             &target_parent,
             Path::new(&target_name),
         )?;
-        native::sync_directory(&source_parent)?;
-        native::sync_directory(&target_parent)
+        #[cfg(test)]
+        ticket.renamed(target.diagnostic_path())?;
+        self.parent()
+            .ok_or_else(invalid_path)?
+            .sync_directory_handle(&source_parent)?;
+        target
+            .parent()
+            .ok_or_else(invalid_path)?
+            .sync_directory_handle(&target_parent)
     }
 }
 
@@ -441,12 +484,16 @@ impl OpenOptions {
             .create_new(self.create_new)
             .follow(cap::FollowSymlinks::No);
         native::file_options(&mut options);
+        #[cfg(test)]
+        let ticket = Ticket::begin(Kind::Open, path.diagnostic_path())?;
         let file = cap::open(&parent, Path::new(&name), &options)?;
         path.admit_mount(&file)?;
         native::validate_file(&file)?;
         if self.truncate {
             file.set_len(0)?;
         }
+        #[cfg(test)]
+        ticket.opened()?;
         Ok(file)
     }
 }
@@ -462,8 +509,8 @@ pub fn persist_rename(
         .create_new(true)
         .open(temporary)?;
     let result = (|| {
-        file.write_all(bytes)?;
-        file.sync_all()?;
+        file_io::write_all(&mut file, temporary.diagnostic_path(), bytes)?;
+        file_io::sync_all(&file, temporary.diagnostic_path())?;
         temporary.rename_to(target)
     })();
     drop(file);

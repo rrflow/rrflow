@@ -25,10 +25,27 @@ qualification:
 - No joined C-07 accepted matrix presently binds native faults, independent
   acknowledged histories and installed sustained-capacity results.
 
-These are observed coverage and resource-contract gaps. This record does not
-claim a reproduced lost acknowledged write or reopen an accepted C-06/D-01
-requirement. POAM-034 separately owns whole-scope semantic constraint cost;
+These were observed coverage and resource-contract gaps at the planning
+baseline, without a reproduced lost acknowledged write. POAM-034 separately
+owns whole-scope semantic constraint cost;
 POAM-025/026 retain broader repair and observability deficiencies.
+
+### C-07b demonstrated publication deficiencies and bounded remediation
+
+At baseline `fca1a980245a9ff8634fa70fe21ee79a27eb2047`, deterministic native-call
+fault tests reproduced an append after failed standalone sync, silent retry
+after a zero-byte vectored write, loss of a newly created WAL name in the
+stable-directory model, and another acknowledged write through the obsolete
+WAL after an uncertain CURRENT rename. A retry/loss fixture also reproduced a
+selected segment missing after its earlier rename's directory barrier failed.
+
+The [C-07b implementation record](../../evidence/change-journals/gate-c/c-07b-io-fault-oracle.md)
+binds regression tests and repairs: poison failed WAL sync, reject zero writes,
+stabilize newly created/reused WAL and immutable names, fence dependent effects
+after uncertain publication, and reconcile selected CURRENT/checkpoint names
+on reopen before reclamation. These are abstract I/O-loss and native-call-error
+fixtures, not observed device power failures. Exact-candidate CI is required
+for landing; this remediation does not close POAM-035 or reopen C-06/D-01.
 
 ## Impact
 
