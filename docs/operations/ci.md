@@ -71,6 +71,14 @@ history, and writer/read-only WAL replay denial followed by exact recovery.
 This accounts active key/value/version charges; it does not establish aggregate
 heap/RSS, installed configuration binding or whole-startup work limits.
 
+The same three native partitions require `write_diagnostics` and
+`rrflow_kv_operator`. Uncontended timing may be zero; measured phases/waits
+must fit their independent outer duration and supplied lock context survives
+exactly, including zero and saturating values. Bounded sample/drop accounting,
+maintenance counters and durable readback remain required. Positive timing is
+not evidence of physical synchronization; the native durability/I/O suites
+retain that responsibility.
+
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
 Those jobs omit dev/test debug symbols and log executable size; executable

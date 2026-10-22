@@ -561,6 +561,8 @@ def main() -> None:
         )
         for command in [
             "cargo test -p rrd-lsm --test mutable_limits --locked",
+            "cargo test -p rrd-lsm --test write_diagnostics --locked",
+            "cargo test -p rrd-store --test rrflow_kv_operator --locked",
             "cargo test -p rrd-lsm --test projected_lifetime --locked",
             "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
             "cargo test -p rrd-lsm --test projected_output_limits --locked",
