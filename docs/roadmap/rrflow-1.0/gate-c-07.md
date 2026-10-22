@@ -144,6 +144,18 @@ The [relay portability correction](../../evidence/change-journals/gate-c/c-07c-r
 retains the first candidate's macOS failure and its deterministic helper
 regression; passed isolated receipts cannot override a failing native lane.
 
+The next [native boundary record](../../evidence/change-journals/gate-c/c-07c-native-crash-boundaries.md)
+adds a unit-test-only owned-process rendezvous at physical write, sync,
+visibility, publication and reclamation boundaries. Its 40 cases include 80
+additional kills during recovery; WAL-only and published-segment fixtures each
+perform 100 acknowledged kill/reopen cycles with exact independent values and
+sequence checks. This is a storage-component prerequisite, not the installed
+instrumented-primary corpus or a capacity profile. The next c package must
+join the internal boundary evidence to installed authorization, semantic
+transactions and stable outcomes through the existing primary-binary harness,
+then run the declared profile corpus. No C-07c exit is waived by a component
+test; c remains open until that composition and its exact native CI pass.
+
 ### Remaining implementation contracts
 
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):

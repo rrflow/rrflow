@@ -390,6 +390,25 @@ ENOSPC, OS-crash, device-cache or physical power-loss qualification. The fault
 controller is compiled only into `rrd-lsm` unit tests; no product feature or
 runtime setting enables it.
 
+The same filter also executes C-07c's `fault_io::crash` native process corpus.
+Its owned unit-test child pauses at a nonce/PID-bound native boundary, then
+the parent kills and reaps that exact handle. Forty borrowed/owned,
+WAL-only/published-segment cases cover write, complete append, sync,
+visibility, flush publication and reclamation; eighty additional kills interrupt
+WAL replay. Two separate 100-cycle histories prove exact acknowledged values
+and sequences through repeated reopen. Logs retain the test executable digest,
+native OS, boundary, run identity and hit/reap timings. The one ignored child
+fixture is explicitly invoked by these parent tests; no required parent is
+ignored. The child accepts at most 4 KiB through its parent-owned stdin, emits
+bounded identity-only receipts, and has a 30-second pause deadline. The parent
+has a 20-second rendezvous deadline and 8 KiB per-stream capture bounds.
+
+This corpus is instrumented native **storage-component** process-death proof.
+It is not the installed primary binary, a loss of OS/device caches, native
+ENOSPC, resource-envelope or sustained-load proof. The independent installed
+client histories and the remaining C-07c composition/profile requirements stay
+distinct. Both model and process facilities remain entirely under `cfg(test)`.
+
 The
 [engine observability contract](../architecture/engine-data-flow.md#runtime-modes-build-profiles-and-build-identity)
 defines one semantic engine with release, optimized-diagnostic,

@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::io;
 use std::path::{Path, PathBuf};
 
+pub(crate) mod crash;
 mod model;
 mod tests;
 use model::Device;
@@ -86,6 +87,7 @@ impl Drop for Session {
 }
 
 pub(crate) struct Ticket {
+    kind: Kind,
     path: PathBuf,
     action: Option<Fault>,
     active: bool,
@@ -97,10 +99,12 @@ fn injected() -> io::Error {
 
 impl Ticket {
     pub(crate) fn begin(kind: Kind, path: &Path) -> io::Result<Self> {
+        crash::io(kind, path, false);
         STATE.with_borrow_mut(|slot| {
             let Some(state) = slot else {
                 return Ok(Self {
-                    path: PathBuf::new(),
+                    kind,
+                    path: path.to_owned(),
                     action: None,
                     active: false,
                 });
@@ -126,6 +130,7 @@ impl Ticket {
                 return Err(injected());
             }
             Ok(Self {
+                kind,
                 path: path.to_owned(),
                 action,
                 active: true,
@@ -150,6 +155,7 @@ impl Ticket {
     }
 
     pub(crate) fn done(self) -> io::Result<()> {
+        crash::io(self.kind, &self.path, true);
         if self.action == Some(Fault::After) {
             Err(injected())
         } else {

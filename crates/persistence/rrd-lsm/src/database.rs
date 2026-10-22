@@ -996,6 +996,8 @@ impl Database {
         &mut self,
         failure: Option<(WriteBoundary, FailureMode)>,
     ) -> Result<()> {
+        #[cfg(test)]
+        crate::fault_io::crash::visible(self.root.diagnostic_path());
         let Some((WriteBoundary::Visible, mode)) = failure else {
             return Ok(());
         };
