@@ -14,6 +14,13 @@ pub enum Error {
         limit: u64,
         observed: u64,
     },
+    /// Active mutable-state admission or read-only WAL materialization exceeded
+    /// a process-local native limit. This does not classify unknown I/O errors.
+    MutableLimit {
+        resource: rrd_lsm::MutableResource,
+        limit: usize,
+        observed: usize,
+    },
     /// Claim encoding or decoding failed.
     Codec(String),
     /// Propagated from the kernel.
@@ -86,6 +93,9 @@ impl fmt::Display for Error {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
+            ),
+            Error::MutableLimit { resource, limit, observed } => write!(
+                f, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()
             ),
             Error::Codec(m) => write!(f, "claim codec: {m}"),
             Error::Kernel(e) => write!(f, "kernel: {e}"),
@@ -171,6 +181,15 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::MutableLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::MutableLimit {
+                resource,
+                limit,
+                observed,
+            },
             rrd_lsm::Error::WriteBatchLimit {
                 resource,
                 limit,

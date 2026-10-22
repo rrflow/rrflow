@@ -76,6 +76,19 @@ retained generations, allocator overhead and temporary decoding. Installed
 bootstrap/configuration binding, aggregate memory and maintenance/queue/work
 limits remain open; local native tests do not close this deficiency.
 
+### Mutable admission adapter gap
+
+Combining accepted main `dde6ef86d278b8c59cf1f61ebc2d3923186396d5`
+with the native policy in PR 65 reproduced both byte and version rejections as
+generic internal errors with prepared commit intent still present. Store open
+wrappers also erased replay-limit classification, and store read-only inspection
+could not receive explicit native options. The [propagation baseline](../../evidence/change-journals/gate-c/c-07d-limit-propagation-baseline.md)
+and [implementation evidence](../../evidence/change-journals/gate-c/c-07d-limit-propagation.md)
+bind typed propagation, absent-outcome intent cleanup and configured inspection.
+Its joined histories must preserve prior acknowledgements and permit later work.
+Installed startup/restore configuration, aggregate resource bounds and sustained
+capacity remain open; this repair does not qualify or close C-07.
+
 ## Impact
 
 ### Encoded staging admission deficiency

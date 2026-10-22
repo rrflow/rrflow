@@ -1,4 +1,5 @@
 use super::*;
+use rrd_store::RrflowKvStore;
 
 fn domain_evidence(engine: &RrdEngine, prior_commit: &str, rejected_commit: &str) -> Value {
     let storage = &engine.storage;
@@ -29,7 +30,73 @@ fn domain_evidence(engine: &RrdEngine, prior_commit: &str, rejected_commit: &str
 
 #[test]
 fn oversized_semantic_commit_is_rejected_abortable_and_reopens_without_effects() {
-    let (root, engine) = isolated_engine();
+    rejection_history(None, 4096, 4096, "write batch encoded_bytes");
+}
+
+#[test]
+fn mutable_byte_rejection_preserves_domain_and_clears_only_absent_intent() {
+    rejection_history(
+        Some(rrd_store::MutableLimits {
+            accounted_bytes: 128 * 1024,
+            versions: 8192,
+        }),
+        256,
+        1024,
+        "mutable accounted bytes",
+    );
+}
+
+#[test]
+fn mutable_version_rejection_preserves_domain_and_clears_only_absent_intent() {
+    rejection_history(
+        Some(rrd_store::MutableLimits {
+            accounted_bytes: 8 * 1024 * 1024,
+            versions: 256,
+        }),
+        256,
+        16,
+        "mutable versions",
+    );
+}
+
+fn configured_engine(
+    root: &std::path::Path,
+    limits: Option<rrd_store::MutableLimits>,
+    create: bool,
+) -> RrdEngine {
+    let Some(mutable_limits) = limits else {
+        return RrdEngine::open(root, instance(), TOKEN_KEY).unwrap();
+    };
+    let options = rrd_store::DatabaseOptions {
+        mutable_limits,
+        ..Default::default()
+    };
+    let storage = if create {
+        RrflowKvStore::create_new_with_options(root, options).unwrap()
+    } else {
+        RrflowKvStore::open_existing_with_options(root, options).unwrap()
+    };
+    let operation_parent = storage.anchored_path().parent();
+    RrdEngine::compose_persistent(
+        operation_parent,
+        instance(),
+        TOKEN_KEY,
+        storage,
+        create,
+        Default::default(),
+    )
+    .unwrap()
+}
+
+fn rejection_history(
+    limits: Option<rrd_store::MutableLimits>,
+    count: usize,
+    object_bytes: usize,
+    expected_error: &str,
+) {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("engine");
+    let engine = configured_engine(&path, limits, true);
     let lease = engine
         .create_session(
             &session_request(5_000, 1),
@@ -65,11 +132,11 @@ fn oversized_semantic_commit_is_rejected_abortable_and_reopens_without_effects()
         )
         .unwrap();
     let rejected = begin(&engine, "oversized", 1_300);
-    let mutations = (0..4096)
+    let mutations = (0..count)
         .map(|index| TransactionMutation::AssertClaim {
             subject: CanonicalId::new(format!("oversized-{index}")).unwrap(),
             predicate: CanonicalId::new("contains").unwrap(),
-            object: "x".repeat(4096),
+            object: "x".repeat(object_bytes),
             valid_from: 1_000,
             tx_time: 1_000,
             producer: CanonicalId::new("admission-oracle").unwrap(),
@@ -109,12 +176,22 @@ fn oversized_semantic_commit_is_rejected_abortable_and_reopens_without_effects()
             "oversized-commit",
         )
         .unwrap_err();
+    let (_, rejected_state) = engine
+        .load_authenticated(&lease.session_id, &lease.token)
+        .unwrap();
+    let intent_retained = rejected_state.transactions[&rejected.transaction_id]
+        .commit_intent
+        .is_some();
     assert_eq!(
         error.kind(),
         crate::ServiceErrorKind::ResourceExhausted,
-        "known batch admission is not an uncertain internal error: {error}"
+        "known batch admission is not an uncertain internal error: {error}; intent_retained={intent_retained}"
     );
     assert!(!error.retryable());
+    assert!(
+        error.to_string().contains(expected_error),
+        "wrong admission resource: {error}"
+    );
     assert_eq!(engine.storage.runtime().cursor().unwrap(), before);
     assert_eq!(
         domain_evidence(&engine, &prior_commit, &rejected_commit),
@@ -127,7 +204,7 @@ fn oversized_semantic_commit_is_rejected_abortable_and_reopens_without_effects()
         .commit_intent
         .is_none());
     drop(engine);
-    let reopened = RrdEngine::open(root.path(), instance(), TOKEN_KEY).unwrap();
+    let reopened = configured_engine(&path, limits, false);
     assert_eq!(reopened.storage.runtime().cursor().unwrap(), before);
     assert_eq!(
         domain_evidence(&reopened, &prior_commit, &rejected_commit),
@@ -187,7 +264,7 @@ fn oversized_semantic_commit_is_rejected_abortable_and_reopens_without_effects()
     assert!(!receipt.idempotent_replay);
     assert_eq!(reopened.storage.runtime().cursor().unwrap(), before + 1);
     drop(reopened);
-    let reopened = RrdEngine::open(root.path(), instance(), TOKEN_KEY).unwrap();
+    let reopened = configured_engine(&path, limits, false);
     let claims = reopened.storage.claims().claims_in_range(0, 8192).unwrap();
     assert_eq!(claims.len(), 2);
     assert_eq!(claims[0].object, "prior-acknowledged");

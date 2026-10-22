@@ -197,6 +197,14 @@ These are safeguards, not measured capacity profiles. Retained generations,
 allocator overhead, queue/maintenance debt, whole-startup work and installed
 configuration projection remain outside this bound and keep C-07d open.
 
+The [mutable admission propagation package](../../evidence/change-journals/gate-c/c-07d-limit-propagation.md)
+keeps native byte/version rejection typed through store open and semantic
+commit, maps known engine rejection to resource exhaustion, and clears prepared
+intent only after confirming no durable outcome. The same native options now
+reach store read-only inspection. Joined rejection/reopen/reuse histories must
+preserve graph, claim, index, audit, function receipt and control evidence; this
+component composition does not bind installed configuration or restore policy.
+
 The [projected reader ownership repair](../../evidence/change-journals/gate-c/c-07e-read-view-release.md)
 addresses reproduced prerequisite defects in empty-view admission release and
 terminal stream source retention. It preserves the canonical registry/reader

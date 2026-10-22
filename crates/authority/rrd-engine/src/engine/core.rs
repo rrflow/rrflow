@@ -142,7 +142,7 @@ impl RrdEngine {
         Self::compose_persistent(operation_parent, instance, token_key, storage, true, limits)
     }
 
-    fn compose_persistent(
+    pub(super) fn compose_persistent(
         operation_parent: Option<AnchoredPath>,
         instance: CanonicalId,
         token_key: [u8; 32],
