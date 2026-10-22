@@ -167,6 +167,15 @@ required for this package. Installed publication/reclamation composition and
 100-cycle operating profiles still remain; neither this bounded history nor
 the component corpus closes C-07c, d-g or POAM-035.
 
+The [ordinary 100-cycle corpus](../../evidence/change-journals/gate-c/c-07c-installed-reopen-corpus.md)
+adds fixed fresh/existing installed ACK/kill/reopen histories with every prior
+transaction replayed after every restart. Its required native candidate lane
+uses the ordinary optimized primary and retains complete build/configuration
+and process-chain receipts. This is correctness qualification under default
+settings, not an admitted constrained capacity profile. Its linked record and
+candidate CI own actual results. Publication/reclamation, resource and
+capacity requirements remain open; this corpus cannot close C-07 independently.
+
 ### Remaining implementation contracts
 
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
@@ -386,6 +395,21 @@ existing authorized configuration path. D-06 and H-04/H-06 own complete UI
 forms, connector setup and client conformance.
 
 ## Prompt, knowledge and UI handoff
+
+Joined-flow acceptance must follow an authorized source through knowledge
+construction, rrflowDB relationships, rrflowKV persistence and rrflowQL
+retrieval to evidence the caller can revisit. The same corpus must exercise
+source edits/deletions, revoked access, duplicate delivery, cancellation and
+restart; one successful commit cannot establish that flow. The
+[knowledge connector contract](../../reference/data/knowledge-connectors.md#knowledge-construction-and-breadcrumbs)
+owns source and breadcrumb semantics. Configurable planning/reference effort
+must reuse the existing [LFG/SWAG policy](../../reference/inference/lfg-swag.md#configurable-execution),
+project preferences, available capabilities and remaining budgets. Downstream
+G/H acceptance must compare declared effort settings on the same tasks,
+including unavailable capabilities and exhausted budgets, and verify
+observable decisions, quality, provenance and cost. It must not grade private
+thought or equate more time with better reasoning. Engineering effort follows
+the change's risk and required evidence; elapsed hours are not a release gate.
 
 The following is the intended joined flow, not implemented alpha evidence:
 
