@@ -21,6 +21,8 @@ use std::time::Duration;
 
 #[path = "support/process.rs"]
 mod process;
+#[path = "support/storage_history.rs"]
+mod storage_history;
 // Authenticated readiness includes the generated discovery catalogue (>4 MiB).
 const OUTPUT_LIMIT: usize = 16 * 1024 * 1024;
 #[cfg(unix)]
@@ -1289,5 +1291,12 @@ max_elapsed_ms = 20000
             "captured_output_bytes": lifecycle_output.len(),
             "stream_limit_bytes": OUTPUT_LIMIT,
         })
+    );
+    storage_history::run(
+        &project,
+        mode,
+        installed_at,
+        &version["build"],
+        &mut lifecycle_output,
     );
 }

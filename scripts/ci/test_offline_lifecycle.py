@@ -14,6 +14,64 @@ import run_offline_lifecycle as runner
 
 
 class OfflineLifecyclePolicyTests(unittest.TestCase):
+    def test_storage_history_requires_both_modes_and_complete_checked_ledgers(self):
+        # Deliberately incomplete history must not become evidence because its
+        # producer printed a passing summary. The real fixture supplies a
+        # canonical ledger for validation by the existing Rust evaluator.
+        for output in ["", "native_storage_history={}",
+                       'native_storage_history={"mode":"fresh","report":{"violations":[]}}']:
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                runner.storage_history_receipts(output, [])
+
+    def test_storage_history_rejects_changed_build_schedule_and_nested_payloads(self):
+        build = {key: "b" * 64 for key in ["executable_sha256", "metadata_sha256",
+                                         "public_contract_sha256", "signal_catalogue_sha256"]}
+        expected = [{"logical_id": name, "request_sha256": "a" * 64,
+                     "effect_sha256": "c" * 64, "resolution": "absent" if name == "c" else "present"}
+                    for name in "abcd"]
+        schedule = [("a", {"kind": "acknowledged", "receipt_sha256": "d" * 64}),
+                    ("b", {"kind": "uncertain", "reason": "response-lost"}),
+                    ("c", {"kind": "rejected", "reason": "stale-cursor"}),
+                    ("d", {"kind": "acknowledged", "receipt_sha256": "d" * 64})]
+        schedule += [(name, {"kind": "acknowledged", "receipt_sha256": "d" * 64})
+                     for _ in range(3) for name in "abd"]
+        attempts = [{"attempt_id": f"attempt-{index}", "logical_id": name,
+                     "request_sha256": "a" * 64, "started_ns": index, "finished_ns": index + 1,
+                     "outcome": outcome} for index, (name, outcome) in enumerate(schedule)]
+        readback = [{"kind": "present", "logical_id": name, "request_sha256": "a" * 64,
+                     "effect_sha256": "c" * 64, "receipt_sha256": "d" * 64, "applications": 1}
+                    for name in "abd"] + [{"kind": "absent", "logical_id": "c"}]
+        first = {"mode": "fresh", "build": build, "forced_reopens": 3, "expected_sha256": "e" * 64,
+                 "ledger": {"expected": expected, "attempts": attempts, "readback": readback},
+                 "report": {"logical_calls": 4, "attempts": 13, "acknowledged": 11, "rejected": 1,
+                            "uncertain": 1, "resolved_present": 3, "resolved_absent": 1,
+                            "unresolved": 0, "violations": []}}
+        second = {**copy.deepcopy(first), "mode": "existing"}
+        durable = [{"mode": mode, "build": build} for mode in ["fresh", "existing"]]
+        def encode(receipts):
+            return "\n".join("native_storage_history=" + json.dumps(item) for item in receipts)
+        self.assertEqual(runner.storage_history_receipts(encode([first, second]), durable), [first, second])
+        invalid = [[], [first], [first, first], [first, second, second]]
+        changes = [(["forced_reopens"], 2), (["build", "executable_sha256"], "0" * 64),
+                   (["report", "violations"], ["lost-acknowledged-operation"]),
+                   (["ledger", "attempts", 0, "credential"], "never retain"),
+                   (["ledger", "attempts", 0, "started_ns"], True),
+                   (["ledger", "attempts", 0, "outcome", "receipt_sha256"], "invalid"),
+                   (["ledger", "expected", 0, "logical_id"], "b"),
+                   (["ledger", "readback", 0, "applications"], 2),
+                   (["ledger", "readback", 0, "logical_id"], "b"),
+                   (["ledger", "attempts", 0, "outcome"], {"kind": "uncertain", "reason": "response-lost"})]
+        for path, value in changes:
+            altered = copy.deepcopy(second)
+            parent = altered
+            for key in path[:-1]:
+                parent = parent[key]
+            parent[path[-1]] = value
+            invalid.append([first, altered])
+        for receipts in invalid:
+            with self.subTest(receipts=receipts), self.assertRaises(RuntimeError):
+                runner.storage_history_receipts(encode(receipts), durable)
+
     def test_windows_ipv6_probe_requires_a_native_nonzero_scope(self):
         with patch.object(runner.sys, "platform", "win32"):
             for scope in [None, False, 0, -1, "12", 2 ** 32]:
