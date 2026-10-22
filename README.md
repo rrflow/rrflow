@@ -85,6 +85,7 @@ bulk import and streaming exchange remain unqualified.
 | Configure CPU analysis, System One model selection and scoped inference caches | [LFG and SWAG target contract](docs/reference/inference/lfg-swag.md) |
 | Prepare Spark experiments, qualify SWAG candidates and govern RROFLOW improvement | [Learning reference](docs/reference/inference/learning/README.md) |
 | Discover connector requirements and build source-grounded knowledge trees | [Knowledge connectors and Parquet target contract](docs/reference/data/knowledge-connectors.md) |
+| Follow planned DuckDB analytical exchange and optional execution | [DuckDB interoperability contract](docs/reference/data/duckdb.md) — unimplemented; native rrflowDB remains authoritative |
 | Understand project, estate, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
 | Select and prove deployment form, storage profile, and endpoint presentation independently | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
 | Install, serve, verify, repair, restore, and remove one project estate through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |
