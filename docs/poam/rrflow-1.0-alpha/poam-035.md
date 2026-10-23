@@ -408,3 +408,11 @@ those observations were omitted, producing an apparent initial coverage gap.
 The fix keeps timestamps, bounds and late/rejected attempts intact. That failed
 42.86-minute run remains retained; fresh native and 24-hour acceptance remain
 open.
+
+The [addressed query-read repair](../../evidence/change-journals/gate-c/c-07g-addressed-query-reads.md)
+selects authenticated record/relation histories for exact ID equality instead
+of reading the full family. A fixed-budget differential history covers growth,
+updates, retirement, parameterized queries and native reopen; lexical scoring
+retains corpus-wide statistics. Native larger-profile comparison remains
+required. This does not resolve relation endpoint scans or POAM-034's separate
+whole-scope constraint validation.

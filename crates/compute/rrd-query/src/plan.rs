@@ -389,6 +389,10 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         explain_analyze: bound.explain_analyze,
     };
     let event_cursor = event_cursor_filter(bound);
+    let identity_read = matches!(
+        bound.version_sources.as_slice(),
+        [RuntimeVersionedSource::Identity { .. }]
+    );
     let traversal = std::iter::once(&bound.source)
         .chain(bound.join.as_ref().map(|join| &join.source))
         .any(|source| matches!(source, Source::Traversal { .. }));
@@ -397,7 +401,7 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         .iter()
         .find(|filter| filter.comparison.is_match())
         .map(|filter| filter.field.as_str());
-    let selected_index = (event_cursor.is_none() && !traversal)
+    let selected_index = (!identity_read && !traversal)
         .then(|| {
             bound
                 .index_candidates
@@ -449,21 +453,26 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
                 reason: "rejected: no projection generation and grounding proof supplied".into(),
             },
         ]
-    } else if let Some(cursor) = event_cursor {
+    } else if identity_read {
         vec![
             CandidatePath {
                 name: "versioned_identity_read".into(),
                 selected: selected_index.is_none(),
                 exact: true,
-                reason: format!(
-                    "selects the typed event identity for bound global cursor {cursor} at the captured read stamp"
+                reason: event_cursor.map_or_else(
+                    || "selects the typed record or relation identity for bound id equality at the captured read stamp; all predicates remain evaluated".into(),
+                    |cursor| format!("selects the typed event identity for bound global cursor {cursor} at the captured read stamp"),
                 ),
             },
             CandidatePath {
                 name: "versioned_source_read".into(),
                 selected: false,
                 exact: true,
-                reason: "rejected: the typed identity range is narrower than the event-family range".into(),
+                reason: if event_cursor.is_some() {
+                    "rejected: the typed identity range is narrower than the event-family range"
+                } else {
+                    "rejected: the bound identity range excludes unrelated family histories"
+                }.into(),
             },
             CandidatePath {
                 name: "derived_projection".into(),
@@ -620,6 +629,26 @@ fn bound_version_sources(
     schema: &RuntimeSchemaRegistry,
 ) -> Result<Vec<RuntimeVersionedSource>> {
     if query.join.is_none() {
+        // ID equality addresses one temporal identity. Preserve every logical
+        // predicate for evaluation after materialization. MATCH depends on
+        // family-wide corpus statistics and must keep its original source.
+        if !filters.iter().any(|filter| filter.comparison.is_match()) {
+            if let Source::Record { kind } | Source::Relation { kind } = &query.source {
+                if let Some(RuntimeValue::String(id)) = filters.iter().find_map(|filter| {
+                    (filter.field == "id" && filter.comparison == ComparisonOperator::Equal)
+                        .then_some(&filter.value)
+                }) {
+                    // An arbitrary comparison string need not be a valid
+                    // runtime ID. Preserve its existing empty-result behavior.
+                    if let Ok(reference) = rrd_core::RuntimeRef::new(kind.to_string(), id.clone()) {
+                        let model = schema
+                            .logical_model(kind)
+                            .map_err(|error| Error::Binding(error.to_string()))?;
+                        return Ok(vec![RuntimeVersionedSource::Identity { model, reference }]);
+                    }
+                }
+            }
+        }
         if let Source::Event { kind } = &query.source {
             if let Some(cursor) = filters.iter().find_map(|filter| {
                 (filter.field == "cursor" && filter.comparison == ComparisonOperator::Equal)
