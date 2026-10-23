@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub const DEPLOYMENT_PROFILE_CONTRACT_VERSION: u16 = 1;
-pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 2;
+pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 3;
 pub const MAX_CLOCK_ROLLBACK_MS: u64 = 3_600_000;
 pub const MAX_REASONING_RUN_ELAPSED_MS: u64 = 3_600_000;
 pub const MAX_REASONING_STEPS: u64 = 10_000;
@@ -224,6 +224,72 @@ impl RecallLimits {
     }
 }
 
+/// Installed native storage limits. These bound separately accounted owners,
+/// not total process RSS. Changing them requires a new governed configuration
+/// and reopening storage; they are never hot-applied by a client.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StorageLimits {
+    pub mutable_accounted_bytes: u64,
+    pub mutable_versions: u64,
+    pub projected_output_bytes: u64,
+    pub page_cache_bytes: u64,
+    pub wal_flush_target_bytes: u64,
+    pub memtable_flush_target_versions: u64,
+}
+
+impl Default for StorageLimits {
+    fn default() -> Self {
+        Self {
+            mutable_accounted_bytes: 128 * 1024 * 1024,
+            mutable_versions: 1_048_576,
+            projected_output_bytes: 128 * 1024 * 1024,
+            page_cache_bytes: 4 * 1024 * 1024,
+            wal_flush_target_bytes: 64 * 1024 * 1024,
+            memtable_flush_target_versions: 524_288,
+        }
+    }
+}
+
+impl StorageLimits {
+    pub fn validate(&self) -> Result<()> {
+        // Fixed protocol ceilings keep admission finite across platforms;
+        // the native adapter additionally checks host-size conversion.
+        const MAX_BYTES: u64 = 1 << 40;
+        const MAX_VERSIONS: u64 = 1 << 32;
+        for (name, value) in [
+            (
+                "storage mutable_accounted_bytes",
+                self.mutable_accounted_bytes,
+            ),
+            (
+                "storage projected_output_bytes",
+                self.projected_output_bytes,
+            ),
+            (
+                "storage wal_flush_target_bytes",
+                self.wal_flush_target_bytes,
+            ),
+        ] {
+            validate_nonzero_max(name, value, MAX_BYTES)?;
+        }
+        validate_nonzero_max(
+            "storage mutable_versions",
+            self.mutable_versions,
+            MAX_VERSIONS,
+        )?;
+        validate_nonzero_max(
+            "storage memtable_flush_target_versions",
+            self.memtable_flush_target_versions,
+            self.mutable_versions,
+        )?;
+        if self.page_cache_bytes > MAX_BYTES {
+            return invalid("storage page_cache_bytes exceeds the protocol ceiling");
+        }
+        Ok(())
+    }
+}
+
 /// Operator-authored input. Revision and digest are assigned by the engine,
 /// so neither can be forged or silently retained across an edit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -231,6 +297,7 @@ impl RecallLimits {
 pub struct EstateConfigurationInput {
     pub format_version: u16,
     pub clock: ClockPolicy,
+    pub storage: StorageLimits,
     pub reasoning: ReasoningLimits,
     pub recall: RecallLimits,
     pub query: QueryBudget,
@@ -244,6 +311,7 @@ impl EstateConfigurationInput {
             ));
         }
         self.clock.validate()?;
+        self.storage.validate()?;
         self.reasoning.validate()?;
         self.recall.validate()?;
         self.query.validate()
@@ -259,6 +327,7 @@ pub struct EstateConfiguration {
     pub format_version: u16,
     pub revision: u64,
     pub clock: ClockPolicy,
+    pub storage: StorageLimits,
     pub reasoning: ReasoningLimits,
     pub recall: RecallLimits,
     pub query: QueryBudget,
@@ -275,6 +344,7 @@ impl EstateConfiguration {
             format_version: input.format_version,
             revision,
             clock: input.clock,
+            storage: input.storage,
             reasoning: input.reasoning,
             recall: input.recall,
             query: input.query,
@@ -288,6 +358,7 @@ impl EstateConfiguration {
         EstateConfigurationInput {
             format_version: self.format_version,
             clock: self.clock.clone(),
+            storage: self.storage.clone(),
             reasoning: self.reasoning.clone(),
             recall: self.recall.clone(),
             query: self.query.clone(),
@@ -357,6 +428,7 @@ impl Default for EstateConfiguration {
                 clock: ClockPolicy {
                     maximum_rollback_ms: 0,
                 },
+                storage: StorageLimits::default(),
                 reasoning: ReasoningLimits {
                     max_run_elapsed_ms: 900_000,
                     max_steps: 256,
@@ -380,6 +452,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
         configuration.format_version,
         configuration.revision,
         &configuration.clock,
+        &configuration.storage,
         &configuration.reasoning,
         &configuration.recall,
         &configuration.query,
@@ -388,7 +461,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
         crate::ContractError(format!("configuration digest encoding failed: {error}"))
     })?;
     let mut bytes = Vec::with_capacity(40 + encoded.len());
-    bytes.extend_from_slice(b"rrflow-estate-configuration-v2\0");
+    bytes.extend_from_slice(b"rrflow-estate-configuration-v3\0");
     bytes.extend_from_slice(&encoded);
     Ok(sha256_bytes(&bytes))
 }

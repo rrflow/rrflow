@@ -53,9 +53,10 @@ pub use capability_surface::{
 pub use deployment::{
     estate_configuration_sha256, ClockPolicy, DeploymentForm, DeploymentProfile,
     EndpointPresentation, EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity,
-    ReasoningLimits, RecallLimits, StorageProfileKind, DEPLOYMENT_PROFILE_CONTRACT_VERSION,
-    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS,
-    MAX_REASONING_STEPS, MAX_REASONING_STEP_ELAPSED_MS,
+    ReasoningLimits, RecallLimits, StorageLimits, StorageProfileKind,
+    DEPLOYMENT_PROFILE_CONTRACT_VERSION, ESTATE_CONFIGURATION_FORMAT_VERSION,
+    MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS, MAX_REASONING_STEPS,
+    MAX_REASONING_STEP_ELAPSED_MS,
 };
 pub use diagnostic::{
     DiagnosticAuthority, DiagnosticCoverage, DiagnosticGraphDifference,

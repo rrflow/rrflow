@@ -16,6 +16,7 @@ fn identity() -> InstalledEstateIdentity {
 fn input() -> EstateConfigurationInput {
     EstateConfigurationInput {
         format_version: ESTATE_CONFIGURATION_FORMAT_VERSION,
+        storage: rrd_contract::StorageLimits::default(),
         clock: ClockPolicy {
             maximum_rollback_ms: 0,
         },

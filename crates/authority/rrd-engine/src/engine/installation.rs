@@ -31,10 +31,10 @@ use std::io::{Read, Write};
 
 const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v2.json");
 const DEFAULT_CONFIGURATION_BYTES: &[u8] =
-    include_bytes!("../../assets/install/default-estate-configuration-v2.toml");
+    include_bytes!("../../assets/install/default-estate-configuration-v3.toml");
 const CLYFFY_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/clyffy-profile-v2.json");
 const INSTALL_PROFILE_FORMAT: u16 = 2;
-const LOCATOR_FORMAT: u16 = 1;
+const LOCATOR_FORMAT: u16 = 2;
 const INSTALLED_RECORD_FORMAT: u16 = 2;
 const INSTALL_CHECKPOINT_FORMAT: u16 = 2;
 pub(super) const INSTALLED_RECORD_KEY: &str = "server/state/install/record";
@@ -107,7 +107,7 @@ impl DefaultInstallProfile {
         if self.format_version != INSTALL_PROFILE_FORMAT
             || !matches!(self.id.as_str(), "default" | "clyffy")
             || self.template_asset != "templates/generic-project-v1.md"
-            || self.configuration_asset != "default-estate-configuration-v2.toml"
+            || self.configuration_asset != "default-estate-configuration-v3.toml"
             || self.initial_grant_policy.as_str() != "local-owner-all-actions"
             || !(32..=4_096).contains(&self.credential_bytes)
             || self.inventory_max_files == 0
@@ -168,8 +168,10 @@ pub fn load_estate_configuration(path: Option<&Path>) -> Result<EstateConfigurat
         std::str::from_utf8(&bytes).map_err(|error| ServiceError::Contract(error.to_string()))?,
     )
     .map_err(|error| ServiceError::Contract(error.to_string()))?;
-    EstateConfiguration::from_input(1, input)
-        .map_err(|error| ServiceError::Contract(error.to_string()))
+    let configuration = EstateConfiguration::from_input(1, input)
+        .map_err(|error| ServiceError::Contract(error.to_string()))?;
+    super::core::installed_storage_options(&configuration.storage)?;
+    Ok(configuration)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,10 +205,13 @@ pub struct ProjectLocator {
     pub installed_record_sha256: String,
     pub configuration_revision: u64,
     pub configuration_sha256: String,
+    /// Pre-open projection, verified against the sealed installed record.
+    pub storage: rrd_contract::StorageLimits,
 }
 
 impl ProjectLocator {
     fn validate(&self) -> Result<()> {
+        super::core::installed_storage_options(&self.storage)?;
         if self.format_version != LOCATOR_FORMAT
             || self.product_version != env!("CARGO_PKG_VERSION")
             || !is_sha256(&self.plan_sha256)
@@ -743,11 +748,25 @@ impl RrdEngine {
         let token_key = intent.token_key()?;
         let engine = match storage_root.metadata() {
             Ok(metadata) if !metadata.file_type().is_symlink() && metadata.is_dir() => {
-                RrdEngine::open_existing_anchored(&storage_root, instance_id.clone(), token_key)?
+                RrdEngine::open_existing_anchored_with_options(
+                    &storage_root,
+                    instance_id.clone(),
+                    token_key,
+                    super::core::installed_storage_options(
+                        &preview.installation.configuration.storage,
+                    )?,
+                )?
             }
             Ok(_) => return Err(ServiceError::ProjectBindingMismatch),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                RrdEngine::create_new_anchored(&storage_root, instance_id.clone(), token_key)?
+                RrdEngine::create_new_anchored_with_options(
+                    &storage_root,
+                    instance_id.clone(),
+                    token_key,
+                    super::core::installed_storage_options(
+                        &preview.installation.configuration.storage,
+                    )?,
+                )?
             }
             Err(error) => return Err(ServiceError::Storage(error.to_string())),
         };
@@ -978,6 +997,7 @@ impl RrdEngine {
             &transitions,
             expected_runtime_cursor,
             bootstrap_control_sequence,
+            super::core::installed_storage_options(&preview.installation.configuration.storage)?,
         )?;
         observe_install_stage(
             preview,
@@ -1000,6 +1020,7 @@ impl RrdEngine {
             executable_sha256: preview.installation.executable_sha256.clone(),
             installed_record_sha256: installed.record_sha256.clone(),
             configuration_revision: preview.installation.configuration.revision,
+            storage: preview.installation.configuration.storage.clone(),
             configuration_sha256: preview
                 .installation
                 .configuration
@@ -1082,10 +1103,11 @@ impl RrdEngine {
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
         #[cfg(feature = "crash-test")]
         let _recovery_crash = rrd_store::crash_test::enter_recovery(storage_root.diagnostic_path());
-        let mut engine = RrdEngine::open_existing_anchored(
+        let mut engine = RrdEngine::open_existing_anchored_with_options(
             &storage_root,
             locator.identity.instance_id.clone(),
             token_key,
+            super::core::installed_storage_options(&locator.storage)?,
         )?;
         let bytes = engine
             .storage
@@ -1112,7 +1134,8 @@ impl RrdEngine {
         configuration
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
-        if configuration.revision != locator.configuration_revision
+        if configuration.storage != locator.storage
+            || configuration.revision != locator.configuration_revision
             || configuration.configuration_sha256 != locator.configuration_sha256
         {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -1200,7 +1223,10 @@ impl RrdEngine {
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
         let storage_root = safe_join(&project, &locator.storage_root)?;
         super::core::validate_existing_object_layout(&storage_root)?;
-        let inspector = RrflowKvInspector::open_anchored(&storage_root)?;
+        let inspector = RrflowKvInspector::open_anchored_with_options(
+            &storage_root,
+            super::core::installed_storage_options(&locator.storage)?,
+        )?;
         let installed: InstalledEstateRecord =
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
         installed.validate()?;
@@ -1221,7 +1247,8 @@ impl RrdEngine {
         configuration
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
-        if configuration.revision != locator.configuration_revision
+        if configuration.storage != locator.storage
+            || configuration.revision != locator.configuration_revision
             || configuration.configuration_sha256 != locator.configuration_sha256
         {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -1610,8 +1637,9 @@ fn require_committed_installation(
     transitions: &[ControlTransition],
     expected_runtime_cursor: u64,
     expected_control_sequence: u64,
+    options: rrd_store::DatabaseOptions,
 ) -> Result<ReadStamp> {
-    let inspector = RrflowKvInspector::open_anchored(storage_root)?;
+    let inspector = RrflowKvInspector::open_anchored_with_options(storage_root, options)?;
     let inspection = inspector.inspection();
     if inspection.claim_sequence != 0
         || inspection.runtime_cursor != expected_runtime_cursor
@@ -1804,7 +1832,10 @@ fn replay_installation_result(
         return Err(ServiceError::IdempotencyConflict);
     }
     let (_, locator, locator_bytes) = read_locator_anchored(project)?;
-    let inspector = RrflowKvInspector::open_anchored(&safe_join(project, &locator.storage_root)?)?;
+    let inspector = RrflowKvInspector::open_anchored_with_options(
+        &safe_join(project, &locator.storage_root)?,
+        super::core::installed_storage_options(&locator.storage)?,
+    )?;
     let installed: InstalledEstateRecord =
         decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
     let job_id = canonical_prefixed("job", &preview.attunement.plan_sha256)?;
@@ -1937,6 +1968,7 @@ pub(super) fn require_locator_record_match(
         || locator.identity != installed.installation.target
         || locator.configuration_revision != installed.installation.configuration.revision
         || locator.configuration_sha256 != installed.installation.configuration.configuration_sha256
+        || locator.storage != installed.installation.configuration.storage
         || locator.storage_root
             != installed
                 .installation

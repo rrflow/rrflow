@@ -274,8 +274,9 @@ Packages `D01-02-canonical-estate-layout-and-configuration-v1`,
 startup slice without claiming the complete target above:
 
 - `rrd-contract` owns `InstalledEstateIdentity`, three independent deployment
-  coordinates, and a strict self-digesting format-2 `EstateConfiguration`,
-  including `clock.maximum_rollback_ms` with a zero default;
+  coordinates, and a strict self-digesting format-3 `EstateConfiguration`,
+  including `clock.maximum_rollback_ms` with a zero default and required native
+  storage limits;
 - the bundled default configuration or one explicit regular, non-symlinked
   TOML file up to 64 KiB is read during planning, validated below hard compiled
   maxima, assigned revision 1, and sealed into the plan;
@@ -285,8 +286,9 @@ startup slice without claiming the complete target above:
   one create-new storage root, token key, credential document and `.rrflow/config.toml`;
 - the active configuration is committed inside rrflowDB at
   `server/state/<instance>/configuration/active` before locator publication;
-- installed open validates locator, installed record, configuration revision
-  and digest, then binds the same identity/configuration into `RrdEngine`;
+- locator format 2 projects the sealed storage policy for admission before
+  WAL replay. Installed open and read-only inspection validate that projection
+  against the installed record and effective configuration before readiness;
 - query, live-query, query-index, and context requests above the installed
   ceiling fail before their data operation; and
 - server capabilities and generated OpenAPI/SDK types expose the effective
@@ -322,6 +324,25 @@ startup slice without claiming the complete target above:
   canonical installation/open. The pre-canonical manifest/private binding,
   raw product CLI, development supervisor, standalone security initializer,
   and server initializer are removed with no successful compatibility reader.
+
+The required `[storage]` configuration has six separately scoped controls:
+`mutable_accounted_bytes` (128 MiB default), `mutable_versions` (1,048,576),
+`projected_output_bytes` (128 MiB), `page_cache_bytes` (4 MiB, zero disables
+caching), `wal_flush_target_bytes` (64 MiB) and
+`memtable_flush_target_versions` (524,288). The first two are native active-state
+hard caps; the next two bound retained projected allocations and cache bytes;
+the last two are soft synchronous maintenance targets. A single atomic batch
+may exceed a soft target only within hard admission. These are not aggregate
+RSS or maintenance-debt bounds. Protocol ceilings and checked native conversion
+reject invalid configuration. Current limits require reopening; no live
+configure operation or qualified capacity profile is implied.
+
+Apply, interrupted installation, reopen, inspection, backup restore and restore
+publication lower the same sealed policy into native storage options. A low
+replay limit denies access without modifying authoritative bytes; inspection
+does not silently retry with larger defaults. Configuration format 2 and locator
+format 1 are replaced pre-release shapes and are rejected, not migrated or
+silently defaulted. Product version remains 1.0.0.
 
 The implementation rejects any pre-existing `.rrflow` tree for a new install.
 It does not migrate, merge, or delete a user's pre-canonical

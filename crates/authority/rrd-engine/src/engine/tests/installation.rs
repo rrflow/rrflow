@@ -694,7 +694,15 @@ fn explicit_configuration_is_sealed_and_apply_does_not_reread_it() {
     let input = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
         input.path(),
-        r#"format_version = 2
+        r#"format_version = 3
+
+[storage]
+mutable_accounted_bytes = 134217728
+mutable_versions = 1048576
+projected_output_bytes = 134217728
+page_cache_bytes = 4194304
+wal_flush_target_bytes = 67108864
+memtable_flush_target_versions = 524288
 
 [clock]
 maximum_rollback_ms = 250

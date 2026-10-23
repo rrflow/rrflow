@@ -178,6 +178,14 @@ capacity requirements remain open; this corpus cannot close C-07 independently.
 
 ### Remaining implementation contracts
 
+The [installed storage-policy implementation](../../evidence/change-journals/gate-c/c-07d-installed-storage-policy.md)
+now carries native active-state, retained-output and cache limits plus soft
+flush targets through sealed installation, bounded reopen/inspection and
+configured restore. Configuration/locator projections and generated clients
+advance together. This is implementation with compilation evidence; the linked
+candidate still requires CI, and aggregate owners, maintenance debt, real disk
+exhaustion, capacity profiles and sustained operation remain open.
+
 Native projected-output admission is a bounded d/e prerequisite. Its
 [baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
 binds a per-open-instance byte pool at the existing reader. An entire output

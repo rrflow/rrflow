@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb
+// OpenAPI SHA-256: f6222edb5c2c247566cbb244a4b33098aa0567a4b883957dad0c0bfbca83d30f
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3321,6 +3321,25 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one
@@ -3523,6 +3542,25 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one

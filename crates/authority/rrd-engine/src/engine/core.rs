@@ -2,6 +2,38 @@ use super::invocation::ActiveInvocation;
 use super::*;
 use rrd_store::filesystem::AnchoredPath;
 
+/// One checked lowering of installed policy into the native storage owner.
+/// The locator carries a projection for pre-open admission, subsequently
+/// compared with the sealed canonical configuration before readiness.
+pub(super) fn installed_storage_options(
+    policy: &rrd_contract::StorageLimits,
+) -> Result<rrd_store::DatabaseOptions> {
+    policy
+        .validate()
+        .map_err(|error| ServiceError::Contract(error.to_string()))?;
+    let native = |name: &str, value: u64| {
+        usize::try_from(value).map_err(|_| {
+            ServiceError::Contract(format!(
+                "storage {name} exceeds this platform's address space"
+            ))
+        })
+    };
+    let mut options = rrd_store::DatabaseOptions::default();
+    options.mutable_limits.accounted_bytes =
+        native("mutable_accounted_bytes", policy.mutable_accounted_bytes)?;
+    options.mutable_limits.versions = native("mutable_versions", policy.mutable_versions)?;
+    options.projected_output_bytes =
+        native("projected_output_bytes", policy.projected_output_bytes)?;
+    options.page_cache_bytes = native("page_cache_bytes", policy.page_cache_bytes)?;
+    options.maintenance.wal_payload_max_bytes =
+        native("wal_flush_target_bytes", policy.wal_flush_target_bytes)?;
+    options.maintenance.memtable_max_versions = native(
+        "memtable_flush_target_versions",
+        policy.memtable_flush_target_versions,
+    )?;
+    Ok(options)
+}
+
 pub struct RrdEngine {
     pub(crate) storage: StorageProfile,
     pub(crate) storage_profile_kind: StorageProfileKind,
@@ -49,8 +81,17 @@ impl RrdEngine {
         instance: CanonicalId,
         token_key: [u8; 32],
     ) -> Result<Self> {
+        Self::create_new_anchored_with_options(root, instance, token_key, Default::default())
+    }
+
+    pub(super) fn create_new_anchored_with_options(
+        root: &AnchoredPath,
+        instance: CanonicalId,
+        token_key: [u8; 32],
+        options: rrd_store::DatabaseOptions,
+    ) -> Result<Self> {
         let operation_parent = root.parent();
-        let storage = RrflowKvStore::create_new_anchored(root, Default::default())?;
+        let storage = RrflowKvStore::create_new_anchored(root, options)?;
         Self::compose_persistent(
             operation_parent,
             instance,
@@ -70,12 +111,21 @@ impl RrdEngine {
         instance: CanonicalId,
         token_key: [u8; 32],
     ) -> Result<Self> {
+        Self::open_existing_anchored_with_options(root, instance, token_key, Default::default())
+    }
+
+    pub(super) fn open_existing_anchored_with_options(
+        root: &AnchoredPath,
+        instance: CanonicalId,
+        token_key: [u8; 32],
+        options: rrd_store::DatabaseOptions,
+    ) -> Result<Self> {
         let operation_parent = root.parent();
         let root = root
             .pin_directory()
             .map_err(|e| ServiceError::Storage(e.to_string()))?;
         validate_existing_object_layout(&root)?;
-        let storage = RrflowKvStore::open_existing_anchored(&root, Default::default())?;
+        let storage = RrflowKvStore::open_existing_anchored(&root, options)?;
         Self::compose_persistent(
             operation_parent,
             instance,

@@ -583,7 +583,15 @@ fn installed_lifecycle(mode: &str) {
     let configuration_file = root.path().join("estate-configuration.toml");
     std::fs::write(
         &configuration_file,
-        r#"format_version = 2
+        r#"format_version = 3
+
+[storage]
+mutable_accounted_bytes = 134217728
+mutable_versions = 1048576
+projected_output_bytes = 134217728
+page_cache_bytes = 4194304
+wal_flush_target_bytes = 67108864
+memtable_flush_target_versions = 524288
 
 [clock]
 maximum_rollback_ms = 0
