@@ -5,7 +5,6 @@ use crate::segment::{
     new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
     ReadView, SharedPageCache,
 };
-use crate::wal::replay_file;
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
 use crate::{
     AppendReceipt, Checkpoint, Durability, Error, Manifest, ManifestStore, Memtable,
@@ -112,6 +111,7 @@ pub struct DatabaseOptions {
     pub compaction: CompactionPolicy,
     pub compaction_limits: crate::CompactionLimits,
     pub reclamation: crate::ReclamationLimits,
+    pub recovery: crate::RecoveryLimits,
 }
 
 impl Default for DatabaseOptions {
@@ -129,6 +129,7 @@ impl Default for DatabaseOptions {
             compaction: CompactionPolicy::default(),
             compaction_limits: crate::CompactionLimits::default(),
             reclamation: crate::ReclamationLimits::default(),
+            recovery: crate::RecoveryLimits::default(),
         }
     }
 }
@@ -158,6 +159,7 @@ impl DatabaseOptions {
         self.compaction.validate()?;
         self.compaction_limits.validate()?;
         self.reclamation.validate()?;
+        self.recovery.validate()?;
         if self.compaction_limits.l0_segments < self.compaction.l0_compaction_trigger as u64 {
             return Err(Error::InvalidConfiguration(
                 "L0 hard capacity is below its compaction trigger".into(),
@@ -487,24 +489,28 @@ impl Database {
         let total_started = Instant::now();
         validate_existing_database_layout(&root)?;
         let options = options.validate()?;
+        let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
         let manifests = ManifestStore::open_existing_anchored(&root)?;
         let (_, manifest) = manifests
-            .current()?
+            .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
         let page_cache =
             new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
-        let segment_bytes = manifest
-            .segments
-            .iter()
-            .map(|segment| segment.bytes)
-            .sum::<u64>();
+        let mut segment_bytes = 0u64;
+        for segment in &manifest.segments {
+            recovery_budget.file(segment.bytes)?;
+            segment_bytes = segment_bytes.checked_add(segment.bytes).ok_or_else(|| {
+                Error::InvalidManifest("recovery segment byte count overflow".into())
+            })?;
+        }
         let segments_started = Instant::now();
         let mut segments = Vec::with_capacity(manifest.segments.len());
         let mut segment_open_evidence = SegmentOpenEvidence::default();
         for expected in &manifest.segments {
+            recovery_budget.tick()?;
             let segment_path = root
                 .join(SEGMENT_DIRECTORY)
                 .join(format!("{}.seg", expected.id));
@@ -530,14 +536,19 @@ impl Database {
         let mut memtable = Memtable::at_sequence(manifest.durable_sequence);
         let wal_started = Instant::now();
         let mut wal_file = OpenOptions::new().read(true).write(true).open(&path)?;
-        let recovery = replay_file(&mut wal_file, manifest.wal_start_sequence, |batch| {
-            #[cfg(all(feature = "crash-test", not(test)))]
-            crate::crash_test::boundary(
-                crate::crash_test::Point::RecoveryRead,
-                root.diagnostic_path(),
-            );
-            memtable.apply_owned_recovered(batch, options.mutable_limits)
-        })?;
+        let recovery = crate::wal::replay_file_bounded(
+            &mut wal_file,
+            manifest.wal_start_sequence,
+            &mut recovery_budget,
+            |batch| {
+                #[cfg(all(feature = "crash-test", not(test)))]
+                crate::crash_test::boundary(
+                    crate::crash_test::Point::RecoveryRead,
+                    root.diagnostic_path(),
+                );
+                memtable.apply_owned_recovered(batch, options.mutable_limits)
+            },
+        )?;
         if let Some(offset) = recovery.torn_tail {
             return Err(Error::TornTail { offset });
         }

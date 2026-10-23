@@ -15,6 +15,11 @@ pub enum Error {
         observed: u64,
     },
     /// Maintenance pressure before the incoming batch is appended.
+    RecoveryLimit {
+        resource: rrd_lsm::RecoveryResource,
+        limit: u64,
+        observed: u64,
+    },
     ReclamationPending,
     ReclamationLimit {
         resource: rrd_lsm::ReclamationResource,
@@ -46,7 +51,10 @@ pub enum Error {
     /// and rebuilds until an operator resets it.
     Quarantined(String),
     /// Optimistic concurrency rejected a writer that observed an older head.
-    RuntimeConflict { expected: u64, actual: u64 },
+    RuntimeConflict {
+        expected: u64,
+        actual: u64,
+    },
     /// Snapshot isolation rejected a transaction because a key in its write
     /// set changed after the transaction began.
     TransactionConflict {
@@ -64,7 +72,10 @@ pub enum Error {
     /// A typed write was attempted before its scope installed a registry.
     RuntimeSchemaMissing(String),
     /// A schema update skipped or repeated a persisted revision.
-    RuntimeSchemaConflict { expected: u64, actual: u64 },
+    RuntimeSchemaConflict {
+        expected: u64,
+        actual: u64,
+    },
     /// A schema-bound native index rejected an invalid definition or write.
     IndexConstraint(String),
     /// Governed-function catalogue or receipt state failed closed.
@@ -72,7 +83,10 @@ pub enum Error {
     /// A leased snapshot is not present in the authoritative snapshot catalog.
     SnapshotNotFound(String),
     /// A leased snapshot was presented after its expiration instant.
-    SnapshotExpired { id: String, expired_at: u64 },
+    SnapshotExpired {
+        id: String,
+        expired_at: u64,
+    },
     /// A caller supplied fields that do not match the persisted snapshot with
     /// the same identity.
     SnapshotMismatch(String),
@@ -81,7 +95,10 @@ pub enum Error {
     /// A stamped transaction read does not match the retained hash/schema state.
     ReadStampMismatch(String),
     /// A direct semantic read would examine more keys than its declared bound.
-    RuntimeReadBudgetExceeded { limit: u64, observed: u64 },
+    RuntimeReadBudgetExceeded {
+        limit: u64,
+        observed: u64,
+    },
     /// Object-tier I/O or capability error.
     Object(String),
     /// A transport-classified remote failure that the bounded object retry
@@ -92,9 +109,15 @@ pub enum Error {
     /// A referenced immutable object is absent.
     ObjectMissing(String),
     /// Stored bytes do not match their content address.
-    ObjectCorrupt { expected: String, actual: String },
+    ObjectCorrupt {
+        expected: String,
+        actual: String,
+    },
     /// Stored bytes match the digest but not the committed length evidence.
-    ObjectLengthMismatch { expected: u64, actual: u64 },
+    ObjectLengthMismatch {
+        expected: u64,
+        actual: u64,
+    },
     /// Deterministic failure-injection boundary used by crash tests.
     FaultInjected(&'static str),
 }
@@ -106,6 +129,7 @@ impl fmt::Display for Error {
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
             ),
+            Error::RecoveryLimit { resource, limit, observed } => write!(f, "recovery {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::ReclamationPending => write!(f, "bounded reclamation has remaining work; retry before admitting another write"),
             Error::ReclamationLimit { resource, limit, observed } => write!(f, "reclamation {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::MaintenanceLimit { resource, limit, observed } => write!(f, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
@@ -196,6 +220,15 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::RecoveryLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::RecoveryLimit {
+                resource,
+                limit,
+                observed,
+            },
             rrd_lsm::Error::ReclamationPending => Self::ReclamationPending,
             rrd_lsm::Error::ReclamationLimit {
                 resource,

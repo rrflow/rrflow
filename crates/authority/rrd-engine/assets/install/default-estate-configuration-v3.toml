@@ -24,6 +24,12 @@ reclamation_elapsed_ms = 30000
 transaction_admission_requests = 64
 transaction_admission_bytes = 67108864
 transaction_admission_wait_ms = 30000
+recovery_metadata_bytes = 67108864
+recovery_files = 262144
+recovery_read_bytes = 1099511627776
+recovery_wal_bytes = 268435456
+recovery_wal_frames = 1048576
+recovery_elapsed_ms = 120000
 
 [clock]
 maximum_rollback_ms = 0

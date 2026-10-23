@@ -195,6 +195,12 @@ and denies growth while bounded reclamation still has work. Its native runtime
 acceptance remains pending; transport cancellation, recovery headroom and the
 capacity/soak obligations are not closed by compilation.
 
+The [recovery-admission change](../../evidence/change-journals/gate-c/c-07d-recovery-admission.md)
+bounds native reopen and inspection metadata, file/read work, WAL size/frames
+and cooperative time using installed policy. It preserves bytes on denial;
+compilation does not qualify recovery-space reserve, an installed repair UX,
+actual exhaustion, host limits or capacity/soak.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

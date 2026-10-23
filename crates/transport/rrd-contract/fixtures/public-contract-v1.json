@@ -75,7 +75,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "510e1074e7c8f99129cd2ddfadc67ba62e05f1e0d9451c45edf77a900e34bb56",
+      "configuration_sha256": "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -115,6 +115,12 @@
         "reclamation_elapsed_ms": 30000,
         "reclamation_inventory_entries": 262144,
         "reclamation_metadata_bytes": 67108864,
+        "recovery_elapsed_ms": 120000,
+        "recovery_files": 262144,
+        "recovery_metadata_bytes": 67108864,
+        "recovery_read_bytes": 1099511627776,
+        "recovery_wal_bytes": 268435456,
+        "recovery_wal_frames": 1048576,
         "retained_mutable_bytes": 536870912,
         "retained_mutable_generations": 64,
         "retained_mutable_versions": 4194304,

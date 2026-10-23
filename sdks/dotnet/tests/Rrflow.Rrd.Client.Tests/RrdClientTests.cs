@@ -75,6 +75,12 @@ public sealed class RrdClientTests
                             ["transaction_admission_requests"] = 64,
                             ["transaction_admission_bytes"] = 67108864,
                             ["transaction_admission_wait_ms"] = 30000,
+                            ["recovery_metadata_bytes"] = 67108864,
+                            ["recovery_files"] = 262144,
+                            ["recovery_read_bytes"] = 1099511627776L,
+                            ["recovery_wal_bytes"] = 268435456,
+                            ["recovery_wal_frames"] = 1048576,
+                            ["recovery_elapsed_ms"] = 120000,
                         },
                         ["reasoning"] = new Dictionary<string, object?>
                         {
@@ -100,7 +106,7 @@ public sealed class RrdClientTests
                             ["max_elapsed_ms"] = 30_000,
                         },
                         ["configuration_sha256"] =
-                            "510e1074e7c8f99129cd2ddfadc67ba62e05f1e0d9451c45edf77a900e34bb56",
+                            "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0",
                     },
                     ["instance"] = new Dictionary<string, object?>
                     {

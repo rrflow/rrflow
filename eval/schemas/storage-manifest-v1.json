@@ -1050,6 +1050,36 @@
           "minimum": 0,
           "type": "integer"
         },
+        "recovery_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_metadata_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_wal_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_wal_frames": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "retained_mutable_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1109,7 +1139,13 @@
         "reclamation_elapsed_ms",
         "transaction_admission_requests",
         "transaction_admission_bytes",
-        "transaction_admission_wait_ms"
+        "transaction_admission_wait_ms",
+        "recovery_metadata_bytes",
+        "recovery_files",
+        "recovery_read_bytes",
+        "recovery_wal_bytes",
+        "recovery_wal_frames",
+        "recovery_elapsed_ms"
       ],
       "type": "object"
     },

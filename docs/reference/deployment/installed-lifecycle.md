@@ -391,6 +391,18 @@ of effects already admitted. Request-context deadlines are checked before
 admission. Native `transaction_admission_snapshot` exposes content-free current
 and peak charge; no new wire operation or independent lifecycle is introduced.
 
+Recovery and mutation-free inspection use `recovery_metadata_bytes` (64 MiB),
+`recovery_files` (262,144 admitted file reads), `recovery_read_bytes` (1 TiB
+conservative whole-file charge), `recovery_wal_bytes` (256 MiB),
+`recovery_wal_frames` (1,048,576), and `recovery_elapsed_ms` (120,000). Metadata
+is admitted before allocation, immutable files before segment opening, and WAL
+size/frames before payload materialization. Inspection charges repeated reads
+again, including its full-file digest pass. Its hashing loop checks elapsed
+work and rejects changed file lengths. Budget exhaustion preserves bytes and
+returns explicit non-readiness; it does not repair tails or relax the installed
+policy. Elapsed checks are cooperative, not interruption of an OS call. These
+work bounds do not establish recovery disk reserve or total process RSS.
+
 Apply, interrupted installation, reopen, inspection, backup restore and restore
 publication lower the same sealed policy into native storage options. A low
 replay limit denies access without modifying authoritative bytes; inspection

@@ -278,7 +278,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "510e1074e7c8f99129cd2ddfadc67ba62e05f1e0d9451c45edf77a900e34bb56",
+      "configuration_sha256": "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -318,6 +318,12 @@
         "reclamation_elapsed_ms": 30000,
         "reclamation_inventory_entries": 262144,
         "reclamation_metadata_bytes": 67108864,
+        "recovery_elapsed_ms": 120000,
+        "recovery_files": 262144,
+        "recovery_metadata_bytes": 67108864,
+        "recovery_read_bytes": 1099511627776,
+        "recovery_wal_bytes": 268435456,
+        "recovery_wal_frames": 1048576,
         "retained_mutable_bytes": 536870912,
         "retained_mutable_generations": 64,
         "retained_mutable_versions": 4194304,
@@ -434,7 +440,7 @@
         "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "e3c76d400c97284b6b8c966997c0337c2030493a258e0aca6c28600108018735",
+    "plan_sha256": "e7f2599d5a21e3bf53f19066cdaf6667a6e6a66a50b55baaf31c548556fbb6c6",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -500,8 +506,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "e3c76d400c97284b6b8c966997c0337c2030493a258e0aca6c28600108018735",
-    "result_sha256": "5598fe8a441dec387aee8c039bfaed901be036732dc29bae42389e5a40746c45",
+    "plan_sha256": "e7f2599d5a21e3bf53f19066cdaf6667a6e6a66a50b55baaf31c548556fbb6c6",
+    "result_sha256": "22c5af9b66e4b68cf4498372b3913bc12d90228abee18ff75954902758599f5d",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },

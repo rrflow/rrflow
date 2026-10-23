@@ -52,6 +52,12 @@ pub(super) fn installed_storage_options(
     options.reclamation.delete_files = policy.reclamation_delete_files;
     options.reclamation.delete_bytes = policy.reclamation_delete_bytes;
     options.reclamation.elapsed_ms = policy.reclamation_elapsed_ms;
+    options.recovery.metadata_bytes = policy.recovery_metadata_bytes;
+    options.recovery.files = policy.recovery_files;
+    options.recovery.read_bytes = policy.recovery_read_bytes;
+    options.recovery.wal_bytes = policy.recovery_wal_bytes;
+    options.recovery.wal_frames = policy.recovery_wal_frames;
+    options.recovery.elapsed_ms = policy.recovery_elapsed_ms;
     Ok(options)
 }
 

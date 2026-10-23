@@ -27,6 +27,7 @@ mod memtable;
 mod mutable;
 mod mutable_memory;
 mod reclamation;
+mod recovery_budget;
 mod segment;
 mod snapshot_bundle;
 mod transaction;
@@ -67,6 +68,7 @@ pub use memtable::{Memtable, MemtableProfile, VersionedValue};
 pub use mutable::{MutableLimits, MutableResource};
 pub use mutable_memory::{MutableMemory, MutableMemoryStats, MutableRetentionLimits};
 pub use reclamation::{ReclamationLimits, ReclamationResource};
+pub use recovery_budget::{RecoveryLimits, RecoveryResource};
 #[cfg(feature = "physical-policy-lab")]
 pub use segment::{
     run_physical_policy_trial, CachePolicyObservation, CandidateDecision, CodecObservation,

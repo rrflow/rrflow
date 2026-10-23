@@ -15,8 +15,9 @@ use crate::manifest::{
     CurrentPointer, Manifest, CHECKPOINT_DIRECTORY, CURRENT_FILE, MANIFEST_DIRECTORY,
     MANIFEST_LOCK_FILE,
 };
+use crate::recovery_budget::RecoveryBudget;
 use crate::segment::{new_page_cache_with_policy, Segment};
-use crate::wal::replay_anchored;
+use crate::wal::replay_file_bounded;
 use crate::{DatabaseOptions, Error, Memtable, Result, VersionedValue};
 use rrd_core::digest::Sha256;
 use serde::{Deserialize, Serialize};
@@ -85,6 +86,7 @@ impl ReadOnlyDatabase {
         options: DatabaseOptions,
     ) -> Result<Self> {
         let options = options.validate()?;
+        let mut budget = RecoveryBudget::new(options.recovery);
         let retained_root = root.pin_directory()?;
         let root = &retained_root;
         let metadata = root.metadata().map_err(|error| {
@@ -135,13 +137,7 @@ impl ReadOnlyDatabase {
 
         let current_path = root.join(CURRENT_FILE);
         require_regular_file(root, Path::new(CURRENT_FILE))?;
-        let current_bytes = current_path.read().map_err(|error| {
-            Error::io(
-                "reading CURRENT for inspection",
-                current_path.diagnostic_path(),
-                error,
-            )
-        })?;
+        let current_bytes = budget.metadata(&current_path)?;
         let pointer: CurrentPointer = serde_json::from_slice(&current_bytes)?;
         pointer.validate()?;
 
@@ -151,6 +147,7 @@ impl ReadOnlyDatabase {
         let mut expected_application_format = None;
         let mut ended_at_gc_boundary = false;
         while let Some(digest) = next_digest {
+            budget.tick()?;
             if lineage
                 .iter()
                 .any(|manifest: &Manifest| manifest.digest == digest)
@@ -174,7 +171,7 @@ impl ReadOnlyDatabase {
                 }
                 Ok(_) => {}
             }
-            let manifest = load_manifest(root, &digest)?;
+            let manifest = load_manifest(root, &digest, &mut budget)?;
             if manifest.generation != expected_generation {
                 return Err(Error::InvalidManifest(
                     "manifest ancestry does not decrement one generation at a time".into(),
@@ -202,6 +199,9 @@ impl ReadOnlyDatabase {
             .first()
             .cloned()
             .ok_or_else(|| Error::InvalidManifest("CURRENT has no manifest".into()))?;
+        for descriptor in &manifest.segments {
+            budget.file(descriptor.bytes)?;
+        }
         let descriptors = manifest
             .segments
             .iter()
@@ -223,6 +223,7 @@ impl ReadOnlyDatabase {
         let io = IoContext::new(options.segment_io)?;
         let mut segments = Vec::with_capacity(manifest.segments.len());
         for descriptor in &manifest.segments {
+            budget.tick()?;
             let relative = PathBuf::from(SEGMENT_DIRECTORY).join(format!("{}.seg", descriptor.id));
             require_regular_file(root, &relative)?;
             segments.push(Segment::open_expected_with_cache_and_io(
@@ -237,9 +238,13 @@ impl ReadOnlyDatabase {
         let active_wal = wal_path(root, manifest.wal_start_sequence);
         let active_wal_relative = active_wal.relative_path();
         require_regular_file(root, active_wal_relative)?;
-        let recovery = replay_anchored(&active_wal, manifest.wal_start_sequence, |batch| {
-            memtable.apply_owned_recovered(batch, options.mutable_limits)
-        })?;
+        let mut wal_file = active_wal.open_read()?;
+        let recovery = replay_file_bounded(
+            &mut wal_file,
+            manifest.wal_start_sequence,
+            &mut budget,
+            |batch| memtable.apply_owned_recovered(batch, options.mutable_limits),
+        )?;
         if let Some(offset) = recovery.torn_tail {
             return Err(Error::TornTail { offset });
         }
@@ -260,7 +265,7 @@ impl ReadOnlyDatabase {
         let mut files = Vec::with_capacity(relative_files.len());
         let mut total_bytes = 0u64;
         for relative in relative_files {
-            let inspected = inspect_file(root, &relative)?;
+            let inspected = inspect_file(root, &relative, &mut budget)?;
             total_bytes = total_bytes.checked_add(inspected.bytes).ok_or_else(|| {
                 Error::InvalidManifest("inspection file byte count overflow".into())
             })?;
@@ -351,7 +356,11 @@ impl ReadOnlyDatabase {
     }
 }
 
-fn load_manifest(root: &AnchoredPath, digest: &str) -> Result<Manifest> {
+fn load_manifest(
+    root: &AnchoredPath,
+    digest: &str,
+    budget: &mut RecoveryBudget,
+) -> Result<Manifest> {
     if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(Error::InvalidManifest(
             "manifest lookup requires a SHA-256 identity".into(),
@@ -360,13 +369,7 @@ fn load_manifest(root: &AnchoredPath, digest: &str) -> Result<Manifest> {
     let relative = PathBuf::from(MANIFEST_DIRECTORY).join(format!("{digest}.json"));
     require_regular_file(root, &relative)?;
     let path = root.join(relative);
-    let bytes = path.read().map_err(|error| {
-        Error::io(
-            "reading manifest for inspection",
-            path.diagnostic_path(),
-            error,
-        )
-    })?;
+    let bytes = budget.metadata(&path)?;
     let manifest: Manifest = serde_json::from_slice(&bytes)?;
     manifest.validate()?;
     if manifest.digest != digest {
@@ -409,7 +412,11 @@ fn require_regular_file(root: &AnchoredPath, relative: &Path) -> Result<()> {
     Ok(())
 }
 
-fn inspect_file(root: &AnchoredPath, relative: &Path) -> Result<InspectionFile> {
+fn inspect_file(
+    root: &AnchoredPath,
+    relative: &Path,
+    budget: &mut RecoveryBudget,
+) -> Result<InspectionFile> {
     require_regular_file(root, relative)?;
     let path = root.join(relative);
     let mut file = path.open_read().map_err(|error| {
@@ -419,10 +426,13 @@ fn inspect_file(root: &AnchoredPath, relative: &Path) -> Result<InspectionFile> 
             error,
         )
     })?;
+    let expected_bytes = file.metadata()?.len();
+    budget.file(expected_bytes)?;
     let mut digest = Sha256::new();
     let mut bytes = 0u64;
     let mut buffer = [0u8; 64 * 1024];
     loop {
+        budget.tick()?;
         let read = file.read(&mut buffer).map_err(|error| {
             Error::io(
                 "reading file for inspection digest",
@@ -437,7 +447,18 @@ fn inspect_file(root: &AnchoredPath, relative: &Path) -> Result<InspectionFile> 
         bytes = bytes
             .checked_add(read as u64)
             .ok_or_else(|| Error::InvalidManifest("inspection file size overflow".into()))?;
+        if bytes > expected_bytes {
+            return Err(Error::InvalidManifest(
+                "inspection file grew while hashing".into(),
+            ));
+        }
     }
+    if bytes != expected_bytes {
+        return Err(Error::InvalidManifest(
+            "inspection file length changed".into(),
+        ));
+    }
+    budget.tick()?;
     Ok(InspectionFile {
         relative_path: relative.to_string_lossy().replace('\\', "/"),
         bytes,

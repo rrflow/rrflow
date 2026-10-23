@@ -253,6 +253,12 @@ pub struct StorageLimits {
     pub transaction_admission_requests: u64,
     pub transaction_admission_bytes: u64,
     pub transaction_admission_wait_ms: u64,
+    pub recovery_metadata_bytes: u64,
+    pub recovery_files: u64,
+    pub recovery_read_bytes: u64,
+    pub recovery_wal_bytes: u64,
+    pub recovery_wal_frames: u64,
+    pub recovery_elapsed_ms: u64,
 }
 
 impl Default for StorageLimits {
@@ -281,6 +287,12 @@ impl Default for StorageLimits {
             transaction_admission_requests: 64,
             transaction_admission_bytes: 67_108_864,
             transaction_admission_wait_ms: 30_000,
+            recovery_metadata_bytes: 67_108_864,
+            recovery_files: 262_144,
+            recovery_read_bytes: 1_099_511_627_776,
+            recovery_wal_bytes: 268_435_456,
+            recovery_wal_frames: 1_048_576,
+            recovery_elapsed_ms: 120_000,
         }
     }
 }
@@ -406,6 +418,32 @@ impl StorageLimits {
         validate_nonzero_max(
             "storage transaction_admission_wait_ms",
             self.transaction_admission_wait_ms,
+            3_600_000,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_metadata_bytes",
+            self.recovery_metadata_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max("storage recovery_files", self.recovery_files, 1 << 24)?;
+        validate_nonzero_max(
+            "storage recovery_read_bytes",
+            self.recovery_read_bytes,
+            1 << 50,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_wal_bytes",
+            self.recovery_wal_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_wal_frames",
+            self.recovery_wal_frames,
+            1 << 32,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_elapsed_ms",
+            self.recovery_elapsed_ms,
             3_600_000,
         )?;
         if self.compaction_l0_segments < 8 {

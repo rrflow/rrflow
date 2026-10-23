@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: d41937932617054902fc4519cc755c5f37ba8cab154667f4b46e006bd12580e0
+// OpenAPI SHA-256: ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3360,6 +3360,18 @@ export interface operations {
                                         /** Format: uint64 */
                                         reclamation_metadata_bytes: number;
                                         /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
                                         retained_mutable_bytes: number;
                                         /** Format: uint64 */
                                         retained_mutable_generations: number;
@@ -3614,6 +3626,18 @@ export interface operations {
                                         reclamation_inventory_entries: number;
                                         /** Format: uint64 */
                                         reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
                                         /** Format: uint64 */
                                         retained_mutable_bytes: number;
                                         /** Format: uint64 */
