@@ -2,8 +2,8 @@ use super::*;
 use rrd_contract::{
     DiagnosticMaintenanceSnapshot, DiagnosticMemtableSnapshot, DiagnosticPageCacheSnapshot,
     DiagnosticRrflowKvSnapshot, DiagnosticSegmentIoMode, DiagnosticSegmentIoSnapshot,
-    DiagnosticSegmentSetSnapshot, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
-    DiagnosticWriteAheadLogSnapshot, MAX_MESSAGE_BYTES,
+    DiagnosticSegmentSetSnapshot, DiagnosticStorageAdmission, DiagnosticStorageEvidenceLevel,
+    DiagnosticStorageSnapshot, DiagnosticWriteAheadLogSnapshot, MAX_MESSAGE_BYTES,
 };
 use rrd_store::PhysicalStoreEvidence;
 
@@ -18,6 +18,37 @@ struct EngineDiagnosticStamp {
 }
 
 impl RrdEngine {
+    /// Observe physical counters without traversing runtime/graph history.
+    /// Authorization and instance scope are identical to full diagnostics;
+    /// these counters are observations, not a cross-model consistency claim.
+    pub fn read_storage_diagnostics(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &rrd_contract::ReadStorageDiagnostics,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<DiagnosticStorageSnapshot> {
+        request
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        self.authorize(
+            session_id,
+            token,
+            SecurityAction::DiagnosticsRead,
+            now,
+            request_id,
+            operation_id,
+        )?;
+        self.query_scope(&request.scope)?;
+        let snapshot = diagnostic_storage(self, now)?;
+        snapshot
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        Ok(snapshot)
+    }
+
     /// Assembles a bounded cross-model diagnostic view under one verified RRD
     /// read stamp. Concurrent mutations cause a retry; a response is never
     /// returned with coordinates from two different runtime states.
@@ -811,6 +842,44 @@ fn diagnostic_storage(
         profile: engine.storage_profile_kind,
         evidence_level,
         rrflow_kv,
+        admission: if evidence_level == DiagnosticStorageEvidenceLevel::RrflowKvCounters {
+            let queue = engine.transaction_admission_snapshot()?;
+            Some(DiagnosticStorageAdmission {
+                checkpoint_entries: counter(evidence.checkpoint_entries, "checkpoint_entries")?,
+                checkpoint_limit: counter(evidence.checkpoint_limit, "checkpoint_limit")?,
+                native_transactions: counter(evidence.native_transactions, "native_transactions")?,
+                native_transaction_bytes: counter(
+                    evidence.native_transaction_bytes,
+                    "native_transaction_bytes",
+                )?,
+                active_read_views: counter(evidence.active_read_views, "active_read_views")?,
+                pinned_read_bytes: counter(evidence.pinned_read_bytes, "pinned_read_bytes")?,
+                retained_mutable_bytes: counter(
+                    evidence.retained_mutable_bytes,
+                    "retained_mutable_bytes",
+                )?,
+                retained_source_bytes: counter(
+                    evidence.retained_source_bytes,
+                    "retained_source_bytes",
+                )?,
+                peak_source_bytes: counter(evidence.peak_source_bytes, "peak_source_bytes")?,
+                denied_source_allocations: counter(
+                    evidence.denied_source_allocations,
+                    "denied_source_allocations",
+                )?,
+                retained_projected_bytes: counter(
+                    evidence.retained_projected_bytes,
+                    "retained_projected_bytes",
+                )?,
+                outstanding_requests: queue.outstanding_requests,
+                outstanding_logical_bytes: queue.logical_bytes,
+                queued_requests: queue.queued_requests as u64,
+                active: queue.active,
+                fenced: queue.fenced,
+            })
+        } else {
+            None
+        },
     })
 }
 
