@@ -235,3 +235,59 @@ pipeline followed by process exit. Empty responses still fail qualification.
 No new host operation ran locally.
 
 The exact-extent correction passed `cargo clippy -p rrd-lsm --all-targets --locked -- -D warnings` in 6.19 seconds. PowerShell parsing and Python syntax compilation passed. Native runtime acceptance remains candidate-CI work, not a local run.
+
+
+## Publication owner release after interrupted repair
+
+Candidate `117c388385db3c2f6bc879c1b8bc4dc54192e471`, run 39893191950,
+engine-authority job 120217937801, failed the installed tail-repair interruption
+history at installation.rs:498: immediate resume reported another publication
+owner after the preceding apply returned. Inspection found PublicationLease
+relied solely on file close. A duplicated/inherited open-file description can
+retain that lock past owner drop. This is a supported explanation for the
+observed failure; the CI log alone does not identify an inheriting process.
+
+The existing publication owner now explicitly unlocks on Drop, matching the
+native manifest/inspection owner lifetime. It keeps the persistent inode and
+nonblocking exclusive acquisition; there is no retry/sleep workaround. A
+regression definition retains a duplicated descriptor, verifies denial during
+ownership, drops the owner, reacquires immediately, and verifies disposal of
+the old duplicate cannot release the new owner's lease. The existing installed
+interruption history remains the integration oracle.
+
+Before editing, PR 71's brief was extended with this exact owner and oracle.
+Reads: restore_publication, tail_repair/publication, installation/lease,
+installation interruption tests, native manifest/inspection Drop, anchored
+filesystem flags and [Rust File locking semantics](https://doc.rust-lang.org/std/fs/struct.File.html#method.unlock).
+`cargo clippy -p rrd-engine --all-targets --locked -- -D warnings` passed in
+38.50 seconds. No local runtime test ran. The dependency PR 65 passed all
+candidate checks at `beb55307a9c54df3eedec45a113084e360a4bdc1` and merged as
+`6de0c5be56a6b7c888586186babb3b1648eb55ae`; this worktree merged that
+unchanged-source main ancestry. Native capacity/repair acceptance still needs
+the corrected candidate pipeline. C-07 remains open.
+
+
+## Native image and receipt framing correction
+
+The same candidate's Windows job 120217937576 executed the fresh WAL capacity
+case in 156.84 seconds. The native write and filler both reported error 112;
+the case's repair/reopen/prior-ACK ledger passed. The outer runner then failed
+while decoding control output, so the suite did not pass. Rust's single-thread
+libtest output placed the receipt immediately after its test-name prefix;
+requiring a standalone `test ... ok` line was invalid with uncaptured output.
+The exact selected test now uses quiet harness output, starts its receipt on a
+new line, and requires the successful one-test summary plus the same exact
+mode/point/build/ledger receipt. This changes framing, not a storage oracle.
+Windows image control now emits a unique framed JSON receipt, verifies exactly
+one frame and identifies attach/detach parse failures. A cleanup failure also
+retains the preceding failure instead of concealing it.
+
+The macOS job 120217937673 passed all three installed crash cases, then failed
+before APFS execution with `hdiutil: create: -format requires -srcfolder or
+-srcdevice`. Blank-image creation now selects `-type UDIF` instead of the
+source-conversion `-format UDRW`; the new owned image's capacity, device and
+filesystem checks remain mandatory. Apple?s archived [APFS tool example](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/ToolsandAPIs/ToolsandAPIs.html)
+uses size/fs image creation; the actual native command error is the direct
+current evidence. No claim is made that the corrected APFS case has executed.
+PowerShell and Python syntax checks are authoring checks only. No local disk
+image, runtime suite or exhaustion run was launched.

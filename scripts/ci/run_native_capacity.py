@@ -95,7 +95,13 @@ def windows_volume(action, fixture, size):
                  "-Fixture", str(fixture), "-SizeMiB", str(size)], env=dict(os.environ), timeout=120)
     require(result.returncode == 0, "owned NTFS image control failed: " + result.stderr[-2048:])
     require(bool(result.stdout.strip()), f"owned NTFS {action} returned no structured receipt; stderr=" + result.stderr[-2048:])
-    return json.loads(result.stdout.strip())
+    marker = "RRFLOW_CAPACITY_VOLUME="
+    rows = [line.removeprefix(marker) for line in result.stdout.splitlines() if line.startswith(marker)]
+    require(len(rows) == 1, f"owned NTFS {action} omitted its framed receipt: " + repr(result.stdout[:512]))
+    try:
+        return json.loads(rows[0])
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"owned NTFS {action} receipt malformed at column {error.colno}") from error
 
 
 @contextmanager
@@ -128,7 +134,7 @@ def volume(fixture: Path, size: int):
             loop_binding(device, image)
             identity = {"device": device, "image": str(image), "mount": info[0]}
         elif sys.platform == "darwin":
-            native_command("hdiutil", "create", "-size", f"{size}m", "-fs", "APFS", "-format", "UDRW",
+            native_command("hdiutil", "create", "-size", f"{size}m", "-fs", "APFS", "-type", "UDIF",
                 "-volname", "RRFlowCapacity", str(image), timeout=120)
             attach = plistlib.loads(native_command("hdiutil", "attach", "-nobrowse", "-mountpoint", str(root),
                                         "-plist", str(image), timeout=60).stdout.encode())
@@ -198,7 +204,7 @@ def volume(fixture: Path, size: int):
 def execute(executable: Path, descriptor: Path, point: str, mode: str):
     env = {**os.environ, "RRFLOW_CAPACITY_DESCRIPTOR": str(descriptor), "RRFLOW_CAPACITY_POINT": point,
            "RRFLOW_CAPACITY_MODE": mode, "RUST_BACKTRACE": "1"}
-    args = [str(executable), "--exact", CASE, "--ignored", "--nocapture", "--test-threads=1"]
+    args = [str(executable), "--exact", CASE, "--ignored", "--nocapture", "--quiet", "--test-threads=1"]
     if os.name == "nt":
         from owned_windows_process import run_owned
         result = run_owned(args, env=env, timeout=900)
@@ -206,8 +212,8 @@ def execute(executable: Path, descriptor: Path, point: str, mode: str):
         result = run(*args, env=env, timeout=900, process_group=True, check=False)
     print(result.stdout, end="", flush=True)
     print(result.stderr, end="", file=sys.stderr, flush=True)
-    require(result.returncode == 0 and f"test {CASE} ... ok" in result.stdout
-            and "1 passed; 0 failed; 0 ignored;" in result.stdout, "installed native capacity case failed")
+    require(result.returncode == 0 and "test result: ok. 1 passed; 0 failed; 0 ignored;" in result.stdout,
+            "installed native capacity case failed")
     rows = [json.loads(line.removeprefix("native_capacity_receipt=")) for line in result.stdout.splitlines()
             if line.startswith("native_capacity_receipt=")]
     require(len(rows) == 1 and rows[0]["point"] == point and rows[0]["mode"] == mode
@@ -292,5 +298,8 @@ if __name__ == "__main__":
         print(json.dumps({"native_capacity_status": "not_run", "reason": str(error)}), file=sys.stderr)
         raise SystemExit(2)
     except Exception as error:
-        print(json.dumps({"native_capacity_status": "failed", "reason": str(error)}), file=sys.stderr)
+        reason = str(error)
+        if error.__context__ is not None:
+            reason += "; preceding failure: " + str(error.__context__)[:2048]
+        print(json.dumps({"native_capacity_status": "failed", "reason": reason}), file=sys.stderr)
         raise SystemExit(1)

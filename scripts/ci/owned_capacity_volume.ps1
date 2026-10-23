@@ -16,7 +16,7 @@ if ($Action -eq 'Detach') {
         if ($image.Attached) { Dismount-DiskImage -ImagePath $imagePath }
         if ((Get-DiskImage -ImagePath $imagePath).Attached) { throw 'Owned image remains attached' }
     }
-    [Console]::Out.WriteLine((@{ detached = $true; image = $imagePath } | ConvertTo-Json -Compress))
+    [Console]::Out.WriteLine(('RRFLOW_CAPACITY_VOLUME=' + (@{ detached = $true; image = $imagePath } | ConvertTo-Json -Compress)))
     [Console]::Out.Flush()
     return
 }
@@ -80,5 +80,5 @@ $receipt = @{ root = "$($partition.DriveLetter):\"; filesystem = 'ntfs'; image =
    disk_number = $disk.Number; disk_unique_id = $disk.UniqueId; volume_id = $volume.UniqueId;
    total_bytes = $volume.Size } | ConvertTo-Json -Compress
 
-[Console]::Out.WriteLine($receipt)
+[Console]::Out.WriteLine(('RRFLOW_CAPACITY_VOLUME=' + $receipt))
 [Console]::Out.Flush()

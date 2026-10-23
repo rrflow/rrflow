@@ -213,6 +213,13 @@ live retained/queue telemetry and explicit native resource launch controls.
 Its full corpus/lifecycle lanes and native qualification remain in progress;
 no actual 24-hour result is implied by these implementation files.
 
+Native candidate run 39893191950 also exposed an interrupted-repair publication
+lease that could remain unavailable immediately after its owner returned.
+The [publication-owner correction](../../evidence/change-journals/gate-c/c-07f-native-capacity.md#publication-owner-release-after-interrupted-repair)
+adds explicit owner-bound unlock and duplicated-handle characterization;
+corrected candidate acceptance is pending. This does not authorize bypassing
+an active owner or changing the persistent lock inode.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
