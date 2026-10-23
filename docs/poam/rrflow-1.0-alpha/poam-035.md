@@ -27,7 +27,12 @@ also persists a terminal-record format marker so an earlier strict session
 reader rejects state whose retained receipts it cannot discover. The current
 decoder accepts existing inline state and rejects unknown marker versions;
 its focused replay/format and owning engine suites pass. Final-candidate
-native evidence remains separately required.
+native evidence is supplied by the
+[final Linux24 comparison](../../evidence/change-journals/gate-c/c-07g-session-retention-final-native.md):
+all 22 short-characterization segments pass on the fenced source, with complete
+1000-record readback, two reopens and backup plus verification in 4.910 seconds.
+Complete native acceptance, capacity profiles and 24-hour qualification remain
+open; the short point does not close this deficiency.
 
 Linux21 again stopped at corpus ordinal 608 after 609 acknowledgements,
 now classified as a storage-substrate error. The
