@@ -65,7 +65,13 @@ impl Volume {
         ));
         let marker = volume.root.join("RRFLOW-CAPACITY-OWNER");
         assert!(std::fs::symlink_metadata(&marker).unwrap().is_file());
-        assert_eq!(std::fs::read_to_string(marker).unwrap(), volume.nonce);
+        let mut owner = Vec::new();
+        File::open(marker)
+            .unwrap()
+            .take(65)
+            .read_to_end(&mut owner)
+            .unwrap();
+        assert_eq!(owner, volume.nonce.as_bytes());
         volume
     }
 }
@@ -200,22 +206,66 @@ async fn read_values(
     session: &rrd_client::Session,
     at: u64,
 ) -> BTreeMap<String, String> {
-    let result = client.execute_query(session, ExecuteQuery {
-        scope:format!("instance:{}",client.instance_id()),
-        query:format!("FROM claim:crash AT VALID {at} KNOWN HEAD PROJECT subject, object EXPLAIN CONTRACT"),
-        parameters:BTreeMap::new(), budget:QueryBudget { max_storage_keys:150_000,max_rows:1024,
-            max_output_bytes:8*1024*1024,max_batch_rows:192,max_memory_bytes:64*1024*1024,
-            max_spill_bytes:64*1024*1024,max_elapsed_ms:30_000 },
-    }, RequestOptions::read("capacity-read","capacity-read").unwrap()).await.unwrap();
-    assert!(!result.execution.truncated);
+    // Enumerate the complete identity set, then fetch bounded object windows at
+    // that exact read cursor. Native capacity payloads exceed a single public
+    // response; raising the contract's response cap would hide the boundary.
+    let query = |text| ExecuteQuery {
+        scope: format!("instance:{}", client.instance_id()),
+        query: text,
+        parameters: BTreeMap::new(),
+        budget: QueryBudget {
+            max_storage_keys: 150_000,
+            max_rows: 1024,
+            max_output_bytes: rrd_contract::MAX_QUERY_OUTPUT_BYTES,
+            max_batch_rows: 64,
+            max_memory_bytes: 64 * 1024 * 1024,
+            max_spill_bytes: 64 * 1024 * 1024,
+            max_elapsed_ms: 30_000,
+        },
+    };
+    let index = client
+        .execute_query(
+            session,
+            query(format!(
+                "FROM claim:crash AT VALID {at} KNOWN HEAD PROJECT subject EXPLAIN CONTRACT"
+            )),
+            RequestOptions::read("capacity-index", "capacity-index").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!index.execution.truncated);
+    let cursor = index.known_at_cursor;
+    let mut subjects = index
+        .rows
+        .iter()
+        .map(|row| {
+            let QueryValue::String(subject) = &row.values["subject"] else {
+                panic!("non-string subject")
+            };
+            subject.clone()
+        })
+        .collect::<Vec<_>>();
+    subjects.sort();
+    subjects.dedup();
+    assert_eq!(subjects.len(), index.rows.len(), "duplicate claim subject");
     let mut values = BTreeMap::new();
-    for row in result.rows {
-        let QueryValue::String(value) = &row.values["object"] else {
-            panic!("non-string claim")
-        };
-        assert!(values.insert(row.identity, value.clone()).is_none());
+    for window in subjects.chunks(64) {
+        let first = serde_json::to_string(window.first().unwrap()).unwrap();
+        let last = serde_json::to_string(window.last().unwrap()).unwrap();
+        let result = client.execute_query(session, query(format!(
+            "FROM claim:crash AT VALID {at} KNOWN {cursor} WHERE subject >= {first} AND subject <= {last} PROJECT subject, object EXPLAIN CONTRACT")),
+            RequestOptions::read("capacity-window","capacity-window").unwrap()).await.unwrap();
+        assert!(!result.execution.truncated);
+        assert_eq!(result.known_at_cursor, cursor);
+        assert_eq!(result.rows.len(), window.len());
+        for row in result.rows {
+            let QueryValue::String(value) = &row.values["object"] else {
+                panic!("non-string claim")
+            };
+            assert!(values.insert(row.identity, value.clone()).is_none());
+        }
     }
-    assert_eq!(result.known_at_cursor, values.len() as u64 + 2);
+    assert_eq!(cursor, values.len() as u64 + 2);
     values
 }
 

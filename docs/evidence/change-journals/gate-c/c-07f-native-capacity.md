@@ -167,3 +167,46 @@ targeted-damage/backup matrix, recovery-space reservation, aggregate process
 and host limits, sustained capacity profiles and actual 24-hour soak remain
 open. The code does not establish PostgreSQL compatibility, retrieval quality,
 provider reasoning, cloud sync, Connectome completion or alpha readiness.
+
+## Candidate correction: public readback windows
+
+Candidate 459e60fd, run 39889580174, Linux installed-capacity job
+120205851327 failed before disk fill: the harness asked for 8 MiB query output
+while the public query contract admits at most 768 KiB. The readback now
+first enumerates every subject, then fetches at most 64 objects per lexical
+window at the same captured cursor. Exact cardinality, no truncation, complete
+identity/value equality and ACK reconciliation remain required. No public
+limit is relaxed. Reads: capacity.rs, installed_crash.rs, installed_reopen.rs,
+rrd-contract/src/lib.rs QueryBudget, and rrd-query/tests/syntax_parser.rs.
+
+The same run exposed cleanup masking the primary failure: successful losetup
+with no associated device can return empty output after autoclear. The
+owned-device cleanup accepts that successful empty listing, while command
+failure or ambiguous ownership still fails. The ownership marker read is now
+bounded to 65 bytes for a 64-byte nonce. Source: the retained native CI output;
+no additional research or architecture change was needed.
+
+`cargo clippy -p rrflow-cli --test installed_crash --features crash-test
+--locked -- -D warnings` passed (26.26 seconds). The intermediate check found
+the missing public query scope in the new window builder; it was restored
+before strict lint passed. Python syntax compilation and generated repository
+navigation/inventory checks run before commit. No local native runtime suite
+or disk fill was run; corrected candidate acceptance remains pending.
+
+The Windows candidate job 120205851581 failed in the diskpart image-creation
+control before installation. The old wrapper discarded its textual native
+failure details; the output does not establish a specific root cause. Creation
+now invokes Windows CreateVirtualDisk directly with version-one parameters,
+VHD device 2, Microsoft vendor identity, 512-byte sectors, and
+FULL_PHYSICAL_ALLOCATION. The exact new contained image remains the only
+target; no physical parent/source is supplied. Native error codes now survive
+as Win32Exception. Existing association checks precede every initialize,
+partition, format and detach effect. This replaces only the script-based image
+creation, not engine storage or a runtime product dependency.
+
+Primary API references read for this correction:
+[CreateVirtualDisk](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-createvirtualdisk),
+[versioned parameters](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/ns-virtdisk-create_virtual_disk_parameters),
+and [fixed-allocation flag](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/ne-virtdisk-create_virtual_disk_flag).
+The new native call is compiled/parsed only locally; candidate NTFS execution
+must establish whether the host supports the requested owned image.

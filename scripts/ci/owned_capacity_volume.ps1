@@ -20,10 +20,43 @@ if ($Action -eq 'Detach') {
 }
 if (Test-Path -LiteralPath $imagePath) { throw 'Refusing to format an existing image' }
 if ($imagePath.Contains('"') -or $imagePath.Contains("`n") -or $imagePath.Contains("`r")) { throw 'Invalid image command path' }
-$diskpartFile = Join-Path $fixtureRoot 'create-owned-vhd.txt'
-[IO.File]::WriteAllText($diskpartFile, "create vdisk file=`"$imagePath`" maximum=$SizeMiB type=fixed`r`nexit`r`n", [Text.Encoding]::Unicode)
-$output = & "$env:SystemRoot\System32\diskpart.exe" /s $diskpartFile
-if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $imagePath)) { throw 'Owned VHD creation unavailable' }
+# Create the exact new image through the native API. No diskpart text parser,
+# shell encoding, Hyper-V installation or existing physical source is involved.
+Add-Type -TypeDefinition @"
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+public static class RRFlowOwnedVhd {
+    [StructLayout(LayoutKind.Sequential)]
+    struct StorageType { public uint Device; public Guid Vendor; }
+    [StructLayout(LayoutKind.Sequential)]
+    struct VersionOne {
+        public Guid UniqueId; public ulong MaximumSize;
+        public uint BlockSize; public uint SectorSize;
+        public IntPtr Parent; public IntPtr Source;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct Parameters { public uint Version; public VersionOne One; }
+    [DllImport("virtdisk.dll", CharSet=CharSet.Unicode)]
+    static extern uint CreateVirtualDisk(ref StorageType type, string path,
+        uint access, IntPtr security, uint flags, uint provider,
+        ref Parameters parameters, IntPtr overlapped, out IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError=true)]
+    static extern bool CloseHandle(IntPtr handle);
+    public static void Create(string path, ulong size) {
+        var type = new StorageType { Device = 2,
+            Vendor = new Guid("ec984aec-a0f9-47e9-901f-71415a66345b") };
+        var parameters = new Parameters { Version = 1,
+            One = new VersionOne { MaximumSize = size, SectorSize = 512 } };
+        IntPtr handle;
+        uint result = CreateVirtualDisk(ref type, path, 0x003f0000,
+            IntPtr.Zero, 1, 0, ref parameters, IntPtr.Zero, out handle);
+        if (result != 0) throw new Win32Exception((int)result, "CreateVirtualDisk owned fixed image");
+        if (!CloseHandle(handle)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+}
+"@
+[RRFlowOwnedVhd]::Create($imagePath, [uint64]$SizeMiB * 1MB)
 $image = Mount-DiskImage -ImagePath $imagePath -NoDriveLetter -Access ReadWrite -PassThru
 $disk = $image | Get-Disk
 if (@($disk).Count -ne 1 -or $disk.IsBoot -or $disk.IsSystem -or $disk.PartitionStyle -ne 'RAW') { throw 'Disk is not a new owned image' }

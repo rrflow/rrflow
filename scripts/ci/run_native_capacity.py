@@ -33,7 +33,7 @@ class NotRun(RuntimeError):
 
 def tools_available():
     names = {"linux": ["sudo", "unshare", "losetup", "mkfs.ext4", "mount", "umount", "findmnt"],
-             "darwin": ["hdiutil", "diskutil"], "win32": ["powershell.exe", "diskpart.exe"]}
+             "darwin": ["hdiutil", "diskutil"], "win32": ["powershell.exe"]}
     if sys.platform not in names:
         raise NotRun("native ext4, APFS or NTFS host required")
     missing = [name for name in names[sys.platform] if not shutil.which(name)]
@@ -69,6 +69,14 @@ def loop_binding(device: str, image: Path):
     rows = data.get("loopdevices", [])
     require(len(rows) == 1 and rows[0]["name"] == device
             and Path(rows[0]["back-file"]).resolve(strict=True) == image, "loop device is not our image")
+
+
+def associated_loops(image):
+    # util-linux can return a successful empty stdout when no matching loop
+    # remains after autoclear. Only that successful empty result means none.
+    response = run("losetup", "--json", "--associated", str(image),
+                   "--output", "NAME,BACK-FILE")
+    return json.loads(response.stdout)["loopdevices"] if response.stdout.strip() else []
 
 
 def windows_volume(action, fixture, size):
@@ -149,8 +157,7 @@ def volume(fixture: Path, size: int):
         # successfully before its control response was lost.
         if sys.platform == "linux":
             if image.exists():
-                associated = json.loads(run("losetup", "--json", "--associated", str(image),
-                                            "--output", "NAME,BACK-FILE").stdout).get("loopdevices", [])
+                associated = associated_loops(image)
                 require(len(associated) <= 1, "ambiguous owned loop attachment")
                 mounted = run("findmnt", "--json", "--mountpoint", str(root), "--output", "SOURCE", check=False)
                 if mounted.returncode == 0:
@@ -161,12 +168,12 @@ def volume(fixture: Path, size: int):
                     run("umount", str(root), timeout=30)
                 require(run("findmnt", "--noheadings", "--mountpoint", str(root), check=False).returncode != 0,
                         "owned ext4 volume remains mounted")
-                remaining = json.loads(run("losetup", "--json", "--associated", str(image)).stdout).get("loopdevices", [])
+                remaining = associated_loops(image)
                 for row in remaining:
                     loop_binding(row["name"], image)
                     run("losetup", "--detach", row["name"])
                 deadline = time.monotonic() + 10
-                while json.loads(run("losetup", "--json", "--associated", str(image)).stdout).get("loopdevices"):
+                while associated_loops(image):
                     require(time.monotonic() < deadline, "owned loop remains attached")
                     time.sleep(0.05)
         elif sys.platform == "darwin":
