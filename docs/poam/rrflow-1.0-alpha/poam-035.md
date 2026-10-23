@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [session retention regression and repair](../../evidence/change-journals/gate-c/c-07g-session-transaction-retention.md)
+reproduced 52280 bytes of hot session state after 32 completed transactions on
+both rrflowMX and rrflowKV. Historical transaction accumulation could exhaust
+the one-MiB control value limit. Bounded atomic terminal-record placement now
+preserves replay without retaining the full history in each session update.
+Installed comparison and complete C-07 qualification remain open.
+
 Linux21 again stopped at corpus ordinal 608 after 609 acknowledgements,
 now classified as a storage-substrate error. The
 [control-size attribution record](../../evidence/change-journals/gate-c/c-07g-control-size-attribution.md)

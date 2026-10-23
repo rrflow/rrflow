@@ -127,6 +127,7 @@ mod retrieval_query;
 mod rollback;
 mod security;
 mod session;
+mod session_transactions;
 mod subscription;
 mod task;
 mod token_key;

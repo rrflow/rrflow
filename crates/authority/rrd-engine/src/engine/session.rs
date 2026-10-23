@@ -308,7 +308,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "session.renewed",
             request_id,
@@ -384,7 +384,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "session.closed",
             request_id,
@@ -556,7 +556,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             expected,
-            state.clone(),
+            state,
             now,
             "session.expired",
             request_id,
@@ -617,31 +617,6 @@ impl RrdEngine {
         let bytes = mac.finalize().into_bytes();
         CorrelationId::new(format!("{prefix}-{}", lower_hex(bytes.as_slice())))
             .map_err(|error| ServiceError::Contract(error.to_string()))
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(in crate::engine) fn replace_session(
-        &self,
-        session_id: &CorrelationId,
-        expected: Vec<u8>,
-        state: SessionState,
-        now: u64,
-        action: &str,
-        request_id: &str,
-        operation_id: &str,
-    ) -> Result<Vec<u8>> {
-        let replacement = serde_json::to_vec(&state).map_err(contract_json)?;
-        self.storage.control().commit(&ControlTransition {
-            key: session_key(&self.instance, session_id),
-            expected: Some(expected),
-            replacement: Some(replacement.clone()),
-            at: now,
-            actor: "rrd-engine".into(),
-            action: action.into(),
-            request_id: request_id.into(),
-            operation_id: operation_id.into(),
-        })?;
-        Ok(replacement)
     }
 }
 
