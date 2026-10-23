@@ -255,7 +255,7 @@ impl RetrievalExecutionContext<'_> {
         )]);
         let pipeline =
             rrd_query::StampedQueryPipeline::new(&self.engine.storage, self.read.clone())
-                .map_err(|error| ServiceError::Query(error.to_string()))?;
+                .map_err(ServiceError::from)?;
         let limit = usize::try_from(limit)
             .map_err(|_| ServiceError::Query("retrieval keyword limit exceeds usize".into()))?;
         let max_input_rows = usize::try_from(self.request.max_storage_keys)
@@ -270,13 +270,11 @@ impl RetrievalExecutionContext<'_> {
         };
         let bound = pipeline
             .bind(&query, &parameters, &budget)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
-        let plan = pipeline
-            .plan(&bound)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
+        let plan = pipeline.plan(&bound).map_err(ServiceError::from)?;
         let execution = pipeline
             .execute(&plan, &budget)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
         if execution.truncated
             || execution.read_manifest != self.read.manifest_id
             || execution.known_at_cursor != self.read.commit_cursor

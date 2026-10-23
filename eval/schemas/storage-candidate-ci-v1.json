@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "CandidateCiJob": {
+      "additionalProperties": false,
+      "properties": {
+        "conclusion": {
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/Limit"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/CandidateCiStep"
+          },
+          "maxItems": 128,
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status",
+        "conclusion",
+        "steps"
+      ],
+      "type": "object"
+    },
+    "CandidateCiStep": {
+      "additionalProperties": false,
+      "properties": {
+        "conclusion": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status",
+        "conclusion"
+      ],
+      "type": "object"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Limit": {
+      "format": "uint64",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "commit_api_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "event": {
+      "type": "string"
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "head_commit": {
+      "description": "PR head and actual reusable-workflow/checkout revision remain distinct.",
+      "type": "string"
+    },
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/CandidateCiJob"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "type": "array"
+    },
+    "jobs_api_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "repository": {
+      "type": "string"
+    },
+    "run_api_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "run_attempt": {
+      "$ref": "#/$defs/Limit"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Limit"
+    },
+    "tested_commit": {
+      "type": "string"
+    },
+    "tested_tree": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "format_version",
+    "repository",
+    "run_id",
+    "run_attempt",
+    "event",
+    "head_commit",
+    "tested_commit",
+    "tested_tree",
+    "run_api_sha256",
+    "jobs_api_sha256",
+    "commit_api_sha256",
+    "jobs"
+  ],
+  "title": "CandidateCiReceipt",
+  "type": "object"
+}
