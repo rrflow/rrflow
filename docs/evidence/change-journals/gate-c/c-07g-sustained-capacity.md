@@ -245,3 +245,50 @@ artifact retention during preparation, native allocation binding, reader/cold
 lanes, fleet, update/delete histories and the complete profile/24-hour matrix.
 PR 65's resource-limit prerequisite passed its complete candidate chain and
 merged as `6de0c5be56a6b7c888586186babb3b1648eb55ae`; C-07 remains open.
+
+
+## Live native allocation verification
+
+Continued from `8d8dfde02f1a87436d2831a80c6ca060a74b4737`. Resource samples
+retain a typed launcher receipt identifying the exact harness, unpredictable
+allocation nonce, memory limits, CPU quota and host logical processor count.
+The driver hashes its own executable in bounded chunks before installation.
+Each sample checks actual kernel membership and effective controls; a supplied
+environment string alone cannot establish native enforcement. Evidence
+validation requires the matching retained receipt and frozen campaign limits.
+
+Linux checks both harness and engine cgroup membership, the canonical owned
+nonce path, memory.max, disabled swap, grouped OOM behavior, PID bound and
+cpu.max. Windows opens only the nonce-named job for query, checks both process
+memberships, committed-memory ceilings, kill-on-close/no-breakaway flags and
+CPU hard-cap settings. The launcher refuses a pre-existing named job and binds
+all controls before resuming the suspended harness. Windows CPU rate uses the
+measured logical-processor count; this is a quota, not dedicated-core affinity.
+Missing platform controls remain failure/not-run, and macOS VM admission is
+still unavailable. These controls do not authenticate a third-party benchmark
+producer or make host RSS equivalent to Windows committed memory.
+
+The owned Windows controller now admits invalid limit/name input before native
+ownership and registers pipe write ends immediately. Every exceptional path
+closes writer handles before joining bounded readers and quiescing its job.
+The original anonymous-job callers retain their default behavior. Evidence
+capacity admission now also precedes corpus/estate setup, not only measured
+segments.
+
+Read boundaries: native sampler, sustained driver/model/writer, explicit
+campaign runner, owned_windows_process, windows_offline native structures and
+job teardown. Primary references: [Linux cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html),
+[Windows CPU rate control](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information),
+[Windows job queries](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-queryinformationjobobject),
+and [Windows extended job limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_extended_limit_information).
+These APIs are qualification infrastructure only, not new installed dependencies.
+
+The compiler exposed that this workspace's SHA-256 output does not implement
+LowerHex; encoding now uses the same explicit per-byte format as the installed
+harness. Strict Clippy for rrflow-eval/rrflow-cli all targets passed (1.71
+seconds). Python syntax compilation passed for both changed runner modules.
+Storage schema generation passed (4.50 seconds). Regression definitions deny
+native claims lacking receipts, substituted limits and mismatched native kinds.
+No native control or runtime campaign executed locally. Full C-07 acceptance,
+preparation-failure artifact retention, cold/pin/fleet lanes, update/delete
+histories and actual profile/24-hour results remain open.

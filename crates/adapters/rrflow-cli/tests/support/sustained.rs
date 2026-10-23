@@ -144,7 +144,12 @@ async fn rotate_session(
     Ok(())
 }
 
-async fn sample(workload: &Workload, pid: u32, clock: Instant) -> DriverResult<ResourceSample> {
+async fn sample(
+    workload: &Workload,
+    pid: u32,
+    clock: Instant,
+    allocation: &Option<NativeAllocationReceipt>,
+) -> DriverResult<ResourceSample> {
     let mut system = sysinfo::System::new();
     let process_id = sysinfo::Pid::from_u32(pid);
     system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[process_id]), true);
@@ -217,7 +222,8 @@ async fn sample(workload: &Workload, pid: u32, clock: Instant) -> DriverResult<R
             },
             None => missing("public-debt-gauge-unavailable"),
         },
-        allocation_enforcement: native::enforcement(),
+        allocation_enforcement: native::enforcement(pid, allocation.as_ref())?,
+        allocation_receipt: allocation.clone(),
         storage: Some(snapshot.storage),
     })
 }
@@ -228,6 +234,7 @@ struct PointRun<'a> {
     workload: Workload,
     pid: u32,
     clock: Instant,
+    allocation: Option<NativeAllocationReceipt>,
 }
 
 impl PointRun<'_> {
@@ -258,7 +265,7 @@ impl PointRun<'_> {
         let deadline =
             self.clock + Duration::from_nanos(started) + Duration::from_millis(duration_ms);
         loop {
-            resources.push(sample(&self.workload, self.pid, self.clock).await?);
+            resources.push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
             if Instant::now() >= deadline {
                 break;
             }
@@ -365,7 +372,8 @@ impl PointRun<'_> {
             seed: self.workload.seed,
             expected_ledger_sha256: expected_digest(&ledger.expected)?,
         }];
-        let mut resources = vec![sample(&self.workload, self.pid, self.clock).await?];
+        let mut resources =
+            vec![sample(&self.workload, self.pid, self.clock, &self.allocation).await?];
         let mut attempts = Vec::new();
         let mut joins = JoinSet::new();
         let mut backup = JoinSet::new();
@@ -383,7 +391,7 @@ impl PointRun<'_> {
                     }
                     _=tokio::time::sleep_until(next_sample) => {
                         if resources.len() as u64>=campaign.evidence.samples_per_segment.get() {return Err("resource sample cap exhausted".into());}
-                        resources.push(sample(&self.workload,self.pid,self.clock).await?);
+                        resources.push(sample(&self.workload,self.pid,self.clock,&self.allocation).await?);
                         next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                     }
                     _=tokio::time::sleep_until(due.into()) => break,
@@ -426,7 +434,7 @@ impl PointRun<'_> {
                 result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger)?,
                 _=tokio::time::sleep_until(next_sample) => {
                     if resources.len() as u64>=campaign.evidence.samples_per_segment.get(){return Err("resource sample cap exhausted".into());}
-                    resources.push(sample(&self.workload,self.pid,self.clock).await?);
+                    resources.push(sample(&self.workload,self.pid,self.clock,&self.allocation).await?);
                     next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                 }
             }
@@ -441,7 +449,7 @@ impl PointRun<'_> {
                     if resources.len() as u64+1>=campaign.evidence.samples_per_segment.get() {
                         return Err("backup resource sample cap exhausted".into());
                     }
-                    resources.push(sample(&self.workload,self.pid,self.clock).await?);
+                    resources.push(sample(&self.workload,self.pid,self.clock,&self.allocation).await?);
                     next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                 }
             }
@@ -452,7 +460,8 @@ impl PointRun<'_> {
                 if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
                     return Err("readback resource sample cap exhausted".into());
                 }
-                resources.push(sample(&self.workload, self.pid, self.clock).await?);
+                resources
+                    .push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
                 next_sample = tokio::time::Instant::now()
                     + Duration::from_millis(campaign.schedule.sample_ms.get());
             }
@@ -492,9 +501,9 @@ impl PointRun<'_> {
             if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
                 return Err("offered interval resource sample cap exhausted".into());
             }
-            resources.push(sample(&self.workload, self.pid, self.clock).await?);
+            resources.push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
         }
-        resources.push(sample(&self.workload, self.pid, self.clock).await?);
+        resources.push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
         attempts.sort_by_key(|a| a.sequence);
         let mut lanes = match &backup_receipt {
             Some(raw) => vec![LaneEvidence {
@@ -681,10 +690,12 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
     if campaign.purpose == CampaignPurpose::Qualification {
         return Err("native allocation enforcement and complete resource gauges required before qualification execution".into());
     }
+    let allocation = native::receipt(campaign)?;
     let configuration = std::env::var_os("RRFLOW_SUSTAINED_CONFIGURATION").map(PathBuf::from);
     let clock = Instant::now();
     for point in &campaign.points {
         for seed in &campaign.seeds {
+            writer.admit_next()?;
             let estate = Estate::install_configured("fresh", configuration.as_deref());
             if estate.build["executable_sha256"].as_str()
                 != Some(campaign.storage.candidate.executable_sha256.as_str())
@@ -769,6 +780,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     .ok_or("owned server missing after lifecycle lane")?
                     .id(),
                 clock,
+                allocation: allocation.clone(),
             };
             for phase in [
                 LoadPhase::Warmup,

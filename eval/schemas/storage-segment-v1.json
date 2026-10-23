@@ -1572,6 +1572,57 @@
       ],
       "type": "object"
     },
+    "NativeAllocationKind": {
+      "enum": [
+        "cgroup_v2",
+        "windows_job"
+      ],
+      "type": "string"
+    },
+    "NativeAllocationReceipt": {
+      "additionalProperties": false,
+      "description": "Launcher receipt, retained with samples. Its digest binds declared native\ncontrols; the installed driver separately checks live kernel membership.",
+      "properties": {
+        "engine_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "harness_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "host_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "host_logical_cpus": {
+          "$ref": "#/$defs/Limit"
+        },
+        "kind": {
+          "$ref": "#/$defs/NativeAllocationKind"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Digest"
+        },
+        "vcpus": {
+          "$ref": "#/$defs/Limit"
+        }
+      },
+      "required": [
+        "format_version",
+        "kind",
+        "nonce",
+        "engine_bytes",
+        "host_bytes",
+        "harness_sha256",
+        "vcpus",
+        "host_logical_cpus"
+      ],
+      "type": "object"
+    },
     "NativeMetric": {
       "oneOf": [
         {
@@ -1943,6 +1994,16 @@
       "properties": {
         "allocation_enforcement": {
           "$ref": "#/$defs/AllocationEnforcement"
+        },
+        "allocation_receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NativeAllocationReceipt"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "cpu_time_ns": {
           "$ref": "#/$defs/NativeMetric"

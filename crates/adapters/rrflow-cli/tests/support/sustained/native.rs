@@ -1,19 +1,14 @@
 //! Native read-only sampling. Address-space mappings, committed private bytes,
 //! and resident bytes are distinct quantities; unavailable data is explicit.
-use rrflow_eval::storage::{AllocationEnforcement, NativeMetric};
+use rrflow_eval::storage::NativeMetric;
+#[path = "native_allocation.rs"]
+mod allocation;
+pub(super) use allocation::{enforcement, receipt};
 
 fn missing(reason: &str) -> NativeMetric {
     NativeMetric::Unavailable {
         reason: reason.to_owned().try_into().unwrap(),
     }
-}
-
-pub(super) fn enforcement() -> AllocationEnforcement {
-    std::env::var("RRFLOW_SUSTAINED_ENFORCEMENT")
-        .ok()
-        .filter(|s| s.len() <= 1024)
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or(AllocationEnforcement::ObservedOnly)
 }
 
 #[cfg(target_os = "linux")]

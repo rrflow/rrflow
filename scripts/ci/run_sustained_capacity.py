@@ -34,11 +34,14 @@ def bounded_json(path):
     return json.loads(raw)
 
 
-def proof(kind, allocation, harness):
-    record = {"format_version": 1, "kind": kind, "nonce": secrets.token_hex(32),
+def proof(kind, allocation, harness, nonce=None):
+    record = {"format_version": 1, "kind": kind, "nonce": nonce or secrets.token_hex(32),
               "engine_bytes": allocation["engine_bytes"], "host_bytes": allocation["host_bytes"],
-              "harness_sha256": sha256(harness)}
-    digest = hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+              "harness_sha256": sha256(harness), "vcpus": allocation["vcpus"],
+              "host_logical_cpus": os.cpu_count()}
+    require(isinstance(record["host_logical_cpus"], int) and 0 < record["vcpus"] <= record["host_logical_cpus"] <= 65536,
+            "host CPU capacity cannot satisfy frozen allocation")
+    digest = hashlib.sha256(b"rrflow-native-allocation-v1\0" + json.dumps(record, separators=(",", ":")).encode()).hexdigest()
     return record, {"kind": kind, "receipt_sha256": digest}
 
 
@@ -47,7 +50,7 @@ def linux_allocation(parent, allocation):
     root = Path("/sys/fs/cgroup").resolve(strict=True)
     parent = parent.resolve(strict=True)
     require(parent != root and parent.is_relative_to(root), "explicit delegated cgroup below root required")
-    owned = parent / ("rrflow-capacity-" + secrets.token_hex(16))
+    owned = parent / ("rrflow-capacity-" + secrets.token_hex(32))
     try:
         owned.mkdir()
     except PermissionError as error:
@@ -56,7 +59,8 @@ def linux_allocation(parent, allocation):
         # Aggregate bound includes the harness and its installed engine children;
         # it is stricter than an engine-only resident allocation.
         for name, value in [("memory.max", allocation["engine_bytes"]), ("memory.swap.max", 0),
-                            ("memory.oom.group", 1), ("pids.max", 512)]:
+                            ("memory.oom.group", 1), ("pids.max", 512),
+                            ("cpu.max", f'{allocation["vcpus"] * 100000} 100000')]:
             target = owned / name
             if not target.is_file():
                 raise NotRun("delegated native controller missing: " + name)
@@ -128,17 +132,19 @@ def main():
         if args.cgroup_parent is None:
             raise NotRun("explicit delegated --cgroup-parent required for native ceilings")
         with linux_allocation(args.cgroup_parent, allocation) as group:
-            receipt, binding = proof("cgroup_v2", allocation, harness)
+            receipt, binding = proof("cgroup_v2", allocation, harness, group.name.removeprefix("rrflow-capacity-"))
             environment["RRFLOW_SUSTAINED_CGROUP"] = str(group)
-            environment["RRFLOW_SUSTAINED_ENFORCEMENT"] = json.dumps(binding)
+            environment["RRFLOW_SUSTAINED_ALLOCATION_RECEIPT"] = json.dumps(receipt, separators=(",", ":"))
             print("native_sustained_enforcement=" + json.dumps(receipt), flush=True)
             result = run(sys.executable, str(Path(__file__).resolve()), "--enter-cgroup", str(group), *command,
                          env=environment, timeout=timeout, process_group=True, check=False)
     elif sys.platform == "win32":
         from owned_windows_process import run_owned
         receipt, binding = proof("windows_job", allocation, harness)
-        environment["RRFLOW_SUSTAINED_ENFORCEMENT"] = json.dumps(binding)
+        environment["RRFLOW_SUSTAINED_ALLOCATION_RECEIPT"] = json.dumps(receipt, separators=(",", ":"))
         result = run_owned(command, env=environment, timeout=timeout,
+                           job_name="Local\\RRFlowCapacity-" + receipt["nonce"],
+                           cpu_rate=10000 * receipt["vcpus"] // receipt["host_logical_cpus"],
                            process_memory_bytes=allocation["engine_bytes"], job_memory_bytes=allocation["host_bytes"],
                            on_bound=lambda: print("native_sustained_enforcement=" + json.dumps(receipt), flush=True))
     else:

@@ -302,6 +302,56 @@ pub enum AllocationEnforcement {
     ExternalVm { receipt_sha256: Digest },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeAllocationKind {
+    CgroupV2,
+    WindowsJob,
+}
+
+/// Launcher receipt, retained with samples. Its digest binds declared native
+/// controls; the installed driver separately checks live kernel membership.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NativeAllocationReceipt {
+    pub format_version: u16,
+    pub kind: NativeAllocationKind,
+    pub nonce: Digest,
+    pub engine_bytes: Limit,
+    pub host_bytes: Limit,
+    pub harness_sha256: Digest,
+    pub vcpus: Limit,
+    pub host_logical_cpus: Limit,
+}
+impl NativeAllocationReceipt {
+    pub fn sha256(&self) -> Result<Digest> {
+        digest("rrflow-native-allocation-v1", self)
+    }
+    pub fn validate(&self, campaign: &StorageCampaign) -> Result<()> {
+        require(
+            self.format_version == 1
+                && self.engine_bytes == campaign.allocation.engine_bytes
+                && self.host_bytes == campaign.allocation.host_bytes,
+            "native allocation differs from frozen campaign",
+        )?;
+        require(
+            self.vcpus == campaign.allocation.vcpus
+                && self.vcpus.get() <= self.host_logical_cpus.get()
+                && self.host_logical_cpus.get() <= 65536,
+            "native CPU allocation differs from frozen campaign",
+        )
+    }
+    pub fn enforcement(&self) -> Result<AllocationEnforcement> {
+        let receipt_sha256 = self.sha256()?;
+        Ok(match self.kind {
+            NativeAllocationKind::CgroupV2 => AllocationEnforcement::CgroupV2 { receipt_sha256 },
+            NativeAllocationKind::WindowsJob => {
+                AllocationEnforcement::WindowsJob { receipt_sha256 }
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceSample {
@@ -321,6 +371,7 @@ pub struct ResourceSample {
     pub queue_requests: NativeMetric,
     pub maintenance_debt_segments: NativeMetric,
     pub allocation_enforcement: AllocationEnforcement,
+    pub allocation_receipt: Option<NativeAllocationReceipt>,
     pub storage: Option<rrd_contract::DiagnosticStorageSnapshot>,
 }
 
@@ -951,8 +1002,33 @@ pub fn validate_segment(
     }
     let mut missing = BTreeSet::new();
     let mut previous = segment.started_ns;
+    let mut allocation_identity = None;
     let sample_bound = campaign.schedule.sample_ms.get() * NANOSECONDS_PER_MS * 2;
     for sample in &segment.resources {
+        if let Some(receipt) = &sample.allocation_receipt {
+            receipt.validate(campaign)?;
+            require(
+                digest("allocation-enforcement", &sample.allocation_enforcement)?
+                    == digest("allocation-enforcement", &receipt.enforcement()?)?,
+                "native allocation receipt digest differs",
+            )?;
+            let identity = receipt.sha256()?;
+            require(
+                allocation_identity
+                    .as_ref()
+                    .is_none_or(|prior| prior == &identity),
+                "native allocation changed within measured segment",
+            )?;
+            allocation_identity = Some(identity);
+        } else {
+            require(
+                matches!(
+                    sample.allocation_enforcement,
+                    AllocationEnforcement::ObservedOnly
+                ),
+                "native enforcement claim omitted its launcher receipt",
+            )?;
+        }
         require(
             sample.pid > 0
                 && sample.elapsed_ns >= previous
@@ -1414,6 +1490,7 @@ mod tests {
             queue_requests: observed.clone(),
             maintenance_debt_segments: observed,
             allocation_enforcement: AllocationEnforcement::ObservedOnly,
+            allocation_receipt: None,
             storage: Some(manifest.storage_observation.clone()),
         };
         let recorded = result.cases[0].ledger.attempts[0].clone();
@@ -1652,5 +1729,35 @@ mod tests {
         proof.cycles[0].checked_operations = 1;
         proof.cycles[0].replay_receipts_sha256 = digest("different", &1).unwrap();
         assert!(proof.validate(&campaign, 1000).is_err());
+    }
+
+    #[test]
+    fn native_allocation_claim_requires_matching_retained_receipt() {
+        let (campaign, mut segment) = fixture();
+        let receipt = NativeAllocationReceipt {
+            format_version: 1,
+            kind: NativeAllocationKind::WindowsJob,
+            nonce: digest("nonce", &1).unwrap(),
+            engine_bytes: campaign.allocation.engine_bytes,
+            host_bytes: campaign.allocation.host_bytes,
+            harness_sha256: digest("harness", &1).unwrap(),
+            vcpus: campaign.allocation.vcpus,
+            host_logical_cpus: limit(8),
+        };
+        segment.resources[0].allocation_enforcement = receipt.enforcement().unwrap();
+        assert!(validate_segment(&campaign, &segment).is_err());
+        segment.resources[0].allocation_receipt = Some(receipt.clone());
+        assert!(validate_segment(&campaign, &segment).is_ok());
+        segment.resources[0]
+            .allocation_receipt
+            .as_mut()
+            .unwrap()
+            .engine_bytes = limit(1);
+        assert!(validate_segment(&campaign, &segment).is_err());
+        segment.resources[0].allocation_receipt = Some(receipt);
+        segment.resources[0].allocation_enforcement = AllocationEnforcement::CgroupV2 {
+            receipt_sha256: digest("different", &1).unwrap(),
+        };
+        assert!(validate_segment(&campaign, &segment).is_err());
     }
 }
