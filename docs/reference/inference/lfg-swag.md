@@ -95,6 +95,46 @@ existence is not evidence of an enforced 15-minute reasoning timeout. The
 [installed configuration boundary](../deployment/installed-lifecycle.md#reasoning-limit-configuration)
 explains what an operator can configure today.
 
+The current embedding execution path consumes `max_step_elapsed_ms`:
+`RrdEngine::generate_embeddings_at` binds one monotonic deadline before input
+preparation and passes it to `EmbeddingExecution::embed_batch_until`.
+Caller waiting and output acceptance are bounded; a late result is discarded.
+The existing single execution permit stays with a blocking adapter until it
+returns. A timeout reports that execution may continue and is not automatically
+retryable. This is not forced adapter cancellation, a durable run limit or an
+implemented SWAG runner. Other calls cannot inherit a fictitious unused budget.
+
+### Research decisions for budget enforcement
+
+Primary-source review on 2026-10-23 supports these separate mechanisms:
+
+- [Tokio timeout](https://docs.rs/tokio/latest/tokio/time/fn.timeout.html) and
+  [blocking task ownership](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+  distinguish a stopped wait from stopping non-yielding work. RRFlow therefore
+  retains admission for the actual worker and never interprets a timeout as
+  provider termination. Hard execution-stop profiles require a qualified
+  cooperative adapter or an owned process termination boundary; unsupported
+  adapters must be rejected before claiming that guarantee.
+- [Temporal activity timeouts](https://docs.temporal.io/encyclopedia/detecting-activity-failures)
+  distinguish one attempt from elapsed time across the activity's attempts.
+  RRFlow's analogous choice is one original durable run deadline with narrower
+  child deadlines. Retry and resume cannot create a new allowance. This is a
+  design inference, not adoption of Temporal or its lifecycle.
+- [LangGraph recursion handling](https://docs.langchain.com/oss/python/langgraph/graph-api#recursion-limit)
+  provides a step ceiling and remaining-step signal. RRFlow must also charge
+  individual dispatched attempts and elapsed time: a step counter alone cannot
+  stop a single blocked adapter or account for parallel attempts.
+- [AWS timeout and retry guidance](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)
+  explains retry amplification and uncertain effects after a timeout. RRFlow
+  keeps one attempt owner, classifies uncertainty, and requires bounded retry
+  admission against the same remaining budget. Backoff is not a budget reset.
+
+No external framework, service dependency or upstream implementation is added.
+The [Gate G execution sequence](../../roadmap/rrflow-1.0/gate-g.md#budget-control-delivery-sequence)
+owns implementation order and the failing histories required for acceptance.
+
+### Aggregate run requirements
+
 Extend that same engine-owned revision and eventual run admission with:
 
 | User control | Required engine semantics |

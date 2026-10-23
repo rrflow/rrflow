@@ -173,6 +173,13 @@ impl RrdEngine {
         read: ReadStamp,
     ) -> Result<GenerateEmbeddingsResult> {
         let scope = self.query_scope(&request.scope)?;
+        // Bind the sealed estate ceiling once, before input preparation. The
+        // adapter cannot reset it by taking longer to validate or execute.
+        let deadline = std::time::Instant::now()
+            .checked_add(std::time::Duration::from_millis(
+                self.estate_configuration.reasoning.max_step_elapsed_ms,
+            ))
+            .ok_or(ServiceError::DeadlineExceeded)?;
         if read.scope != scope {
             return Err(ServiceError::WrongScope);
         }
@@ -186,14 +193,18 @@ impl RrdEngine {
         let requests = request
             .inputs
             .iter()
-            .map(|input| embedding_request(&read, descriptor, input))
+            .map(|input| {
+                check_embedding_deadline(deadline)?;
+                embedding_request(&read, descriptor, input)
+            })
             .collect::<Result<Vec<_>>>()?;
         let model = descriptor.model.clone();
         let batch = execution
-            .embed_batch(
-                &model,
+            .embed_batch_until(
+                model,
                 internal_network_policy(request.network_policy),
-                &requests,
+                requests,
+                deadline,
             )
             .map_err(embedding_dispatch_error)?;
         let backend = public_embedding_backend(&batch.backend);
@@ -202,6 +213,7 @@ impl RrdEngine {
             .iter()
             .zip(batch.vectors.iter())
             .map(|(input, value)| {
+                check_embedding_deadline(deadline)?;
                 let generated = GeneratedEmbedding {
                     input_id: input.id.clone(),
                     value: public_vector_value(value),
@@ -237,6 +249,7 @@ impl RrdEngine {
                 Ok(generated)
             })
             .collect::<Result<Vec<_>>>()?;
+        check_embedding_deadline(deadline)?;
         Ok(GenerateEmbeddingsResult {
             scope: request.scope.clone(),
             read_manifest_sha256: read.manifest_id,
@@ -246,6 +259,15 @@ impl RrdEngine {
             embeddings,
         })
     }
+}
+
+fn check_embedding_deadline(deadline: std::time::Instant) -> Result<()> {
+    if std::time::Instant::now() >= deadline {
+        return Err(ServiceError::InferenceDeadlineExceeded {
+            execution_may_continue: false,
+        });
+    }
+    Ok(())
 }
 
 fn embedding_request(
@@ -414,6 +436,14 @@ fn embedding_dispatch_error(error: rrd_inference::EmbeddingDispatchError) -> Ser
         rrd_inference::EmbeddingDispatchError::Busy => ServiceError::InferenceBusy,
         rrd_inference::EmbeddingDispatchError::UnhealthyBackend => {
             ServiceError::Storage("embedding backend lock is poisoned".into())
+        }
+        rrd_inference::EmbeddingDispatchError::DeadlineExceeded {
+            execution_may_continue,
+        } => ServiceError::InferenceDeadlineExceeded {
+            execution_may_continue,
+        },
+        rrd_inference::EmbeddingDispatchError::WorkerUnavailable => {
+            ServiceError::Storage("embedding worker unavailable".into())
         }
         rrd_inference::EmbeddingDispatchError::Rejected(error) => inference_error(error),
     }

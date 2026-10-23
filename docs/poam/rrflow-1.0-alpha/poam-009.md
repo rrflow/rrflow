@@ -96,6 +96,14 @@ Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
 
 ## Closure evidence
 
+[PR 100](https://github.com/rrflow/rrflow-development/pull/100) adds a configured
+deadline to the existing embedding execution path. Late output is rejected and
+the admitted worker keeps its slot until actual return. This addresses caller
+waiting, not forced adapter cancellation or aggregate reasoning-run budgets.
+The [budget-control sequence](../../roadmap/rrflow-1.0/gate-g.md#budget-control-delivery-sequence)
+binds those remaining requirements to code owners and falsifying histories.
+POAM-009 remains open; controlled adapter tests do not qualify a real router.
+
 Invalid-output and identity-denial corpora, same-stamp principal/representation/seat/policy
 route packets, attributed CAS/reopen tests, and separated model/storage measurements pass.
 
