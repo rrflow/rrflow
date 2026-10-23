@@ -241,6 +241,13 @@ adds sealed native ceilings and actual-owner release, removes duplicate intent
 buffers, and preserves uncertainty when receipt lookup is resource-starved.
 Candidate runtime acceptance remains pending.
 
+The installed mixed-model workload also exposed a real backup-under-write
+failure: application export reread live source watermarks and rejected a
+concurrent commit. The [candidate correction record](../../evidence/change-journals/gate-c/c-07g-candidate-workload-corrections.md)
+binds one admitted read-only physical snapshot across archive, object closure,
+catalogue and control reads. Native candidate acceptance remains pending;
+this implementation does not qualify large-corpus backup latency or soak.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

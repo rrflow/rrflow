@@ -266,13 +266,22 @@ impl Filler {
                 "bounded metadata fill"
             );
             let path = directory.join(format!("c{}-{index:04x}", &volume.nonce[..8]));
-            match OpenOptions::new().write(true).create_new(true).open(&path) {
-                Ok(file) => {
+            let created = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .and_then(|file| {
+                    // Register before sync so an allocation failure still cleans
+                    // up this exact owned entry. Drop ignores close errors.
                     self.metadata_paths.push(path);
-                    // Creation is the resource being exhausted. Dropping
-                    // the handle retains its directory record until cleanup.
+                    if cfg!(target_os = "macos") {
+                        file.sync_all()?;
+                    }
                     drop(file);
-                }
+                    Ok(())
+                });
+            match created {
+                Ok(()) => {}
                 Err(error) => {
                     let code = error.raw_os_error().expect("native metadata capacity code");
                     assert!(
