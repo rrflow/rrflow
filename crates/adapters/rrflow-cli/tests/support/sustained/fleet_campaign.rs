@@ -51,20 +51,7 @@ impl Participation {
             writer.admit_next()?;
             let duration = driver
                 .campaign
-                .schedule
-                .sample_ms
-                .get()
-                .checked_mul(
-                    driver
-                        .campaign
-                        .evidence
-                        .samples_per_segment
-                        .get()
-                        .saturating_sub(2),
-                )
-                .filter(|v| *v > 0)
-                .ok_or("quiet wait needs bounded resource samples")?
-                .min(120_000);
+                .idle_segment_ms(driver.campaign.schedule.measured_ms.get())?;
             writer.append(&driver.drain(writer, duration).await?)?;
         }
         Ok(())
