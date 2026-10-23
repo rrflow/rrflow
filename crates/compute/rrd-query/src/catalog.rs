@@ -338,6 +338,14 @@ impl Catalog {
         Ok(())
     }
 
+    pub(crate) fn covers_version_sources(&self, required: &[RuntimeVersionedSource]) -> bool {
+        required.iter().all(|required| {
+            self.version_sources
+                .iter()
+                .any(|available| version_source_covers(available, required))
+        })
+    }
+
     pub fn schema_at(&self, cursor: u64) -> Option<&RuntimeSchemaRegistry> {
         self.schemas
             .iter()

@@ -178,6 +178,19 @@ pub struct PhysicalPlan {
 }
 
 pub fn bind(query: &Query, parameters: &Parameters, catalog: &Catalog) -> Result<BoundQuery> {
+    let (bound, required) = prepare_binding(query, parameters, catalog)?;
+    catalog.require_version_sources(&required)?;
+    Ok(bound)
+}
+
+/// Resolve the one canonical binding and its catalogue requirements before
+/// admitting source acquisition. The caller must satisfy `required` before
+/// exposing or executing this binding.
+pub(crate) fn prepare_binding(
+    query: &Query,
+    parameters: &Parameters,
+    catalog: &Catalog,
+) -> Result<(BoundQuery, Vec<RuntimeVersionedSource>)> {
     query
         .validate()
         .map_err(|error| Error::Binding(error.to_string()))?;
@@ -313,6 +326,14 @@ pub fn bind(query: &Query, parameters: &Parameters, catalog: &Catalog) -> Result
     } else {
         Vec::new()
     };
+    let version_sources = bound_version_sources(query, &filters, schema)?;
+    let addressed = query.join.is_none()
+        && matches!(
+            version_sources.as_slice(),
+            [RuntimeVersionedSource::Identity { .. }
+                | RuntimeVersionedSource::IdentityRange { .. }
+                | RuntimeVersionedSource::Adjacency { .. }]
+        );
     let source_cursor = catalog
         .source_watermarks
         .for_source_at(&query.source, known_at_cursor);
@@ -327,27 +348,40 @@ pub fn bind(query: &Query, parameters: &Parameters, catalog: &Catalog) -> Result
     if let Some(join) = &query.join {
         queried_sources.push(join.source.clone());
     }
-    let required_catalogue_sources = version_sources_for_sources(&queried_sources);
-    catalog.require_version_sources(&required_catalogue_sources)?;
-    let version_sources = bound_version_sources(query, &filters, schema)?;
-    Ok(BoundQuery {
-        contract_version: QUERY_CONTRACT_VERSION,
-        read: catalog.read.clone(),
-        source: query.source.clone(),
-        join: query.join.clone(),
-        valid_at,
-        known_at_cursor,
-        source_cursor,
-        version_sources,
-        field_types: fields,
-        filters,
-        projection: query.projection.clone(),
-        limit: query.limit,
-        explain_contract: query.explain_contract,
-        explain_analyze: query.explain_analyze,
-        schema_revision: schema.revision,
-        index_candidates,
-    })
+    let required_catalogue_sources = if addressed {
+        vec![RuntimeVersionedSource::Schema]
+    } else {
+        version_sources_for_sources(&queried_sources)
+    };
+    // Addressed direct paths do not consume a family index generation. Like
+    // traversal, their freshness coordinate is the requested known prefix;
+    // exact family index candidates still require actual source watermarks.
+    let source_cursor = if addressed {
+        known_at_cursor
+    } else {
+        source_cursor
+    };
+    Ok((
+        BoundQuery {
+            contract_version: QUERY_CONTRACT_VERSION,
+            read: catalog.read.clone(),
+            source: query.source.clone(),
+            join: query.join.clone(),
+            valid_at,
+            known_at_cursor,
+            source_cursor,
+            version_sources,
+            field_types: fields,
+            filters,
+            projection: query.projection.clone(),
+            limit: query.limit,
+            explain_contract: query.explain_contract,
+            explain_analyze: query.explain_analyze,
+            schema_revision: schema.revision,
+            index_candidates,
+        },
+        required_catalogue_sources,
+    ))
 }
 
 pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {

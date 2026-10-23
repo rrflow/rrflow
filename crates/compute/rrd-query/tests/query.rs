@@ -25,6 +25,8 @@ mod adjacency_reads;
 mod identity_ranges;
 #[path = "query/identity_reads.rs"]
 mod identity_reads;
+#[path = "query/stamped_admission.rs"]
+mod stamped_admission;
 
 fn value(value: &str) -> RuntimeValue {
     RuntimeValue::String(value.into())
@@ -460,7 +462,30 @@ fn stamped_pipeline_matches_manual_execution_and_retains_its_read_coordinate() {
     assert_eq!(pipeline.read(), &read);
     assert_eq!(stamped.bound, manual_bound);
     assert_eq!(stamped.plan, manual_plan);
-    assert_eq!(stamped.execution, manual_execution);
+    // The public pipeline also admits and reports both catalogue phases.
+    // Standalone execution reports only the executor's semantic read work.
+    let schema_catalog =
+        Catalog::capture_for_sources_at(&engine, read.clone(), &[], read_budget()).unwrap();
+    assert_eq!(
+        stamped.execution.read_evidence.keys_examined,
+        schema_catalog.read_evidence.keys_examined
+            + catalog.read_evidence.keys_examined
+            + manual_execution.read_evidence.keys_examined
+    );
+    assert_eq!(
+        stamped.execution.read_evidence.values_decoded,
+        schema_catalog.read_evidence.values_decoded
+            + catalog.read_evidence.values_decoded
+            + manual_execution.read_evidence.values_decoded
+    );
+    assert_eq!(
+        stamped.execution.read_evidence.key_budget,
+        budget.max_storage_keys
+    );
+    stamped.execution.read_evidence.validate().unwrap();
+    let mut expected = manual_execution;
+    expected.read_evidence = stamped.execution.read_evidence.clone();
+    assert_eq!(stamped.execution, expected);
     assert_eq!(stamped.bound.read, read);
     assert_eq!(stamped.plan.logical.read, read);
     assert_eq!(stamped.execution.read_manifest, read.manifest_id);
@@ -681,7 +706,9 @@ fn valid_time_and_known_at_are_stable_across_profiles_and_rrflow_kv_reopen() {
             "ready".into(),
             "corrected".into(),
             10,
-            3,
+            // An addressed direct read is current through its requested
+            // known prefix; it no longer acquires a family watermark.
+            10,
         )
     );
 }

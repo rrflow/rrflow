@@ -95,6 +95,7 @@ mod installation_recovery;
 mod lifecycle;
 mod memory_estate;
 mod native_inference;
+mod query_admission;
 mod query_transaction;
 mod recovery;
 mod security;

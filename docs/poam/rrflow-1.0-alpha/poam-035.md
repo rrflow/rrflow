@@ -433,3 +433,11 @@ pipeline binding/watermark and aggregate-budget repair is required before
 claiming end-to-end bounded access. Linux campaign05 retained all 1,000 writes
 but timed out after 950 setup verifications; it is failed characterization,
 not a qualified operating point. Full profiles and soak remain open.
+
+The [stamped-pipeline admission repair](../../evidence/change-journals/gate-c/c-07g-stamped-query-admission.md)
+reproduces and removes the catalogue full-family preflight for addressed reads,
+shares the semantic key budget across capture and execution, and preserves
+explicit resource-exhaustion classification at the public query boundary.
+Seventy query tests and 163 engine tests pass, including cap/cap-minus-one,
+historical/schema changes and native reopen. Exact current native comparison,
+complete profile qualification, soak and candidate CI remain required.

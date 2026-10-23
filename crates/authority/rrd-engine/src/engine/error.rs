@@ -213,6 +213,7 @@ impl From<rrd_query::Error> for ServiceError {
     fn from(error: rrd_query::Error) -> Self {
         match error {
             rrd_query::Error::StorageAdmission(message) => Self::StorageAdmission(message),
+            rrd_query::Error::Budget(message) => Self::ConfigurationLimit(message),
             other => Self::Query(other.to_string()),
         }
     }
