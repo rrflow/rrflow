@@ -353,7 +353,15 @@ fn resume_after_fill(
     for key in ["nonce", "id", "point"] {
         assert_eq!(hit[key], control[key]);
     }
+    println!("native_capacity_pause={hit}");
     let filler = Filler::fill(&volume, metadata_directory.as_deref());
+    println!(
+        "native_capacity_fill={}",
+        json!({"point":control["point"],
+        "bytes":filler.bytes,"native_code":filler.native_code,
+        "metadata_files":filler.metadata_paths.len(),
+        "metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes})
+    );
     child
         .child
         .resume_controlled(
@@ -362,7 +370,18 @@ fn resume_after_fill(
             .unwrap(),
         )
         .unwrap();
-    let line = child.line();
+    let line = match child.lines.recv_timeout(Duration::from_secs(60)) {
+        Ok(Ok(line)) => line,
+        failure => {
+            child.child.terminate();
+            let output = child.child.finish().expect("reap failed capacity engine");
+            let tail = |bytes: &[u8]| {
+                String::from_utf8_lossy(&bytes[bytes.len().saturating_sub(2048)..]).into_owned()
+            };
+            panic!("selected native capacity event missing: {failure:?}; exit={}; stdout_tail={}; stderr_tail={}",
+                output.status, tail(&output.stdout), tail(&output.stderr));
+        }
+    };
     let error: Value = serde_json::from_str(
         std::str::from_utf8(&line)
             .unwrap()
@@ -564,6 +583,13 @@ fn capacity_case(point: &str, mode: &str) {
         let started = clock.elapsed().as_nanos() as u64;
         let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory));
         let result = client.commit_transaction(&session,&lease.transaction_id,target.clone(),options("uncertain")).await;
+        let result_class = match &result {
+            Ok(_) => "acknowledged".to_owned(),
+            Err(rrd_client::Error::Api { error, .. }) => format!("api-{:?}",error.code),
+            Err(rrd_client::Error::Timeout) => "client-timeout".to_owned(),
+            Err(_) => "client-failure".to_owned(),
+        };
+        println!("native_capacity_client={}",json!({"point":point,"mode":mode,"class":result_class}));
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();

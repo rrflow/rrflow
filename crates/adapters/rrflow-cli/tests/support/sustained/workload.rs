@@ -74,6 +74,26 @@ fn error(value: impl std::fmt::Display) -> String {
     value.to_string()
 }
 
+// Preserve only the closed client/API classification and a digest of details.
+// Server messages, transport text and credentials never enter campaign output.
+fn client_error(value: rrd_client::Error) -> String {
+    use rrd_client::Error;
+    let code = match &value {
+        Error::Api { error, .. } => format!("api-{:?}", error.code).to_ascii_lowercase(),
+        Error::Contract(_) => "client-contract".into(),
+        Error::Transport(_) => "client-transport".into(),
+        Error::Timeout => "client-timeout".into(),
+        Error::ResponseTooLarge => "client-response-too-large".into(),
+        Error::Decode(_) => "client-decode".into(),
+        Error::WebSocket(_) => "client-websocket".into(),
+        Error::WebSocketProtocol(_) => "client-websocket-protocol".into(),
+        Error::ResponseIdentityMismatch => "client-response-identity".into(),
+        Error::UnsupportedProtocol { .. } => "client-unsupported-protocol".into(),
+    };
+    let detail = digest("c07g.client-error", &value.to_string()).expect("error digest");
+    format!("{code}:{}", detail.as_str())
+}
+
 impl Workload {
     /// Conservative owned request/encoding allowance, including escaping,
     /// vector float formatting and record/edge identities. Segment admission
@@ -177,11 +197,11 @@ impl Workload {
                 options(&format!("{key}-begin")),
             )
             .await
-            .map_err(error)?;
+            .map_err(client_error)?;
         self.client
             .commit_transaction(&self.session, &lease.transaction_id, request, options(key))
             .await
-            .map_err(error)
+            .map_err(client_error)
     }
     pub async fn initialize(&self) -> Result<()> {
         let lease = self
@@ -195,7 +215,7 @@ impl Workload {
                 options("capacity-schema-begin"),
             )
             .await
-            .map_err(error)?;
+            .map_err(client_error)?;
         let initialized = async {
             let snapshot = self
                 .client
@@ -212,7 +232,7 @@ impl Workload {
                     read_options("capacity-schema-read")?,
                 )
                 .await
-                .map_err(error)?;
+                .map_err(client_error)?;
             check(
                 snapshot.known_at_cursor == lease.read_cursor,
                 "database changed while planning capacity schema",
@@ -303,7 +323,7 @@ impl Workload {
                     options("capacity-schema"),
                 )
                 .await
-                .map_err(error)?;
+                .map_err(client_error)?;
             Ok::<(), String>(())
         }
         .await;
@@ -339,7 +359,7 @@ impl Workload {
                 options("capacity-collection"),
             )
             .await
-            .map_err(error)?;
+            .map_err(client_error)?;
         Ok(())
     }
     pub fn prepare(&self, key: String, kind: StorageLoadKind, revision: u64) -> Result<Prepared> {
@@ -461,7 +481,7 @@ impl Workload {
                 read_options("capacity-retired")?,
             )
             .await
-            .map_err(error)?;
+            .map_err(client_error)?;
         check(
             vectors.points.is_empty()
                 && vectors.missing.len() == references.len()
@@ -559,7 +579,7 @@ impl Workload {
                         options(&format!("{}-begin", request.id)),
                     )
                     .await
-                    .map_err(error)?;
+                    .map_err(client_error)?;
                 let cancelled = self
                     .client
                     .abort_transaction(
@@ -569,7 +589,7 @@ impl Workload {
                         options(&request.id),
                     )
                     .await
-                    .map_err(error)?;
+                    .map_err(client_error)?;
                 digest("c07g.cancel-receipt", &cancelled)?
             }
         };
@@ -589,7 +609,7 @@ impl Workload {
         let result=self.client.execute_query(&self.session,ExecuteQuery {scope:self.scope(),
             query:format!("FROM {source} AT VALID {} KNOWN {known} WHERE {filter} PROJECT {projection} EXPLAIN CONTRACT",self.valid_at),
             parameters:BTreeMap::new(),budget:self.query_budget.clone()},
-            read_options("capacity-read")?).await.map_err(error)?;
+            read_options("capacity-read")?).await.map_err(client_error)?;
         check(!result.execution.truncated, "capacity read truncated")?;
         Ok(result)
     }
@@ -634,7 +654,7 @@ impl Workload {
                 read_options("capacity-vector-read")?,
             )
             .await
-            .map_err(error)?;
+            .map_err(client_error)?;
         check(
             vectors.missing.is_empty() && vectors.points.len() == self.vectors_per_record as usize,
             "mixed batch lost vector",
