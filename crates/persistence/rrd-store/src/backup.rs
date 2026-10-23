@@ -327,8 +327,9 @@ pub fn create_logical_backup<E: StorageEngine>(
 /// families such as sessions, subscriptions, and operation receipts stay out
 /// of the scope. Logical replay, object bytes, catalogues, and control entries
 /// remain separate physical artifacts, but one digest-verified catalogue entry
-/// binds their content identities. A concurrent source mutation rejects the
-/// backup before it is catalogued.
+/// binds their content identities. All repositories read one admitted physical
+/// snapshot, retained through publication; concurrent writes belong to a later
+/// cut and cannot mix into this archive.
 pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     engine: &E,
     objects: &O,
@@ -337,6 +338,8 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     created_at: u64,
     control_families: &[String],
 ) -> Result<BackupEntry> {
+    let snapshot = crate::snapshot::SnapshotStore::capture(engine)?;
+    let engine = &snapshot;
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     validate_label(label)?;
     validate_control_families(control_families)?;

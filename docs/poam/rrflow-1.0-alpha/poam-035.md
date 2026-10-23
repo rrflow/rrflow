@@ -207,12 +207,87 @@ incomplete-tail candidate repair. Native acceptance, damage/backup matrix,
 recovery reserve, operating profiles and 24-hour soak remain open; compiling
 these paths is not qualification evidence.
 
+The [C-07g sustained implementation](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md)
+adds bounded campaign evidence, independent mixed-family installed readback,
+live retained/queue telemetry and explicit native resource launch controls.
+Its full corpus/lifecycle lanes and native qualification remain in progress;
+no actual 24-hour result is implied by these implementation files.
+
 Native candidate run 39893191950 also exposed an interrupted-repair publication
 lease that could remain unavailable immediately after its owner returned.
 The [publication-owner correction](../../evidence/change-journals/gate-c/c-07f-native-capacity.md#publication-owner-release-after-interrupted-repair)
 adds explicit owner-bound unlock and duplicated-handle characterization;
 corrected candidate acceptance is pending. This does not authorize bypassing
 an active owner or changing the persistent lock inode.
+
+The sustained sampler was found to invoke complete graph/history diagnostics
+for physical counters, with a million-change ceiling and cross-model retries.
+This can distort load or prevent sampling at the required corpus sizes.
+The [C-07g storage observation change](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md)
+adds a scope-bound authenticated physical-counter read using the same storage
+projection. Candidate acceptance and large-corpus measurement remain pending;
+full diagnostic consistency remains POAM-029's separate responsibility.
+
+Native projected reads also accepted caller-controlled aggregate view/pin
+ceilings. The [C-07g retention correction](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md#per-open-read-retention-ceilings-and-ownership-observations)
+binds per-open ceilings to sealed installation policy and exposes actual
+owner observations for drain validation. Candidate runtime acceptance is
+pending; this does not establish the installed retained-reader workload.
+
+Native physical transactions also lacked aggregate owner/write-buffer admission,
+and the store retained a second copy of runtime snapshot writes. The
+[C-07g transaction-owner correction](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md#aggregate-native-transaction-ownership-and-copy-removal)
+adds sealed native ceilings and actual-owner release, removes duplicate intent
+buffers, and preserves uncertainty when receipt lookup is resource-starved.
+Candidate runtime acceptance remains pending.
+
+The native transaction scan's requested limit was applied after full-range
+materialization. The [bounded transaction-read correction](../../evidence/change-journals/gate-c/c-07d-bounded-transaction-scans.md)
+reuses the projected reader and ordered pending overlay, with bounded result
+copies and explicit work denial. Native candidate acceptance is pending;
+other full-range APIs and caller-owned result residency remain distinct.
+
+The installed mixed-model workload also exposed a real backup-under-write
+failure: application export reread live source watermarks and rejected a
+concurrent commit. The [candidate correction record](../../evidence/change-journals/gate-c/c-07g-candidate-workload-corrections.md)
+binds one admitted read-only physical snapshot across archive, object closure,
+catalogue and control reads. Native candidate acceptance remains pending;
+this implementation does not qualify large-corpus backup latency or soak.
+
+The combined two-estate flow exposed concurrent session-state replacement
+between transaction begin/abort and commit. The [session admission correction](../../evidence/change-journals/gate-c/c-07g-session-admission.md)
+extends the existing bounded transaction gate to begin, preview, abort, renewal
+and closure, preserving exact identities and explicit conflicts. Native
+concurrent characterization passes; full candidate acceptance remains pending.
+
+The first optimized Windows Job characterization of the combined candidate
+failed its measured backup/reader segment with nine uncertain requests. The
+driver discarded request errors and omitted failed-case provenance; the
+[native failure record](../../evidence/change-journals/gate-c/c-07g-native-failure-provenance.md)
+binds the reporting repair and retained failure. The actual load failure remains
+open. The current macOS capacity candidate also times out awaiting its first
+WAL native-error event; bounded owned-process diagnostics are being retained
+without weakening the real filesystem-error requirement.
+
+The subsequent classified campaign identified three commit conflicts followed
+by seven resource-exhaustion responses, with all acknowledgements read back.
+The [rejected-transaction cleanup](../../evidence/change-journals/gate-c/c-07g-rejected-transaction-cleanup.md)
+uses explicit engine-approved abort to release a failed workload lease and
+classify rejection; ambiguous outcomes stay uncertain. Its real load acceptance
+and sustainable envelope remain pending.
+
+Characterization03 also exposed a scheduler pause: serial independent readback
+after each offered segment manufactured overdue-load rejections and a resource
+coverage gap. The [bounded-worker readback correction](../../evidence/change-journals/gate-c/c-07g-bounded-worker-readback.md)
+moves the same independent oracle into existing admitted workers while keeping
+real API latency and final restart readback. Actual timing acceptance is pending.
+
+The lower-rate campaign reached drain and exposed an invalid probe ledger:
+it claimed a present read without a recorded attempt. The
+[drain receipt correction](../../evidence/change-journals/gate-c/c-07g-drain-probe-receipt.md)
+records an executed public request, real receipt and independent verification
+without counting idle-drain probes as offered throughput. Native flow acceptance
+remains pending; the earlier failed resource policies remain retained.
 
 ## Closure evidence
 
@@ -223,3 +298,171 @@ profiles. Gate C must accept the complete matrix at exact tested revisions
 before this row closes. Missing facilities or unrun large profiles remain
 visible gaps. J-02/J-03 retain OS/power-cut and distribution-profile claims;
 J-04 retains full-product competitive evidence.
+
+The [installed physical cursor candidate](../../evidence/change-journals/gate-c/c-07e-installed-storage-cursors.md)
+adds session-owned native reader/output retention and raw sustained-interference
+reconciliation. Runtime acceptance, complete capacity profiles and soak remain
+open; a schema or compiled capability does not establish this proof.
+
+
+The acceptance review found that author-supplied campaign SLOs could be looser
+than J-04's owning nominal latency/error thresholds. The
+[C-07h acceptance implementation](../../evidence/change-journals/gate-c/c-07h-acceptance-reconciliation.md)
+projects those thresholds from their owner and checks raw measured observations
+in addition to campaign qualification. It also binds native CI to the actual
+tested revision and reports absent/failed operating points explicitly. Candidate
+acceptance and the full profile/24-hour matrix remain pending; POAM-035 is open.
+
+The same acceptance inspection found that a successful inner workload result
+could outlive failed outer native-allocation cleanup. C-07h now requires a
+separately bound launcher outcome/cleanup receipt and matches its allocation
+against all raw samples. Missing or failed cleanup remains unqualified; the
+native capacity/soak acceptance gap stays open.
+
+
+Checkpoint creation and ordinary inventory lacked a native count/metadata cap.
+The [checkpoint admission candidate](../../evidence/change-journals/gate-c/c-07d-checkpoint-admission.md)
+adds serialized sealed admission, typed denial, real ownership observations and
+post-burst drain enforcement. Focused native snapshot/concurrency tests pass;
+exact candidate CI and the complete profile/24-hour matrix remain pending.
+No retained checkpoint is evicted to satisfy the limit.
+
+
+Installed domain crash coverage did not yet compose immutable publication and
+reclamation with authenticated semantic transactions. The
+[installed publication candidate](../../evidence/change-journals/gate-c/c-07c-installed-publication.md)
+extends the same native controls and independent ledger across six maintenance
+boundaries plus compound manifest recovery, for both installation modes.
+Candidate evidence is pending; component proof alone does not close this gap.
+
+
+That installed corpus exposed a real restart defect: counter-only publication
+temporary names could collide with a killed writer's orphan, fencing subsequent
+writes despite readable recovery. The same publication candidate adds a fresh
+per-open random namespace without overwriting interrupted bytes. An independent
+subprocess regression first reproduced native AlreadyExists, then passed for
+manifest/CURRENT/checkpoint publication after correction. Exact installed and
+three-platform candidate acceptance remain pending.
+The canonical ten-estate J-04 declaration was itself inadmissible: the shared
+8 GiB ceiling was multiplied into an 80 GiB host reservation. The
+[shared fleet budget correction](../../evidence/change-journals/gate-c/c-07g-shared-fleet-budget.md)
+binds an explicit aggregate pool and rejects true summed-reservation overcommit.
+Contract acceptance now passes; actual native fleet qualification remains open.
+The [native flow and damage-policy record](../../evidence/change-journals/gate-c/c-07g-native-flow-and-damage-policy.md)
+retains a successful small installed flow and all three platforms' capacity
+cases on their exact candidates. CI also exposed a stale damage-fixture
+assumption that backup publishes segments; the fixture now installs an explicit
+flush policy. Updated native damage qualification, high-load storage-admission
+resolution, complete profiles and the 24-hour run remain open.
+
+The [budget-admitted compaction repair](../../evidence/change-journals/gate-c/c-07d-budgeted-compaction-selection.md)
+reproduces a count-only selection failure even when a smaller native merge fits.
+Selection now admits complete overlap closures and lower-level relief within
+the existing limits. All 183 native storage tests pass; the old long-run candidate
+was stopped with retained incomplete evidence. Repaired installed capacity and
+full soak qualification remain required.
+
+The [large-page acquisition repair](../../evidence/change-journals/gate-c/c-07e-large-page-acquisition.md)
+reproduces a valid compacted key/history page exceeding the per-request I/O
+cap. Bounded chunks now preserve the full-page checksum and exact historical
+reads without raising any limit. Native component tests pass; attribution of
+the retained installed Internal failure and updated installed capacity/soak
+acceptance remain open.
+
+The [source-page admission repair](../../evidence/change-journals/gate-c/c-07e-source-page-admission.md)
+closes a distinct ownership gap: cache residency excluded evicted reader-held
+pages, concurrent miss allocations and uncached decode work. A sealed source
+budget now follows live immutable owners through release, with public current,
+peak and denial gauges. Known read-only pressure stays typed; obstructed durable
+outcome resolution remains uncertain until reconciled. Component evidence does
+not replace installed pressure, full-profile or 24-hour acceptance. This row
+remains open.
+
+The [addressed vector-read repair](../../evidence/change-journals/gate-c/c-07g-addressed-vector-reads.md)
+replaces whole-family scanning for named points with existing authenticated
+identity ranges and prevents old collection addresses from reappearing after
+an identity moves. Fixed-budget temporal/reopen histories and the engine suite
+pass. The motivating Linux 1,000-record/5,000-edge/1,000-vector setup exceeded
+its frozen 30-minute deadline after 936 verified records; that failed envelope
+remains retained. Combined native rerun, full profiles and soak remain required.
+
+The first actual shared-allocation fleet campaign found an idle-neighbour
+segment that spent its whole time budget before the required verification
+probe. The [idle deadline reservation repair](../../evidence/change-journals/gate-c/c-07g-idle-segment-deadlines.md)
+derives bounded idle spans and enforces an outer deadline without changing
+ledger acceptance. Forty evaluation tests and CLI lint pass; the repaired
+quiet/equal/abusive installed campaign remains required.
+
+The [combined native characterization record](../../evidence/change-journals/gate-c/c-07h-native-flow-characterization.md)
+retains completed repaired Windows compaction flow, all three two-estate
+interference trials, and a Linux WSL ext4 cold flow with zero resident pages
+before restart. Fleet and Linux small runs have exact histories and no rejected
+or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
+All remain characterization. Required corpus profiles, complete 24-hour evidence,
+current-candidate CI and final acceptance reconciliation remain open.
+
+The [overlapping resource-window repair](../../evidence/change-journals/gate-c/c-07g-overlapping-resource-windows.md)
+preserves real samples collected by a preceding late segment inside the next
+offered window. Windows campaign13 stopped after 255 completed segments because
+those observations were omitted, producing an apparent initial coverage gap.
+The fix keeps timestamps, bounds and late/rejected attempts intact. That failed
+42.86-minute run remains retained; fresh native and 24-hour acceptance remain
+open.
+
+The [addressed query-read repair](../../evidence/change-journals/gate-c/c-07g-addressed-query-reads.md)
+selects authenticated record/relation histories for exact ID equality instead
+of reading the full family. A fixed-budget differential history covers growth,
+updates, retirement, parameterized queries and native reopen; lexical scoring
+retains corpus-wide statistics. Native larger-profile comparison remains
+required. This does not resolve relation endpoint scans or POAM-034's separate
+whole-scope constraint validation.
+
+The [addressed endpoint-query repair](../../evidence/change-journals/gate-c/c-07g-adjacency-filter-reads.md)
+selects authenticated adjacency ranges for uniquely identified relation
+endpoints, then expands complete relation identity histories before temporal
+filtering. Fixed-budget differential tests preserve moved, backdated and
+retired edges, colliding IDs and native reopen. All 63 query tests and six engine
+query tests pass. Native comparison and full qualification remain open;
+POAM-034's independent commit-constraint cost is unchanged.
+
+The [identity-interval implementation](../../evidence/change-journals/gate-c/c-07g-identity-range-reads.md)
+narrows ordered ID predicates to authenticated complete histories. Both store
+and query suites pass (284 tests). Review also confirmed that public pipeline
+catalogue capture still scans the full source family before those reads;
+pipeline binding/watermark and aggregate-budget repair is required before
+claiming end-to-end bounded access. Linux campaign05 retained all 1,000 writes
+but timed out after 950 setup verifications; it is failed characterization,
+not a qualified operating point. Full profiles and soak remain open.
+
+The [stamped-pipeline admission repair](../../evidence/change-journals/gate-c/c-07g-stamped-query-admission.md)
+reproduces and removes the catalogue full-family preflight for addressed reads,
+shares the semantic key budget across capture and execution, and preserves
+explicit resource-exhaustion classification at the public query boundary.
+Seventy query tests and 163 engine tests pass, including cap/cap-minus-one,
+historical/schema changes and native reopen. Exact current native comparison,
+complete profile qualification, soak and candidate CI remain required.
+
+The [bounded control-journal repair](../../evidence/change-journals/gate-c/c-07g-bounded-control-journal.md)
+removes whole-META materialization before page limits. A three-entry native
+page previously exceeded an 8 KiB ceiling; ordered pagination, reopen,
+corruption rejection and oversized-page denial now pass. All 221 store tests
+and five engine backup tests pass. Linux06/07 completed the 1,000-record corpus
+but failed backup interference at the 128 MiB projected-output ceiling; exact
+candidate native comparison remains required. Projected-read admission still
+loses its typed classification through generic substrate/internal errors.
+These bounded repairs and failed characterizations do not close C-07.
+
+The [read-only denial repair](../../evidence/change-journals/gate-c/c-07e-projected-read-denials.md)
+preserves projected-read resource identity through store/query/engine layers.
+A real public cursor request now reports ResourceExhausted, releases resources
+after denial and admits a correctly budgeted retry. Generic durable conversion
+continues to preserve uncertainty; this does not reclassify backup failures as
+safe rejection. Store/query suites pass 291 tests and engine passes 165 with
+two existing ignored. Exact candidate CI and native qualification remain open.
+
+The [scoped commit-constraint repair](../../evidence/change-journals/gate-c/c-07g-scoped-constraint-reads.md)
+removes unrelated-scope record/relation reads from stable-schema validation.
+Endpoint/pair histories and selected-key counts are checked against the
+full-state constraint oracle, including native reopen. This advances the
+POAM-034 scale prerequisite without closing its remaining unique-value-index
+requirement or substituting for native C-07 capacity/soak acceptance.

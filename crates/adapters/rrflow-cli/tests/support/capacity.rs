@@ -133,6 +133,7 @@ struct Filler {
     bytes: u64,
     native_code: i32,
     metadata_paths: Vec<PathBuf>,
+    metadata_directories: Vec<PathBuf>,
     metadata_native_code: Option<i32>,
     free_inodes: Option<u64>,
 }
@@ -162,6 +163,7 @@ impl Filler {
             bytes: 0,
             native_code: 0,
             metadata_paths: Vec::new(),
+            metadata_directories: Vec::new(),
             metadata_native_code: None,
             free_inodes: None,
         };
@@ -169,6 +171,18 @@ impl Filler {
         // sync failures are actual OS results, never injected StorageFull.
         let buffer = [0xa5u8; 64 * 1024];
         let started = Instant::now();
+        // A full NTFS directory index does not prove that free MFT records are
+        // exhausted: a small CURRENT file may still be resident. Reserve a
+        // fixed set of empty, fixture-owned directory indexes before filling
+        // data, then consume their spare records without touching engine files.
+        #[cfg(windows)]
+        if directory.is_some() {
+            for index in 0..16 {
+                let path = volume.root.join(format!("{}-m{index:02}", volume.nonce));
+                std::fs::create_dir(&path).unwrap();
+                filler.metadata_directories.push(path);
+            }
+        }
         // Ext4 directory blocks may have filename-dependent spare slots. Exhaust
         // inodes while data space remains, then fill data through the already
         // open filler. A free-inode observation of zero proves create denial
@@ -192,6 +206,7 @@ impl Filler {
             );
             filler.free_inodes = Some(state.f_ffree);
         }
+        let mut write_size = buffer.len();
         let error = loop {
             assert!(
                 started.elapsed() < Duration::from_secs(25),
@@ -201,10 +216,20 @@ impl Filler {
                 filler.bytes < volume.max_bytes,
                 "owned filesystem did not enforce its capacity"
             );
-            match file.write(&buffer) {
+            match file.write(&buffer[..write_size]) {
                 Ok(0) => panic!("zero-length filler write"),
                 Ok(n) => filler.bytes += n as u64,
-                Err(error) => break error,
+                Err(error) => {
+                    let code = error.raw_os_error().expect("native capacity code");
+                    assert!(capacity_code(code), "unexpected fill error: {error}");
+                    if write_size == 1 {
+                        break error;
+                    }
+                    // An all-or-nothing large write may leave smaller free
+                    // allocations. Consume those too before declaring full.
+                    write_size = (write_size / 16).max(1);
+                    continue;
+                }
             }
             // Force delayed allocation while the error still belongs to this
             // owned volume. A sync failure is retained as native evidence.
@@ -226,22 +251,37 @@ impl Filler {
                 filler.fill_metadata(volume, directory, started);
             }
         }
+        // Each empty index can consume otherwise reusable MFT records. A
+        // failure in one directory must not end the global metadata fill.
+        for directory in filler.metadata_directories.clone() {
+            filler.fill_metadata(volume, &directory, started);
+        }
         filler
     }
     fn fill_metadata(&mut self, volume: &Volume, directory: &std::path::Path, started: Instant) {
         for index in 0..8192u32 {
+            assert!(self.metadata_paths.len() < 8192, "metadata entry bound");
             assert!(
                 started.elapsed() < Duration::from_secs(25),
                 "bounded metadata fill"
             );
             let path = directory.join(format!("c{}-{index:04x}", &volume.nonce[..8]));
-            match OpenOptions::new().write(true).create_new(true).open(&path) {
-                Ok(file) => {
+            let created = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .and_then(|file| {
+                    // Register before sync so an allocation failure still cleans
+                    // up this exact owned entry. Drop ignores close errors.
                     self.metadata_paths.push(path);
-                    // Creation is the resource being exhausted. Dropping
-                    // the handle retains its directory record until cleanup.
+                    if cfg!(target_os = "macos") {
+                        file.sync_all()?;
+                    }
                     drop(file);
-                }
+                    Ok(())
+                });
+            match created {
+                Ok(()) => {}
                 Err(error) => {
                     let code = error.raw_os_error().expect("native metadata capacity code");
                     assert!(
@@ -266,6 +306,13 @@ impl Drop for Filler {
             if let Err(error) = std::fs::remove_file(path) {
                 if !std::thread::panicking() {
                     panic!("owned metadata filler cleanup failed: {error}");
+                }
+            }
+        }
+        for path in &self.metadata_directories {
+            if let Err(error) = std::fs::remove_dir(path) {
+                if !std::thread::panicking() {
+                    panic!("owned empty metadata directory cleanup failed: {error}");
                 }
             }
         }
@@ -306,7 +353,15 @@ fn resume_after_fill(
     for key in ["nonce", "id", "point"] {
         assert_eq!(hit[key], control[key]);
     }
+    println!("native_capacity_pause={hit}");
     let filler = Filler::fill(&volume, metadata_directory.as_deref());
+    println!(
+        "native_capacity_fill={}",
+        json!({"point":control["point"],
+        "bytes":filler.bytes,"native_code":filler.native_code,
+        "metadata_files":filler.metadata_paths.len(),
+        "metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes})
+    );
     child
         .child
         .resume_controlled(
@@ -315,7 +370,18 @@ fn resume_after_fill(
             .unwrap(),
         )
         .unwrap();
-    let line = child.line();
+    let line = match child.lines.recv_timeout(Duration::from_secs(60)) {
+        Ok(Ok(line)) => line,
+        failure => {
+            child.child.terminate();
+            let output = child.child.finish().expect("reap failed capacity engine");
+            let tail = |bytes: &[u8]| {
+                String::from_utf8_lossy(&bytes[bytes.len().saturating_sub(2048)..]).into_owned()
+            };
+            panic!("selected native capacity event missing: {failure:?}; exit={}; stdout_tail={}; stderr_tail={}",
+                output.status, tail(&output.stdout), tail(&output.stderr));
+        }
+    };
     let error: Value = serde_json::from_str(
         std::str::from_utf8(&line)
             .unwrap()
@@ -517,6 +583,13 @@ fn capacity_case(point: &str, mode: &str) {
         let started = clock.elapsed().as_nanos() as u64;
         let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory));
         let result = client.commit_transaction(&session,&lease.transaction_id,target.clone(),options("uncertain")).await;
+        let result_class = match &result {
+            Ok(_) => "acknowledged".to_owned(),
+            Err(rrd_client::Error::Api { error, .. }) => format!("api-{:?}",error.code),
+            Err(rrd_client::Error::Timeout) => "client-timeout".to_owned(),
+            Err(_) => "client-failure".to_owned(),
+        };
+        println!("native_capacity_client={}",json!({"point":point,"mode":mode,"class":result_class}));
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();
