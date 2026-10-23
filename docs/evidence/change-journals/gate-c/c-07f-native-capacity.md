@@ -526,3 +526,13 @@ Authoring checks: crash-test installed_crash Clippy with warnings denied passed
 (18.61s on Windows; Linux branch requires native CI). Navigation, inventory,
 documentation policy and diff whitespace checks passed. Python controller
 syntax compiled without executing volume operations. No native acceptance yet.
+
+### Linux inode-oracle direct dependency correction
+
+Candidate 5627c07e failed compilation in native Linux job 120265582476: the
+new fstatvfs oracle referenced libc while its existing direct dev dependency
+was macOS-only. Expanded that same target-scoped declaration to Linux, using
+the existing locked version. No capacity assertion or failure deadline was
+relaxed. The PR brief records this refinement before implementation. No
+Linux runtime result from that candidate is claimed; new candidate CI is
+required. Cargo metadata and static repository checks follow this correction.
