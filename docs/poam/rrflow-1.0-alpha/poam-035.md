@@ -416,3 +416,11 @@ updates, retirement, parameterized queries and native reopen; lexical scoring
 retains corpus-wide statistics. Native larger-profile comparison remains
 required. This does not resolve relation endpoint scans or POAM-034's separate
 whole-scope constraint validation.
+
+The [addressed endpoint-query repair](../../evidence/change-journals/gate-c/c-07g-adjacency-filter-reads.md)
+selects authenticated adjacency ranges for uniquely identified relation
+endpoints, then expands complete relation identity histories before temporal
+filtering. Fixed-budget differential tests preserve moved, backdated and
+retired edges, colliding IDs and native reopen. All 63 query tests and six engine
+query tests pass. Native comparison and full qualification remain open;
+POAM-034's independent commit-constraint cost is unchanged.

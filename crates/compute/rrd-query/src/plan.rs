@@ -393,6 +393,10 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         bound.version_sources.as_slice(),
         [RuntimeVersionedSource::Identity { .. }]
     );
+    let adjacency_read = matches!(
+        bound.version_sources.as_slice(),
+        [RuntimeVersionedSource::Adjacency { .. }]
+    );
     let traversal = std::iter::once(&bound.source)
         .chain(bound.join.as_ref().map(|join| &join.source))
         .any(|source| matches!(source, Source::Traversal { .. }));
@@ -401,7 +405,7 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         .iter()
         .find(|filter| filter.comparison.is_match())
         .map(|filter| filter.field.as_str());
-    let selected_index = (!identity_read && !traversal)
+    let selected_index = (!identity_read && !adjacency_read && !traversal)
         .then(|| {
             bound
                 .index_candidates
@@ -451,6 +455,21 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
                 selected: false,
                 exact: false,
                 reason: "rejected: no projection generation and grounding proof supplied".into(),
+            },
+        ]
+    } else if adjacency_read {
+        vec![
+            CandidatePath {
+                name: "versioned_adjacency_read".into(),
+                selected: true,
+                exact: true,
+                reason: "reads the bound endpoint adjacency and complete histories of its named relations before temporal and residual predicate evaluation".into(),
+            },
+            CandidatePath {
+                name: "versioned_source_read".into(),
+                selected: false,
+                exact: true,
+                reason: "rejected: unrelated relation histories do not belong to the addressed endpoint".into(),
             },
         ]
     } else if identity_read {
@@ -648,6 +667,9 @@ fn bound_version_sources(
                     }
                 }
             }
+            if let Some(source) = bound_adjacency_source(&query.source, filters, schema) {
+                return Ok(vec![source]);
+            }
         }
         if let Source::Event { kind } = &query.source {
             if let Some(cursor) = filters.iter().find_map(|filter| {
@@ -700,6 +722,61 @@ fn bound_version_sources(
         }
     }
     Ok(normalize_version_sources(sources))
+}
+
+/// Only a fully addressed endpoint can narrow the relation source. Multiple
+/// allowed kinds without an explicit kind predicate retain the family scan.
+fn bound_adjacency_source(
+    source: &Source,
+    filters: &[BoundFilter],
+    schema: &RuntimeSchemaRegistry,
+) -> Option<RuntimeVersionedSource> {
+    let Source::Relation { kind } = source else {
+        return None;
+    };
+    let definition = schema.relations.get(kind)?;
+    let equality = |field: &str| {
+        filters.iter().find_map(|filter| {
+            if filter.field == field && filter.comparison == ComparisonOperator::Equal {
+                if let RuntimeValue::String(value) = &filter.value {
+                    return Some(value.as_str());
+                }
+            }
+            None
+        })
+    };
+    for (id_field, kind_field, allowed, direction) in [
+        (
+            "from_id",
+            "from_kind",
+            &definition.from,
+            rrd_store::RuntimeAdjacencyDirection::Outgoing,
+        ),
+        (
+            "to_id",
+            "to_kind",
+            &definition.to,
+            rrd_store::RuntimeAdjacencyDirection::Incoming,
+        ),
+    ] {
+        let Some(id) = equality(id_field) else {
+            continue;
+        };
+        let node_kind = equality(kind_field).or_else(|| {
+            (allowed.len() == 1)
+                .then(|| allowed.first().expect("one allowed endpoint kind").as_str())
+        });
+        let Some(node_kind) = node_kind else { continue };
+        let Ok(node) = rrd_core::RuntimeRef::new(node_kind, id) else {
+            continue;
+        };
+        return Some(RuntimeVersionedSource::Adjacency {
+            relation: kind.clone(),
+            node,
+            direction,
+        });
+    }
+    None
 }
 
 impl PhysicalPlan {
