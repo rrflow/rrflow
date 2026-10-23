@@ -1987,6 +1987,7 @@ impl Database {
         started: Instant,
     ) -> Result<Option<CompactionCandidate>> {
         let mut denied = None;
+        let mut overlap_blocked = false;
         for source_level in 0..self.compaction.max_level {
             self.compaction_limits.check_elapsed(started)?;
             let mut sources = self
@@ -1996,7 +1997,7 @@ impl Database {
                 .filter(|(_, segment)| segment.descriptor.level == source_level)
                 .map(|(index, _)| index)
                 .collect::<Vec<_>>();
-            let blocked = denied.is_some();
+            let blocked = denied.is_some() || overlap_blocked;
             let threshold = if source_level == 0 {
                 self.compaction.l0_compaction_trigger
             } else {
@@ -2019,34 +2020,47 @@ impl Database {
                         .then_with(|| left.id.cmp(&right.id))
                 }
             });
-            for take in (1..=sources.len().min(self.compaction.max_input_segments)).rev() {
-                let Some(candidate) =
-                    self.compaction_overlap_candidate(&sources[..take], source_level, started)?
-                else {
-                    continue;
-                };
-                // Do not disguise a rejected merge of multiple source segments
-                // as a successful move of just one. A sole blocking target may
-                // move down to free its parent; this is finite in max_level.
-                if candidate.indices.len() < 2 && !(sources.len() == 1 && (force || blocked)) {
-                    continue;
-                }
-                match self.admit_compaction_input(&candidate, started) {
-                    Ok(_) => return Ok(Some(candidate)),
-                    Err(
-                        error @ Error::MaintenanceLimit {
-                            resource:
-                                crate::MaintenanceResource::InputBytes
-                                | crate::MaintenanceResource::InputLogicalBytes
-                                | crate::MaintenanceResource::InputVersions,
-                            ..
-                        },
-                    ) => {
-                        if denied.is_none() {
-                            denied = Some(error);
-                        }
+            // Preserve oldest/key-first preference, but a blocked prefix must
+            // not hide independent ranges that fit the same admitted quantum.
+            // Enumeration remains subject to the existing elapsed bound; every
+            // candidate includes its complete target-level overlap closure.
+            for start in 0..sources.len() {
+                for take in
+                    (1..=(sources.len() - start).min(self.compaction.max_input_segments)).rev()
+                {
+                    self.compaction_limits.check_elapsed(started)?;
+                    let Some(candidate) = self.compaction_overlap_candidate(
+                        &sources[start..start + take],
+                        source_level,
+                        started,
+                    )?
+                    else {
+                        overlap_blocked = true;
+                        continue;
+                    };
+                    // Do not disguise a rejected merge of multiple source segments
+                    // as a successful move of just one. A sole blocking target may
+                    // move down to free its parent; this is finite in max_level.
+                    if candidate.indices.len() < 2 && !(sources.len() == 1 && (force || blocked)) {
+                        continue;
                     }
-                    Err(error) => return Err(error),
+                    match self.admit_compaction_input(&candidate, started) {
+                        Ok(_) => return Ok(Some(candidate)),
+                        Err(
+                            error @ Error::MaintenanceLimit {
+                                resource:
+                                    crate::MaintenanceResource::InputBytes
+                                    | crate::MaintenanceResource::InputLogicalBytes
+                                    | crate::MaintenanceResource::InputVersions,
+                                ..
+                            },
+                        ) => {
+                            if denied.is_none() {
+                                denied = Some(error);
+                            }
+                        }
+                        Err(error) => return Err(error),
+                    }
                 }
             }
         }

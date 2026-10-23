@@ -291,6 +291,13 @@ remains pending; the earlier failed resource policies remain retained.
 
 ## Closure evidence
 
+Linux17's setup-failure observation retained L0 debt despite available process
+memory and earlier compactions. The
+[bounded candidate-discovery repair](../../evidence/change-journals/gate-c/c-07d-compaction-candidate-progress.md)
+proves and repairs an oldest-prefix blockage that hid later admitted ranges.
+Snapshot/reopen and existing maintenance assertions remain required. Native
+scale comparison is pending; the failed operating point is not reclassified.
+
 Native run 39979675928 failed the macOS existing/WAL capacity case after a
 real filler ENOSPC: the client returned resource denial without a selected
 native I/O error receipt. The

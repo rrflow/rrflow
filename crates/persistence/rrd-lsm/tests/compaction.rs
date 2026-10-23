@@ -22,6 +22,81 @@ fn delete(key: &str) -> Mutation {
 }
 
 #[test]
+fn blocked_oldest_source_does_not_hide_independent_budgeted_compaction() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("blocked-prefix");
+    let seed_options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            l0_compaction_trigger: 16,
+            target_segment_bytes: 512,
+            ..CompactionPolicy::default()
+        },
+        ..DatabaseOptions::default()
+    };
+    let mut database = Database::create_with_options(&root, seed_options).unwrap();
+    let expected = [
+        ("a", "x".repeat(8192)),
+        ("b", "y".repeat(256)),
+        ("c", "z".repeat(256)),
+    ];
+    let mut snapshots = Vec::new();
+    for (ordinal, (key, value)) in expected.iter().enumerate() {
+        database
+            .write(&batch(vec![put(key, value)]), Durability::Authoritative)
+            .unwrap();
+        snapshots.push(database.snapshot());
+        database.flush_memtable(ordinal as u64).unwrap();
+    }
+    assert_eq!(database.l0_segment_count(), 3);
+    drop(database);
+    let options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            l0_compaction_trigger: 2,
+            max_input_segments: 2,
+            ..seed_options.compaction
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            input_logical_bytes: 4096,
+            ..seed_options.compaction_limits
+        },
+        ..seed_options
+    };
+    let mut database = Database::open_with_options(&root, options).unwrap();
+    let before = database.snapshot();
+    let outcome = database
+        .compact_if_needed(4)
+        .unwrap()
+        .expect("later independent range fits the unchanged budget");
+    assert_eq!(outcome.source_level, 0);
+    assert_eq!(outcome.input_segments, 2);
+    assert_eq!(outcome.input_versions, 2);
+    assert!(!outcome.history_pruned);
+    assert_eq!(database.l0_segment_count(), 1);
+    assert_eq!(database.snapshot(), before);
+    for ((key, value), snapshot) in expected.iter().zip(&snapshots) {
+        assert_eq!(
+            database.get(key.as_bytes(), *snapshot).unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+    database
+        .write(&batch(vec![put("tail", "ack")]), Durability::Authoritative)
+        .unwrap();
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    for ((key, value), snapshot) in expected.iter().zip(&snapshots) {
+        assert_eq!(
+            reopened.get(key.as_bytes(), *snapshot).unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+    assert_eq!(
+        reopened.get(b"tail", reopened.snapshot()).unwrap(),
+        Some(b"ack".to_vec())
+    );
+}
+
+#[test]
 fn automatic_compaction_selects_a_budgeted_subset_before_rejecting_writes() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("database");
