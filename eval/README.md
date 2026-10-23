@@ -192,8 +192,8 @@ from the owning workload table; CI rejects drift. A qualifying operating point
 is not proof of the entire load sweep. Reduced characterization remains
 explicitly unqualified. Fleet manifests derive independent child campaigns
 from the same frozen allocation and corpus; they require four clients per
-estate and an exactly divisible aggregate request rate. Quiet loads estate
-zero while neighbours retain their engines and sample without offered load;
+estate and an exactly divisible aggregate request rate. Quiet rotates the measured interval through every estate, one at a time,
+while neighbours retain their engines and sampled drain without offered load;
 equal loads every estate; abusive offers estate zero twice its admitted rate.
 Each trial retains the full warmup/measured/burst/drain/soak durations. All
 members warm up before the quiet trial begins. Phase barriers share one clock
@@ -205,8 +205,14 @@ membership is checked before ingestion and at resource sampling/reopen.
 Pre-phase boundaries capture idle overhead, unique instance/PID identities
 and explicit cross-estate session denial. Per-estate child histories retain
 canonical record/relation/vector verification, lifecycle lanes, final restart
-and readback. The aggregate reducer checks overlapping active phases, quiet
-neighbour drain, shared allocation, and a conservative sum of member RSS peaks.
+and readback. The aggregate reducer checks overlapping concurrent phases, non-overlapping
+isolated measured intervals, quiet-neighbour drain, shared allocation, and a
+conservative sum of member RSS peaks. It derives bounded p99 intervals from
+raw measured attempt timings using 4,096 integer bins (at most 1/64 relative
+bin width above 64 ns). Every compliant estate's abusive p99 upper bound must
+be no greater than twice its own quiet p99 lower bound; ambiguous boundary
+bins fail conservatively. `isolated_latency_passed` reports this separately
+from complete qualification.
 That sum is explicitly not a simultaneous RSS sample.
 
 `storage-fleet-trial-v1.json` and `storage-fleet-result-v1.json` are generated

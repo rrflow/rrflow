@@ -94,6 +94,7 @@ fn complete_trial_requires_real_child_results_and_boundary_coverage() {
         child_results: vec![],
         boundaries: vec![],
         sum_member_peak_resident_bytes: 0,
+        measured_latency: vec![],
         qualification_passed: true,
     };
     assert!(assess_fleet_trial(temp.path(), &parent, &mut trial).is_err());
@@ -140,6 +141,7 @@ fn boundaries_require_distinct_engines_explicit_denial_and_real_reopen() {
         child_results: vec![],
         boundaries,
         sum_member_peak_resident_bytes: 0,
+        measured_latency: vec![],
         qualification_passed: false,
     };
     check_boundaries(&parent, &valid).unwrap();

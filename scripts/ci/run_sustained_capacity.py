@@ -129,6 +129,8 @@ def main():
     timeout = (duration // 1000 + 600) * len(campaign["points"]) * len(campaign["seeds"])
     if campaign["allocation"]["estates"] > 1:
         timeout *= 3  # quiet, equal and abusive trials, each with full durations
+        timeout += ((campaign["allocation"]["estates"] - 1) *
+                    (schedule["measured_ms"] + 120_000) // 1000) * len(campaign["points"]) * len(campaign["seeds"])
     require(0 < timeout <= 31 * 86400, "campaign exceeds explicit one-month run bound")
     allocation = campaign["allocation"]
     environment = dict(os.environ, RRFLOW_SUSTAINED_CAMPAIGN=str(args.campaign.resolve()),

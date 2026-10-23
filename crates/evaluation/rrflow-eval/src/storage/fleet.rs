@@ -2,6 +2,9 @@
 //! Child campaigns are mechanical views; only the aggregate can qualify a fleet.
 use super::sustained::{encode_bounded, read_bounded, write_new};
 use super::*;
+#[path = "fleet_latency.rs"]
+mod latency;
+pub use latency::FleetLatencyBand;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -155,6 +158,8 @@ pub struct FleetTrialResult {
     pub boundaries: Vec<FleetBoundary>,
     /// Conservative sum of per-estate peaks, not a simultaneous RSS sample.
     pub sum_member_peak_resident_bytes: u64,
+    #[schemars(length(max = 10))]
+    pub measured_latency: Vec<FleetLatencyBand>,
     pub qualification_passed: bool,
 }
 
@@ -166,6 +171,7 @@ pub struct FleetResult {
     pub status: CampaignStatus,
     #[schemars(length(max = 96))]
     pub trials: Vec<Digest>,
+    pub isolated_latency_passed: bool,
     pub qualification_passed: bool,
 }
 
@@ -318,7 +324,8 @@ pub fn assess_fleet_trial(
     require(trial.index == expected_index, "fleet trial order differs")?;
     require(
         trial.boundaries.len() <= 70
-            && trial.child_results.len() <= campaign.allocation.estates.get() as usize,
+            && trial.child_results.len() <= campaign.allocation.estates.get() as usize
+            && trial.measured_latency.len() <= campaign.allocation.estates.get() as usize,
         "fleet trial metadata exceeds bound",
     )?;
     if trial.status != CampaignStatus::Completed {
@@ -332,6 +339,8 @@ pub fn assess_fleet_trial(
     )?;
     let mut peak = 0u64;
     let mut qualifies = true;
+    let mut measured_latency = Vec::new();
+    let mut isolated_intervals = Vec::new();
     let mut overlap = std::collections::BTreeMap::<LoadPhase, (u64, u64)>::new();
     for estate in 0..campaign.allocation.estates.get() {
         let child = fleet_child(campaign, trial.point, trial.seed, trial.trial, estate)?;
@@ -362,6 +371,7 @@ pub fn assess_fleet_trial(
             .iter()
             .find(|b| b.estate == estate && b.stage.as_str() == "warmup")
             .ok_or("warmup boundary missing")?;
+        let mut histogram = latency::Histogram::new();
         for index in 0..result.segments {
             let segment: SustainedSegment = decode(&read_bounded(
                 &directory.join(format!("segment-{index:020}.json")),
@@ -372,6 +382,16 @@ pub fn assess_fleet_trial(
                     && segment.finished_ns <= loaded.sample.elapsed_ns,
                 "child load lies outside fleet boundary interval",
             )?;
+            if segment.phase == LoadPhase::Measured {
+                for attempt in &segment.attempts {
+                    histogram.record(
+                        attempt
+                            .finished_ns
+                            .checked_sub(attempt.scheduled_ns)
+                            .ok_or("negative fleet latency")?,
+                    )?;
+                }
+            }
             for sample in &segment.resources {
                 require(
                     sample.pid == loaded.sample.pid,
@@ -383,6 +403,15 @@ pub fn assess_fleet_trial(
                     "child sample changed shared fleet allocation",
                 )?;
             }
+        }
+        measured_latency.push(histogram.finish(estate)?);
+        if trial.trial == FleetTrial::Quiet {
+            let row = result
+                .operating_points
+                .iter()
+                .find(|r| r.phase == LoadPhase::Measured)
+                .ok_or("quiet estate measured baseline missing")?;
+            isolated_intervals.push((row.started_ns, row.finished_ns));
         }
         if trial.trial.active(estate) {
             for row in &result.operating_points {
@@ -409,10 +438,12 @@ pub fn assess_fleet_trial(
             qualifies &= super::sustained::satisfies_operating_requirements(&child, &result)?;
         } else {
             require(
-                result
-                    .operating_points
-                    .iter()
-                    .all(|r| r.phase == LoadPhase::Warmup || r.phase == LoadPhase::Drain),
+                result.operating_points.iter().all(|r| {
+                    matches!(
+                        r.phase,
+                        LoadPhase::Warmup | LoadPhase::Measured | LoadPhase::Drain
+                    )
+                }),
                 "quiet neighbour executed offered load",
             )?;
             qualifies &= result
@@ -424,16 +455,25 @@ pub fn assess_fleet_trial(
                 .iter()
                 .find(|r| r.phase == LoadPhase::Drain)
                 .ok_or("quiet neighbour was not observed")?;
-            let expected = [
-                LoadPhase::Measured,
-                LoadPhase::Burst,
-                LoadPhase::Drain,
-                LoadPhase::Soak,
-            ]
-            .iter()
-            .map(|p| child.schedule.duration_ms(*p))
-            .sum::<u64>()
+            let expected = [LoadPhase::Burst, LoadPhase::Drain, LoadPhase::Soak]
+                .iter()
+                .map(|p| child.schedule.duration_ms(*p))
+                .sum::<u64>()
                 * 1_000_000;
+            let baseline = result
+                .operating_points
+                .iter()
+                .find(|r| r.phase == LoadPhase::Measured)
+                .ok_or("quiet baseline absent")?;
+            let point = &child.points[0];
+            qualifies &= baseline.elapsed_ns >= child.schedule.measured_ms.get() * 1_000_000
+                && baseline.attempts as u128
+                    >= (u128::from(child.schedule.measured_ms.get())
+                        * u128::from(point.requests_per_second.get()))
+                    .div_ceil(1000)
+                && baseline.latency_over_budget as u128 * 100 <= baseline.attempts as u128
+                && baseline.failures as u128 * 10_000
+                    <= baseline.attempts as u128 * u128::from(point.maximum_error_basis_points);
             qualifies &= idle.elapsed_ns >= expected;
         }
     }
@@ -455,6 +495,19 @@ pub fn assess_fleet_trial(
         qualifies &= end.saturating_sub(*start).saturating_add(allowance)
             >= campaign.schedule.duration_ms(phase) * 1_000_000;
     }
+    if trial.trial == FleetTrial::Quiet {
+        require(
+            isolated_intervals.len() == campaign.allocation.estates.get() as usize,
+            "quiet isolated baseline coverage missing",
+        )?;
+        for pair in isolated_intervals.windows(2) {
+            require(
+                pair[0].1 <= pair[1].0,
+                "quiet baselines overlap or are not in estate order",
+            )?;
+        }
+    }
+    trial.measured_latency = measured_latency;
     trial.sum_member_peak_resident_bytes = peak;
     trial.qualification_passed = campaign.purpose == CampaignPurpose::Qualification
         && qualifies
@@ -513,9 +566,11 @@ impl FleetWriter {
             campaign_sha256: self.campaign.sha256()?,
             status,
             trials: self.trials,
+            isolated_latency_passed: false,
             qualification_passed: false,
         };
-        result.qualification_passed = verify_fleet_parts(&self.directory, &self.campaign, &result)?;
+        (result.qualification_passed, result.isolated_latency_passed) =
+            verify_fleet_parts(&self.directory, &self.campaign, &result)?;
         write_new(
             &self.directory.join("fleet-result.json"),
             &encode_bounded(&result, MAX_DOCUMENT_BYTES)?,
@@ -527,7 +582,7 @@ fn verify_fleet_parts(
     root: &Path,
     campaign: &StorageCampaign,
     result: &FleetResult,
-) -> Result<bool> {
+) -> Result<(bool, bool)> {
     validate_fleet(campaign)?;
     let count = campaign.points.len() * campaign.seeds.len() * 3;
     require(
@@ -542,6 +597,8 @@ fn verify_fleet_parts(
     )?;
     let mut passed = result.status == CampaignStatus::Completed
         && campaign.purpose == CampaignPurpose::Qualification;
+    let mut quiet = None;
+    let mut isolation_passed = result.status == CampaignStatus::Completed;
     for (index, expected) in result.trials.iter().enumerate() {
         let raw = read_bounded(
             &root.join(format!("trial-{index:04}.json")),
@@ -562,9 +619,21 @@ fn verify_fleet_parts(
             result.status != CampaignStatus::Completed || trial.status == CampaignStatus::Completed,
             "completed fleet contains a failed trial",
         )?;
+        if trial.trial == FleetTrial::Quiet {
+            quiet = Some(trial.measured_latency.clone());
+        }
+        if trial.trial == FleetTrial::Abusive && trial.status == CampaignStatus::Completed {
+            isolation_passed &= latency::isolated_ratio(
+                quiet
+                    .as_ref()
+                    .ok_or("quiet baseline missing before abusive trial")?,
+                &trial.measured_latency,
+                campaign.allocation.estates.get(),
+            )?;
+        }
         passed &= trial.qualification_passed;
     }
-    Ok(passed)
+    Ok((passed && isolation_passed, isolation_passed))
 }
 pub fn verify_fleet(root: &Path) -> Result<FleetResult> {
     let campaign: StorageCampaign = decode(&read_bounded(
@@ -576,7 +645,8 @@ pub fn verify_fleet(root: &Path) -> Result<FleetResult> {
         MAX_DOCUMENT_BYTES,
     )?)?;
     require(
-        result.qualification_passed == verify_fleet_parts(root, &campaign, &result)?,
+        (result.qualification_passed, result.isolated_latency_passed)
+            == verify_fleet_parts(root, &campaign, &result)?,
         "fleet qualification claim differs",
     )?;
     Ok(result)

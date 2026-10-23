@@ -26,6 +26,9 @@
       "minimum": 0,
       "type": "integer"
     },
+    "isolated_latency_passed": {
+      "type": "boolean"
+    },
     "qualification_passed": {
       "type": "boolean"
     },
@@ -45,6 +48,7 @@
     "campaign_sha256",
     "status",
     "trials",
+    "isolated_latency_passed",
     "qualification_passed"
   ],
   "title": "FleetResult",

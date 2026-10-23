@@ -722,6 +722,38 @@
       ],
       "type": "object"
     },
+    "FleetLatencyBand": {
+      "additionalProperties": false,
+      "properties": {
+        "estate": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "p99_lower_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "p99_upper_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "samples": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "estate",
+        "samples",
+        "p99_lower_ns",
+        "p99_upper_ns"
+      ],
+      "type": "object"
+    },
     "FleetTrial": {
       "enum": [
         "quiet",
@@ -960,6 +992,13 @@
       "minimum": 0,
       "type": "integer"
     },
+    "measured_latency": {
+      "items": {
+        "$ref": "#/$defs/FleetLatencyBand"
+      },
+      "maxItems": 10,
+      "type": "array"
+    },
     "point": {
       "format": "uint",
       "minimum": 0,
@@ -997,6 +1036,7 @@
     "child_results",
     "boundaries",
     "sum_member_peak_resident_bytes",
+    "measured_latency",
     "qualification_passed"
   ],
   "title": "FleetTrialResult",

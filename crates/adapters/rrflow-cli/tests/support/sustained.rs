@@ -992,7 +992,9 @@ async fn run_estate(
                     .ok_or("setup deadline overflow")?,
                 |n, p| n.checked_add(campaign.schedule.duration_ms(p)),
             )
-            .ok_or("campaign deadline overflow")?;
+            .ok_or("campaign deadline overflow")?
+            .checked_add(fleet.map_or(0, |f| f.quiet_extra_ms(campaign.schedule.measured_ms.get())))
+            .ok_or("fleet isolated baseline deadline overflow")?;
             let (child, client, _) = estate.start_for(clock, Duration::from_millis(lifetime_ms));
             native::enforcement(child.id(), allocation.as_ref())?;
             let mut child = Some(child);
@@ -1078,7 +1080,7 @@ async fn run_estate(
                 LoadPhase::Drain,
                 LoadPhase::Soak,
             ] {
-                let phase_origin = if let Some(fleet) = fleet {
+                let mut phase_origin = if let Some(fleet) = fleet {
                     rotate_session(
                         &estate,
                         &mut driver.workload,
@@ -1109,9 +1111,25 @@ async fn run_estate(
                 } else {
                     None
                 };
+                if phase == LoadPhase::Measured {
+                    if let Some(fleet) = fleet.filter(|f| f.trial == FleetTrial::Quiet) {
+                        fleet
+                            .wait_quiet(
+                                fleet.estate,
+                                &mut driver,
+                                writer,
+                                (&estate, &mut session_ordinal, &mut session_opened),
+                            )
+                            .await?;
+                        phase_origin = Some(ns(clock));
+                    }
+                }
                 if phase == LoadPhase::Drain
                     || (phase != LoadPhase::Warmup
-                        && fleet.is_some_and(|f| !f.trial.active(f.estate)))
+                        && fleet.is_some_and(|f| {
+                            !f.trial.active(f.estate)
+                                && !(phase == LoadPhase::Measured && f.trial == FleetTrial::Quiet)
+                        }))
                 {
                     let mut remaining = campaign.schedule.duration_ms(phase);
                     let cap = campaign
@@ -1231,6 +1249,19 @@ async fn run_estate(
                     }
                     writer.append(&segment)?;
                     next += take;
+                }
+                if phase == LoadPhase::Measured {
+                    if let Some(fleet) = fleet.filter(|f| f.trial == FleetTrial::Quiet) {
+                        let all = fleet.finish_quiet()?;
+                        fleet
+                            .wait_quiet(
+                                all,
+                                &mut driver,
+                                writer,
+                                (&estate, &mut session_ordinal, &mut session_opened),
+                            )
+                            .await?;
+                    }
                 }
             }
             if let Some(fleet) = fleet {

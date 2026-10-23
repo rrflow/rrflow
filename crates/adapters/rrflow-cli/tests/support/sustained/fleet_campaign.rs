@@ -1,6 +1,9 @@
 //! Bounded coordinator over the existing single-estate campaign implementation.
 use super::super::*;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex,
+};
 use tokio::sync::Barrier;
 
 pub(super) struct Shared {
@@ -8,6 +11,8 @@ pub(super) struct Shared {
     works: Mutex<Vec<Option<Workload>>>,
     boundaries: Mutex<Vec<FleetBoundary>>,
     origin: Mutex<u64>,
+    quiet_turn: AtomicU64,
+    estates: u64,
 }
 #[derive(Clone)]
 pub(crate) struct Participation {
@@ -18,6 +23,64 @@ pub(crate) struct Participation {
     wait: Duration,
 }
 impl Participation {
+    pub fn quiet_extra_ms(&self, measured_ms: u64) -> u64 {
+        if self.trial == FleetTrial::Quiet {
+            (self.shared.estates - 1) * (measured_ms + 120_000)
+        } else {
+            0
+        }
+    }
+    pub async fn wait_quiet(
+        &self,
+        target: u64,
+        driver: &mut PointRun<'_>,
+        writer: &mut CampaignWriter,
+        lease: (&Estate, &mut u64, &mut Instant),
+    ) -> DriverResult<()> {
+        let (estate, ordinal, opened) = lease;
+        while self.shared.quiet_turn.load(Ordering::Acquire) < target {
+            rotate_session(
+                estate,
+                &mut driver.workload,
+                driver.campaign,
+                driver.point.clients.get(),
+                ordinal,
+                opened,
+            )
+            .await?;
+            writer.admit_next()?;
+            let duration = driver
+                .campaign
+                .schedule
+                .sample_ms
+                .get()
+                .checked_mul(
+                    driver
+                        .campaign
+                        .evidence
+                        .samples_per_segment
+                        .get()
+                        .saturating_sub(2),
+                )
+                .filter(|v| *v > 0)
+                .ok_or("quiet wait needs bounded resource samples")?
+                .min(120_000);
+            writer.append(&driver.drain(writer, duration).await?)?;
+        }
+        Ok(())
+    }
+    pub fn finish_quiet(&self) -> DriverResult<u64> {
+        self.shared
+            .quiet_turn
+            .compare_exchange(
+                self.estate,
+                self.estate + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .map_err(|_| "isolated estate completed out of order")?;
+        Ok(self.shared.estates)
+    }
     /// All engines finish the previous phase before a new phase is admitted.
     /// Session credentials stay in process memory and are never serialized.
     pub async fn boundary(
@@ -182,6 +245,8 @@ async fn run_fleet(
                     works: Mutex::new(vec![None; n]),
                     boundaries: Mutex::new(Vec::with_capacity(n * 7)),
                     origin: Mutex::new(0),
+                    quiet_turn: AtomicU64::new(0),
+                    estates: n as u64,
                 });
                 let clock = Instant::now();
                 let mut tasks = JoinSet::new();
@@ -258,6 +323,7 @@ async fn run_fleet(
                     child_results: receipts.into_iter().flatten().collect(),
                     boundaries,
                     sum_member_peak_resident_bytes: 0,
+                    measured_latency: vec![],
                     qualification_passed: false,
                 })?;
                 if let Some(error) = failure {

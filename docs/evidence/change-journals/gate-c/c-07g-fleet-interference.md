@@ -140,3 +140,31 @@ navigation, documentation, workflow policy, generated public-surface parity
 (44 operations), and diff whitespace passed. Python launcher syntax compiled.
 Generated inventory is rerendered after this final journal amendment and must
 pass --check before commit. Full native capacity/soak remains unexecuted.
+
+### Per-estate isolated p99 acceptance refinement
+
+Review of J-04's owning fleet threshold exposed a missing relative-latency
+oracle. The pre-implementation refinement is recorded in PR 75 comment
+6358992786. Quiet measurement now rotates through every estate rather than
+using estate zero as a proxy for its neighbours. Waiting estates retain live
+engines and emit canonical drain/resource segments; a monotonic atomic turn
+admits exactly one measured baseline at a time. Phase/lifetime and launcher
+bounds include the additional isolated intervals. Full equal/abusive phases
+and soak requirements remain unchanged.
+
+The evaluation boundary derives p99 lower/upper bands from retained raw
+scheduled-to-finished attempt latency, using fixed 4,096 integer bins and
+no interpolation. Below 64 ns bins are exact; higher bins have at most 1/64
+relative width. Each compliant estate's abusive upper bound must fit twice
+its own isolated lower bound, so ambiguous bins fail conservatively. Root
+verification recomputes bands and the separate isolated_latency_passed field;
+changed claims, missing members or overlapping isolated baselines fail.
+This is mechanical bounded measurement, not an imported upstream algorithm
+or superiority claim. Added fleet_latency.rs under the same evaluation owner.
+
+All seven focused fleet checks passed (0.02s), including an independently
+sorted percentile oracle and conservative boundary rejection. After regenerating
+schemas, the owning eval suite passed all 38 tests: 24 library, 3 provider
+compatibility and 11 storage contract. Strict eval/installed_reopen Clippy
+passed (3.22s) before final projections. No installed workload or native
+resource effect ran locally; full profile acceptance remains pending.
