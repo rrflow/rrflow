@@ -142,10 +142,12 @@ fn native_write_path_diagnostics_are_explicit_bounded_and_semantically_inert() {
 
     store.enable_native_write_path_diagnostics(1).unwrap();
     let expected = claim("diagnostic", "accepted");
+    let started = std::time::Instant::now();
     store
         .claims()
         .append_batch(std::slice::from_ref(&expected))
         .unwrap();
+    let operation_ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
     let diagnostics = store.take_native_write_path_diagnostics().unwrap().unwrap();
 
     assert_eq!(diagnostics.capacity, 1);
@@ -155,8 +157,10 @@ fn native_write_path_diagnostics_are_explicit_bounded_and_semantically_inert() {
     let sample = &diagnostics.samples[0];
     assert_eq!(sample.mutation_count, 3);
     assert_eq!(sample.durability, rrd_lsm::Durability::Authoritative);
-    assert!(sample.lock_wait.begin_mutex_wait_ns > 0);
-    assert!(sample.lock_wait.commit_mutex_wait_ns > 0);
+    // Uncontended acquisitions can fall within one clock tick. Preserve zero;
+    // the two disjoint measured waits must fit inside the observed operation.
+    assert!(sample.lock_wait.total_ns() <= operation_ns);
+    assert!(sample.phases.physical_total.wall_ns <= operation_ns);
 
     drop(store);
     let reopened = RrflowKvStore::open(&path).unwrap();

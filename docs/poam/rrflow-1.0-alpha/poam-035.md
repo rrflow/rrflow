@@ -69,6 +69,16 @@ compaction/GC, terminal admission reuse and reopen using the existing independen
 model. Its bounded physical matrix does not close native memory, aggregate
 output admission or installed reclamation obligations.
 
+### Diagnostic timing oracle deficiency
+
+During the pending mutable-limit/accepted reader-history combination, the
+store diagnostics test rejected an observed zero uncontended mutex duration.
+Its strictly-positive assumption exceeds the monotonic clock contract. The
+[clock-oracle repair](../../evidence/change-journals/gate-c/c-07a-diagnostic-clock.md)
+retains actual timings and checks independent outer bounds, exact forwarded
+context and durable effects. It does not qualify contention performance,
+resource enforcement or close this POA&M item.
+
 ## Impact
 
 ### Encoded staging admission deficiency
