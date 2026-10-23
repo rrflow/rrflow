@@ -2,7 +2,7 @@ use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SharedIoContext};
 use crate::mutable::MutableCharge;
 use crate::segment::{
-    new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
+    new_page_cache_with_limits, next_projected_cache_access, page_cache_stats, ActiveReadViews,
     ReadView, SharedPageCache,
 };
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
@@ -109,6 +109,8 @@ pub struct DatabaseOptions {
     pub recovery_reserve_bytes: u64,
     /// Output allocation cap shared by projected streams of this open instance.
     pub projected_output_bytes: usize,
+    /// Live owned source allocations across cached and uncached readers.
+    pub source_page_bytes: usize,
     pub page_cache_bytes: usize,
     pub page_cache_policy: PageCachePolicy,
     pub segment_io: SegmentIoPolicy,
@@ -131,6 +133,7 @@ impl Default for DatabaseOptions {
             active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
             pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
+            source_page_bytes: crate::DEFAULT_SOURCE_PAGE_BYTES,
             recovery_reserve_bytes: 16 * 1024 * 1024,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
             page_cache_policy: PageCachePolicy::default(),
@@ -155,13 +158,14 @@ impl DatabaseOptions {
                 "checkpoint entries must be in 1..=65536".into(),
             ));
         }
-        if self.projected_output_bytes == 0
+        if self.source_page_bytes == 0
+            || self.projected_output_bytes == 0
             || self.recovery_reserve_bytes == 0
             || self.active_read_views == 0
             || self.pinned_read_bytes == 0
         {
             return Err(Error::InvalidConfiguration(
-                "projected output, read retention and recovery reserve must be positive".into(),
+                "source pages, projected output, read retention and recovery reserve must be positive".into(),
             ));
         }
         self.page_cache_policy
@@ -470,9 +474,10 @@ impl Database {
             memtable: mutable_memory.empty(0),
             mutable_memory,
             segments: Vec::new(),
-            page_cache: new_page_cache_with_policy(
+            page_cache: new_page_cache_with_limits(
                 options.page_cache_bytes,
                 options.page_cache_policy,
+                options.source_page_bytes,
             )?,
             segment_io,
             segment_open_evidence: SegmentOpenEvidence::default(),
@@ -536,8 +541,11 @@ impl Database {
             root.diagnostic_path(),
         );
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
-        let page_cache =
-            new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
+        let page_cache = new_page_cache_with_limits(
+            options.page_cache_bytes,
+            options.page_cache_policy,
+            options.source_page_bytes,
+        )?;
         let mut segment_bytes = 0u64;
         for segment in &manifest.segments {
             recovery_budget.file(segment.bytes)?;
@@ -687,6 +695,10 @@ impl Database {
     /// Aggregate live stream ownership; returned batches own separate output reservations.
     pub fn read_view_ownership(&self) -> Result<(u64, u64)> {
         ActiveReadViews::ownership(&self.active_read_views)
+    }
+
+    pub fn source_page_memory(&self) -> crate::SourcePageMemory {
+        crate::segment::source_page_memory(&self.page_cache)
     }
 
     pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {

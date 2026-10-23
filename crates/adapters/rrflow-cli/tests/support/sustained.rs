@@ -209,6 +209,7 @@ async fn sample(
                 value: value
                     .retained_mutable_bytes
                     .checked_add(value.retained_projected_bytes)
+                    .and_then(|bytes| bytes.checked_add(value.retained_source_bytes))
                     .and_then(|bytes| bytes.checked_add(value.native_transaction_bytes))
                     .ok_or("retained sum overflow")?,
             },

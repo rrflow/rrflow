@@ -106,8 +106,9 @@ impl RrdEngine {
                     return Err(ServiceError::SessionNotFound);
                 }
                 let deadline = Instant::now() + Duration::from_millis(lifetime);
-                let cursor =
-                    store.inspect_storage(usize::from(batch_rows), batch_bytes as usize)?;
+                let cursor = store
+                    .inspect_storage(usize::from(batch_rows), batch_bytes as usize)
+                    .map_err(crate::engine::error::storage_read_error)?;
                 if Instant::now() >= deadline {
                     return Err(ServiceError::Contract(
                         "storage cursor lifetime elapsed during capture".into(),
@@ -143,7 +144,7 @@ impl RrdEngine {
                 }
                 if let Err(error) = entry.cursor.advance(expected_ordinal) {
                     registry.remove(&key);
-                    return Err(error.into());
+                    return Err(crate::engine::error::storage_read_error(error));
                 }
             }
             StorageCursorAction::CancelSource {} => entry.cursor.cancel_source()?,

@@ -35,7 +35,7 @@
   "candidate": {
     "clean": true,
     "commit": "1111111111111111111111111111111111111111",
-    "configuration_sha256": "013df7cdb73ab4840bc88cada4fa071e89e1dc6be400bee355163a25443e1cfb",
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
     "executable_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
     "public_catalogue_sha256": "5c9e8e6f9586649da1297e4dcd0b220e4fdbc37c930b4f38fbffd933757e1b3c",
     "tree": "2222222222222222222222222222222222222222"
@@ -59,7 +59,7 @@
     "clock": {
       "maximum_rollback_ms": 0
     },
-    "configuration_sha256": "013df7cdb73ab4840bc88cada4fa071e89e1dc6be400bee355163a25443e1cfb",
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
     "format_version": 3,
     "query": {
       "max_batch_rows": 256,
@@ -114,6 +114,7 @@
       "retained_mutable_bytes": 536870912,
       "retained_mutable_generations": 64,
       "retained_mutable_versions": 4194304,
+      "source_page_bytes": 268435456,
       "transaction_admission_bytes": 67108864,
       "transaction_admission_requests": 64,
       "transaction_admission_wait_ms": 30000,

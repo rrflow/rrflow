@@ -828,6 +828,7 @@ recovery_reserve_bytes = 16777216
 mutable_accounted_bytes = 134217728
 mutable_versions = 1048576
 projected_output_bytes = 134217728
+source_page_bytes = 268435456
 native_transactions = 64
 native_transaction_bytes = 67108864
 checkpoint_entries = 1024

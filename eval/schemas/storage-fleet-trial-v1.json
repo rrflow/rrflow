@@ -530,6 +530,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "denied_source_allocations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "fenced": {
           "type": "boolean"
         },
@@ -554,6 +559,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "peak_source_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "pinned_read_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -574,6 +584,12 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "retained_source_bytes": {
+          "description": "Owned source-page allocation charges; excludes borrowed mmap residency.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
@@ -585,6 +601,9 @@
         "pinned_read_bytes",
         "retained_mutable_bytes",
         "retained_projected_bytes",
+        "retained_source_bytes",
+        "peak_source_bytes",
+        "denied_source_allocations",
         "outstanding_requests",
         "outstanding_logical_bytes",
         "queued_requests",

@@ -49,6 +49,7 @@ final class RrdClientTest {
                                     Map.entry("mutable_accounted_bytes", 134217728),
                                     Map.entry("mutable_versions", 1048576),
                                     Map.entry("projected_output_bytes", 134217728),
+                                    Map.entry("source_page_bytes", 268435456),
                                     Map.entry("page_cache_bytes", 4194304),
                                     Map.entry("wal_flush_target_bytes", 67108864),
                                     Map.entry("memtable_flush_target_versions", 524288),
@@ -221,7 +222,7 @@ final class RrdClientTest {
                                     "request-expired", "operation-expired", null,
                                     Instant.ofEpochMilli(1), Map.of(), null, session, null)));
             assertTrue(expired.getMessage().contains("deadline has expired"));
-            assertEquals(43, OperationId.values().length);
+            assertEquals(44, OperationId.values().length);
             assertTrue(OperationId.BACKUP_CREATE.mutation());
             assertTrue(OperationId.TRANSACTION_PREVIEW.mutation());
             assertEquals(

@@ -86,6 +86,9 @@ mod tests {
     #[test]
     fn retained_evidence_rejects_changed_bytes_and_premature_release() {
         let owners = || DiagnosticStorageAdmission {
+            retained_source_bytes: 0,
+            peak_source_bytes: 0,
+            denied_source_allocations: 0,
             checkpoint_entries: 0,
             checkpoint_limit: 1024,
             native_transactions: 0,

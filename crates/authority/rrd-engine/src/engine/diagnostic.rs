@@ -858,6 +858,15 @@ fn diagnostic_storage(
                     evidence.retained_mutable_bytes,
                     "retained_mutable_bytes",
                 )?,
+                retained_source_bytes: counter(
+                    evidence.retained_source_bytes,
+                    "retained_source_bytes",
+                )?,
+                peak_source_bytes: counter(evidence.peak_source_bytes, "peak_source_bytes")?,
+                denied_source_allocations: counter(
+                    evidence.denied_source_allocations,
+                    "denied_source_allocations",
+                )?,
                 retained_projected_bytes: counter(
                     evidence.retained_projected_bytes,
                     "retained_projected_bytes",

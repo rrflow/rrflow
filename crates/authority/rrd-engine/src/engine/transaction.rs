@@ -361,6 +361,7 @@ impl RrdEngine {
                             if matches!(
                                 error,
                                 rrd_store::Error::Kernel(_)
+                                    | rrd_store::Error::SourcePageLimit { .. }
                                     | rrd_store::Error::TransactionLimit { .. }
                                     | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::MutableLimit { .. }
@@ -393,7 +394,8 @@ impl RrdEngine {
                                 )?;
                             }
                             return Err(match error {
-                                rrd_store::Error::TransactionLimit { .. } => {
+                                rrd_store::Error::TransactionLimit { .. }
+                                | rrd_store::Error::SourcePageLimit { .. } => {
                                     ServiceError::StorageAdmission(error.to_string())
                                 }
                                 other => other.into(),

@@ -10,7 +10,9 @@ const jsonResponse = (value: unknown, status = 200) =>
   });
 
 test("generated catalogue tracks all mutation boundaries", () => {
-  assert.equal(Object.keys(endpoints).length, 43);
+  assert.equal(Object.keys(endpoints).length, 44);
+  assert.equal(endpoints["diagnostics-storage-cursor"].path, "/v1/diagnostics/storage/cursor");
+  assert.equal(endpoints["diagnostics-storage-cursor"].authentication, "session_bearer");
   assert.equal(endpoints["audit-export"].path, "/v1/audit/export");
   assert.equal(endpoints["backup-create"].mutation, true);
   assert.equal(endpoints["transaction-preview"].mutation, true);
@@ -51,6 +53,7 @@ test("public negotiation retries transport loss and validates the ArkType envelo
               mutable_accounted_bytes: 134217728,
               mutable_versions: 1048576,
               projected_output_bytes: 134217728,
+              source_page_bytes: 268435456,
               page_cache_bytes: 4194304,
               wal_flush_target_bytes: 67108864,
               memtable_flush_target_versions: 524288,

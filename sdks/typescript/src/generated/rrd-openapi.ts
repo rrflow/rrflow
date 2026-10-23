@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 03639d8aff602c966b800becaa5b8442d0e912904cb50383f1ecee86ad32fb9a
+// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3437,6 +3437,8 @@ export interface operations {
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
                                         /** Format: uint64 */
+                                        source_page_bytes: number;
+                                        /** Format: uint64 */
                                         transaction_admission_bytes: number;
                                         /** Format: uint64 */
                                         transaction_admission_requests: number;
@@ -3728,6 +3730,8 @@ export interface operations {
                                         retained_mutable_generations: number;
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
                                         /** Format: uint64 */
                                         transaction_admission_bytes: number;
                                         /** Format: uint64 */
@@ -11179,6 +11183,8 @@ export interface operations {
                                         checkpoint_entries: number;
                                         /** Format: uint64 */
                                         checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
                                         native_transaction_bytes: number;
@@ -11192,6 +11198,8 @@ export interface operations {
                                          */
                                         outstanding_requests: number;
                                         /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
                                         pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         queued_requests: number;
@@ -11202,6 +11210,11 @@ export interface operations {
                                         retained_mutable_bytes: number;
                                         /** Format: uint64 */
                                         retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
                                     } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
@@ -13762,6 +13775,8 @@ export interface operations {
                                         checkpoint_entries: number;
                                         /** Format: uint64 */
                                         checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
                                         native_transaction_bytes: number;
@@ -13775,6 +13790,8 @@ export interface operations {
                                          */
                                         outstanding_requests: number;
                                         /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
                                         pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         queued_requests: number;
@@ -13785,6 +13802,11 @@ export interface operations {
                                         retained_mutable_bytes: number;
                                         /** Format: uint64 */
                                         retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
                                     } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
@@ -14321,6 +14343,8 @@ export interface operations {
                                     checkpoint_entries: number;
                                     /** Format: uint64 */
                                     checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
                                     native_transaction_bytes: number;
@@ -14334,6 +14358,8 @@ export interface operations {
                                      */
                                     outstanding_requests: number;
                                     /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
                                     pinned_read_bytes: number;
                                     /** Format: uint64 */
                                     queued_requests: number;
@@ -14344,6 +14370,11 @@ export interface operations {
                                     retained_mutable_bytes: number;
                                     /** Format: uint64 */
                                     retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
                                 } | null;
                                 /** @description How much physical evidence the instance's storage profile reports. */
                                 evidence_level: "logical_only" | "rrflow_kv_counters";
@@ -14555,6 +14586,8 @@ export interface operations {
                                     checkpoint_entries: number;
                                     /** Format: uint64 */
                                     checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
                                     native_transaction_bytes: number;
@@ -14568,6 +14601,8 @@ export interface operations {
                                      */
                                     outstanding_requests: number;
                                     /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
                                     pinned_read_bytes: number;
                                     /** Format: uint64 */
                                     queued_requests: number;
@@ -14578,6 +14613,11 @@ export interface operations {
                                     retained_mutable_bytes: number;
                                     /** Format: uint64 */
                                     retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
                                 } | null;
                                 /** @description How much physical evidence the instance's storage profile reports. */
                                 evidence_level: "logical_only" | "rrflow_kv_counters";

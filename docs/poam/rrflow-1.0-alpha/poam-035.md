@@ -369,6 +369,23 @@ reads without raising any limit. Native component tests pass; attribution of
 the retained installed Internal failure and updated installed capacity/soak
 acceptance remain open.
 
+The [source-page admission repair](../../evidence/change-journals/gate-c/c-07e-source-page-admission.md)
+closes a distinct ownership gap: cache residency excluded evicted reader-held
+pages, concurrent miss allocations and uncached decode work. A sealed source
+budget now follows live immutable owners through release, with public current,
+peak and denial gauges. Known read-only pressure stays typed; obstructed durable
+outcome resolution remains uncertain until reconciled. Component evidence does
+not replace installed pressure, full-profile or 24-hour acceptance. This row
+remains open.
+
+The [addressed vector-read repair](../../evidence/change-journals/gate-c/c-07g-addressed-vector-reads.md)
+replaces whole-family scanning for named points with existing authenticated
+identity ranges and prevents old collection addresses from reappearing after
+an identity moves. Fixed-budget temporal/reopen histories and the engine suite
+pass. The motivating Linux 1,000-record/5,000-edge/1,000-vector setup exceeded
+its frozen 30-minute deadline after 936 verified records; that failed envelope
+remains retained. Combined native rerun, full profiles and soak remain required.
+
 The first actual shared-allocation fleet campaign found an idle-neighbour
 segment that spent its whole time budget before the required verification
 probe. The [idle deadline reservation repair](../../evidence/change-journals/gate-c/c-07g-idle-segment-deadlines.md)
