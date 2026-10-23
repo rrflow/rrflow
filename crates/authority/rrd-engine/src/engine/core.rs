@@ -19,6 +19,7 @@ pub(super) fn installed_storage_options(
         })
     };
     let mut options = rrd_store::DatabaseOptions {
+        checkpoint_entries: native("checkpoint_entries", policy.checkpoint_entries)?,
         recovery_reserve_bytes: policy.recovery_reserve_bytes,
         ..rrd_store::DatabaseOptions::default()
     };

@@ -841,6 +841,7 @@ impl StorageEngine for RrflowKvStore {
         let compaction = database.compaction_policy();
         let maintenance_stats = database.maintenance_stats();
         let memtable = database.memtable().profile();
+        let (checkpoint_entries, checkpoint_limit) = database.checkpoint_ownership()?;
         let (native_transactions, native_transaction_bytes) = database.transaction_ownership()?;
         let (active_read_views, pinned_read_bytes) = database.read_view_ownership()?;
         Ok(PhysicalStoreEvidence {
@@ -849,6 +850,8 @@ impl StorageEngine for RrflowKvStore {
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),
+            checkpoint_entries: Some(checkpoint_entries),
+            checkpoint_limit: Some(checkpoint_limit),
             native_transactions: Some(native_transactions),
             native_transaction_bytes: Some(native_transaction_bytes),
             active_read_views: Some(active_read_views),
@@ -1088,6 +1091,11 @@ fn reconcile_runtime_checkpoints(
         .filter(|checkpoint| checkpoint.name.starts_with(RUNTIME_CHECKPOINT_PREFIX))
         .map(|checkpoint| checkpoint.name.clone())
         .collect::<BTreeSet<_>>();
+    // Canonical live handles decide reachability. Release only obsolete runtime
+    // pins before admitting missing pins so the quota cannot block reconciliation.
+    for name in existing.difference(&desired) {
+        database.release_checkpoint(name)?;
+    }
     let missing = desired.difference(&existing).cloned().collect::<Vec<_>>();
     if !missing.is_empty() {
         let created_at = at.max(database.manifest().created_at);
@@ -1095,9 +1103,6 @@ fn reconcile_runtime_checkpoints(
         for name in missing {
             database.checkpoint(&name, created_at)?;
         }
-    }
-    for name in existing.difference(&desired) {
-        database.release_checkpoint(name)?;
     }
     Ok(())
 }

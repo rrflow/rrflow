@@ -291,3 +291,107 @@ fn named_checkpoints_pin_historical_manifests_until_explicit_release() {
     assert!(store.checkpoints().unwrap().is_empty());
     assert!(store.checkpoint("../escape", &second.digest, 103).is_err());
 }
+
+#[test]
+fn checkpoint_admission_is_atomic_idempotent_and_reusable_after_release() {
+    use std::sync::Arc;
+    let root = tempfile::tempdir().unwrap();
+    let store = ManifestStore::open(root.path())
+        .unwrap()
+        .with_checkpoint_limits(2, rrd_lsm::ReclamationLimits::default())
+        .unwrap();
+    let manifest = Manifest::new(1, None, 100, 0, 1, vec![]).unwrap();
+    store.publish(&manifest, None).unwrap();
+    let first = store.checkpoint("first", &manifest.digest, 100).unwrap();
+    let store = Arc::new(store);
+    let outcomes = std::thread::scope(|threads| {
+        let handles = (0..8)
+            .map(|i| {
+                let store = store.clone();
+                let digest = &manifest.digest;
+                threads.spawn(move || store.checkpoint(&format!("contender-{i}"), digest, 100))
+            })
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(outcomes.iter().filter(|r| r.is_ok()).count(), 1);
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|r| matches!(
+                r,
+                Err(Error::CheckpointLimit {
+                    limit: 2,
+                    observed: 3
+                })
+            ))
+            .count(),
+        7
+    );
+    assert_eq!(store.checkpoint_ownership().unwrap(), (2, 2));
+    assert_eq!(
+        std::fs::read_dir(root.path().join("checkpoints"))
+            .unwrap()
+            .count(),
+        2
+    );
+    assert_eq!(
+        store.checkpoint("first", &manifest.digest, 100).unwrap(),
+        first
+    );
+    assert!(store.release_checkpoint("first").unwrap());
+    store
+        .checkpoint("replacement", &manifest.digest, 101)
+        .unwrap();
+    let before = store.checkpoints().unwrap();
+    drop(store);
+    let reopened = ManifestStore::open_existing(root.path())
+        .unwrap()
+        .with_checkpoint_limits(2, rrd_lsm::ReclamationLimits::default())
+        .unwrap();
+    assert_eq!(reopened.checkpoints().unwrap(), before);
+    assert!(matches!(
+        reopened.checkpoint("over", &manifest.digest, 102),
+        Err(Error::CheckpointLimit { .. })
+    ));
+}
+
+#[test]
+fn checkpoint_inventory_and_metadata_are_bounded_without_deleting_pins() {
+    let root = tempfile::tempdir().unwrap();
+    let store = ManifestStore::open(root.path())
+        .unwrap()
+        .with_checkpoint_limits(
+            1,
+            rrd_lsm::ReclamationLimits {
+                metadata_bytes: 1024,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let manifest = Manifest::new(1, None, 100, 0, 1, vec![]).unwrap();
+    store.publish(&manifest, None).unwrap();
+    store.checkpoint("kept", &manifest.digest, 100).unwrap();
+    let checkpoint = root.path().join("checkpoints/kept.json");
+    let original = std::fs::read(&checkpoint).unwrap();
+    let excess = root.path().join("checkpoints/.interrupted.tmp");
+    std::fs::write(&excess, b"retained interrupted publication").unwrap();
+    assert!(matches!(
+        store.checkpoints(),
+        Err(Error::CheckpointLimit { .. })
+    ));
+    assert_eq!(std::fs::read(&checkpoint).unwrap(), original);
+    std::fs::remove_file(&excess).unwrap();
+    std::fs::write(&checkpoint, vec![b' '; 1025]).unwrap();
+    assert!(matches!(
+        store.checkpoints(),
+        Err(Error::ReclamationLimit {
+            resource: rrd_lsm::ReclamationResource::MetadataBytes,
+            ..
+        })
+    ));
+    assert_eq!(std::fs::metadata(&checkpoint).unwrap().len(), 1025);
+}

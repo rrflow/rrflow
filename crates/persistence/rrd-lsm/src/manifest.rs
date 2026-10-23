@@ -6,6 +6,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
+
+pub const DEFAULT_CHECKPOINT_ENTRIES: usize = 1024;
 
 pub const MANIFEST_FORMAT_VERSION: u16 = 3;
 const MANIFEST_CONTROL_FORMAT_VERSION: u16 = 1;
@@ -412,6 +415,9 @@ pub struct ManifestStore {
     root: AnchoredPath,
     _lock: File,
     publication_uncertain: AtomicBool,
+    checkpoint_entries: usize,
+    checkpoint_budget: crate::ReclamationLimits,
+    checkpoint_gate: Mutex<()>,
 }
 
 impl Drop for ManifestStore {
@@ -551,6 +557,9 @@ impl ManifestStore {
             root: root.to_owned(),
             _lock: lock,
             publication_uncertain: AtomicBool::new(false),
+            checkpoint_entries: DEFAULT_CHECKPOINT_ENTRIES,
+            checkpoint_budget: crate::ReclamationLimits::default(),
+            checkpoint_gate: Mutex::new(()),
         };
         if !create_new {
             // Reopen may observe an earlier rename/unlink whose barrier failed.
@@ -699,20 +708,74 @@ impl ManifestStore {
         Ok(pointer)
     }
 
+    /// Restart-only ceiling shared by checkpoint creation, listing and release.
+    /// Count every directory entry, including interrupted temporary publications.
+    pub fn with_checkpoint_limits(
+        mut self,
+        entries: usize,
+        metadata: crate::ReclamationLimits,
+    ) -> Result<Self> {
+        if entries == 0 || entries > 65_536 {
+            return Err(Error::InvalidConfiguration(
+                "checkpoint entries must be in 1..=65536".into(),
+            ));
+        }
+        metadata.validate()?;
+        self.checkpoint_entries = entries;
+        self.checkpoint_budget = metadata;
+        Ok(self)
+    }
+
+    fn checkpoint_entry_count(
+        &self,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<usize> {
+        let mut count = 0usize;
+        for entry in self.root.join(CHECKPOINT_DIRECTORY).entries()? {
+            budget.entry()?;
+            entry?;
+            count += 1;
+            if count > self.checkpoint_entries {
+                return Err(Error::CheckpointLimit {
+                    limit: self.checkpoint_entries,
+                    observed: count,
+                });
+            }
+        }
+        Ok(count)
+    }
+
+    pub fn checkpoint_ownership(&self) -> Result<(u64, u64)> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.checkpoint_budget);
+        Ok((
+            self.checkpoint_entry_count(&mut budget)? as u64,
+            self.checkpoint_entries as u64,
+        ))
+    }
+
     pub fn checkpoint(
         &self,
         name: &str,
         manifest_digest: &str,
         created_at: u64,
     ) -> Result<Checkpoint> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
         self.ensure_publication_ready()?;
-        let manifest = self.load(manifest_digest)?;
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.checkpoint_budget);
+        let manifest = self.load_bounded(manifest_digest, &mut budget)?;
         let checkpoint = Checkpoint::new(name, &manifest, created_at)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let path = directory.join(format!("{name}.json"));
         let bytes = serde_json::to_vec(&checkpoint)?;
         if path.try_exists()? {
-            let existing: Checkpoint = serde_json::from_slice(&path.read()?)?;
+            let existing: Checkpoint = serde_json::from_slice(&budget.read_metadata(&path)?)?;
             existing.validate()?;
             if existing == checkpoint {
                 self.publication_result(directory.sync_directory().map_err(Error::Io))?;
@@ -721,6 +784,13 @@ impl ManifestStore {
             return Err(Error::InvalidManifest(format!(
                 "checkpoint {name:?} already pins another manifest or instant"
             )));
+        }
+        let count = self.checkpoint_entry_count(&mut budget)?;
+        if count >= self.checkpoint_entries {
+            return Err(Error::CheckpointLimit {
+                limit: self.checkpoint_entries,
+                observed: count + 1,
+            });
         }
         let temporary = directory.join(format!(
             ".{name}.{}.tmp",
@@ -731,26 +801,35 @@ impl ManifestStore {
     }
 
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {
-        self.checkpoints_inner(None)
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.checkpoint_budget);
+        self.checkpoints_inner(&mut budget)
     }
 
     pub(crate) fn checkpoints_bounded(
         &self,
         budget: &mut crate::reclamation::ReclamationBudget,
     ) -> Result<Vec<Checkpoint>> {
-        self.checkpoints_inner(Some(budget))
+        self.checkpoints_inner(budget)
     }
 
     fn checkpoints_inner(
         &self,
-        mut budget: Option<&mut crate::reclamation::ReclamationBudget>,
+        budget: &mut crate::reclamation::ReclamationBudget,
     ) -> Result<Vec<Checkpoint>> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let mut checkpoints = Vec::new();
         let mut entries = Vec::new();
         for entry in directory.entries()? {
-            if let Some(budget) = budget.as_deref_mut() {
-                budget.entry()?;
+            budget.entry()?;
+            if entries.len() >= self.checkpoint_entries {
+                return Err(Error::CheckpointLimit {
+                    limit: self.checkpoint_entries,
+                    observed: entries.len() + 1,
+                });
             }
             entries.push(entry?);
         }
@@ -764,16 +843,10 @@ impl ManifestStore {
             {
                 continue;
             }
-            let bytes = match budget.as_deref_mut() {
-                Some(budget) => budget.read_metadata(&entry)?,
-                None => entry.read()?,
-            };
+            let bytes = budget.read_metadata(&entry)?;
             let checkpoint: Checkpoint = serde_json::from_slice(&bytes)?;
             checkpoint.validate()?;
-            let manifest = match budget.as_deref_mut() {
-                Some(budget) => self.load_bounded(&checkpoint.manifest, budget)?,
-                None => self.load(&checkpoint.manifest)?,
-            };
+            let manifest = self.load_bounded(&checkpoint.manifest, budget)?;
             if manifest.generation != checkpoint.generation {
                 return Err(Error::InvalidManifest(format!(
                     "checkpoint {:?} generation differs from its manifest",
@@ -787,6 +860,10 @@ impl ManifestStore {
     }
 
     pub fn release_checkpoint(&self, name: &str) -> Result<bool> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
         self.ensure_publication_ready()?;
         validate_checkpoint_name(name)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);

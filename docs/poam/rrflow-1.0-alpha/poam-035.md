@@ -276,3 +276,11 @@ could outlive failed outer native-allocation cleanup. C-07h now requires a
 separately bound launcher outcome/cleanup receipt and matches its allocation
 against all raw samples. Missing or failed cleanup remains unqualified; the
 native capacity/soak acceptance gap stays open.
+
+
+Checkpoint creation and ordinary inventory lacked a native count/metadata cap.
+The [checkpoint admission candidate](../../evidence/change-journals/gate-c/c-07d-checkpoint-admission.md)
+adds serialized sealed admission, typed denial, real ownership observations and
+post-burst drain enforcement. Focused native snapshot/concurrency tests pass;
+exact candidate CI and the complete profile/24-hour matrix remain pending.
+No retained checkpoint is evicted to satisfy the limit.

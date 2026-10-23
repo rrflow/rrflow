@@ -177,3 +177,20 @@ fn strict_contract_rejects_unknown_and_legacy_scalar_fields() {
     });
     assert!(serde_json::from_value::<InstalledEstateIdentity>(identity).is_err());
 }
+
+#[test]
+fn checkpoint_quota_is_finite_restart_configuration_and_digest_bound() {
+    for entries in [0, 65_537, u64::MAX] {
+        let mut config = input();
+        config.storage.checkpoint_entries = entries;
+        assert!(EstateConfiguration::from_input(1, config).is_err());
+    }
+    let baseline = EstateConfiguration::from_input(1, input()).unwrap();
+    let mut changed = input();
+    changed.storage.checkpoint_entries = 7;
+    let changed = EstateConfiguration::from_input(1, changed).unwrap();
+    assert_ne!(baseline.configuration_sha256, changed.configuration_sha256);
+    let mut tampered = baseline;
+    tampered.storage.checkpoint_entries = 7;
+    assert!(tampered.validate().is_err());
+}

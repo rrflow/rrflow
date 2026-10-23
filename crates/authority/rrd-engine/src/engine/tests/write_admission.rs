@@ -4,6 +4,7 @@ use rrd_store::RrflowKvStore;
 #[test]
 fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     let policy = rrd_contract::StorageLimits {
+        checkpoint_entries: 7,
         recovery_reserve_bytes: 32 * 1024 * 1024,
         native_transactions: 5,
         native_transaction_bytes: 16384,
@@ -17,6 +18,12 @@ fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     assert_eq!(native.transaction_limits.buffered_bytes, 16384);
     assert_eq!(native.active_read_views, 7);
     assert_eq!(native.pinned_read_bytes, 8192);
+    assert_eq!(native.checkpoint_entries, 7);
+    let checkpoint = ServiceError::from(rrd_store::Error::CheckpointLimit {
+        limit: 7,
+        observed: 8,
+    });
+    assert!(matches!(checkpoint, ServiceError::StorageAdmission(_)));
     let error = rrd_store::Error::DiskAdmission {
         available: 100,
         required: 200,

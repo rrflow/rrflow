@@ -671,6 +671,16 @@
           "minimum": 0,
           "type": "integer"
         },
+        "checkpoint_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "fenced": {
           "type": "boolean"
         },
@@ -718,6 +728,8 @@
         }
       },
       "required": [
+        "checkpoint_entries",
+        "checkpoint_limit",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",
@@ -1275,6 +1287,12 @@
           "minimum": 0,
           "type": "integer"
         },
+        "checkpoint_entries": {
+          "description": "Named checkpoint-directory entry ceiling; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "compaction_elapsed_ms": {
           "format": "uint64",
           "minimum": 0,
@@ -1444,6 +1462,7 @@
         }
       },
       "required": [
+        "checkpoint_entries",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",
