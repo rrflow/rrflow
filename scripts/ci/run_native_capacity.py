@@ -123,7 +123,7 @@ def volume(fixture: Path, size: int):
             # Format only the new bounded regular image. mount's loop owner
             # uses autoclear, so namespace teardown cannot leave an attached
             # persistent loop device if the controller is forcibly terminated.
-            run("mkfs.ext4", "-q", "-F", "-m", "0", str(image), timeout=60)
+            run("mkfs.ext4", "-q", "-F", "-m", "0", "-N", "4096", str(image), timeout=60)
             run("mount", "-t", "ext4", "-o", "loop,nodev,nosuid", str(image), str(root))
             attached = True
             info = json.loads(run("findmnt", "--json", "--mountpoint", str(root), "--output", "SOURCE,FSTYPE,TARGET").stdout)["filesystems"]
@@ -132,7 +132,9 @@ def volume(fixture: Path, size: int):
             device = info[0]["source"]
             require(device.startswith("/dev/loop") and device.removeprefix("/dev/loop").isdigit(), "invalid owned loop identity")
             loop_binding(device, image)
-            identity = {"device": device, "image": str(image), "mount": info[0]}
+            inode_count = os.statvfs(root).f_files
+            require(0 < inode_count <= 8192, "owned ext4 inode count exceeds bounded filler")
+            identity = {"device": device, "image": str(image), "mount": info[0], "inodes": inode_count}
         elif sys.platform == "darwin":
             native_command("hdiutil", "create", "-size", f"{size}m", "-fs", "APFS", "-type", "UDIF",
                 "-volname", "RRFlowCapacity", str(image), timeout=120)
