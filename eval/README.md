@@ -67,11 +67,9 @@ that implementation. Native RSS and disk measurements remain C-07g work.
 
 Limits are positive JSON-exact integers. Inputs/outputs are limited to 8 MiB,
 required cases/bindings to 256, and attempts to 10,000 across a run. This is
-the early bounded fault/history contract. J-04's arrival schedules, full
-operation mix, histogram/resource-series collector and sustained workload
-driver remain future work. No large-run result may be silently truncated to
-fit this format; its later bounded artifact/shard contract needs explicit
-versioned implementation and acceptance.
+the per-segment fault/history contract. Sustained campaigns compose bounded
+segments under an explicit total artifact quota; no large run is truncated
+to fit a single document. J-04's full product workload remains a separate gate.
 
 ## Commands and fixture maintenance
 
@@ -112,7 +110,95 @@ schema, fixture and protocol-version consequences before committing changes.
 
 After an intentional installed-configuration or evaluation-contract change,
 `cargo run --locked -p rrflow-eval --example refresh_storage_contract` regenerates
-the three storage schemas and existing synthetic manifest/result/report fixtures
+the storage and sustained campaign schemas and existing synthetic manifest/result/report fixtures
 with canonical Rust serializers and digests. It preserves the independent
 ledger inputs, refuses a non-synthetic manifest, and does not execute a native
 workload. Review the diff; refreshed synthetic data is never acceptance evidence.
+
+
+## Installed sustained campaigns
+
+Each campaign also freezes `drain`: `maximum_mutable_growth_bytes`,
+`maximum_projected_growth_bytes`, `maximum_debt_segments`, and `stable_samples`
+(2 through 64). Growth is compared with the first pre-load warmup observation;
+the final consecutive drain samples must meet those thresholds with zero
+outstanding requests, queued requests and admitted bytes, and no active or
+fenced writer. Missing ownership gauges fail this check. The driver checks
+drain before soak; completion and offline verification repeat it. Current
+maintenance is synchronous: a failed debt threshold is retained as a failed
+operating point, without silently forcing extra maintenance or relaxing policy.
+
+The `storage campaign` contract freezes candidate identity, sealed engine
+configuration, allocation, corpus, load schedule, operating points, thresholds
+and finite evidence limits. The installed driver seeds and independently reads
+all requested records, relationships and vectors before offered load. Immutable
+seed data serves point/range reads. Mixed writes reuse at most
+`evidence.segment_attempts` mutable slots and cycle through insert, update,
+atomic retirement and recreation. Transaction identities remain unique;
+canonical version history can still grow even though live key count is bounded.
+The required `read_distribution` is frozen in each campaign: `{"kind":"uniform"}`,
+`{"kind":"hot_key","ordinal":0}`, or
+`{"kind":"hot_set","keys":64,"traffic_basis_points":2500}`. The hot-set
+fraction selects its first `keys` records; the remainder selects the disjoint
+cold region. Keys and fractions must fit the declared corpus. Seeded selection
+is reproducible, and changing it changes campaign/request identity. This
+configures point-read keys and bounded-range starting keys; write-slot
+generation and finite live key count keep their separate contract.
+After load the driver kills/reopens the engine and independently reads seed
+and final slot state before any retry.
+
+```text
+cargo run --locked -p rrflow-eval -- storage campaign profiles
+cargo run --locked -p rrflow-eval -- storage schema campaign
+cargo run --locked -p rrflow-eval -- storage schema progress-event
+cargo run --locked -p rrflow-eval -- storage campaign validate path/to/campaign.json
+python scripts/ci/run_sustained_capacity.py --campaign path/to/campaign.json --configuration path/to/configuration.toml --evidence path/to/new-evidence
+cargo run --locked -p rrflow-eval -- storage campaign verify path/to/new-evidence
+```
+
+Launching is an explicit resource-consuming operation on a clean frozen
+candidate using the ordinary release binary and harness. Linux additionally requires `--cgroup-parent` naming an already
+delegated cgroup; Windows uses an owned Job Object. The driver verifies live
+native limits and process membership rather than trusting environment labels.
+No privileged host setup is implicit. The current runner rejects full
+qualification, reader-pin lanes and multi-estate allocation until
+those facilities exist. macOS constrained-capacity launch is unavailable.
+Characterization results cannot close the profile or 24-hour requirement.
+
+The Linux cold lane stops the owned engine, synchronizes and advises eviction
+only for regular files inside its installed native root, and checks actual
+page residency through bounded, untouched mappings. Nonzero residency fails
+the lane. File inventory, size, memory and elapsed time have frozen bounds;
+per-file observations and the restart/readback receipt remain in the evidence.
+This measures cold startup plus the first independent read, since startup can
+warm pages. It does not assert that later queries are cold. No host-wide cache
+setting changes. The lane is unavailable on other operating systems.
+
+`progress.jsonl` retains typed intents, outcomes, samples and readback with
+bounded record encoding and periodic durable checkpoints. Final reports bind
+its exact bytes, count and digest. A crash may leave observations after the last
+checkpoint uncertain; absent final reports and partial records are incomplete
+evidence. Offline verification streams artifacts and rejects altered, missing
+or truncated files. Reserve enough evidence disk for both successful and
+failed runs. An evidence quota failure is a failed operating point, not a
+reason to omit samples or increase the frozen limit mid-run.
+
+Capacity qualification binds the exact current J-04 projection digest, fixed
+CPU/memory/estate allocation, minimum corpus, vector dimensions and declared
+load coordinates. `campaign profiles` exposes the bundled projection without
+running a workload. `scripts/knowledge/render_capacity_profiles.py` derives it
+from the owning workload table; CI rejects drift. A qualifying operating point
+is not proof of the entire load sweep. Reduced characterization remains
+explicitly unqualified. Fleet qualification is refused until quiet/equal/abusive
+per-estate interference can be represented and observed.
+
+Installed read retention has per-open active-view and pinned-byte ceilings.
+Requests can lower these limits but cannot raise them. Storage observations
+report actual physical views separately from retained output-buffer bytes;
+campaign drain checks require both view and pin counts to return to baseline.
+
+Native transactions separately enforce an aggregate owner count and owned-buffer
+reservation. These restart-only installed ceilings are visible in configuration;
+actual counts/bytes are observed in storage diagnostics and must drain to
+baseline. The reservation charges vector capacities and explicit record/handoff
+representations; allocator metadata and caller input are not process-RSS proof.

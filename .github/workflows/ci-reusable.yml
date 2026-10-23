@@ -252,6 +252,8 @@ jobs:
         run: |
           python3 scripts/ci/test_execution_inventory.py
           python3 scripts/ci/build_execution_inventory.py --check
+          python3 scripts/knowledge/render_capacity_profiles.py --check
+          python3 scripts/knowledge/test_capacity_profiles.py
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership
@@ -494,11 +496,18 @@ jobs:
           cache-on-failure: false
       - name: Build ordinary primary and fixed reopen corpus
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
+      - name: Exercise installed capacity workload and backup readback
+        timeout-minutes: 10
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
+      - name: Require fresh and existing installed damage denial
+        timeout-minutes: 10
+        run: >-
+          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2
       - name: Require fresh and existing 100-cycle histories
         timeout-minutes: 65
         env:
           RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2
       - name: Require both complete ordinary-primary receipts
         shell: bash
         env:

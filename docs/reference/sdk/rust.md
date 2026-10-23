@@ -42,9 +42,9 @@ merely compare JSON shapes.
 
 ## Audited current surface
 
-The executable `endpoint_catalogue()` contains 42 HTTP operations and one
+The executable `endpoint_catalogue()` contains 43 HTTP operations and one
 generic authenticated `/v1/ws` descriptor. `RrdClient` currently supplies
-typed HTTP methods for 37 of those 42 operations, while `RrdWebSocket`
+typed HTTP methods for 38 of those 43 operations, while `RrdWebSocket`
 implements the bounded B-04 multiplexed protocol. The current boundary is:
 
 | Family | Catalogued HTTP operations | Rust methods now | Missing now |
@@ -62,11 +62,11 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Backup and restore | 3 | 3 | none |
 | Estate | 1 | 1 | none |
 | Audit | 2 | 2 | none |
-| Diagnostics | 1 | 1 | none |
+| Diagnostics | 2 | 2 | none |
 | Prompt flights | 3 | 3 | none |
 | Tasks | 4 | 4 | none |
 | Context | 1 | 1 | none |
-| **Total** | **42** | **37** | **5** |
+| **Total** | **43** | **38** | **5** |
 
 The WebSocket method authenticates one generic connection, validates the
 server's opening identity and negotiated limits, and carries request,
@@ -349,7 +349,7 @@ The gates then close behavior in dependency order:
 2. **B-04 (implemented):** the dedicated socket is absent; one bounded
    multiplexed protocol and Rust carriage now own request/cancel/subscription
    correlation, exact resume state, and adversarial frame rejection.
-3. **H-04:** bind all 42 operations from the catalogue, validate every request
+3. **H-04:** bind all 43 operations from the catalogue, validate every request
    and response, and compare Rust with every supported surface against one
    real `RrdEngine` corpus.
 4. **H-07:** add endpoint resolution/rotation as an outward adapter while

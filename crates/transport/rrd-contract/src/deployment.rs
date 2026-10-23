@@ -230,12 +230,19 @@ impl RecallLimits {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StorageLimits {
+    /// Native transaction owner count and logical buffer capacity; restart required.
+    pub native_transactions: u64,
+    pub native_transaction_bytes: u64,
+    /// Aggregate live physical read owners and charged pinned bytes; restart required.
+    pub active_read_views: u64,
+    pub pinned_read_bytes: u64,
     /// Bytes to keep available beyond each native WAL/immutable allocation.
     /// Requires restart; racy admission cannot replace actual I/O error handling.
     pub recovery_reserve_bytes: u64,
     pub mutable_accounted_bytes: u64,
     pub mutable_versions: u64,
     pub projected_output_bytes: u64,
+    pub source_page_bytes: u64,
     pub page_cache_bytes: u64,
     pub wal_flush_target_bytes: u64,
     pub memtable_flush_target_versions: u64,
@@ -267,10 +274,15 @@ pub struct StorageLimits {
 impl Default for StorageLimits {
     fn default() -> Self {
         Self {
+            native_transactions: 64,
+            native_transaction_bytes: 64 * 1024 * 1024,
+            active_read_views: 1024,
+            pinned_read_bytes: 4 * 1024 * 1024 * 1024,
             mutable_accounted_bytes: 128 * 1024 * 1024,
             recovery_reserve_bytes: 16 * 1024 * 1024,
             mutable_versions: 1_048_576,
             projected_output_bytes: 128 * 1024 * 1024,
+            source_page_bytes: 256 * 1024 * 1024,
             page_cache_bytes: 4 * 1024 * 1024,
             wal_flush_target_bytes: 64 * 1024 * 1024,
             memtable_flush_target_versions: 524_288,
@@ -307,7 +319,24 @@ impl StorageLimits {
         // the native adapter additionally checks host-size conversion.
         const MAX_BYTES: u64 = 1 << 40;
         const MAX_VERSIONS: u64 = 1 << 32;
+        validate_nonzero_max(
+            "storage native_transactions",
+            self.native_transactions,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage native_transaction_bytes",
+            self.native_transaction_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max("storage active_read_views", self.active_read_views, 65_536)?;
+        validate_nonzero_max(
+            "storage pinned_read_bytes",
+            self.pinned_read_bytes,
+            MAX_BYTES,
+        )?;
         for (name, value) in [
+            ("storage source_page_bytes", self.source_page_bytes),
             (
                 "storage recovery_reserve_bytes",
                 self.recovery_reserve_bytes,

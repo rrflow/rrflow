@@ -36,6 +36,11 @@ impl RrdEngine {
         if !matches!(request.scope.as_str(), "claims" | "data") {
             return Err(ServiceError::WrongScope);
         }
+        let _transaction_guard = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         let (bytes, mut state) = self.load_authenticated(session_id, token)?;
         self.authorize_session_policy(&state, SecurityAction::TransactionBegin, now)?;
         let operation_sha256 = match intent_sha256 {
@@ -356,6 +361,8 @@ impl RrdEngine {
                             if matches!(
                                 error,
                                 rrd_store::Error::Kernel(_)
+                                    | rrd_store::Error::SourcePageLimit { .. }
+                                    | rrd_store::Error::TransactionLimit { .. }
                                     | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::MutableLimit { .. }
                                     | rrd_store::Error::MaintenanceLimit { .. }
@@ -385,7 +392,13 @@ impl RrdEngine {
                                     operation_id,
                                 )?;
                             }
-                            return Err(error.into());
+                            return Err(match error {
+                                rrd_store::Error::TransactionLimit { .. }
+                                | rrd_store::Error::SourcePageLimit { .. } => {
+                                    ServiceError::StorageAdmission(error.to_string())
+                                }
+                                other => other.into(),
+                            });
                         }
                     },
                 }
@@ -440,6 +453,11 @@ impl RrdEngine {
         let idempotency_key = context.idempotency_key.as_ref().ok_or_else(|| {
             ServiceError::Contract("transaction abort requires idempotency".into())
         })?;
+        let _transaction_guard = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         let (bytes, mut state) = self.authorize(
             session_id,
             token,
@@ -519,6 +537,11 @@ impl RrdEngine {
         request
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        let _transaction_guard = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         let (bytes, mut state) = self.authorize(
             session_id,
             token,

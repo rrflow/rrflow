@@ -57,6 +57,7 @@ http_dispatch_catalogue! {
     ContextAssemble => ("context-assemble", RrdOperation::MemoryContextRead),
     DataSchemaRead => ("data-schema-read", RrdOperation::DiagnosticsRead),
     DiagnosticsRead => ("diagnostics-read", RrdOperation::DiagnosticsRead),
+    DiagnosticsStorageRead => ("diagnostics-storage-read", RrdOperation::DiagnosticsRead),
     FlightLaunch => ("flight-launch", RrdOperation::FlightLaunch),
     FlightList => ("flight-list", RrdOperation::FlightRead),
     FlightRead => ("flight-read", RrdOperation::FlightRead),
@@ -228,6 +229,9 @@ impl AppState {
             Some(HttpDispatch::SubscriptionClose) => self.close_subscription(&headers, &body, now),
             Some(HttpDispatch::DiagnosticsRead) => {
                 self.read_diagnostic_snapshot(&headers, &body, now)
+            }
+            Some(HttpDispatch::DiagnosticsStorageRead) => {
+                self.read_storage_diagnostics(&headers, &body, now)
             }
             Some(HttpDispatch::FlightLaunch) => self.launch_prompt_flight(&headers, &body, now),
             Some(HttpDispatch::FlightList) => self.list_prompt_flights(&headers, &body, now),

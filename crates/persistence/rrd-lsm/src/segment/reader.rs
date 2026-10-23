@@ -364,6 +364,13 @@ struct ActiveManifest {
 }
 
 impl ActiveReadViews {
+    pub(crate) fn ownership(registry: &Arc<Mutex<Self>>) -> Result<(u64, u64)> {
+        let views = registry
+            .lock()
+            .map_err(|_| Error::PoisonedReadViewRegistry)?;
+        Ok((views.active as u64, views.pinned_bytes))
+    }
+
     pub(crate) fn acquire(
         registry: &Arc<Mutex<Self>>,
         manifest: Manifest,

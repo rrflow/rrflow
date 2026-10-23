@@ -29,6 +29,7 @@ mod projection;
 mod repository;
 mod rrflow_kv;
 mod s3;
+mod snapshot;
 mod transaction;
 mod writer;
 
@@ -95,6 +96,7 @@ pub use rrd_lsm::filesystem;
 pub use rrd_lsm::{
     publish_rename as publish_durable_rename, sync_directory as sync_directory_metadata,
     DatabaseOptions, MutableLimits, MutableResource, TailRepairPlan, TailRepairReceipt,
+    TransactionLimits, TransactionResource,
 };
 pub use rrflow_kv::{
     create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,

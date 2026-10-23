@@ -25,8 +25,14 @@ pub(super) fn installed_storage_options(
     options.mutable_limits.accounted_bytes =
         native("mutable_accounted_bytes", policy.mutable_accounted_bytes)?;
     options.mutable_limits.versions = native("mutable_versions", policy.mutable_versions)?;
+    options.transaction_limits.active = native("native_transactions", policy.native_transactions)?;
+    options.transaction_limits.buffered_bytes =
+        native("native_transaction_bytes", policy.native_transaction_bytes)?;
+    options.active_read_views = native("active_read_views", policy.active_read_views)?;
+    options.pinned_read_bytes = policy.pinned_read_bytes;
     options.projected_output_bytes =
         native("projected_output_bytes", policy.projected_output_bytes)?;
+    options.source_page_bytes = native("source_page_bytes", policy.source_page_bytes)?;
     options.page_cache_bytes = native("page_cache_bytes", policy.page_cache_bytes)?;
     options.maintenance.wal_payload_max_bytes =
         native("wal_flush_target_bytes", policy.wal_flush_target_bytes)?;

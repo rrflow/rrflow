@@ -444,6 +444,22 @@ fn generated_schemas_and_synthetic_receipts_match_goldens() {
         &schema_root.join("storage-report-v1.json"),
         &schema::<ValidationReport>(),
     );
+    golden(
+        &schema_root.join("storage-campaign-v1.json"),
+        &schema::<StorageCampaign>(),
+    );
+    golden(
+        &schema_root.join("storage-segment-v1.json"),
+        &schema::<SustainedSegment>(),
+    );
+    golden(
+        &schema_root.join("storage-campaign-result-v1.json"),
+        &schema::<CampaignResult>(),
+    );
+    golden(
+        &schema_root.join("storage-progress-event-v1.json"),
+        &schema::<ProgressEvent>(),
+    );
     let (manifest, result) = fixtures();
     let fixture_root = root.join("tests/fixtures/storage");
     golden(

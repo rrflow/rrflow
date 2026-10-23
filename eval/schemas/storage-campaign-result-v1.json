@@ -1,0 +1,501 @@
+{
+  "$defs": {
+    "CampaignStatus": {
+      "enum": [
+        "completed",
+        "failed",
+        "interrupted",
+        "not_run"
+      ],
+      "type": "string"
+    },
+    "CapacityLane": {
+      "enum": [
+        "cold",
+        "warm",
+        "backup_under_write",
+        "reader_pin_interference",
+        "forced_reopens"
+      ],
+      "type": "string"
+    },
+    "CorpusEvidence": {
+      "additionalProperties": false,
+      "description": "Streaming corpus receipts bind generated input, acknowledged writes and a\nsecond complete readback pass without retaining the corpus in driver memory.",
+      "properties": {
+        "acknowledgement_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "anchor_records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "edges": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "encoded_mutation_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "logical_source_bytes": {
+          "description": "UTF-8 source payload only; vectors and protocol encoding are additional.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "records": {
+          "description": "Project documents; the separately counted graph anchor is not workload data.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vector_dimensions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vectors": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verified_records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "records",
+        "anchor_records",
+        "edges",
+        "vectors",
+        "vector_dimensions",
+        "logical_source_bytes",
+        "encoded_mutation_bytes",
+        "verified_records",
+        "started_ns",
+        "finished_ns",
+        "input_sha256",
+        "acknowledgement_sha256",
+        "readback_sha256"
+      ],
+      "type": "object"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "DrainOwnership": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "active_read_views": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "debt_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fenced": {
+          "type": "boolean"
+        },
+        "mutable_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projected_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "queued_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "native_transactions",
+        "native_transaction_bytes",
+        "active_read_views",
+        "pinned_read_bytes",
+        "mutable_bytes",
+        "projected_bytes",
+        "debt_segments",
+        "outstanding_requests",
+        "outstanding_bytes",
+        "queued_requests",
+        "active",
+        "fenced"
+      ],
+      "type": "object"
+    },
+    "DrainSample": {
+      "additionalProperties": false,
+      "properties": {
+        "elapsed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ownership": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DrainOwnership"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Missing native admission/counters are retained, never converted to zero."
+        }
+      },
+      "required": [
+        "elapsed_ns"
+      ],
+      "type": "object"
+    },
+    "FailedSegment": {
+      "additionalProperties": false,
+      "description": "The first rejected operating point remains independently inspectable. This\nreference is not an accepted segment and cannot contribute passing totals.",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "sha256",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "Id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+      "type": "string"
+    },
+    "LoadPhase": {
+      "enum": [
+        "warmup",
+        "measured",
+        "burst",
+        "drain",
+        "soak"
+      ],
+      "type": "string"
+    },
+    "OperatingPointResult": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged_transitions": {
+          "items": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "attempts": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "corpus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CorpusEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "drain_tail": {
+          "items": {
+            "$ref": "#/$defs/DrainSample"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "elapsed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failures": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "first_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "forced_reopens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lanes": {
+          "items": {
+            "$ref": "#/$defs/CapacityLane"
+          },
+          "type": "array"
+        },
+        "latency_over_budget": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximum_resident_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximum_scheduled_latency_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "missing_metrics": {
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        },
+        "next_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ownership_baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DrainSample"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phase": {
+          "$ref": "#/$defs/LoadPhase"
+        },
+        "point": {
+          "$ref": "#/$defs/Id"
+        },
+        "schedule_origin_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unresolved": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "point",
+        "seed",
+        "phase",
+        "elapsed_ns",
+        "started_ns",
+        "finished_ns",
+        "attempts",
+        "acknowledged_transitions",
+        "first_sequence",
+        "next_sequence",
+        "failures",
+        "unresolved",
+        "latency_over_budget",
+        "maximum_scheduled_latency_ns",
+        "maximum_resident_bytes",
+        "missing_metrics",
+        "lanes",
+        "forced_reopens",
+        "drain_tail"
+      ],
+      "type": "object"
+    },
+    "ProgressReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "bytes",
+        "records",
+        "sha256"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_bytes": {
+      "description": "Campaign and segment bytes, excluding this self-describing result file.\nThe total evidence quota still includes the result's encoded bytes.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "campaign_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "failed_segment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FailedSegment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "last_segment_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "limitations": {
+      "items": {
+        "$ref": "#/$defs/Id"
+      },
+      "type": "array"
+    },
+    "operating_points": {
+      "items": {
+        "$ref": "#/$defs/OperatingPointResult"
+      },
+      "type": "array"
+    },
+    "progress": {
+      "$ref": "#/$defs/ProgressReceipt"
+    },
+    "qualification_passed": {
+      "type": "boolean"
+    },
+    "segments": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/CampaignStatus"
+    }
+  },
+  "required": [
+    "format_version",
+    "campaign_sha256",
+    "status",
+    "segments",
+    "artifact_bytes",
+    "progress",
+    "operating_points",
+    "limitations",
+    "qualification_passed"
+  ],
+  "title": "CampaignResult",
+  "type": "object"
+}
