@@ -741,3 +741,11 @@ continued and published merge 03e83faf with inventory conflict markers. No CI
 acceptance is claimed for that revision. Regenerated the mechanical inventory
 after resolving the index, checked documentation and whitespace, and published
 a normal corrective commit without rewriting history.
+
+### Candidate inventory ordering correction
+
+Candidate f8d204d8 verify job 120264174581 rejected inventory drift: the prior
+journal amendment followed inventory generation. Regenerated after the final
+journal content, and checked again before commit. This is a publication-order
+error; no engine or acceptance threshold changed. New exact-candidate CI is
+required.
