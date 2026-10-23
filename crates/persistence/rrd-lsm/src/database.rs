@@ -98,6 +98,12 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Maximum named checkpoint-directory entries, including interrupted temporary files.
+    pub checkpoint_entries: usize,
+    pub transaction_limits: crate::TransactionLimits,
+    /// Per-open aggregate ownership ceilings, independent of caller budgets.
+    pub active_read_views: usize,
+    pub pinned_read_bytes: u64,
     /// Available native bytes retained beyond each proposed WAL/immutable
     /// allocation. This is admission, not reserved disk space or a total quota.
     pub recovery_reserve_bytes: u64,
@@ -120,6 +126,10 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            checkpoint_entries: crate::manifest::DEFAULT_CHECKPOINT_ENTRIES,
+            transaction_limits: crate::TransactionLimits::default(),
+            active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
+            pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
             recovery_reserve_bytes: 16 * 1024 * 1024,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
@@ -140,9 +150,18 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     pub(crate) fn validate(self) -> Result<Self> {
-        if self.projected_output_bytes == 0 || self.recovery_reserve_bytes == 0 {
+        if self.checkpoint_entries == 0 || self.checkpoint_entries > 65_536 {
             return Err(Error::InvalidConfiguration(
-                "projected output capacity and recovery reserve must be positive".into(),
+                "checkpoint entries must be in 1..=65536".into(),
+            ));
+        }
+        if self.projected_output_bytes == 0
+            || self.recovery_reserve_bytes == 0
+            || self.active_read_views == 0
+            || self.pinned_read_bytes == 0
+        {
+            return Err(Error::InvalidConfiguration(
+                "projected output, read retention and recovery reserve must be positive".into(),
             ));
         }
         self.page_cache_policy
@@ -150,6 +169,7 @@ impl DatabaseOptions {
         self.segment_io.validate()?;
         self.segment_row_group_budget.validate()?;
         self.segment_compression.validate()?;
+        self.transaction_limits.validate()?;
         self.maintenance.validate()?;
         self.mutable_limits.validate()?;
         if self.mutable_retention.accounted_bytes < self.mutable_limits.accounted_bytes
@@ -355,6 +375,8 @@ pub struct Database {
     writer_requires_reopen: Option<&'static str>,
     transaction_snapshots: Arc<crate::transaction::TransactionSnapshots>,
     active_read_views: Arc<std::sync::Mutex<ActiveReadViews>>,
+    active_read_view_limit: usize,
+    pinned_read_byte_limit: u64,
     projected_output: crate::ProjectedOutputMemory,
     write_path_diagnostics: Option<WritePathCollector>,
 }
@@ -432,7 +454,8 @@ impl Database {
         }
         let root = root.pin_directory()?;
         let root = root.with_recovery_reserve(options.recovery_reserve_bytes)?;
-        let manifests = ManifestStore::create_anchored(&root)?;
+        let manifests = ManifestStore::create_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         root.join(WAL_DIRECTORY).create_dir()?;
         root.join(SEGMENT_DIRECTORY).create_dir()?;
         let manifest = new_manifest(1, None, 0, 0, 1, Vec::new(), application_format)?;
@@ -464,8 +487,12 @@ impl Database {
             maintenance_stats: MaintenanceStats::default(),
             wal_payload_bytes: 0,
             writer_requires_reopen: None,
-            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
+            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::new(
+                options.transaction_limits,
+            )),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            active_read_view_limit: options.active_read_views,
+            pinned_read_byte_limit: options.pinned_read_bytes,
             projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
@@ -498,7 +525,8 @@ impl Database {
         let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
-        let manifests = ManifestStore::open_existing_anchored(&root)?;
+        let manifests = ManifestStore::open_existing_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         let (_, manifest) = manifests
             .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
@@ -613,8 +641,12 @@ impl Database {
             maintenance_stats,
             wal_payload_bytes,
             writer_requires_reopen: None,
-            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
+            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::new(
+                options.transaction_limits,
+            )),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            active_read_view_limit: options.active_read_views,
+            pinned_read_byte_limit: options.pinned_read_bytes,
             projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
@@ -642,6 +674,16 @@ impl Database {
         self.mutable_memory.clone()
     }
 
+    /// Coherent aggregate native transaction owner/buffer charge observation.
+    pub fn transaction_ownership(&self) -> Result<(u64, u64)> {
+        self.transaction_snapshots.ownership()
+    }
+
+    /// Aggregate live stream ownership; returned batches own separate output reservations.
+    pub fn read_view_ownership(&self) -> Result<(u64, u64)> {
+        ActiveReadViews::ownership(&self.active_read_views)
+    }
+
     pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {
         self.projected_output.clone()
     }
@@ -651,10 +693,18 @@ impl Database {
     /// caller can consume the stream without retaining a borrow of `Database`.
     pub fn begin_projected_read(
         &self,
-        request: ProjectedReadRequest,
+        mut request: ProjectedReadRequest,
     ) -> Result<ProjectedReadStream> {
         let current_sequence = self.snapshot().sequence;
         request.validate(current_sequence)?;
+        request.budget.max_active_views = request
+            .budget
+            .max_active_views
+            .min(self.active_read_view_limit);
+        request.budget.max_pinned_bytes = request
+            .budget
+            .max_pinned_bytes
+            .min(self.pinned_read_byte_limit);
         let segments = self
             .segments
             .iter()
@@ -1331,6 +1381,10 @@ impl Database {
 
     pub fn checkpoint(&self, name: &str, at: u64) -> Result<Checkpoint> {
         self.manifests.checkpoint(name, &self.manifest.digest, at)
+    }
+
+    pub fn checkpoint_ownership(&self) -> Result<(u64, u64)> {
+        self.manifests.checkpoint_ownership()
     }
 
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {

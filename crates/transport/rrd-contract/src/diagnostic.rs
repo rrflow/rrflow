@@ -12,6 +12,26 @@ pub const DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION: u16 = 1;
 pub const MAX_DIAGNOSTIC_AUDIT_RECORDS: u16 = 1_024;
 pub const MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES: u64 = 1_000_000;
 
+/// Physical process-local counters only; no graph/history assembly or claim
+/// that independently sampled counters form an authoritative read stamp.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadStorageDiagnostics {
+    pub scope: String,
+}
+
+impl ReadStorageDiagnostics {
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.scope.is_empty()
+            || self.scope.len() > crate::MAX_ID_BYTES
+            || self.scope.as_bytes().contains(&0)
+        {
+            return invalid("storage diagnostic scope is invalid");
+        }
+        Ok(())
+    }
+}
+
 /// Coordinates a bounded diagnostic read. Cursors are explicit so a client can
 /// resume without asking RRD to infer history from UI state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -430,18 +450,53 @@ pub struct DiagnosticRrflowKvSnapshot {
 /// process reopens its store.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct DiagnosticStorageAdmission {
+    pub checkpoint_entries: u64,
+    pub checkpoint_limit: u64,
+    pub native_transactions: u64,
+    pub native_transaction_bytes: u64,
+    /// Actual live physical read views and conservative aggregate pin charge.
+    pub active_read_views: u64,
+    pub pinned_read_bytes: u64,
+    /// Logical owner charges; these are not allocator or process RSS bytes.
+    pub retained_mutable_bytes: u64,
+    pub retained_projected_bytes: u64,
+    /// Includes the active request plus admitted waiters, matching admission.
+    pub outstanding_requests: u64,
+    pub outstanding_logical_bytes: u64,
+    pub queued_requests: u64,
+    pub active: bool,
+    pub fenced: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DiagnosticStorageSnapshot {
     pub observed_at_unix_ms: u64,
     pub profile: StorageProfileKind,
     pub evidence_level: DiagnosticStorageEvidenceLevel,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rrflow_kv: Option<DiagnosticRrflowKvSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission: Option<DiagnosticStorageAdmission>,
 }
 
 impl DiagnosticStorageSnapshot {
     pub fn validate(&self) -> crate::Result<()> {
         if self.observed_at_unix_ms == 0 {
             return invalid("diagnostic storage observation time must be greater than zero");
+        }
+        if let Some(admission) = &self.admission {
+            if self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
+                || !(1..=65_536).contains(&admission.checkpoint_limit)
+                || admission.checkpoint_entries > admission.checkpoint_limit
+                || admission
+                    .queued_requests
+                    .checked_add(u64::from(admission.active))
+                    != Some(admission.outstanding_requests)
+            {
+                return invalid("storage admission ownership or evidence level differs");
+            }
         }
         match (self.profile, self.evidence_level, &self.rrflow_kv) {
             (

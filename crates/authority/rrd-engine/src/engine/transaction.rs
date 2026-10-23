@@ -356,10 +356,12 @@ impl RrdEngine {
                             if matches!(
                                 error,
                                 rrd_store::Error::Kernel(_)
+                                    | rrd_store::Error::TransactionLimit { .. }
                                     | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::MutableLimit { .. }
                                     | rrd_store::Error::MaintenanceLimit { .. }
                                     | rrd_store::Error::DiskAdmission { .. }
+                                    | rrd_store::Error::CheckpointLimit { .. }
                                     | rrd_store::Error::ReclamationPending
                                     | rrd_store::Error::ReclamationLimit { .. }
                                     | rrd_store::Error::RuntimeConflict { .. }
@@ -385,7 +387,12 @@ impl RrdEngine {
                                     operation_id,
                                 )?;
                             }
-                            return Err(error.into());
+                            return Err(match error {
+                                rrd_store::Error::TransactionLimit { .. } => {
+                                    ServiceError::StorageAdmission(error.to_string())
+                                }
+                                other => other.into(),
+                            });
                         }
                     },
                 }

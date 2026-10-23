@@ -63,6 +63,9 @@ jobs:
       - name: Test retained projected output admission and release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
       - name: Test output reservation arithmetic and partial release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib segment::output::tests --locked
@@ -157,6 +160,9 @@ jobs:
       - name: Test retained projected output admission and release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
       - name: Test output reservation arithmetic and partial release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib segment::output::tests --locked
@@ -252,6 +258,10 @@ jobs:
         run: |
           python3 scripts/ci/test_execution_inventory.py
           python3 scripts/ci/build_execution_inventory.py --check
+          python3 scripts/knowledge/render_capacity_profiles.py --check
+          python3 scripts/knowledge/test_capacity_profiles.py
+          python3 scripts/ci/test_collect_storage_acceptance.py
+          python3 scripts/ci/test_sustained_launch.py
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership
@@ -494,11 +504,20 @@ jobs:
           cache-on-failure: false
       - name: Build ordinary primary and fixed reopen corpus
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
+      - name: Exercise installed capacity workload and backup readback
+        timeout-minutes: 10
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
+      - name: Independent installed estates under concurrent load
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture
+      - name: Require fresh and existing installed damage denial
+        timeout-minutes: 10
+        run: >-
+          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2
       - name: Require fresh and existing 100-cycle histories
         timeout-minutes: 65
         env:
           RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2
       - name: Require both complete ordinary-primary receipts
         shell: bash
         env:

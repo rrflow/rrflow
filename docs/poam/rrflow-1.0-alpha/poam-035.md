@@ -207,12 +207,45 @@ incomplete-tail candidate repair. Native acceptance, damage/backup matrix,
 recovery reserve, operating profiles and 24-hour soak remain open; compiling
 these paths is not qualification evidence.
 
+The [C-07g sustained implementation](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md)
+adds bounded campaign evidence, independent mixed-family installed readback,
+live retained/queue telemetry and explicit native resource launch controls.
+Its full corpus/lifecycle lanes and native qualification remain in progress;
+no actual 24-hour result is implied by these implementation files.
+
 Native candidate run 39893191950 also exposed an interrupted-repair publication
 lease that could remain unavailable immediately after its owner returned.
 The [publication-owner correction](../../evidence/change-journals/gate-c/c-07f-native-capacity.md#publication-owner-release-after-interrupted-repair)
 adds explicit owner-bound unlock and duplicated-handle characterization;
 corrected candidate acceptance is pending. This does not authorize bypassing
 an active owner or changing the persistent lock inode.
+
+The sustained sampler was found to invoke complete graph/history diagnostics
+for physical counters, with a million-change ceiling and cross-model retries.
+This can distort load or prevent sampling at the required corpus sizes.
+The [C-07g storage observation change](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md)
+adds a scope-bound authenticated physical-counter read using the same storage
+projection. Candidate acceptance and large-corpus measurement remain pending;
+full diagnostic consistency remains POAM-029's separate responsibility.
+
+Native projected reads also accepted caller-controlled aggregate view/pin
+ceilings. The [C-07g retention correction](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md#per-open-read-retention-ceilings-and-ownership-observations)
+binds per-open ceilings to sealed installation policy and exposes actual
+owner observations for drain validation. Candidate runtime acceptance is
+pending; this does not establish the installed retained-reader workload.
+
+Native physical transactions also lacked aggregate owner/write-buffer admission,
+and the store retained a second copy of runtime snapshot writes. The
+[C-07g transaction-owner correction](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md#aggregate-native-transaction-ownership-and-copy-removal)
+adds sealed native ceilings and actual-owner release, removes duplicate intent
+buffers, and preserves uncertainty when receipt lookup is resource-starved.
+Candidate runtime acceptance remains pending.
+
+The native transaction scan's requested limit was applied after full-range
+materialization. The [bounded transaction-read correction](../../evidence/change-journals/gate-c/c-07d-bounded-transaction-scans.md)
+reuses the projected reader and ordered pending overlay, with bounded result
+copies and explicit work denial. Native candidate acceptance is pending;
+other full-range APIs and caller-owned result residency remain distinct.
 
 ## Closure evidence
 
@@ -223,3 +256,31 @@ profiles. Gate C must accept the complete matrix at exact tested revisions
 before this row closes. Missing facilities or unrun large profiles remain
 visible gaps. J-02/J-03 retain OS/power-cut and distribution-profile claims;
 J-04 retains full-product competitive evidence.
+
+The [installed physical cursor candidate](../../evidence/change-journals/gate-c/c-07e-installed-storage-cursors.md)
+adds session-owned native reader/output retention and raw sustained-interference
+reconciliation. Runtime acceptance, complete capacity profiles and soak remain
+open; a schema or compiled capability does not establish this proof.
+
+
+The acceptance review found that author-supplied campaign SLOs could be looser
+than J-04's owning nominal latency/error thresholds. The
+[C-07h acceptance implementation](../../evidence/change-journals/gate-c/c-07h-acceptance-reconciliation.md)
+projects those thresholds from their owner and checks raw measured observations
+in addition to campaign qualification. It also binds native CI to the actual
+tested revision and reports absent/failed operating points explicitly. Candidate
+acceptance and the full profile/24-hour matrix remain pending; POAM-035 is open.
+
+The same acceptance inspection found that a successful inner workload result
+could outlive failed outer native-allocation cleanup. C-07h now requires a
+separately bound launcher outcome/cleanup receipt and matches its allocation
+against all raw samples. Missing or failed cleanup remains unqualified; the
+native capacity/soak acceptance gap stays open.
+
+
+Checkpoint creation and ordinary inventory lacked a native count/metadata cap.
+The [checkpoint admission candidate](../../evidence/change-journals/gate-c/c-07d-checkpoint-admission.md)
+adds serialized sealed admission, typed denial, real ownership observations and
+post-burst drain enforcement. Focused native snapshot/concurrency tests pass;
+exact candidate CI and the complete profile/24-hour matrix remain pending.
+No retained checkpoint is evicted to satisfy the limit.

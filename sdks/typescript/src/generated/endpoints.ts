@@ -1,6 +1,6 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377
-export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377" as const;
+// OpenAPI SHA-256: 03639d8aff602c966b800becaa5b8442d0e912904cb50383f1ecee86ad32fb9a
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "03639d8aff602c966b800becaa5b8442d0e912904cb50383f1ecee86ad32fb9a" as const;
 
 export const endpoints = {
   "audit-export": {
@@ -60,6 +60,18 @@ export const endpoints = {
   "diagnostics-read": {
     "method": "POST",
     "path": "/v1/diagnostics/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "diagnostics-storage-cursor": {
+    "method": "POST",
+    "path": "/v1/diagnostics/storage/cursor",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "diagnostics-storage-read": {
+    "method": "POST",
+    "path": "/v1/diagnostics/storage/read",
     "authentication": "session_bearer",
     "mutation": false
   },

@@ -6,6 +6,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    /// Known checkpoint admission denial before a new publication.
+    CheckpointLimit {
+        limit: usize,
+        observed: usize,
+    },
+    TransactionLimit {
+        resource: rrd_lsm::TransactionResource,
+        limit: usize,
+        observed: usize,
+    },
     DiskAdmission {
         available: u64,
         required: u64,
@@ -131,6 +141,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
+            Error::CheckpointLimit { limit, observed } => write!(f, "checkpoint entry limit {limit} would be exceeded by {observed}"),
+            Error::TransactionLimit { resource, limit, observed } => write!(f, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
             ),
@@ -241,6 +253,18 @@ impl From<rrd_lsm::Error> for Error {
                 limit,
                 observed,
             } => Self::ReclamationLimit {
+                resource,
+                limit,
+                observed,
+            },
+            rrd_lsm::Error::CheckpointLimit { limit, observed } => {
+                Self::CheckpointLimit { limit, observed }
+            }
+            rrd_lsm::Error::TransactionLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::TransactionLimit {
                 resource,
                 limit,
                 observed,

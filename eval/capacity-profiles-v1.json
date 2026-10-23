@@ -1,0 +1,115 @@
+{
+  "format_version": 1,
+  "owner": "docs/roadmap/rrflow-1.0/gate-j.md",
+  "owner_projection_sha256": "4d8b30e45b0c53d96b27b8bd1b1a4a1bad70f2050e9f72853b2895c0e98f2e45",
+  "record_payload_bytes": 1024,
+  "profiles": [
+    {
+      "id": "desktop",
+      "name": "Desktop",
+      "vcpus": 4,
+      "host_bytes": 8589934592,
+      "engine_bytes": 2147483648,
+      "estates": 1,
+      "records_min": 100000,
+      "edges_min": 500000,
+      "vectors_min": 100000,
+      "vector_dimensions": 384,
+      "logical_source_bytes_min": 102400000,
+      "clients": [
+        1,
+        4,
+        8
+      ],
+      "rates": [
+        5,
+        25,
+        50
+      ],
+      "requires_estate_interference": false
+    },
+    {
+      "id": "single-service-estate",
+      "name": "Single service estate",
+      "vcpus": 8,
+      "host_bytes": 34359738368,
+      "engine_bytes": 8589934592,
+      "estates": 1,
+      "records_min": 1000000,
+      "edges_min": 5000000,
+      "vectors_min": 1000000,
+      "vector_dimensions": 768,
+      "logical_source_bytes_min": 1024000000,
+      "clients": [
+        8,
+        32,
+        64
+      ],
+      "rates": [
+        25,
+        100,
+        250
+      ],
+      "requires_estate_interference": false
+    },
+    {
+      "id": "fleet-isolation",
+      "name": "Fleet isolation",
+      "vcpus": 16,
+      "host_bytes": 34359738368,
+      "engine_bytes": 8589934592,
+      "estates": 10,
+      "records_min": 1000000,
+      "edges_min": 5000000,
+      "vectors_min": 1000000,
+      "vector_dimensions": 384,
+      "logical_source_bytes_min": 1024000000,
+      "clients": [
+        40
+      ],
+      "rates": [],
+      "requires_estate_interference": true
+    },
+    {
+      "id": "data-larger-than-memory",
+      "name": "Data larger than memory",
+      "vcpus": 8,
+      "host_bytes": 34359738368,
+      "engine_bytes": 8589934592,
+      "estates": 1,
+      "records_min": 0,
+      "edges_min": 0,
+      "vectors_min": 2000000,
+      "vector_dimensions": 1536,
+      "logical_source_bytes_min": 34359738368,
+      "clients": [],
+      "rates": [],
+      "requires_estate_interference": false
+    }
+  ],
+  "thresholds": {
+    "nominal_rates": [
+      {
+        "profile": "desktop",
+        "requests_per_second": 25
+      },
+      {
+        "profile": "single-service-estate",
+        "requests_per_second": 100
+      }
+    ],
+    "point_read": {
+      "p95_ns": 50000000,
+      "p99_ns": 200000000
+    },
+    "mixed_write": {
+      "p95_ns": 100000000,
+      "p99_ns": 500000000
+    },
+    "range_read": {
+      "p95_ns": 250000000,
+      "p99_ns": 1000000000
+    },
+    "maximum_error_basis_points": 10
+  }
+}
