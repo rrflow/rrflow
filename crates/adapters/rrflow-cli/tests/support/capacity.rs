@@ -41,24 +41,7 @@ impl Volume {
             volume.root,
             std::fs::canonicalize(std::env::temp_dir()).unwrap()
         );
-        let disks = sysinfo::Disks::new_with_refreshed_list();
-        let matching: Vec<_> = disks
-            .iter()
-            .filter(|disk| {
-                std::fs::canonicalize(disk.mount_point()).ok().as_ref() == Some(&volume.root)
-            })
-            .collect();
-        assert_eq!(
-            matching.len(),
-            1,
-            "fixture must be a separately enumerated native volume"
-        );
-        let disk = matching[0];
-        assert_eq!(
-            disk.file_system().to_str().unwrap().to_ascii_lowercase(),
-            volume.filesystem
-        );
-        assert!(disk.total_space() > 32 * 1024 * 1024 && disk.total_space() <= volume.max_bytes);
+        volume.verify_native_mount();
         assert!(matches!(
             volume.filesystem.as_str(),
             "ext4" | "apfs" | "ntfs"
@@ -74,6 +57,74 @@ impl Volume {
         assert_eq!(owner, volume.nonce.as_bytes());
         volume
     }
+
+    #[cfg(not(target_os = "macos"))]
+    fn verify_native_mount(&self) {
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let matching: Vec<_> = disks
+            .iter()
+            .filter(|disk| {
+                std::fs::canonicalize(disk.mount_point()).ok().as_ref() == Some(&self.root)
+            })
+            .collect();
+        assert_eq!(
+            matching.len(),
+            1,
+            "fixture must be a separately enumerated native volume"
+        );
+        let disk = matching[0];
+        assert_eq!(
+            disk.file_system().to_str().unwrap().to_ascii_lowercase(),
+            self.filesystem
+        );
+        assert!(disk.total_space() > 32 * 1024 * 1024 && disk.total_space() <= self.max_bytes);
+    }
+
+    #[cfg(target_os = "macos")]
+    fn verify_native_mount(&self) {
+        use std::os::unix::{ffi::OsStrExt, fs::MetadataExt};
+        // sysinfo intentionally hides non-browsable APFS volumes. Query the
+        // kernel mount itself; visibility in Finder is not volume admission.
+        let path = std::ffi::CString::new(self.root.as_os_str().as_bytes()).unwrap();
+        let mut native = std::mem::MaybeUninit::<libc::statfs>::uninit();
+        // SAFETY: NUL-terminated path and writable, correctly sized output.
+        let result = unsafe { libc::statfs(path.as_ptr(), native.as_mut_ptr()) };
+        assert_eq!(
+            result,
+            0,
+            "statfs failed: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: successful statfs initialized every output field.
+        let native = unsafe { native.assume_init() };
+        let text = |field: &[libc::c_char]| {
+            let end = field
+                .iter()
+                .position(|c| *c == 0)
+                .expect("terminated statfs field");
+            field[..end].iter().map(|c| *c as u8).collect::<Vec<_>>()
+        };
+        let mount = text(&native.f_mntonname);
+        assert_eq!(
+            std::fs::canonicalize(std::ffi::OsStr::from_bytes(&mount)).unwrap(),
+            self.root,
+            "fixture must be an exact native mount root"
+        );
+        assert_eq!(text(&native.f_fstypename), self.filesystem.as_bytes());
+        assert_eq!(self.filesystem, "apfs");
+        assert_ne!(
+            std::fs::metadata(&self.root).unwrap().dev(),
+            std::fs::metadata(self.root.parent().unwrap())
+                .unwrap()
+                .dev(),
+            "fixture must be a separate filesystem"
+        );
+        let total = native
+            .f_blocks
+            .checked_mul(u64::from(native.f_bsize))
+            .expect("capacity overflow");
+        assert!(total > 32 * 1024 * 1024 && total <= self.max_bytes);
+    }
 }
 
 struct Filler {
@@ -81,9 +132,23 @@ struct Filler {
     path: PathBuf,
     bytes: u64,
     native_code: i32,
+    metadata_paths: Vec<PathBuf>,
+    metadata_native_code: Option<i32>,
 }
 impl Filler {
-    fn fill(volume: &Volume) -> Self {
+    fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
+        let directory = metadata_directory.map(|path| {
+            assert!(!std::fs::symlink_metadata(path)
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            let path = std::fs::canonicalize(path).unwrap();
+            assert!(
+                path.starts_with(&volume.root) && path != volume.root,
+                "metadata fill must remain inside the owned estate volume"
+            );
+            path
+        });
         let path = volume.root.join(format!("{}.filler", volume.nonce));
         let mut file = OpenOptions::new()
             .write(true)
@@ -95,6 +160,8 @@ impl Filler {
             path,
             bytes: 0,
             native_code: 0,
+            metadata_paths: Vec::new(),
+            metadata_native_code: None,
         };
         // Nonzero data prevents sparse/zero-block optimizations. Allocation and
         // sync failures are actual OS results, never injected StorageFull.
@@ -128,12 +195,52 @@ impl Filler {
             "filler failed for another reason: {error}"
         );
         filler.file = Some(file);
+        // NTFS can still create resident files after data clusters are full.
+        // Exhaust actual directory/MFT allocation at the selected create
+        // boundary; never call a later WAL error a segment/publication proof.
+        if let Some(directory) = directory {
+            for index in 0..8192u32 {
+                assert!(
+                    started.elapsed() < Duration::from_secs(25),
+                    "bounded metadata fill"
+                );
+                let path = directory.join(format!("c{}-{index:04x}", &volume.nonce[..8]));
+                match OpenOptions::new().write(true).create_new(true).open(&path) {
+                    Ok(file) => {
+                        filler.metadata_paths.push(path);
+                        // Creation is the resource being exhausted. Dropping
+                        // the handle retains its directory record until cleanup.
+                        drop(file);
+                    }
+                    Err(error) => {
+                        let code = error.raw_os_error().expect("native metadata capacity code");
+                        assert!(
+                            capacity_code(code),
+                            "metadata fill failed for another reason: {error}"
+                        );
+                        filler.metadata_native_code = Some(code);
+                        break;
+                    }
+                }
+            }
+            assert!(
+                filler.metadata_native_code.is_some(),
+                "metadata file count bound exhausted"
+            );
+        }
         filler
     }
 }
 impl Drop for Filler {
     fn drop(&mut self) {
         self.file.take();
+        for path in &self.metadata_paths {
+            if let Err(error) = std::fs::remove_file(path) {
+                if !std::thread::panicking() {
+                    panic!("owned metadata filler cleanup failed: {error}");
+                }
+            }
+        }
         // Exact create_new-owned file only; never recurse or remove estate data.
         if let Err(error) = std::fs::remove_file(&self.path) {
             if !std::thread::panicking() {
@@ -152,7 +259,12 @@ fn capacity_code(code: i32) -> bool {
     }
 }
 
-fn resume_after_fill(mut child: Child, control: Value, volume: Volume) -> (Child, Filler, Value) {
+fn resume_after_fill(
+    mut child: Child,
+    control: Value,
+    volume: Volume,
+    metadata_directory: Option<PathBuf>,
+) -> (Child, Filler, Value) {
     let line = child.line();
     let hit: Value = serde_json::from_str(
         std::str::from_utf8(&line)
@@ -166,7 +278,7 @@ fn resume_after_fill(mut child: Child, control: Value, volume: Volume) -> (Child
     for key in ["nonce", "id", "point"] {
         assert_eq!(hit[key], control[key]);
     }
-    let filler = Filler::fill(&volume);
+    let filler = Filler::fill(&volume, metadata_directory.as_deref());
     child
         .child
         .resume_controlled(
@@ -319,6 +431,15 @@ fn wal_bytes(estate: &Estate) -> u64 {
 fn capacity_case(point: &str, mode: &str) {
     let volume = Volume::admitted();
     let estate = Estate::install_at(mode, Some(&volume.root), point != "wal_before_write");
+    let locator = RrdEngine::read_project_locator(&estate.project).unwrap();
+    let native_root = estate.project.join(locator.storage_root);
+    let metadata_directory = match point {
+        "wal_before_write" => None,
+        "segment_before_create" => Some(native_root.join("segments")),
+        "manifest_before_create" => Some(native_root.join("manifests")),
+        "current_before_create" => Some(native_root),
+        _ => panic!("unsupported native capacity point"),
+    };
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
     let mut ledger = AcknowledgementLedger::default();
     let clock = Instant::now();
@@ -366,12 +487,13 @@ fn capacity_case(point: &str, mode: &str) {
         let (child,client) = estate.serve(&control);
         let lease = begin(&client,&session,"uncertain").await;
         let started = clock.elapsed().as_nanos() as u64;
-        let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume));
+        let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory));
         let result = client.commit_transaction(&session,&lease.transaction_id,target.clone(),options("uncertain")).await;
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();
-        let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code});
+        let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code,
+            "metadata_files":filler.metadata_paths.len(),"metadata_native_code":filler.metadata_native_code});
         drop(filler);
         ledger.attempts.push(Attempt {attempt_id:"capacity-uncertain".to_owned().try_into().unwrap(),
             logical_id:"uncertain".to_owned().try_into().unwrap(),request_sha256:digest("c07f.request",&target).unwrap(),

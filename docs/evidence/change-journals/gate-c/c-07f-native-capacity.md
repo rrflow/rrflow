@@ -291,3 +291,64 @@ uses size/fs image creation; the actual native command error is the direct
 current evidence. No claim is made that the corrected APFS case has executed.
 PowerShell and Python syntax checks are authoring checks only. No local disk
 image, runtime suite or exhaustion run was launched.
+
+
+## Non-browsable APFS fixture admission
+
+Candidate `151626c0ef950c47e0b2f4bdec9750d5bb321e80`, run 39895107779,
+macOS job 120225089113 created/attached the capped APFS image successfully,
+then failed before filling: Volume::admitted found zero sysinfo matches.
+Locked sysinfo 0.39.6's Apple implementation skips volumes for which
+kCFURLVolumeIsBrowsableKey is false; the fixture intentionally uses -nobrowse.
+This is an admission mismatch, not native exhaustion evidence.
+
+The macOS harness now queries statfs on the canonical fixture root, requires
+that the returned mount root match exactly, verifies APFS and actual bounded
+capacity, and independently checks the root's device differs from its parent's.
+Image/device/nonce ownership and capped image creation are unchanged. Linux
+and Windows retain their existing native disk enumeration. Added only a
+macOS-specific test dependency on the already locked libc 0.2.189. No default
+runtime dependency, mount visibility change or relaxed volume admission.
+
+Read: Volume::admitted, native image controller and identity checks, locked
+sysinfo Apple getfsstat/browsability filter and libc statfs declaration.
+Primary references: [Apple statfs](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/statfs.2.html)
+and [locked sysinfo source](https://docs.rs/sysinfo/0.39.6/src/sysinfo/unix/apple/disk.rs.html).
+The owner brief was updated before implementation. Native macOS execution
+remains the acceptance oracle, not Windows compilation of cfg-gated source.
+
+The initial Windows compile found a stale shared-target rrd-contract artifact
+from C-07g (a missing diagnostic admission initializer in unchanged F source).
+After cleaning that package, `cargo clippy -p rrflow-cli --test installed_crash
+--features crash-test --locked -- -D warnings` passed (20.13 seconds).
+No local runtime test, mount or fill ran. Candidate CI and actual APFS/NTFS/ext4
+capacity matrix remain required; C-07 status is unchanged.
+
+
+## Native create-phase exhaustion
+
+On the same candidate, Windows job 120225089228 passed the fresh WAL
+exhaustion/recovery case (159.11 seconds). The next segment case reached its
+rendezvous, but the observed error's role was WAL, not segment (58.06 seconds,
+failed). The exact-role assertion correctly rejected this as segment proof.
+Data-cluster exhaustion alone does not guarantee create-phase failure on NTFS,
+where resident metadata may still accommodate small new files.
+
+The owned filler now additionally consumes create_new directory entries at the
+selected segment/manifest/CURRENT directory until creation actually returns a
+native capacity error. The installed locator supplies that directory; canonical
+containment and non-symlink checks bind it to the capped owned volume. Each
+successful path is retained for exact cleanup after server termination, with
+at most 8,192 files and the existing 25-second total fill deadline. Only those
+owned paths and the data filler are removed. WAL still uses data-only fill.
+Receipts retain metadata file count and the actual creation capacity code;
+engine failure role and native error remain mandatory and unchanged. No native
+error is substituted and a later-phase error still fails the selected case.
+
+Read: diagnostic boundary/observation code, capped native filesystem wrapper,
+installed locator, WAL warmup and native capacity cleanup. PR brief was updated
+before implementation. `cargo clippy -p rrflow-cli --test installed_crash
+--features crash-test --locked -- -D warnings` passed (15.64 seconds) after
+clearing shared-target artifacts belonging to the G worktree. No local native
+fill/runtime case executed. The next exact-candidate native matrix must prove
+these paths; earlier WAL success does not validate the modified candidate.
