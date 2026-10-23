@@ -18,6 +18,221 @@ use std::time::Duration;
 
 const SCOPE: &str = "instance:test-instance";
 
+#[test]
+fn public_budget_is_immutable_narrowed_and_stop_survives_provider_completion() {
+    use rrd_contract::{
+        ConfigureTaskBudget, ExecuteTaskEmbedding, ReadTaskAttempt, ReadTaskBudget, StopTaskBudget,
+        TaskAttemptStatus,
+    };
+    let (root, engine, lease, task, mut request, calls) = fixture(3);
+    let config = ConfigureTaskBudget {
+        scope: SCOPE.into(),
+        task_id: task.clone(),
+        limits: rrd_contract::ReasoningLimits {
+            max_run_elapsed_ms: 9_000,
+            max_steps: 2,
+            max_step_elapsed_ms: 4_000,
+        },
+    };
+    let configured = engine
+        .configure_task_budget(
+            &lease.session_id,
+            &lease.token,
+            &config,
+            30,
+            "configure",
+            "configure",
+        )
+        .unwrap();
+    assert_eq!(
+        engine
+            .configure_task_budget(
+                &lease.session_id,
+                &lease.token,
+                &config,
+                31,
+                "again",
+                "again"
+            )
+            .unwrap(),
+        configured
+    );
+    let mut changed = config.clone();
+    changed.limits.max_steps = 3;
+    assert!(matches!(
+        engine.configure_task_budget(
+            &lease.session_id,
+            &lease.token,
+            &changed,
+            32,
+            "change",
+            "change"
+        ),
+        Err(ServiceError::IdempotencyConflict)
+    ));
+    changed.limits.max_steps = 4;
+    assert!(matches!(
+        engine.configure_task_budget(
+            &lease.session_id,
+            &lease.token,
+            &changed,
+            33,
+            "exceed",
+            "exceed"
+        ),
+        Err(ServiceError::ConfigurationLimit(_))
+    ));
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let inner = FeatureHashBackend::new(32, 45).unwrap();
+    let mut descriptor = inner.descriptor().clone();
+    descriptor.id = "test:public-stop:cpu:v1".into();
+    request.backend_id = descriptor.id.clone();
+    engine
+        .install_embedding_backend(CountedBackend {
+            inner,
+            descriptor: Some(descriptor),
+            calls: calls.clone(),
+            blocked: Some((entered_tx, release_rx)),
+        })
+        .unwrap();
+    let execute = ExecuteTaskEmbedding {
+        task_id: task.clone(),
+        attempt_id: id("public-blocked"),
+        request,
+    };
+    let read = ReadTaskBudget {
+        scope: SCOPE.into(),
+        task_id: task.clone(),
+    };
+    let stop = std::thread::scope(|threads| {
+        let (done_tx, done_rx) = mpsc::channel();
+        let (engine, lease, execute) = (&engine, &lease, &execute);
+        threads.spawn(move || {
+            done_tx
+                .send(engine.execute_task_embedding(
+                    &lease.session_id,
+                    &lease.token,
+                    execute,
+                    40,
+                    "execute",
+                    "execute",
+                ))
+                .unwrap();
+        });
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let active = engine
+            .read_task_budget(
+                &lease.session_id,
+                &lease.token,
+                &read,
+                50,
+                "active",
+                "active",
+            )
+            .unwrap();
+        let stale = StopTaskBudget {
+            scope: SCOPE.into(),
+            task_id: task.clone(),
+            expected_budget_sha256: configured.budget_sha256.clone().unwrap(),
+        };
+        assert!(matches!(
+            engine.stop_task_budget(
+                &lease.session_id,
+                &lease.token,
+                &stale,
+                51,
+                "stale",
+                "stale"
+            ),
+            Err(ServiceError::IdempotencyConflict)
+        ));
+        let stop = StopTaskBudget {
+            expected_budget_sha256: active.budget_sha256.unwrap(),
+            ..stale
+        };
+        let stopped = engine
+            .stop_task_budget(&lease.session_id, &lease.token, &stop, 52, "stop", "stop")
+            .unwrap();
+        assert_eq!(
+            stopped.budget.unwrap().stopped,
+            Some(ReasoningBudgetStop::Cancelled)
+        );
+        // Stop returns and the caller unwinds while non-cooperative work is
+        // still blocked. Never pretend cancellation terminated that work.
+        let result = done_rx.recv_timeout(Duration::from_secs(2));
+        release_tx.send(()).unwrap();
+        assert!(matches!(
+            result.unwrap(),
+            Err(ServiceError::InferenceCancelled {
+                execution_may_continue: true
+            })
+        ));
+        stop
+    });
+    let final_state = engine
+        .read_task_budget(&lease.session_id, &lease.token, &read, 60, "final", "final")
+        .unwrap();
+    assert_eq!(
+        final_state.budget.as_ref().unwrap().stopped,
+        Some(ReasoningBudgetStop::Cancelled)
+    );
+    assert!(final_state.budget.as_ref().unwrap().execution_may_continue);
+    assert_eq!(final_state.budget.as_ref().unwrap().reserved_steps, 1);
+    assert_eq!(
+        final_state.budget.as_ref().unwrap().deadline_unix_ms,
+        configured.budget.unwrap().deadline_unix_ms
+    );
+    assert_eq!(
+        engine
+            .stop_task_budget(
+                &lease.session_id,
+                &lease.token,
+                &stop,
+                61,
+                "retry-stop",
+                "retry-stop"
+            )
+            .unwrap(),
+        final_state
+    );
+    drop(engine);
+    let mut engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
+    configure(&mut engine, 3);
+    assert_eq!(
+        engine
+            .read_task_budget(
+                &lease.session_id,
+                &lease.token,
+                &read,
+                62,
+                "reopen",
+                "reopen"
+            )
+            .unwrap(),
+        final_state
+    );
+    let attempt = engine
+        .read_task_attempt(
+            &lease.session_id,
+            &lease.token,
+            &ReadTaskAttempt {
+                scope: SCOPE.into(),
+                task_id: task,
+                attempt_id: execute.attempt_id,
+            },
+            63,
+            "receipt",
+            "receipt",
+        )
+        .unwrap()
+        .attempt
+        .unwrap();
+    assert_eq!(attempt.status, TaskAttemptStatus::Stopped);
+    assert!(attempt.result.is_none());
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
 struct CountedBackend {
     inner: FeatureHashBackend,
     descriptor: Option<EmbeddingBackendDescriptor>,

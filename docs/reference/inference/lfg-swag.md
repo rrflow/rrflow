@@ -119,8 +119,8 @@ also checks during token processing and hashing, between inputs and around
 normalization. Individual bounded string/vector operations are not preempted.
 A non-cooperative adapter, including the current FastEmbed call, retains its
 slot until return even after the caller receives a cancellation outcome.
-There is no public daemon Stop operation, persisted cancellation receipt or
-Connectome Stop control yet; those require the durable run owner below.
+The task embedding flow below exposes durable Stop through the daemon. It
+does not stop unrelated activities or supply a Connectome control yet.
 
 ### Research decisions for budget enforcement
 
@@ -159,8 +159,9 @@ owns implementation order and the failing histories required for acceptance.
 to the sealed estate reasoning limits. `TaskEmbeddingAttempt` carries the
 existing task ID, stable attempt ID, embedding request and cancellation handle.
 It requires both `ReasoningWrite` and `EmbeddingGenerate`; inspection through
-`inspect_task_reasoning_budget` requires `ReasoningRead`. These are embedded
-Rust methods, not daemon operations or Connectome controls.
+`inspect_task_reasoning_budget` requires `ReasoningRead`. The public task
+effort operations below compose this same owner; Connectome presentation is
+still unimplemented.
 
 The first admitted attempt fixes the configuration digest, original host-clock
 deadline and step cap. Each attempt reserves one step before dispatch. The
@@ -173,8 +174,8 @@ completed attempts also accumulate conservatively rounded monotonic elapsed
 time. Unrelated commit contention may retry completion publication up to three
 times, without dispatching another provider call or resetting any allowance.
 
-A repeated attempt never executes automatically. Accepted completion exposes
-its result digest; this package does not retain the full embedding result for
+A repeated attempt never executes automatically. Accepted completion retains
+its result and digest within the bounded task output limit for read-only
 replay. An interrupted reservation stays unresolved and blocks further task
 attempts. Cancellation or expiry observed before completion publication,
 rollback, changed configuration, exhaustion and execution failure stop further
@@ -203,9 +204,41 @@ The [package evidence](../../evidence/change-journals/gate-g/g-02a-task-budget.m
 separates native rrflowKV reopen/component evidence from installed process-kill
 and real-provider qualification. Ordinary standalone embedding calls retain
 their per-call limits. Router/context/fallback execution, per-run preference
-resolution, cost/token accounting, durable Stop, authorized extension, full
-output replay and UI presentation remain open. This is a G-02a prerequisite,
+resolution, cost/token accounting, authorized extension, general result replay
+and UI presentation remain open. This is a G-02a prerequisite,
 not full aggregate reasoning-run or Gate G acceptance.
+
+#### Public task effort flow
+
+The executable operation catalogue owns these authenticated operations and
+generates their OpenAPI and SDK projections. A client opens an existing task,
+configures finite limits, explicitly activates the bundled reference adapter,
+executes a task attempt, and reads its budget/result or requests Stop.
+
+| Operation | Required grant | Behavior |
+|---|---|---|
+| `task-budget-configure` | `ReasoningWrite` | Fix narrower-or-equal estate limits and the original deadline immediately. Repeating identical limits reads the existing budget; changing them conflicts. |
+| `embedding-builtin-activate` | `ReasoningWrite` | Explicitly activate the bundled CPU FeatureHash reference adapter for this process. No model fetch, LLM or trained semantic-quality claim. |
+| `task-embedding-execute` | `ReasoningWrite` and `EmbeddingGenerate` | Require configuration and an activated backend; reserve one attempt through the existing durable owner before dispatch. |
+| `task-budget-read` | `ReasoningRead` | Return persisted counters, original deadline, terminal reason, uncertainty and the digest required by Stop. |
+| `task-budget-stop` | `ReasoningWrite` | Compare the observed budget digest, durably record cancellation, then signal active execution. Repeating the original Stop digest is safe after a lost acknowledgement. |
+| `task-attempt-read` | `ReasoningRead` | Point-read retained status/output without executing or requiring backend activation. |
+
+Public embedding requests allow at most 16 inputs, 64 KiB total input and
+4096 output values. Retained task output is bounded to 512 KiB. Attempt
+records store bounded results and digests, not raw prompts or private thought.
+Earlier digest-only records remain readable without invented output.
+Completion retries reload the budget and preserve a concurrent durable Stop;
+they cannot overwrite it with success or reset consumption. Active cancellation
+registration is tied to the attempt identity so an older completion cannot
+unregister a newer attempt. The process-local map delivers signals and is
+never the durable authority.
+
+Activation is process-local and must be repeated explicitly after restart for
+new execution. Replaying retained output does not activate a backend. A stopped
+budget stays stopped across configuration retries, new sessions and reopen.
+There is no extension or reconciliation operation in this package. See the
+[public-flow evidence](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md).
 
 Extend that same engine-owned revision and eventual run admission with:
 

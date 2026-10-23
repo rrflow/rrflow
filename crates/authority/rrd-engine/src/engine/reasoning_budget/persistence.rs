@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 const EVENT_KIND: &str = "rrflow-reasoning-budget-event";
 
 impl RrdEngine {
-    fn budget_key(&self, scope: &str, task: &CanonicalId) -> String {
+    pub(super) fn budget_key(&self, scope: &str, task: &CanonicalId) -> String {
         // Typed identities are encoded before hashing; no delimiter ambiguity
         // or caller-controlled control-key suffix is accepted.
         let identity = serde_json::to_vec(&(self.instance.as_str(), scope, task.as_str()))

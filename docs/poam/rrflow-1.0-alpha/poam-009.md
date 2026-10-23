@@ -98,11 +98,25 @@ unqualified. See the
 
 ## Owning gates
 
+[PR103](https://github.com/rrflow/rrflow-development/pull/103) exposes the same
+task embedding budget through the public catalogue, HTTP and Rust client, with
+explicit reference-adapter activation, narrowed immutable limits, durable Stop
+and bounded output replay. The [linked evidence](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md)
+separates the real socket/reopen flow from installed qualification. This
+addresses that flow's missing public controls and replay; it does not close
+the governed router/context/fallback runner, semantic no-progress control,
+Connectome wiring, real LLM accounting or installed resource qualification.
+POAM-009 remains open.
+
 D-05, G-01 through G-06; I-03/I-07 for governed improvement
 
 Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
 [Gate G](../../roadmap/rrflow-1.0/gate-g.md), and
 [Gate I](../../roadmap/rrflow-1.0/gate-i.md).
+
+Installed resource qualification depends on
+[Gate C](../../roadmap/rrflow-1.0/gate-c.md); public effort controls cannot
+replace its crash, capacity or sustained-load evidence.
 
 ## Closure evidence
 

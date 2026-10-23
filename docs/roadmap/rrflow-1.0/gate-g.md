@@ -121,6 +121,38 @@ or the remaining row 3 acceptance. Its
 [journal](../../evidence/change-journals/gate-g/g-02a-task-budget.md) records the
 exact evidence and open boundaries; Gate G and POAM-009 stay open.
 
+### Public effort flow and next implementation boundaries
+
+[PR103](https://github.com/rrflow/rrflow-development/pull/103) composes the
+existing task budget through six catalogue-owned operations: explicit bundled
+reference-adapter activation, immutable narrowed configuration, bounded task
+execution, budget inspection, digest-checked durable Stop and retained-result
+readback. The [package journal](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md)
+owns validation. This advances sequence rows 3/5 without closing either row,
+Gate G, C-07 or H-06. The remaining work follows these existing boundaries:
+
+1. G-01/G-02/G-05: qualify the separate router capability and compose route,
+   context and fallback dispatch through the same durable task allowance.
+   Charge each admitted attempt; preserve uncertain effects and validate
+   source/configuration identity before accepting decisions. First oracle:
+   repeated context/fallback requests exhaust one budget across restart.
+2. G-03/D-06: bound semantic no-progress tracking by the attempt cap; resolve
+   configured presets and explicit limits at admission. New correlation IDs
+   cannot bypass repetition. Authorized new evidence can permit useful work
+   within the original remainder. Token/cost limits require measured adapter
+   accounting; unsupported accounting must remain unavailable.
+3. H-06: update the pinned Connectome engine/SDK pair and installation-plan
+   adapter together, then add controls beneath the existing task detail route.
+   Preview effective limits; show attempts, retained outputs and uncertainty;
+   Stop uses the observed digest. No browser-owned budget or duplicate run
+   lifecycle. Prove reload/reconnect and stale Stop through the public API.
+4. G-06 and the existing C-07 owner: run the installed real-adapter flow with
+   process interruption, resource admission, capacity and sustained-load
+   evidence. Reopen/component tests cannot substitute for these campaigns.
+
+These are bounded implementation packages in the existing dependency sequence,
+not permission to skip installed durability or promote a complete alpha.
+
 ## Controller learning packages
 
 The [learning contract](../../reference/inference/learning/controller-training.md)

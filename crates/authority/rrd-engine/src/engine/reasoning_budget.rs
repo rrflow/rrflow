@@ -3,45 +3,12 @@
 
 use super::clock::{observe_required, ClockSource, HostSystemClock};
 use super::*;
-use rrd_contract::ReasoningLimits;
 use rrd_inference::{EmbeddingCancellation, EmbeddingExecutionControl};
 
 mod persistence;
+mod public;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ReasoningBudgetStop {
-    StepLimit,
-    Deadline,
-    Cancelled,
-    ClockRollback,
-    ConfigurationChanged,
-    UnresolvedAttempt,
-    AttemptFailed,
-}
-
-/// Engine-owned control state. This is an embedded observation, not a public
-/// transport operation or a task lifecycle replacement.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct TaskReasoningBudget {
-    pub format_version: u16,
-    pub instance_id: CanonicalId,
-    pub scope: String,
-    pub task_id: CanonicalId,
-    pub configuration_sha256: String,
-    pub limits: ReasoningLimits,
-    pub started_at_unix_ms: u64,
-    pub deadline_unix_ms: u64,
-    pub last_observed_at_unix_ms: u64,
-    pub charged_elapsed_ms: u64,
-    pub reserved_steps: u64,
-    pub active_attempt: Option<CorrelationId>,
-    /// Conservative persisted observation; only explicit future reconciliation
-    /// may clear uncertainty about non-cooperative external work.
-    pub execution_may_continue: bool,
-    pub stopped: Option<ReasoningBudgetStop>,
-}
+pub use rrd_contract::{ReasoningBudgetStop, TaskReasoningBudget};
 
 /// Attempt identity is stable across a lost response or reconnect. A new
 /// identity spends another step; it cannot change this task's original budget.
@@ -52,7 +19,7 @@ pub struct TaskEmbeddingAttempt<'a> {
     pub cancellation: &'a EmbeddingCancellation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AttemptRecord {
     format_version: u16,
@@ -63,6 +30,7 @@ struct AttemptRecord {
     read_cursor: u64,
     outcome: AttemptOutcome,
     outcome_sha256: Option<String>,
+    result: Option<GenerateEmbeddingsResult>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -135,7 +103,26 @@ impl RrdEngine {
             request_id,
             operation_id,
         };
-        let reservation = self.reserve_task_attempt(attempt, clock, &context)?;
+        // Registration and durable Stop share this short lock. No provider
+        // computation holds it; the durable budget remains the only authority.
+        let key = self.budget_key(&attempt.request.scope, attempt.task_id);
+        let reservation = {
+            let mut active = self
+                .active_task_cancellations
+                .lock()
+                .map_err(|_| ServiceError::Storage("task cancellation lock poisoned".into()))?;
+            let reservation = self.reserve_task_attempt(attempt, clock, &context)?;
+            active.insert(
+                key.clone(),
+                (attempt.attempt_id.clone(), attempt.cancellation.clone()),
+            );
+            reservation
+        };
+        let _active = ActiveTaskCancellation {
+            engine: self,
+            key,
+            attempt_id: attempt.attempt_id.clone(),
+        };
         let result = self.generate_embeddings_at_with_control(
             attempt.request,
             reservation.read.clone(),
@@ -216,6 +203,7 @@ impl RrdEngine {
             active_attempt: None,
             execution_may_continue: false,
             stopped: None,
+            stop_expected_sha256: None,
         });
         if let Some(reason) = budget.stopped {
             return Err(ServiceError::ReasoningBudgetStopped(reason));
@@ -264,6 +252,7 @@ impl RrdEngine {
             read_cursor: read.commit_cursor,
             outcome: AttemptOutcome::Reserved,
             outcome_sha256: None,
+            result: None,
         };
         self.commit_budget(&read, expected, &budget, Some((None, &attempt)), context)?;
         Ok(Reservation {
@@ -283,74 +272,90 @@ impl RrdEngine {
         context: &EngineControlContext<'_>,
     ) -> Result<GenerateEmbeddingsResult> {
         let Reservation {
-            mut budget,
+            budget: reserved,
             mut attempt,
             control,
             started,
             ..
         } = reservation;
-        let expected_budget = Some(serde_json::to_vec(&budget).map_err(contract_json)?);
         let expected_attempt = Some(serde_json::to_vec(&attempt).map_err(contract_json)?);
-        // Clock failure or failed durable completion leaves the reservation
-        // unresolved. The output is withheld and cannot cause automatic replay.
         let at = observe_required(clock, "reasoning-complete")?.observed_at_unix_ms;
         let elapsed = u64::try_from(started.elapsed().as_millis())
             .unwrap_or(u64::MAX)
             .saturating_add(1);
-        budget.charged_elapsed_ms = budget.charged_elapsed_ms.saturating_add(elapsed);
-        let stop = if at < budget.last_observed_at_unix_ms {
-            Some(ReasoningBudgetStop::ClockRollback)
-        } else if at >= budget.deadline_unix_ms
-            || budget.charged_elapsed_ms >= budget.limits.max_run_elapsed_ms
-            || control.check().is_err()
-        {
-            Some(match control.check() {
-                Err(rrd_inference::EmbeddingDispatchError::Cancelled { .. }) => {
-                    ReasoningBudgetStop::Cancelled
-                }
-                _ => ReasoningBudgetStop::Deadline,
-            })
-        } else if result.is_err() {
-            Some(ReasoningBudgetStop::AttemptFailed)
-        } else {
-            None
-        };
-        if let Some(reason) = stop {
-            budget.stopped = Some(reason);
-            // Preserve an inference error's explicit outstanding-work flag.
-            if result.as_ref().err().is_none_or(ServiceError::retryable) {
-                result = Err(ServiceError::ReasoningBudgetStopped(reason));
+        if let Ok(output) = &result {
+            if serde_json::to_vec(output).map_err(contract_json)?.len()
+                > rrd_contract::MAX_TASK_EMBEDDING_OUTPUT_BYTES
+            {
+                result = Err(ServiceError::ConfigurationLimit(
+                    "task output exceeds the retained output bound".into(),
+                ));
             }
         }
-        budget.last_observed_at_unix_ms = budget.last_observed_at_unix_ms.max(at);
-        budget.active_attempt = None;
-        budget.execution_may_continue = match &result {
-            Err(ServiceError::InferenceDeadlineExceeded {
-                execution_may_continue,
-            })
-            | Err(ServiceError::InferenceCancelled {
-                execution_may_continue,
-            }) => *execution_may_continue,
-            Err(ServiceError::Storage(_)) => true,
-            _ => false,
-        };
-        attempt.outcome = if result.is_ok() {
-            AttemptOutcome::Accepted
-        } else {
-            AttemptOutcome::Stopped
-        };
-        attempt.outcome_sha256 = match &result {
-            Ok(output) => Some(operation_digest(output)?),
-            Err(_) => None,
-        };
-        // Even a non-timeout worker error can leave external work uncertain.
-        // A rejected attempt is charged and never automatically dispatched again.
-        let scope = self.query_scope(&budget.scope)?;
         for index in 0..3 {
+            let (expected_budget, current) =
+                self.load_task_budget(&reserved.scope, &reserved.task_id)?;
+            let mut budget = current
+                .ok_or_else(|| ServiceError::Storage("reserved budget disappeared".into()))?;
+            if budget.active_attempt.as_ref() != Some(&attempt.attempt_id)
+                || budget.reserved_steps != reserved.reserved_steps
+                || budget.limits != reserved.limits
+                || budget.configuration_sha256 != reserved.configuration_sha256
+            {
+                return Err(ServiceError::StorageConflict(
+                    "attempt no longer owns completion".into(),
+                ));
+            }
+            budget.charged_elapsed_ms = reserved.charged_elapsed_ms.saturating_add(elapsed);
+            let stop = budget.stopped.or_else(|| {
+                if at < budget.last_observed_at_unix_ms {
+                    Some(ReasoningBudgetStop::ClockRollback)
+                } else if at >= budget.deadline_unix_ms
+                    || budget.charged_elapsed_ms >= budget.limits.max_run_elapsed_ms
+                    || control.check().is_err()
+                {
+                    Some(match control.check() {
+                        Err(rrd_inference::EmbeddingDispatchError::Cancelled { .. }) => {
+                            ReasoningBudgetStop::Cancelled
+                        }
+                        _ => ReasoningBudgetStop::Deadline,
+                    })
+                } else if result.is_err() {
+                    Some(ReasoningBudgetStop::AttemptFailed)
+                } else {
+                    None
+                }
+            });
+            if let Some(reason) = stop {
+                budget.stopped = Some(reason);
+                if result.as_ref().err().is_none_or(ServiceError::retryable) {
+                    result = Err(ServiceError::ReasoningBudgetStopped(reason));
+                }
+            }
+            budget.last_observed_at_unix_ms = budget.last_observed_at_unix_ms.max(at);
+            budget.active_attempt = None;
+            budget.execution_may_continue = match &result {
+                Err(ServiceError::InferenceDeadlineExceeded {
+                    execution_may_continue,
+                })
+                | Err(ServiceError::InferenceCancelled {
+                    execution_may_continue,
+                }) => *execution_may_continue,
+                Err(ServiceError::Storage(_)) => true,
+                _ => false,
+            };
+            attempt.outcome = if result.is_ok() {
+                AttemptOutcome::Accepted
+            } else {
+                AttemptOutcome::Stopped
+            };
+            attempt.outcome_sha256 = result.as_ref().ok().map(operation_digest).transpose()?;
+            attempt.result = result.as_ref().ok().cloned();
+            let scope = self.query_scope(&budget.scope)?;
             let read = self.storage.runtime().read_stamp(&scope)?;
             match self.commit_budget(
                 &read,
-                expected_budget.clone(),
+                expected_budget,
                 &budget,
                 Some((expected_attempt.clone(), &attempt)),
                 context,
@@ -363,12 +368,30 @@ impl RrdEngine {
             }
         }
         if result.is_ok() {
-            // If persistence itself crosses the deadline, the recorded result
-            // remains discoverable but a late success is never delivered.
             control
                 .check()
                 .map_err(super::inference::embedding_dispatch_error)?;
         }
         result
+    }
+}
+
+struct ActiveTaskCancellation<'a> {
+    engine: &'a RrdEngine,
+    key: String,
+    attempt_id: CorrelationId,
+}
+impl Drop for ActiveTaskCancellation<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut active) = self.engine.active_task_cancellations.lock() {
+            // Completion may have admitted the next attempt before this guard
+            // runs. An old guard must never unregister the next attempt's Stop.
+            if active
+                .get(&self.key)
+                .is_some_and(|(id, _)| id == &self.attempt_id)
+            {
+                active.remove(&self.key);
+            }
+        }
     }
 }

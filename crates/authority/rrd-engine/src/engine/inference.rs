@@ -392,7 +392,7 @@ fn validate_embedding_collection(
     Ok(())
 }
 
-fn public_embedding_backend(
+pub(in crate::engine) fn public_embedding_backend(
     descriptor: &rrd_inference::EmbeddingBackendDescriptor,
 ) -> EmbeddingBackendSnapshot {
     EmbeddingBackendSnapshot {
