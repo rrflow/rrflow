@@ -459,6 +459,10 @@ pub struct DiagnosticStorageAdmission {
     /// Logical owner charges; these are not allocator or process RSS bytes.
     pub retained_mutable_bytes: u64,
     pub retained_projected_bytes: u64,
+    /// Owned source-page allocation charges; excludes borrowed mmap residency.
+    pub retained_source_bytes: u64,
+    pub peak_source_bytes: u64,
+    pub denied_source_allocations: u64,
     /// Includes the active request plus admitted waiters, matching admission.
     pub outstanding_requests: u64,
     pub outstanding_logical_bytes: u64,
@@ -485,7 +489,8 @@ impl DiagnosticStorageSnapshot {
             return invalid("diagnostic storage observation time must be greater than zero");
         }
         if let Some(admission) = &self.admission {
-            if self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
+            if admission.retained_source_bytes > admission.peak_source_bytes
+                || self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
                 || admission
                     .queued_requests
                     .checked_add(u64::from(admission.active))

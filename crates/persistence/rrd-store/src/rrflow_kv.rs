@@ -297,7 +297,10 @@ impl RrflowKvStore {
 
     pub fn open_existing_anchored(path: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
         let database = Database::open_anchored(path, options).map_err(|error| {
-            if matches!(error, rrd_lsm::Error::MutableLimit { .. }) {
+            if matches!(
+                error,
+                rrd_lsm::Error::MutableLimit { .. } | rrd_lsm::Error::SourcePageLimit { .. }
+            ) {
                 return Error::from(error);
             }
             Error::Substrate(format!(
@@ -367,7 +370,10 @@ impl RrflowKvStore {
             Database::create_anchored(path, options, Some(keyspaces::RRFLOW_KV_FORMAT))?
         } else {
             Database::open_anchored(path, options).map_err(|error| {
-                if matches!(error, rrd_lsm::Error::MutableLimit { .. }) {
+                if matches!(
+                    error,
+                    rrd_lsm::Error::MutableLimit { .. } | rrd_lsm::Error::SourcePageLimit { .. }
+                ) {
                     return Error::from(error);
                 }
                 Error::Substrate(format!(
@@ -833,6 +839,7 @@ impl StorageEngine for RrflowKvStore {
         let database = self.lock()?;
         let manifest = database.manifest();
         let cache = database.page_cache_stats();
+        let source_pages = database.source_page_memory().stats();
         let segment_io = database.segment_io_stats();
         let maintenance = database.maintenance_policy();
         let compaction = database.compaction_policy();
@@ -851,6 +858,9 @@ impl StorageEngine for RrflowKvStore {
             active_read_views: Some(active_read_views),
             pinned_read_bytes: Some(pinned_read_bytes),
             retained_mutable_bytes: Some(database.mutable_memory().stats().accounted_bytes as u64),
+            retained_source_bytes: Some(source_pages.reserved_bytes as u64),
+            peak_source_bytes: Some(source_pages.peak_reserved_bytes as u64),
+            denied_source_allocations: Some(source_pages.denied_allocations),
             retained_projected_bytes: Some(
                 database.projected_output_memory().stats().reserved_bytes as u64,
             ),

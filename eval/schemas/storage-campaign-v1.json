@@ -671,6 +671,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "denied_source_allocations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "fenced": {
           "type": "boolean"
         },
@@ -695,6 +700,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "peak_source_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "pinned_read_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -715,6 +725,12 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "retained_source_bytes": {
+          "description": "Owned source-page allocation charges; excludes borrowed mmap residency.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
@@ -724,6 +740,9 @@
         "pinned_read_bytes",
         "retained_mutable_bytes",
         "retained_projected_bytes",
+        "retained_source_bytes",
+        "peak_source_bytes",
+        "denied_source_allocations",
         "outstanding_requests",
         "outstanding_logical_bytes",
         "queued_requests",
@@ -1422,6 +1441,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "source_page_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "transaction_admission_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1452,6 +1476,7 @@
         "mutable_accounted_bytes",
         "mutable_versions",
         "projected_output_bytes",
+        "source_page_bytes",
         "page_cache_bytes",
         "wal_flush_target_bytes",
         "memtable_flush_target_versions",

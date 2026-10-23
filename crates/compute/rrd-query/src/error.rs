@@ -8,6 +8,7 @@ pub enum Error {
     Graphql(String),
     Binding(String),
     Budget(String),
+    StorageAdmission(String),
     Execution(String),
     Integrity(String),
 }
@@ -19,6 +20,7 @@ impl fmt::Display for Error {
             Self::Graphql(value) => ("GraphQL adapter", value),
             Self::Binding(value) => ("binding", value),
             Self::Budget(value) => ("budget", value),
+            Self::StorageAdmission(value) => ("storage admission", value),
             Self::Execution(value) => ("execution", value),
             Self::Integrity(value) => ("integrity", value),
         };
@@ -30,7 +32,9 @@ impl std::error::Error for Error {}
 
 impl From<rrd_store::Error> for Error {
     fn from(value: rrd_store::Error) -> Self {
-        if matches!(value, rrd_store::Error::RuntimeReadBudgetExceeded { .. }) {
+        if matches!(value, rrd_store::Error::SourcePageLimit { .. }) {
+            Self::StorageAdmission(value.to_string())
+        } else if matches!(value, rrd_store::Error::RuntimeReadBudgetExceeded { .. }) {
             Self::Budget(value.to_string())
         } else {
             Self::Execution(value.to_string())

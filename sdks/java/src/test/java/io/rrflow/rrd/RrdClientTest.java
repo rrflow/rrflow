@@ -49,6 +49,7 @@ final class RrdClientTest {
                                     Map.entry("mutable_accounted_bytes", 134217728),
                                     Map.entry("mutable_versions", 1048576),
                                     Map.entry("projected_output_bytes", 134217728),
+                                    Map.entry("source_page_bytes", 268435456),
                                     Map.entry("page_cache_bytes", 4194304),
                                     Map.entry("wal_flush_target_bytes", 67108864),
                                     Map.entry("memtable_flush_target_versions", 524288),
