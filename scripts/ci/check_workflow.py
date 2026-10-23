@@ -531,7 +531,8 @@ def main() -> None:
     require(
         reusable.count("python3 scripts/knowledge/render_capacity_profiles.py --check") == 1
         and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1
-        and reusable.count("python3 scripts/ci/test_collect_storage_acceptance.py") == 1,
+        and reusable.count("python3 scripts/ci/test_collect_storage_acceptance.py") == 1
+        and reusable.count("python3 scripts/ci/test_sustained_launch.py") == 1,
         "the owning J-04 capacity projection must be checked exactly once",
     )
 

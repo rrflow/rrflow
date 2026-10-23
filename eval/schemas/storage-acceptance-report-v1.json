@@ -44,6 +44,29 @@
         "evidence_verified": {
           "type": "boolean"
         },
+        "launch_cleanup_confirmed": {
+          "type": "boolean"
+        },
+        "launch_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "launch_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CampaignStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "platform": {
           "$ref": "#/$defs/NativePlatform"
         },
@@ -70,7 +93,8 @@
         "requests_per_second",
         "status",
         "qualification_passed",
-        "evidence_verified"
+        "evidence_verified",
+        "launch_cleanup_confirmed"
       ],
       "type": "object"
     },

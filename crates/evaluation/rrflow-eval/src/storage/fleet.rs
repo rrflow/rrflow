@@ -81,6 +81,7 @@ pub fn fleet_child(
     let children = campaign.points.len() as u64 * campaign.seeds.len() as u64 * 3 * estates;
     let root_reserve = MAX_DOCUMENT_BYTES
         .checked_mul(2 + campaign.points.len() as u64 * campaign.seeds.len() as u64 * 3)
+        .and_then(|n| n.checked_add(MAX_LAUNCH_RECEIPT_BYTES))
         .ok_or("fleet evidence reserve overflow")?;
     let total = campaign
         .evidence

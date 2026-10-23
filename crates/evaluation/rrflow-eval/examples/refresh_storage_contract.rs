@@ -3,8 +3,8 @@
 use rrflow_eval::storage::{
     catalogue_digest, manifest_digest, schema, validate_result, CampaignResult, CandidateCiReceipt,
     EvidenceClass, FleetResult, FleetTrialResult, ProgressEvent, StorageAcceptanceManifest,
-    StorageAcceptanceReport, StorageCampaign, StorageManifest, StorageResult, SustainedSegment,
-    ValidationReport,
+    StorageAcceptanceReport, StorageCampaign, StorageLaunchReceipt, StorageManifest, StorageResult,
+    SustainedSegment, ValidationReport,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -86,6 +86,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write(
         &schemas.join("storage-candidate-ci-v1.json"),
         &schema::<CandidateCiReceipt>(),
+    )?;
+    write(
+        &schemas.join("storage-launch-v1.json"),
+        &schema::<StorageLaunchReceipt>(),
     )?;
     println!("refreshed synthetic storage contract projections; no native workload executed");
     Ok(())

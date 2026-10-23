@@ -12,6 +12,8 @@ use std::sync::Mutex;
 
 const NANOSECONDS_PER_MS: u64 = 1_000_000;
 const MAX_SAMPLES: usize = 4096;
+/// Reserved outside workload artifacts for the outer process cleanup receipt.
+pub const MAX_LAUNCH_RECEIPT_BYTES: u64 = 8192;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -761,7 +763,7 @@ impl CampaignWriter {
         let bytes = encode_bounded(&campaign, MAX_DOCUMENT_BYTES)?;
         require(
             (bytes.len() as u64)
-                .checked_add(MAX_DOCUMENT_BYTES)
+                .checked_add(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES)
                 .and_then(|n| n.checked_add(4096))
                 .is_some_and(|n| n <= campaign.evidence.total_bytes.get()),
             "campaign identity exceeds artifact budget",
@@ -799,7 +801,7 @@ impl CampaignWriter {
             .total_bytes
             .get()
             .checked_sub(self.bytes)
-            .and_then(|n| n.checked_sub(MAX_DOCUMENT_BYTES))
+            .and_then(|n| n.checked_sub(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES))
             .and_then(|n| n.checked_sub(self.campaign.evidence.segment_bytes.get()))
             .ok_or("progress has no reserved evidence capacity")?;
         self.progress
@@ -831,7 +833,7 @@ impl CampaignWriter {
             self.bytes
                 .checked_add(self.campaign.evidence.segment_bytes.get())
                 .and_then(|n| n.checked_add(self.progress_bytes().ok()?))
-                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES))
+                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES))
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "next operating point has no reserved evidence capacity",
         )
@@ -854,7 +856,7 @@ impl CampaignWriter {
         // reporting space. Failed OS writes remain failed, never counted complete.
         require(
             next.checked_add(self.progress_bytes()?)
-                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES))
+                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES))
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "campaign artifact quota exhausted",
         )?;
@@ -948,7 +950,7 @@ impl CampaignWriter {
         let bytes = encode_bounded(&result, MAX_DOCUMENT_BYTES)?;
         require(
             artifact_bytes
-                .checked_add(bytes.len() as u64)
+                .checked_add(bytes.len() as u64 + MAX_LAUNCH_RECEIPT_BYTES)
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "final result exceeds artifact quota",
         )?;
@@ -1757,7 +1759,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
     }
     require(
         bytes
-            .checked_add(result_bytes.len() as u64)
+            .checked_add(result_bytes.len() as u64 + MAX_LAUNCH_RECEIPT_BYTES)
             .is_some_and(|n| n <= campaign.evidence.total_bytes.get()),
         "campaign total evidence quota exceeded",
     )?;

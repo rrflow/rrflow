@@ -21,6 +21,16 @@
           "$ref": "#/$defs/Id",
           "description": "One non-symlink directory directly below the evidence root."
         },
+        "launch_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "result_sha256": {
           "anyOf": [
             {

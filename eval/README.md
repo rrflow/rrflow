@@ -282,3 +282,18 @@ timing is explicitly a C-07 proxy; graph/context/model quality remains under its
 own later gates. Unknown owner grammar fails projection generation. Full
 capacity and 24-hour native evidence remain required and are not supplied by
 these commands or synthetic regression fixtures.
+
+
+Outer launch cleanup is part of acceptance. The existing sustained launcher
+now seals a bounded `launch.json` only after its owned cgroup/Job cleanup has
+returned. An unavailable facility, interrupted launcher or failed cleanup
+retains the frozen campaign and explicit outer outcome even if the harness
+never created a result. Existing inner results are preserved. Each manifest
+member binds this receipt with `launch_sha256` (semantic domain
+`rrflow-storage-launch-v1`); absent launch evidence cannot qualify. Acceptance
+compares its allocation/harness identity against every bound raw resource
+sample across all segments and fleet children, then requires successful exit
+and confirmed cleanup. A successful inner result cannot override an outer
+failure. Campaign/fleet evidence admission reserves 8 KiB for this receipt.
+The generated `storage-launch-v1.json` describes its bounded structure. No
+native resource limit is changed by offline receipt verification.

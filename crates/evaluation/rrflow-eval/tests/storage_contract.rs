@@ -480,6 +480,10 @@ fn generated_schemas_and_synthetic_receipts_match_goldens() {
         &schema_root.join("storage-candidate-ci-v1.json"),
         &schema::<CandidateCiReceipt>(),
     );
+    golden(
+        &schema_root.join("storage-launch-v1.json"),
+        &schema::<StorageLaunchReceipt>(),
+    );
     let (manifest, result) = fixtures();
     let fixture_root = root.join("tests/fixtures/storage");
     golden(

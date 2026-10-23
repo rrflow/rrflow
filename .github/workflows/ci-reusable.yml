@@ -261,6 +261,7 @@ jobs:
           python3 scripts/knowledge/render_capacity_profiles.py --check
           python3 scripts/knowledge/test_capacity_profiles.py
           python3 scripts/ci/test_collect_storage_acceptance.py
+          python3 scripts/ci/test_sustained_launch.py
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership

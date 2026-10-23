@@ -116,3 +116,42 @@ Generated parity retains 44 operations and OpenAPI digest
 `6a8d3e490eeb0e13a10465b752dee165223c7097e18ccd08acb79b38934e4650`.
 The journal was appended before final inventory regeneration. Candidate CI is
 pending and the native profile/soak checklist remains unchecked.
+
+## Outer native cleanup reconciliation
+
+Read the existing sustained launcher, native cgroup/Windows Job ownership
+helpers, campaign writer/reducer and fleet child/result binding. Inspection
+found that the inner harness can seal a successful result before outer native
+cleanup fails. Pre-edit PR comment 6359584213 binds the correction at this
+acceptance boundary. Extended the existing launcher, not the engine, to retain
+an exclusive 8 KiB `launch.json` after cleanup, including failed/interrupted/
+unavailable outcomes. If no harness directory exists it retains only the
+frozen campaign and outer receipt; it never fabricates an inner result. Existing
+inner evidence cannot be overwritten. Reservation covers the receipt before
+workload admission. The acceptance manifest binds the outer receipt separately;
+all resource samples must match its allocation and harness across the exact
+verified segment/trial chains. Missing/failed/unconfirmed cleanup cannot qualify,
+even if the inner result passed. Reports expose both outcomes distinctly.
+
+The first refresh command exposed a missing StorageLaunchReceipt import in
+the schema generator; corrected the explicit import and reran successfully.
+Six focused acceptance tests passed. `test_sustained_launch.py` passed three
+pure filesystem cases (0.051s), including inner success followed by outer
+failure and exclusive receipt preservation. The evaluation owner suite passed
+45 tests (31 library, 3 provider-compatibility, 11 storage-contract), and strict
+all-target evaluation Clippy passed (2.53s). No native process/resource fixture
+or soak was launched by these regressions. Schema projections were refreshed.
+
+PR 71 candidate run 39910177310 separately completed all three native domain
+crash/capacity jobs (120272369258 Linux, 120272369290 Windows, 120272369301
+macOS). Retrieved job logs each contain eight fresh/existing actual-capacity
+receipts and a passed suite. This is evidence for that candidate only, not
+this newer acceptance candidate or a 24-hour capacity qualification. Its
+Windows ordinary reopen job was still running when inspected.
+
+The launch oracle additionally read a two-segment chain and rejected a second
+allocation even when the changed segment's hash chain was recomputed correctly.
+The focused regression passed (0.03s); strict all-target lint passed (1.12s).
+Navigation, inventory, documentation, workflow policy and diff checks passed
+for the cleanup refinement before publication. Final inventory regeneration
+includes this evidence paragraph.

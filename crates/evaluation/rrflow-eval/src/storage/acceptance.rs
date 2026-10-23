@@ -5,6 +5,9 @@ use super::*;
 #[path = "acceptance_latency.rs"]
 mod nominal;
 pub use nominal::NominalObservation;
+#[path = "acceptance_launch.rs"]
+mod launch;
+pub use launch::StorageLaunchReceipt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::Path};
@@ -181,6 +184,7 @@ pub struct AcceptanceCampaign {
     pub directory: Id,
     pub campaign_sha256: Digest,
     pub result_sha256: Option<Digest>,
+    pub launch_sha256: Option<Digest>,
     pub status: CampaignStatus,
     /// Missing results must be declared, never silently omitted from coverage.
     pub absence_reason: Option<Id>,
@@ -244,6 +248,9 @@ pub struct AcceptedOperatingPoint {
     pub status: CampaignStatus,
     pub qualification_passed: bool,
     pub evidence_verified: bool,
+    pub launch_status: Option<CampaignStatus>,
+    pub launch_cleanup_confirmed: bool,
+    pub launch_reason: Option<Id>,
     pub absence_reason: Option<Id>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -508,6 +515,34 @@ pub fn verify_storage_acceptance(
             status == entry.status,
             "campaign result status differs from declared acceptance member",
         )?;
+        let launch_path = directory.join("launch.json");
+        let (launch_status, launch_cleanup_confirmed, launch_reason, launch_passed) =
+            if let Some(expected) = &entry.launch_sha256 {
+                let receipt: StorageLaunchReceipt =
+                    decode(&read_bounded(&launch_path, MAX_LAUNCH_RECEIPT_BYTES)?)?;
+                require(
+                    digest("rrflow-storage-launch-v1", &receipt)? == *expected,
+                    "launch receipt identity changed",
+                )?;
+                let passed = launch::verify(
+                    &directory,
+                    &campaign,
+                    &receipt,
+                    entry.result_sha256.as_ref(),
+                )?;
+                (
+                    Some(receipt.status),
+                    receipt.cleanup_confirmed,
+                    receipt.reason,
+                    passed,
+                )
+            } else {
+                require(
+                    !launch_path.try_exists().map_err(|e| e.to_string())?,
+                    "unreviewed launch receipt exists",
+                )?;
+                (None, false, None, false)
+            };
         for point in &campaign.points {
             points.push(AcceptedOperatingPoint {
                 directory: entry.directory.clone(),
@@ -516,8 +551,11 @@ pub fn verify_storage_acceptance(
                 clients: point.clients.get(),
                 requests_per_second: point.requests_per_second.get(),
                 status,
-                qualification_passed: qualified,
+                qualification_passed: qualified && launch_passed,
                 evidence_verified: entry.result_sha256.is_some(),
+                launch_status,
+                launch_cleanup_confirmed,
+                launch_reason: launch_reason.clone(),
                 absence_reason: entry.absence_reason.clone(),
             });
         }

@@ -270,3 +270,9 @@ projects those thresholds from their owner and checks raw measured observations
 in addition to campaign qualification. It also binds native CI to the actual
 tested revision and reports absent/failed operating points explicitly. Candidate
 acceptance and the full profile/24-hour matrix remain pending; POAM-035 is open.
+
+The same acceptance inspection found that a successful inner workload result
+could outlive failed outer native-allocation cleanup. C-07h now requires a
+separately bound launcher outcome/cleanup receipt and matches its allocation
+against all raw samples. Missing or failed cleanup remains unqualified; the
+native capacity/soak acceptance gap stays open.

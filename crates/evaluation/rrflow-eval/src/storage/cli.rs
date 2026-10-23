@@ -48,6 +48,7 @@ pub fn run(args: &[String]) -> Result<()> {
                 "acceptance-manifest" => schema::<StorageAcceptanceManifest>(),
                 "acceptance-report" => schema::<StorageAcceptanceReport>(),
                 "candidate-ci" => schema::<CandidateCiReceipt>(),
+                "launch" => schema::<StorageLaunchReceipt>(),
                 _ => return Err("unknown storage schema projection".into()),
             };
             std::io::stdout()
@@ -134,6 +135,6 @@ pub fn run(args: &[String]) -> Result<()> {
             );
             Ok(())
         }
-        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event|fleet-result|fleet-trial|acceptance-manifest|acceptance-report|candidate-ci> | validate <manifest> | verify <manifest> <result> <new-report> | campaign profiles | campaign validate <campaign> | campaign verify <directory> | acceptance ci-receipt <directory> | acceptance verify <root> <manifest> <new-report>".into()),
+        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event|fleet-result|fleet-trial|acceptance-manifest|acceptance-report|candidate-ci|launch> | validate <manifest> | verify <manifest> <result> <new-report> | campaign profiles | campaign validate <campaign> | campaign verify <directory> | acceptance ci-receipt <directory> | acceptance verify <root> <manifest> <new-report>".into()),
     }
 }

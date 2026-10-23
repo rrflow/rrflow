@@ -112,6 +112,7 @@ fn acceptance_fixture(root: &Path) -> StorageAcceptanceManifest {
             directory: "desktop".to_owned().try_into().unwrap(),
             campaign_sha256: campaign.sha256().unwrap(),
             result_sha256: None,
+            launch_sha256: None,
             status: CampaignStatus::NotRun,
             absence_reason: Some("not-run".to_owned().try_into().unwrap()),
         }],
@@ -169,6 +170,9 @@ fn coverage_keeps_failed_knee_and_reports_only_measured_envelope() {
         status: CampaignStatus::Completed,
         qualification_passed: true,
         evidence_verified: true,
+        launch_status: Some(CampaignStatus::Completed),
+        launch_cleanup_confirmed: true,
+        launch_reason: None,
         absence_reason: None,
     };
     let mut points = vec![point.clone()];
