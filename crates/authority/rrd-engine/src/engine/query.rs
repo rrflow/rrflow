@@ -84,12 +84,12 @@ impl RrdEngine {
             .storage
             .runtime()
             .read_stamp(&scope)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(super::error::query_storage_error)?;
         let pipeline = rrd_query::StampedQueryPipeline::new(&self.storage, read)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
         let stamped = pipeline
             .run(&query, &parameters, &budget)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
         let bound = stamped.bound;
         let plan = stamped.plan;
         let execution = stamped.execution;
@@ -217,7 +217,7 @@ impl RrdEngine {
                 request.after_cursor,
                 &live_budget,
             )
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
             let elapsed = started.elapsed();
             if delta.through_cursor > request.after_cursor
                 || request.wait_timeout_ms == 0
