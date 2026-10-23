@@ -120,7 +120,7 @@ fn target(estate: &Estate, role: &str) -> PathBuf {
             physical
                 .reachable_segments
                 .first()
-                .expect("backup must publish a segment")
+                .expect("configured native writes must publish a reachable segment")
         ),
         "wal" => physical
             .files
@@ -290,7 +290,26 @@ async fn restore_backup(
 }
 
 fn run(mode: &str) {
-    let estate = Estate::install(mode);
+    // An application backup is a read-only logical snapshot. Publish native
+    // segments through ordinary writes under an explicit installed policy,
+    // rather than depending on an unrelated backup flush side effect.
+    let configuration = tempfile::Builder::new()
+        .prefix("rrflow damage policy ")
+        .tempdir()
+        .unwrap();
+    let path = configuration.path().join("configuration.toml");
+    let mut policy: toml::Value = toml::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../authority/rrd-engine/assets/install/default-estate-configuration-v3.toml"
+    )))
+    .unwrap();
+    policy["storage"]["wal_flush_target_bytes"] = toml::Value::Integer(1);
+    std::fs::write(&path, toml::to_string(&policy).unwrap()).unwrap();
+    let estate = Estate::install_configured(mode, Some(&path));
+    assert_eq!(
+        estate.plan["configuration"]["storage"]["wal_flush_target_bytes"],
+        1
+    );
     let clock = Instant::now();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

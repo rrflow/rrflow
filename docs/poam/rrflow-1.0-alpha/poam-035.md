@@ -298,3 +298,10 @@ profiles. Gate C must accept the complete matrix at exact tested revisions
 before this row closes. Missing facilities or unrun large profiles remain
 visible gaps. J-02/J-03 retain OS/power-cut and distribution-profile claims;
 J-04 retains full-product competitive evidence.
+
+The [native flow and damage-policy record](../../evidence/change-journals/gate-c/c-07g-native-flow-and-damage-policy.md)
+retains a successful small installed flow and all three platforms' capacity
+cases on their exact candidates. CI also exposed a stale damage-fixture
+assumption that backup publishes segments; the fixture now installs an explicit
+flush policy. Updated native damage qualification, high-load storage-admission
+resolution, complete profiles and the 24-hour run remain open.
