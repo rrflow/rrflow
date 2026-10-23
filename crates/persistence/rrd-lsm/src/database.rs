@@ -1687,31 +1687,10 @@ impl Database {
     ) -> Result<Option<CompactionOutcome>> {
         self.flush_memtable_inner(at, None)?;
         let started = Instant::now();
-        let Some(candidate) = self.select_compaction_candidate(force) else {
+        let Some(candidate) = self.select_compaction_candidate(force, started)? else {
             return Ok(None);
         };
-        let mut logical_bytes = 0u64;
-        let mut versions = 0u64;
-        let mut physical_bytes = 0u64;
-        for index in &candidate.indices {
-            let segment = &self.segments[*index];
-            physical_bytes = physical_bytes
-                .checked_add(segment.descriptor.bytes)
-                .ok_or_else(|| Error::InvalidSegment("compaction physical byte overflow".into()))?;
-            logical_bytes = logical_bytes
-                .checked_add(segment.compaction_logical_bytes()?)
-                .ok_or_else(|| Error::InvalidSegment("compaction logical byte overflow".into()))?;
-            versions = versions
-                .checked_add(segment.descriptor.entries)
-                .ok_or_else(|| Error::InvalidSegment("compaction version count overflow".into()))?;
-            self.compaction_limits
-                .check(crate::MaintenanceResource::InputBytes, physical_bytes)?;
-            self.compaction_limits
-                .check(crate::MaintenanceResource::InputLogicalBytes, logical_bytes)?;
-            self.compaction_limits
-                .check(crate::MaintenanceResource::InputVersions, versions)?;
-            self.compaction_limits.check_elapsed(started)?;
-        }
+        let input_bytes = self.admit_compaction_input(&candidate, started)?;
         let durable = self.manifest.durable_sequence;
         let mut protected_sequences = protected
             .iter()
@@ -1722,7 +1701,6 @@ impl Database {
         protected_sequences.insert(durable);
         let previous_manifest = self.manifest.digest.clone();
         let input_segments = candidate.indices.len();
-        let input_bytes = physical_bytes;
         let merge = self.merge_compaction_candidate(
             &candidate,
             durable,
@@ -1795,134 +1773,153 @@ impl Database {
         }))
     }
 
-    fn select_compaction_candidate(&self, force: bool) -> Option<CompactionCandidate> {
-        let mut l0 = self
-            .segments
-            .iter()
-            .enumerate()
-            .filter(|(_, segment)| segment.descriptor.level == 0)
-            .map(|(index, segment)| (index, &segment.descriptor))
-            .collect::<Vec<_>>();
-        l0.sort_by(|left, right| {
-            left.1
-                .maximum_sequence
-                .cmp(&right.1.maximum_sequence)
-                .then_with(|| left.1.first_key.cmp(&right.1.first_key))
-                .then_with(|| left.1.id.cmp(&right.1.id))
-        });
-        if !l0.is_empty() && (force || l0.len() >= self.compaction.l0_compaction_trigger) {
-            let target_level = 1.min(self.compaction.max_level);
-            let mut selected_l0 = vec![l0[0].0];
-            let mut first_key = l0[0].1.first_key.clone();
-            let mut last_key = l0[0].1.last_key.clone();
-            for (index, descriptor) in l0.into_iter().skip(1) {
-                let candidate_first = first_key.as_slice().min(descriptor.first_key.as_slice());
-                let candidate_last = last_key.as_slice().max(descriptor.last_key.as_slice());
-                let overlap_count = self
-                    .segments
-                    .iter()
-                    .enumerate()
-                    .filter(|(other, segment)| {
-                        !selected_l0.contains(other)
-                            && *other != index
-                            && segment.descriptor.level == target_level
-                            && ranges_overlap(
-                                candidate_first,
-                                candidate_last,
-                                &segment.descriptor.first_key,
-                                &segment.descriptor.last_key,
-                            )
-                    })
-                    .count();
-                if selected_l0.len() + 1 + overlap_count > self.compaction.max_input_segments {
-                    break;
-                }
-                selected_l0.push(index);
-                first_key = candidate_first.to_vec();
-                last_key = candidate_last.to_vec();
-            }
-            let mut indices = selected_l0;
-            let overlaps = self
-                .segments
-                .iter()
-                .enumerate()
-                .filter(|(index, segment)| {
-                    !indices.contains(index)
-                        && segment.descriptor.level == target_level
-                        && ranges_overlap(
-                            &first_key,
-                            &last_key,
-                            &segment.descriptor.first_key,
-                            &segment.descriptor.last_key,
-                        )
-                })
-                .map(|(index, _)| index)
-                .collect::<Vec<_>>();
-            indices.extend(overlaps);
-            if (force || indices.len() >= 2) && indices.len() <= self.compaction.max_input_segments
-            {
-                indices.sort_unstable();
-                return Some(CompactionCandidate {
-                    indices,
-                    source_level: 0,
-                    target_level,
-                });
-            }
-            return None;
-        }
-
-        for source_level in 1..self.compaction.max_level {
-            let mut at_level = self
+    /// Select a complete overlap closure that fits one maintenance quantum.
+    /// A blocked upper level must not hide feasible work that clears its target.
+    fn select_compaction_candidate(
+        &self,
+        force: bool,
+        started: Instant,
+    ) -> Result<Option<CompactionCandidate>> {
+        let mut denied = None;
+        for source_level in 0..self.compaction.max_level {
+            self.compaction_limits.check_elapsed(started)?;
+            let mut sources = self
                 .segments
                 .iter()
                 .enumerate()
                 .filter(|(_, segment)| segment.descriptor.level == source_level)
-                .map(|(index, segment)| (index, &segment.descriptor))
+                .map(|(index, _)| index)
                 .collect::<Vec<_>>();
-            if at_level.is_empty() || (!force && at_level.len() < 2) {
+            let blocked = denied.is_some();
+            let threshold = if source_level == 0 {
+                self.compaction.l0_compaction_trigger
+            } else {
+                2
+            };
+            if sources.is_empty() || (!force && !blocked && sources.len() < threshold) {
                 continue;
             }
-            at_level.sort_by(|left, right| {
-                left.1
-                    .first_key
-                    .cmp(&right.1.first_key)
-                    .then_with(|| left.1.id.cmp(&right.1.id))
-            });
-            let target_level = source_level.saturating_add(1);
-            for take in (1..=at_level.len().min(self.compaction.max_input_segments)).rev() {
-                let first_key = &at_level[0].1.first_key;
-                let last_key = &at_level[take - 1].1.last_key;
-                let mut indices = at_level
-                    .iter()
-                    .take(take)
-                    .map(|(index, _)| *index)
-                    .collect::<Vec<_>>();
-                for (index, segment) in self.segments.iter().enumerate() {
-                    if segment.descriptor.level == target_level
-                        && ranges_overlap(
-                            first_key,
-                            last_key,
-                            &segment.descriptor.first_key,
-                            &segment.descriptor.last_key,
-                        )
-                    {
-                        indices.push(index);
-                    }
+            sources.sort_by(|left, right| {
+                let left = &self.segments[*left].descriptor;
+                let right = &self.segments[*right].descriptor;
+                if source_level == 0 {
+                    left.maximum_sequence
+                        .cmp(&right.maximum_sequence)
+                        .then_with(|| left.first_key.cmp(&right.first_key))
+                        .then_with(|| left.id.cmp(&right.id))
+                } else {
+                    left.first_key
+                        .cmp(&right.first_key)
+                        .then_with(|| left.id.cmp(&right.id))
                 }
-                indices.sort_unstable();
-                indices.dedup();
-                if indices.len() <= self.compaction.max_input_segments
-                    && (force || indices.len() >= 2)
-                {
-                    return Some(CompactionCandidate {
-                        indices,
-                        source_level,
-                        target_level,
-                    });
+            });
+            for take in (1..=sources.len().min(self.compaction.max_input_segments)).rev() {
+                let Some(candidate) =
+                    self.compaction_overlap_candidate(&sources[..take], source_level, started)?
+                else {
+                    continue;
+                };
+                // Do not disguise a rejected merge of multiple source segments
+                // as a successful move of just one. A sole blocking target may
+                // move down to free its parent; this is finite in max_level.
+                if candidate.indices.len() < 2 && !(sources.len() == 1 && (force || blocked)) {
+                    continue;
+                }
+                match self.admit_compaction_input(&candidate, started) {
+                    Ok(_) => return Ok(Some(candidate)),
+                    Err(
+                        error @ Error::MaintenanceLimit {
+                            resource:
+                                crate::MaintenanceResource::InputBytes
+                                | crate::MaintenanceResource::InputLogicalBytes
+                                | crate::MaintenanceResource::InputVersions,
+                            ..
+                        },
+                    ) => {
+                        if denied.is_none() {
+                            denied = Some(error);
+                        }
+                    }
+                    Err(error) => return Err(error),
                 }
             }
         }
-        None
+        match denied {
+            Some(error) => Err(error),
+            None => Ok(None),
+        }
+    }
+
+    fn compaction_overlap_candidate(
+        &self,
+        sources: &[usize],
+        source_level: u8,
+        started: Instant,
+    ) -> Result<Option<CompactionCandidate>> {
+        let first_key = sources
+            .iter()
+            .map(|index| self.segments[*index].descriptor.first_key.as_slice())
+            .min()
+            .expect("nonempty source selection");
+        let last_key = sources
+            .iter()
+            .map(|index| self.segments[*index].descriptor.last_key.as_slice())
+            .max()
+            .expect("nonempty source selection");
+        let target_level = source_level + 1;
+        let mut indices = sources.to_vec();
+        for (index, segment) in self.segments.iter().enumerate() {
+            self.compaction_limits.check_elapsed(started)?;
+            if segment.descriptor.level == target_level
+                && ranges_overlap(
+                    first_key,
+                    last_key,
+                    &segment.descriptor.first_key,
+                    &segment.descriptor.last_key,
+                )
+            {
+                indices.push(index);
+                if indices.len() > self.compaction.max_input_segments {
+                    return Ok(None);
+                }
+            }
+        }
+        indices.sort_unstable();
+        Ok(Some(CompactionCandidate {
+            indices,
+            source_level,
+            target_level,
+        }))
+    }
+
+    fn admit_compaction_input(
+        &self,
+        candidate: &CompactionCandidate,
+        started: Instant,
+    ) -> Result<u64> {
+        let mut logical_bytes = 0u64;
+        let mut versions = 0u64;
+        let mut physical_bytes = 0u64;
+        for index in &candidate.indices {
+            let segment = &self.segments[*index];
+            physical_bytes = physical_bytes
+                .checked_add(segment.descriptor.bytes)
+                .ok_or_else(|| Error::InvalidSegment("compaction physical byte overflow".into()))?;
+            logical_bytes = logical_bytes
+                .checked_add(segment.compaction_logical_bytes()?)
+                .ok_or_else(|| Error::InvalidSegment("compaction logical byte overflow".into()))?;
+            versions = versions
+                .checked_add(segment.descriptor.entries)
+                .ok_or_else(|| Error::InvalidSegment("compaction version count overflow".into()))?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputBytes, physical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputLogicalBytes, logical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputVersions, versions)?;
+            self.compaction_limits.check_elapsed(started)?;
+        }
+        Ok(physical_bytes)
     }
 
     fn merge_compaction_candidate(

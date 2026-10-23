@@ -315,3 +315,10 @@ cases on their exact candidates. CI also exposed a stale damage-fixture
 assumption that backup publishes segments; the fixture now installs an explicit
 flush policy. Updated native damage qualification, high-load storage-admission
 resolution, complete profiles and the 24-hour run remain open.
+
+The [budget-admitted compaction repair](../../evidence/change-journals/gate-c/c-07d-budgeted-compaction-selection.md)
+reproduces a count-only selection failure even when a smaller native merge fits.
+Selection now admits complete overlap closures and lower-level relief within
+the existing limits. All 183 native storage tests pass; the old long-run candidate
+was stopped with retained incomplete evidence. Repaired installed capacity and
+full soak qualification remain required.
