@@ -158,3 +158,16 @@ qualification verdict for Qualification-purpose installed and offline CLI
 success; completed insufficient evidence stays on disk. The CLI binds its
 purpose check to the verified campaign digest. Characterization keeps its
 explicit unqualified success semantics. No acceptance threshold changed.
+
+
+### Candidate SDK count correction
+
+Candidate run 39915649527, SDK job 120289418658, exposed the authored .NET
+catalogue assertion still expecting 43 operations. Pre-edit PR comment
+6359934150 binds this refinement. Updated RrdClientTests to expect 44 and
+explicitly retain session authentication and read-only mutation semantics
+for DiagnosticsStorageCursor. Generated catalogue remains the sole owner.
+The focused local dotnet run could not execute: pinned SDK 10.0.402 is absent
+on this workstation (the attempted --filter-method argument was also rejected).
+This is recorded as not run, not a passing SDK test. Candidate CI installs
+the pinned SDK and must rerun the full SDK conformance job. No gate closes.
