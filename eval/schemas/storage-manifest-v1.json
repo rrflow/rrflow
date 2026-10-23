@@ -4,6 +4,17 @@
       "additionalProperties": false,
       "description": "Proposed, frozen laboratory ceilings. They are NOT installed configuration.\nByte reservations are disjoint; recovery replay bytes differ from memory.",
       "properties": {
+        "aggregate_process_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Limit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-estate disjoint reservations must fit this aggregate."
+        },
         "atomic_batch_bytes": {
           "$ref": "#/$defs/Limit"
         },

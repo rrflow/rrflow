@@ -282,6 +282,13 @@ coverage gap. The [bounded-worker readback correction](../../evidence/change-jou
 moves the same independent oracle into existing admitted workers while keeping
 real API latency and final restart readback. Actual timing acceptance is pending.
 
+The lower-rate campaign reached drain and exposed an invalid probe ledger:
+it claimed a present read without a recorded attempt. The
+[drain receipt correction](../../evidence/change-journals/gate-c/c-07g-drain-probe-receipt.md)
+records an executed public request, real receipt and independent verification
+without counting idle-drain probes as offered throughput. Native flow acceptance
+remains pending; the earlier failed resource policies remain retained.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
@@ -336,3 +343,8 @@ per-open random namespace without overwriting interrupted bytes. An independent
 subprocess regression first reproduced native AlreadyExists, then passed for
 manifest/CURRENT/checkpoint publication after correction. Exact installed and
 three-platform candidate acceptance remain pending.
+The canonical ten-estate J-04 declaration was itself inadmissible: the shared
+8 GiB ceiling was multiplied into an 80 GiB host reservation. The
+[shared fleet budget correction](../../evidence/change-journals/gate-c/c-07g-shared-fleet-budget.md)
+binds an explicit aggregate pool and rejects true summed-reservation overcommit.
+Contract acceptance now passes; actual native fleet qualification remains open.
