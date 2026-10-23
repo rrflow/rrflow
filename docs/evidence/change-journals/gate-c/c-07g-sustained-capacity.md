@@ -671,3 +671,16 @@ Candidate CI must execute these regression definitions. Gate C, C-07f/g,
 OBJ-02 and POAM-035 remain open; reader-pin/fleet execution, disk reserve and
 full profile/24-hour qualification remain unfinished. Full changed diff
 reviewed before commit.
+
+## Candidate workflow parse repair
+
+Candidate `a5084140` runs 39901929763 and 39901935907 failed before any jobs
+were created. Reproduced the committed workflow's YAML parse error at line
+502: the unquoted Rust filter ends in `::` followed by a space. Changed its
+run value to a folded YAML block, preserving the exact command and both cases.
+The existing workflow policy now requires that safe scalar form. Read the
+failed run metadata, complete changed step and relevant command-policy list;
+no execution or acceptance requirement changed. Local PyYAML parsed the fixed
+workflow successfully and rejected the prior committed bytes at the reported
+position; repository workflow policy passed. This was syntax validation only,
+not a local engine test. Candidate CI must restart on the corrected head.
