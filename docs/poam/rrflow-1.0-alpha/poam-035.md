@@ -348,3 +348,9 @@ The canonical ten-estate J-04 declaration was itself inadmissible: the shared
 [shared fleet budget correction](../../evidence/change-journals/gate-c/c-07g-shared-fleet-budget.md)
 binds an explicit aggregate pool and rejects true summed-reservation overcommit.
 Contract acceptance now passes; actual native fleet qualification remains open.
+The [native flow and damage-policy record](../../evidence/change-journals/gate-c/c-07g-native-flow-and-damage-policy.md)
+retains a successful small installed flow and all three platforms' capacity
+cases on their exact candidates. CI also exposed a stale damage-fixture
+assumption that backup publishes segments; the fixture now installs an explicit
+flush policy. Updated native damage qualification, high-load storage-admission
+resolution, complete profiles and the 24-hour run remain open.
