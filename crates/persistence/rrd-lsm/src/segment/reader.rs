@@ -364,6 +364,13 @@ struct ActiveManifest {
 }
 
 impl ActiveReadViews {
+    pub(crate) fn ownership(registry: &Arc<Mutex<Self>>) -> Result<(u64, u64)> {
+        let views = registry
+            .lock()
+            .map_err(|_| Error::PoisonedReadViewRegistry)?;
+        Ok((views.active as u64, views.pinned_bytes))
+    }
+
     pub(crate) fn acquire(
         registry: &Arc<Mutex<Self>>,
         manifest: Manifest,
@@ -533,6 +540,7 @@ pub struct ProjectedReadStream {
     cursors: Vec<RunCursor>,
     heads: Vec<Option<ProjectedEntry>>,
     heap: BinaryHeap<HeapItem>,
+    unopened: BinaryHeap<HeapItem>,
     pending: Option<PreparedRow>,
     initialized: bool,
     terminal: bool,
@@ -591,6 +599,7 @@ impl ProjectedReadStream {
             cursors,
             heads,
             heap: BinaryHeap::new(),
+            unopened: BinaryHeap::new(),
             pending: None,
             initialized: false,
             terminal: false,
@@ -729,7 +738,30 @@ impl ProjectedReadStream {
         }
         self.initialized = true;
         for run in 0..self.cursors.len() {
-            self.advance(run)?;
+            match &self.cursors[run] {
+                RunCursor::Memtable(_) => self.advance(run)?,
+                RunCursor::Segment(cursor) => self.unopened.push(HeapItem {
+                    // Descriptor bounds already govern read-view selection.
+                    // This lower bound cannot exceed any visible selected key.
+                    key: cursor.segment.descriptor.first_key.clone(),
+                    run,
+                }),
+            }
+        }
+        Ok(())
+    }
+
+    fn open_competing_runs(&mut self) -> Result<()> {
+        // Open every run that could precede or tie the smallest loaded key.
+        // Opening may move that key; compare again before selecting a winner.
+        // Disjoint future runs remain pinned/admitted but need no page I/O yet.
+        while self.unopened.peek().is_some_and(|candidate| {
+            self.heap
+                .peek()
+                .is_none_or(|head| candidate.key <= head.key)
+        }) {
+            let candidate = self.unopened.pop().expect("unopened run was checked");
+            self.advance(candidate.run)?;
         }
         Ok(())
     }
@@ -748,6 +780,7 @@ impl ProjectedReadStream {
 
     fn next_row(&mut self) -> Result<Option<PreparedRow>> {
         loop {
+            self.open_competing_runs()?;
             let Some(first) = self.heap.pop() else {
                 return Ok(None);
             };
@@ -881,6 +914,7 @@ impl ProjectedReadStream {
         self.pending = None;
         self.heads = Vec::new();
         self.heap = BinaryHeap::new();
+        self.unopened = BinaryHeap::new();
         self.cursors = Vec::new();
         let release = self
             .lease

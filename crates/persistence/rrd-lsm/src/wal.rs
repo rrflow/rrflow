@@ -266,7 +266,7 @@ impl WalWriter {
         }
         let write_started = phases.is_some().then(PhaseClock::start);
         #[cfg(all(feature = "crash-test", not(test)))]
-        crate::crash_test::boundary(crate::crash_test::Point::WalBeforeWrite, &self.path);
+        crate::crash_test::wal_before_write(&self.path, batch.payload.len());
         let write = (|| -> std::io::Result<()> {
             let written = loop {
                 match file_io::write_vectored(

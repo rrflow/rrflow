@@ -74,6 +74,18 @@ Existing model-manifest validation admits the three route-proposal grammar,
 not an arbitrary endpoint-selector model or unbound LoRA sidecar. No training,
 Spark hardware, runtime admission extension or promotion is qualified here.
 
+Inspection at `ff11edf6ec8da7461955cb4eb349fb81828a2f09` confirms that
+`ReasoningLimits` is validated/sealed by installation and exposed by server
+capabilities, but no governed reasoning runner consumes its aggregate elapsed,
+step and per-step ceilings. Defaults therefore cannot prove prevention of
+hours-long work or repeated retries. The
+[effort and run-budget contract](../../reference/inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+and Gate G acceptance now explicitly require finite user-selected effort,
+aggregate accounting, no-progress stopping and non-resetting cancellation/
+resume. Connectome must not advertise those controls as operational while
+the capability is unavailable. This remains an implementation deficiency;
+the clarification does not close this item.
+
 ## Owning gates
 
 D-05, G-01 through G-06; I-03/I-07 for governed improvement

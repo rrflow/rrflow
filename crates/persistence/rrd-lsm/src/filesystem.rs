@@ -409,7 +409,11 @@ impl AnchoredPath {
         // unlinkat semantics remove this directory entry, never its link target.
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::Remove, self.diagnostic_path())?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::before_io("remove", self.diagnostic_path());
         cap::remove_file(&parent, Path::new(&name))?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::after_io("remove", self.diagnostic_path());
         #[cfg(test)]
         ticket.removed()?;
         self.parent()
@@ -455,6 +459,8 @@ impl AnchoredPath {
         #[cfg(all(feature = "crash-test", not(test)))]
         crate::crash_test::observe_native_error("rename", self.diagnostic_path(), &result);
         result?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::after_io("rename", self.diagnostic_path());
         #[cfg(test)]
         ticket.renamed(target.diagnostic_path())?;
         self.parent()

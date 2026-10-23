@@ -1,5 +1,5 @@
 use crate::access::runtime_state::{
-    checked_key, get, put_sequence, read_sequence, scan_space_from,
+    checked_key, get, put_sequence, read_sequence, scan_space_bounded_from,
 };
 use crate::access::synchronize_index_commit_bindings;
 use crate::control::{
@@ -13,6 +13,10 @@ use rrd_core::{digest, ScopeId};
 
 const CONTROL_TRANSACTION_ATTEMPTS: usize = 16;
 const INDEX_CATALOGUE_CONTROL_PREFIX: &str = "server/state/index-catalogue/";
+
+#[cfg(test)]
+#[path = "control_page_tests.rs"]
+mod page_tests;
 
 struct IndexBindingProjection<'a> {
     expected_schema_revision: u64,
@@ -234,34 +238,57 @@ impl<'a> ControlRepository<'a> {
             ));
         }
         let transaction = self.storage.begin_transaction()?;
+        let head = read_sequence(&*transaction, &keyspaces::control_journal_sequence_key())?;
+        if after > head {
+            return Ok(Vec::new());
+        }
         let anchor_digest = if after == 0 {
             None
         } else {
-            get(
+            let bytes = get(
                 &*transaction,
                 keyspaces::META,
                 &keyspaces::control_journal_key(after),
             )?
-            .map(|bytes| serde_json::from_slice::<ControlJournalEntry>(&bytes))
-            .transpose()?
-            .map(|entry| {
-                if !entry.verify() || entry.sequence != after {
-                    return Err(Error::Substrate("control journal anchor is corrupt".into()));
-                }
-                Ok(entry.digest)
-            })
-            .transpose()?
+            .ok_or_else(|| Error::Substrate("control journal anchor is missing".into()))?;
+            let entry: ControlJournalEntry = serde_json::from_slice(&bytes)?;
+            if !entry.verify() || entry.sequence != after {
+                return Err(Error::Substrate("control journal anchor is corrupt".into()));
+            }
+            Some(entry.digest)
         };
-        let entries = scan_space_from(
+        if after == head {
+            return Ok(Vec::new());
+        }
+        // Admit only this page within the journal family. Reading the whole
+        // META tail before taking `limit` makes backup cost depend on unrelated
+        // state and defeats the caller's pagination under native byte limits.
+        let count = limit.min(usize::try_from(head - after).unwrap_or(usize::MAX));
+        let entries = scan_space_bounded_from(
             &*transaction,
             keyspaces::META,
-            &keyspaces::control_journal_key(after.saturating_add(1)),
+            &keyspaces::control_journal_prefix(),
+            &keyspaces::control_journal_key(after + 1),
+            count,
         )?
         .into_iter()
-        .take_while(|(key, _)| keyspaces::is_control_journal_key(KeyCodec, key))
-        .take(limit)
-        .map(|(_, bytes)| serde_json::from_slice(&bytes).map_err(Error::from))
+        .map(|(key, bytes)| {
+            let entry: ControlJournalEntry = serde_json::from_slice(&bytes)?;
+            if !keyspaces::is_control_journal_key(KeyCodec, &key)
+                || key != keyspaces::control_journal_key(entry.sequence)
+            {
+                return Err(Error::Substrate(
+                    "control journal key does not match its entry".into(),
+                ));
+            }
+            Ok(entry)
+        })
         .collect::<Result<Vec<ControlJournalEntry>>>()?;
+        if entries.len() != count {
+            return Err(Error::Substrate(
+                "control journal ended before its captured watermark".into(),
+            ));
+        }
         verify_control_page(after, anchor_digest, &entries)?;
         Ok(entries)
     }
