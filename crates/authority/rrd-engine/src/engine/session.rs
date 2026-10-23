@@ -250,6 +250,7 @@ impl RrdEngine {
         request_id: &str,
         operation_id: &str,
     ) -> Result<SessionLease> {
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         let operation_sha256 = operation_digest(request)?;
         let key = session_key(&self.instance, session_id);
         let bytes = self
@@ -327,6 +328,7 @@ impl RrdEngine {
         request_id: &str,
         operation_id: &str,
     ) -> Result<SessionTermination> {
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         let operation_sha256 = operation_digest(request)?;
         let key = session_key(&self.instance, session_id);
         let bytes = self
@@ -344,6 +346,7 @@ impl RrdEngine {
             {
                 return Err(ServiceError::IdempotencyConflict);
             }
+            self.release_session_storage_cursors(session_id)?;
             return Ok(termination(state.session_id, closure, true));
         }
         if state.token_sha256 != presented_sha256 {
@@ -387,6 +390,7 @@ impl RrdEngine {
             request_id,
             operation_id,
         )?;
+        self.release_session_storage_cursors(session_id)?;
         Ok(termination(session_id.clone(), &closure, false))
     }
 
