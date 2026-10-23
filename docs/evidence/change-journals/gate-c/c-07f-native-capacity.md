@@ -391,3 +391,13 @@ runtime tests were launched; native candidate execution remains required.
 Reviewed the full changed helper/test/profile diff. No source move/deletion,
 new dependency, relaxed capacity oracle or roadmap status change. C-07f,
 C-07g, OBJ-02 and POAM-035 remain open.
+Dependency verification correction before push: `cargo tree --locked -e
+features -i sha2 --target aarch64-apple-darwin` resolves sha2 **0.11.0**, not
+the 0.10.9 copy initially inspected in the local registry. The pinned
+sha256.rs and aarch64_sha2.rs include runtime-selected hardware acceleration.
+The previous software-only inference is withdrawn; no native backend absence
+has been demonstrated. The dev optimization still targets the pinned actual
+compression implementation without bypassing verification, but its effect on
+the observed timeout remains unmeasured until candidate CI. Updated the PR
+brief to the verified dependency facts. The command acquired already-locked
+platform source dependencies; Cargo.lock was unchanged.
