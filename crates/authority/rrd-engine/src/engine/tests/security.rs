@@ -294,6 +294,17 @@ fn diagnostic_snapshot_requires_its_exact_grant() {
     );
 
     assert!(matches!(result, Err(ServiceError::PermissionDenied)));
+    let storage = engine.read_storage_diagnostics(
+        &lease.session_id,
+        &lease.token,
+        &rrd_contract::ReadStorageDiagnostics {
+            scope: "instance:test-instance".into(),
+        },
+        1_100,
+        "storage-denied",
+        "storage-denied",
+    );
+    assert!(matches!(storage, Err(ServiceError::PermissionDenied)));
 }
 
 /// Characterizes POAM-029. The diagnostic read compares a before/after stamp
@@ -388,6 +399,33 @@ fn an_audited_read_inside_every_assembly_window_exhausts_the_diagnostic_read() {
         )
         .unwrap();
     assert_eq!(quiet.read.assembly_attempts, 1);
+    let storage = engine
+        .read_storage_diagnostics(
+            &lease.session_id,
+            &lease.token,
+            &rrd_contract::ReadStorageDiagnostics {
+                scope: scope.clone(),
+            },
+            1_100,
+            "storage-observation",
+            "storage-observation",
+        )
+        .unwrap();
+    storage.validate().unwrap();
+    assert_eq!(storage.profile, quiet.storage.profile);
+    assert!(matches!(
+        engine.read_storage_diagnostics(
+            &lease.session_id,
+            &lease.token,
+            &rrd_contract::ReadStorageDiagnostics {
+                scope: "instance:another-estate".into()
+            },
+            1_100,
+            "storage-wrong-scope",
+            "storage-wrong-scope"
+        ),
+        Err(ServiceError::WrongScope)
+    ));
 
     let runtime_cursor = engine.storage.runtime().cursor().unwrap();
     let control_sequence = engine.storage.control().sequence().unwrap();
@@ -401,6 +439,20 @@ fn an_audited_read_inside_every_assembly_window_exhausts_the_diagnostic_read() {
         "operation-diagnostic-busy",
         &mut |attempt| {
             attempts.push(attempt);
+            engine
+                .read_storage_diagnostics(
+                    &lease.session_id,
+                    &lease.token,
+                    &rrd_contract::ReadStorageDiagnostics {
+                        scope: scope.clone(),
+                    },
+                    1_200,
+                    &format!("storage-during-{attempt}"),
+                    &format!("storage-during-{attempt}"),
+                )?
+                .validate()
+                .unwrap();
+
             engine
                 .read_changefeed(
                     &lease.session_id,

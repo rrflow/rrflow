@@ -53,3 +53,15 @@ the endpoints and values the commit touches. A differential test proves the
 same accept/reject outcome as the whole-scope oracle across insert, update,
 retire, conflict, and reopen. Physical counters show a constrained commit's
 read cost unchanged as unrelated records and relations are added to the scope.
+
+## Bounded remediation
+
+The [scoped constraint-input repair](../../evidence/change-journals/gate-c/c-07g-scoped-constraint-reads.md)
+uses current endpoint/pair adjacency for stable-schema relation constraints
+and skips unrelated record kinds. Schema changes preserve full-scope checks.
+Actual selected-key counts stay fixed as unrelated data grows; differential
+memory/native/reopen histories cover every relation-rule combination.
+All 226 store tests and 165 engine tests pass (two engine tests remain ignored).
+Unique properties still scan the affected kind rather than a persisted value
+index. Exact candidate CI, native capacity and E-02's value-index requirement
+remain open; this is partial remediation, not closure.

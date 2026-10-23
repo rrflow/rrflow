@@ -134,15 +134,27 @@ impl Budgets {
             sum <= self.process_bytes.get(),
             "disjoint memory reservations exceed process budget",
         )?;
-        let host = self
-            .process_bytes
-            .get()
-            .checked_mul(self.estates.get())
-            .ok_or("host reservation overflow")?;
-        require(
-            host <= self.host_bytes.get(),
-            "estate reservations exceed host budget",
-        )?;
+        if let Some(aggregate) = self.aggregate_process_bytes {
+            let reserved = sum
+                .checked_mul(self.estates.get())
+                .ok_or("aggregate reservation overflow")?;
+            require(
+                self.process_bytes.get() <= aggregate.get()
+                    && reserved <= aggregate.get()
+                    && aggregate.get() <= self.host_bytes.get(),
+                "shared process pool does not contain estate reservations and fit host budget",
+            )?;
+        } else {
+            let host = self
+                .process_bytes
+                .get()
+                .checked_mul(self.estates.get())
+                .ok_or("host reservation overflow")?;
+            require(
+                host <= self.host_bytes.get(),
+                "estate reservations exceed host budget",
+            )?;
+        }
         require(
             self.atomic_batch_bytes.get() <= self.mutable_bytes.get()
                 && self.atomic_batch_bytes.get() <= self.queue_bytes.get(),
