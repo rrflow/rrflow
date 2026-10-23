@@ -331,7 +331,7 @@ impl Workload {
         Ok(request)
     }
 
-    async fn verify_retired(&self, key: &str) -> Result<()> {
+    pub(super) async fn verify_absent(&self, key: &str) -> Result<()> {
         let references = (0..self.vectors_per_record)
             .map(|n| reference("capacity_vector", &format!("vector-{n}-{key}")))
             .collect::<Vec<_>>();
@@ -488,7 +488,7 @@ impl Workload {
     pub async fn verify(&self, request: &Prepared) -> Result<()> {
         if request.kind == StorageLoadKind::MixedWrite {
             if request.write.is_some_and(WriteTransition::retired) {
-                self.verify_retired(&request.key).await
+                self.verify_absent(&request.key).await
             } else {
                 self.verify_key(&request.key, request.revision).await
             }

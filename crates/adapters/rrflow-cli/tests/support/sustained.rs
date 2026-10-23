@@ -14,6 +14,8 @@ use tokio::task::JoinSet;
 mod cold;
 #[path = "sustained/corpus.rs"]
 mod corpus;
+#[path = "sustained/damage.rs"]
+mod damage;
 #[path = "sustained/lifecycle.rs"]
 mod lifecycle;
 #[path = "sustained/native.rs"]

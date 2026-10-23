@@ -507,6 +507,48 @@ require candidate execution. No local runtime suite, capacity effect or soak
 ran. Reader-pin interference, multi-estate allocation, full native damage and
 backup matrix, profile campaigns and 24-hour acceptance remain open. No
 objective, roadmap or POA&M completion status changed.
+
+## Ordinary installed damage refusal and backup restoration
+
+Continued from `0c1743b3`; PR 72 brief and backup refinement were posted
+before implementation. Added `support/sustained/damage.rs` under the existing
+installed harness. Fresh and existing estates acknowledge actual mixed-family
+records, relationships and vectors, create a verified public backup, then
+acknowledge another WAL-backed batch. Eight cases independently remove or
+corrupt WAL, segment, manifest and CURRENT bytes. Ordinary full verification
+and serving must refuse each damaged estate without changing its streamed
+byte inventory. Only the fixture restores saved bytes; subsequent reopening
+must independently read every acknowledged effect before exact receipt replay.
+Inventory is bounded to 4096 entries, 128 MiB file content, 16 MiB path metadata,
+depth eight, and a 64 KiB hashing buffer; aliases and nonregular files fail.
+
+The same case stages and applies the original backup through existing public
+and installed restore contracts. Two plans must agree without mutating project
+bytes, publication must preserve quarantine, all backed-up families must read
+back, and the later batch must be absent. Backup intentionally excludes session
+authorization and operation receipts: the old session must receive NotFound,
+then a newly authorized session commits mixed work whose exact receipt survives
+another restart. No automatic salvage or old session resurrection is implied.
+The existing workload absence assertion is exposed within this module rather
+than duplicated. Native installed-reopen CI explicitly selects both cases on
+all three operating systems; its policy checker requires that selection.
+
+Read/reviewed: complete damage helper, sustained module declarations and
+workload verification/retirement logic; lifecycle backup helper; installed
+restore plan/apply fixtures; store backup exclusion policy; engine session
+authentication and API error mapping; CI job and checker. Existing canonical
+restore publication and absence characterization remain the destinations;
+no implementation is deleted, moved or replaced. No new research, dependency,
+runtime authority, logging of credentials or changed capacity threshold.
+
+Initial compile surfaced the nonexistent `rrd_client::ClientError` name;
+corrected to the existing `rrd_client::Error::Api` and exact NotFound code.
+`cargo fmt --all` and `cargo clippy -p rrflow-cli --test installed_reopen
+--locked -- -D warnings` passed after the final inventory bounds (10.96s).
+No local runtime test, disk effect, campaign or soak ran. Remote candidate CI
+must execute this new matrix; compilation is not damage or restore evidence.
+Gate C, OBJ-02, C-07f/g and POAM-035 remain open. Reviewed the complete changed
+helper and wiring before commit.
 ## Streamed progress reconciliation and completion enforcement
 
 Continued from `8c1dabca4ab0457c5a697bd067345e6a0946e767`; updated PR 72's
@@ -580,3 +622,4 @@ compilation passed. No local runtime test, native resource effect, campaign
 or soak executed. Candidate CI is pending; full retained-reader/fleet/native
 profile and 24-hour evidence remain open. Full changed diff reviewed; no
 objective, roadmap or POA&M completion status changed.
+Navigation and execution inventory regeneration, documentation policy and CI workflow policy passed; staged diff whitespace check passed.
