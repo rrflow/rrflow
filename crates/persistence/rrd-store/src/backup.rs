@@ -396,9 +396,10 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     }
     let (manifest_file, manifest_inventory) =
         retain_object_payloads(objects, catalogue_root, &references)?;
-    let (catalogue_manifest_file, catalogue_manifest) = retain_catalogues(engine, catalogue_root)?;
-    let (control_archive_file, control_archive) =
+    let (control_archive_file, control_archive, catalogues) =
         retain_control_journal(engine, catalogue_root, control_sequence, control_families)?;
+    let (catalogue_manifest_file, catalogue_manifest) =
+        retain_catalogues(engine, catalogue_root, control_sequence, catalogues)?;
     if engine.claims().sequence()? != inventory.claim_sequence
         || engine.runtime().cursor()? != inventory.runtime_cursor
         || engine.control().sequence()? != control_sequence
@@ -960,12 +961,13 @@ fn retain_control_journal(
     catalogue_root: &AnchoredPath,
     source_control_sequence: u64,
     families: &[String],
-) -> Result<(String, ControlArchiveInventory)> {
+) -> Result<(String, ControlArchiveInventory, CatalogueCapture)> {
     let archives = catalogue_root.join(CONTROL_ARCHIVE_DIRECTORY);
     archives.create_dir_all().map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
     let staging = archives.join(format!(".control-archive-{}-{id}.tmp", std::process::id()));
     let mut writer = ControlArchiveWriter::create(&staging, source_control_sequence, families)?;
+    let mut catalogues = CatalogueCapture::default();
     let result = (|| {
         let mut after = 0u64;
         let mut pages = ControlJournalPages::new();
@@ -987,6 +989,10 @@ fn retain_control_journal(
                 if control_family_of(families, &entry.key).is_some() {
                     writer.entry(&entry)?;
                 }
+                // Fold catalogue state from the same already-verified entry.
+                // Excluded control families are still chain-validated, but
+                // their payloads are not retained for a second traversal.
+                catalogues.observe(entry)?;
             }
         }
         if engine.control().sequence()? != source_control_sequence {
@@ -1021,6 +1027,7 @@ fn retain_control_journal(
     Ok((
         format!("{CONTROL_ARCHIVE_DIRECTORY}/{file_name}"),
         inventory,
+        catalogues,
     ))
 }
 
@@ -1135,64 +1142,57 @@ fn object_references_at(engine: &impl StorageEngine, head: u64) -> Result<Vec<Ob
     Ok(objects.into_values().collect())
 }
 
+#[derive(Default)]
+struct CatalogueCapture {
+    records: std::collections::BTreeMap<String, CatalogueRecordSnapshot>,
+    scopes: BTreeSet<ScopeId>,
+}
+
+impl CatalogueCapture {
+    fn observe(&mut self, entry: crate::ControlJournalEntry) -> Result<()> {
+        let Some(scope) = catalogue_scope(&entry.key)? else {
+            return Ok(());
+        };
+        self.scopes.insert(scope.clone());
+        match entry.replacement {
+            Some(value) => {
+                if !self.records.contains_key(&entry.key)
+                    && self.records.len() == MAX_ARCHIVE_CATALOGUE_RECORDS
+                {
+                    return Err(Error::Archive(
+                        "backup catalogue closure exceeds the v1 entry bound".into(),
+                    ));
+                }
+                self.records.insert(
+                    entry.key.clone(),
+                    CatalogueRecordSnapshot {
+                        scope,
+                        key: entry.key,
+                        value,
+                    },
+                );
+            }
+            None => {
+                self.records.remove(&entry.key);
+            }
+        }
+        Ok(())
+    }
+}
+
 fn retain_catalogues(
     engine: &impl StorageEngine,
     catalogue_root: &AnchoredPath,
+    source_control_sequence: u64,
+    capture: CatalogueCapture,
 ) -> Result<(String, CatalogueManifestInventory)> {
-    let source_control_sequence = engine.control().sequence()?;
-    let mut after = 0u64;
-    let mut records = std::collections::BTreeMap::<String, CatalogueRecordSnapshot>::new();
-    let mut scopes = std::collections::BTreeSet::<ScopeId>::new();
-    let mut pages = ControlJournalPages::new();
-    while after < source_control_sequence {
-        let page = pages.read(engine, after)?;
-        if page.is_empty() {
-            return Err(Error::Archive(
-                "control journal ended before the captured backup watermark".into(),
-            ));
-        }
-        for entry in page {
-            if entry.sequence != after + 1 || entry.sequence > source_control_sequence {
-                return Err(Error::Archive(
-                    "control journal changed or became discontinuous during catalogue capture"
-                        .into(),
-                ));
-            }
-            after = entry.sequence;
-            let Some(scope) = catalogue_scope(&entry.key)? else {
-                continue;
-            };
-            scopes.insert(scope.clone());
-            match entry.replacement {
-                Some(value) => {
-                    if !records.contains_key(&entry.key)
-                        && records.len() == MAX_ARCHIVE_CATALOGUE_RECORDS
-                    {
-                        return Err(Error::Archive(
-                            "backup catalogue closure exceeds the v1 entry bound".into(),
-                        ));
-                    }
-                    records.insert(
-                        entry.key.clone(),
-                        CatalogueRecordSnapshot {
-                            scope,
-                            key: entry.key,
-                            value,
-                        },
-                    );
-                }
-                None => {
-                    records.remove(&entry.key);
-                }
-            }
-        }
-    }
     if engine.control().sequence()? != source_control_sequence {
         return Err(Error::Archive(
             "control journal changed while capturing catalogue state".into(),
         ));
     }
-    let scopes = scopes
+    let scopes = capture
+        .scopes
         .into_iter()
         .map(|scope| {
             Ok(CatalogueScopeSnapshot {
@@ -1205,7 +1205,7 @@ fn retain_catalogues(
         format_version: CATALOGUE_MANIFEST_VERSION,
         source_control_sequence,
         scopes,
-        records: records.into_values().collect(),
+        records: capture.records.into_values().collect(),
     };
     validate_catalogue_manifest(&payload)?;
     let inventory = catalogue_manifest_inventory(&payload)?;
@@ -2221,6 +2221,9 @@ fn backup_io(error: std::io::Error) -> Error {
 }
 
 #[cfg(test)]
+mod capture_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
@@ -2245,7 +2248,7 @@ mod tests {
         );
     }
 
-    fn transition(
+    pub(super) fn transition(
         key: &str,
         expected: Option<&[u8]>,
         replacement: Option<&[u8]>,
@@ -2263,7 +2266,7 @@ mod tests {
         }
     }
 
-    fn families() -> Vec<String> {
+    pub(super) fn families() -> Vec<String> {
         vec![
             "server/state/install".into(),
             "server/state/one/audit".into(),
@@ -2325,7 +2328,7 @@ mod tests {
             .unwrap();
         let catalogue_root = root.join("catalogue");
         fs::create_dir_all(&catalogue_root).unwrap();
-        let (file, inventory) = retain_control_journal(
+        let (file, inventory, _) = retain_control_journal(
             &source,
             &AnchoredPath::from_path(&catalogue_root).unwrap(),
             6,

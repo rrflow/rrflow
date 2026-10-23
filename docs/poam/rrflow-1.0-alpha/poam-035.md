@@ -474,3 +474,12 @@ histories pass. Linux08 still failed backup after the earlier journal-prefix
 repair, and Windows14 failed its actual resource-sampling interval after
 497 segments; both failures remain recorded. Exact new native comparison,
 full profiles, 24-hour soak and candidate CI remain required.
+
+The [single control-capture repair](../../evidence/change-journals/gate-c/c-07g-single-control-capture.md)
+removes a duplicate full-journal traversal while preserving backup artifact
+digests, scope revisions and exact restore state in memory/native fixtures.
+Linux09 failed the unchanged backup deadline after the page-admission repair;
+native timing acceptance remains open. PR76's macOS native-capacity lane also
+failed because the selected engine I/O error receipt was absent despite filler
+ENOSPC and a public ResourceExhausted response. Its cause is unresolved;
+admission denial cannot substitute for required native-I/O failure evidence.
