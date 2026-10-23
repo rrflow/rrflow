@@ -280,7 +280,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
     AllowedUse {
         path: "crates/persistence/rrd-store/tests/snapshot.rs",
         kind: SensitiveReadUse::SnapshotCausalLogPage,
-        count: 12,
+        count: 13,
         operation: "snapshot-lease change-page characterization",
     },
     AllowedUse {

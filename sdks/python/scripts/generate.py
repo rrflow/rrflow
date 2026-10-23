@@ -83,7 +83,7 @@ def main() -> None:
             )
         return
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(generated)
+    OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

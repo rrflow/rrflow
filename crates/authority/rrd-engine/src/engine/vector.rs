@@ -24,12 +24,16 @@ pub(in crate::engine) fn read_vector_versions(
     read: &ReadStamp,
     max_storage_keys: u64,
 ) -> Result<DirectVectorRead> {
-    let direct = engine.storage.runtime().read_versioned(
-        read,
-        &[rrd_store::RuntimeVersionedSource::Vectors { kind: None }],
-        rrd_store::RuntimeReadBudget::new(max_storage_keys)
-            .map_err(|error| ServiceError::Vector(error.to_string()))?,
-    )?;
+    let direct = engine
+        .storage
+        .runtime()
+        .read_versioned(
+            read,
+            &[rrd_store::RuntimeVersionedSource::Vectors { kind: None }],
+            rrd_store::RuntimeReadBudget::new(max_storage_keys)
+                .map_err(|error| ServiceError::Vector(error.to_string()))?,
+        )
+        .map_err(super::error::storage_read_error)?;
     public_vector_read(direct)
 }
 
@@ -43,7 +47,8 @@ pub(in crate::engine) fn read_vector_search_versions(
         read,
         &[rrd_store::RuntimeVersionedSource::Vectors { kind: None }],
         rrd_store::RuntimeReadBudget::new(max_storage_keys)?,
-    )?;
+    )
+    .map_err(super::error::storage_read_error)?;
     public_vector_read(direct)
 }
 

@@ -562,3 +562,63 @@ fn deterministic_mixed_scope_trace_is_identical_across_backends() {
         .unwrap();
     assert_eq!(replayed, one_page.changes);
 }
+
+#[test]
+fn native_checkpoint_quota_preserves_snapshot_state_and_reuses_released_capacity() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("checkpoint-quota");
+    let options = rrd_store::DatabaseOptions {
+        checkpoint_entries: 1,
+        ..Default::default()
+    };
+    let store = RrflowKvStore::open_with_options(&path, options).unwrap();
+    let scope = ScopeId::new("instance:checkpoint-quota").unwrap();
+    store.runtime().commit(&bootstrap(&scope, 0)).unwrap();
+    let first = store
+        .runtime()
+        .open_snapshot(&scope, "agent:first", 1000, 100)
+        .unwrap();
+    let before = store.runtime().read_stamp(&scope).unwrap();
+    let denied = store
+        .runtime()
+        .open_snapshot(&scope, "agent:denied", 1001, 100);
+    assert!(
+        matches!(
+            denied,
+            Err(Error::CheckpointLimit {
+                limit: 1,
+                observed: 2
+            })
+        ),
+        "{denied:?}"
+    );
+    assert_eq!(store.runtime().read_stamp(&scope).unwrap(), before);
+    assert_eq!(
+        store.runtime().snapshots(1002).unwrap(),
+        vec![first.clone()]
+    );
+    let physical = store.physical_store_evidence().unwrap();
+    assert_eq!(
+        (physical.checkpoint_entries, physical.checkpoint_limit),
+        (Some(1), Some(1))
+    );
+    assert!(store.runtime().release_snapshot(&first.id).unwrap());
+    let replacement = store
+        .runtime()
+        .open_snapshot(&scope, "agent:replacement", 1003, 100)
+        .unwrap();
+    drop(store);
+    let store = RrflowKvStore::open_with_options(&path, options).unwrap();
+    assert_eq!(
+        store.runtime().snapshots(1004).unwrap(),
+        vec![replacement.clone()]
+    );
+    assert_eq!(
+        store
+            .runtime()
+            .snapshot_changes(&replacement, 0, 10, 1004)
+            .unwrap()
+            .head_cursor,
+        1
+    );
+}

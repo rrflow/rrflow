@@ -79,6 +79,8 @@ pub(crate) fn sync_all(file: &File, _path: &Path) -> io::Result<()> {
     #[cfg(all(feature = "crash-test", not(test)))]
     crate::crash_test::observe_native_error("sync_all", _path, &result);
     result?;
+    #[cfg(all(feature = "crash-test", not(test)))]
+    crate::crash_test::after_io("sync_all", _path);
     #[cfg(test)]
     ticket.synced()?;
     Ok(())

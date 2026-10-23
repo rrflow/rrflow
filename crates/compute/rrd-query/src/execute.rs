@@ -333,6 +333,16 @@ impl ReadPath {
                         [RuntimeVersionedSource::Identity { .. }]
                     ) {
                         "versioned_identity_read"
+                    } else if matches!(
+                        sources.as_slice(),
+                        [RuntimeVersionedSource::IdentityRange { .. }]
+                    ) {
+                        "versioned_identity_range_read"
+                    } else if matches!(
+                        sources.as_slice(),
+                        [RuntimeVersionedSource::Adjacency { .. }]
+                    ) {
+                        "versioned_adjacency_read"
                     } else {
                         "versioned_source_read"
                     } =>
@@ -472,7 +482,48 @@ impl ReadPath {
         }
         let selected = match self {
             Self::Versioned { sources } => {
-                engine.runtime().read_versioned(stamp, sources, budget)?
+                if matches!(
+                    sources.as_slice(),
+                    [RuntimeVersionedSource::Adjacency { .. }]
+                ) {
+                    let mut expanded = false;
+                    engine.runtime().read_versioned_expanding(
+                        stamp,
+                        sources,
+                        budget,
+                        &mut |changes| {
+                            if std::mem::replace(&mut expanded, true) {
+                                return Vec::new();
+                            }
+                            // An adjacency entry names an identity, not its final
+                            // temporal state. Later endpoint moves and retirements
+                            // outside this adjacency must still govern visibility.
+                            changes
+                                .iter()
+                                .filter_map(|change| match &change.mutation {
+                                    RuntimeMutation::Relation { relation } => {
+                                        Some(relation.reference.clone())
+                                    }
+                                    RuntimeMutation::Retire { retirement }
+                                        if retirement.model
+                                            == rrd_core::RuntimeLogicalModel::GraphRelation =>
+                                    {
+                                        Some(retirement.reference.clone())
+                                    }
+                                    _ => None,
+                                })
+                                .collect::<std::collections::BTreeSet<_>>()
+                                .into_iter()
+                                .map(|reference| RuntimeVersionedSource::Identity {
+                                    model: rrd_core::RuntimeLogicalModel::GraphRelation,
+                                    reference,
+                                })
+                                .collect()
+                        },
+                    )?
+                } else {
+                    engine.runtime().read_versioned(stamp, sources, budget)?
+                }
             }
             Self::Adjacency {
                 sources,
