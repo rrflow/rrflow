@@ -352,3 +352,42 @@ before implementation. `cargo clippy -p rrflow-cli --test installed_crash
 clearing shared-target artifacts belonging to the G worktree. No local native
 fill/runtime case executed. The next exact-candidate native matrix must prove
 these paths; earlier WAL success does not validate the modified candidate.
+
+## Offline timeout evidence and debug hashing cost
+
+Continued from `ebb70266284bfb01c729229bf53d091b257a038a` in PR 71. Native
+macOS estate job 120232488067 in run 39897715995 failed the unchanged
+540-second isolated harness deadline. Retained offline-macos-latest artifact
+reported command deadline but discarded every partial lifecycle observation.
+This is a qualification failure, not evidence of a specific engine startup
+error. The PR brief was extended before editing the acceptance helper.
+
+The bounded subprocess helper now invokes an optional completion observer
+before raising on timeout/output/exit failure. The offline payload retains
+only allowlisted case names/status/counts, fresh/existing receipt marker
+counts, readiness count and output sizes. It does not retain arbitrary
+stdout/stderr, argument contents or receipt payloads. Native failure details
+are carried alongside this partial receipt; full success still requires the
+same complete lifecycle and independent history validators. Added negative
+definitions for timeout/output observer delivery and secret/unknown-field
+omission. The 540-second inner and 600-second outer deadlines are unchanged.
+
+Inspected CLI build_identity.rs, installation executable SHA verification,
+the large-debug-binary lifecycle fixture, workspace build profiles, and locked
+sha2 0.10.9 src/sha256.rs dispatch. This feature set selects its software
+compression on aarch64; development/test builds left that implementation
+unoptimized while repeatedly hashing the actual executable. Added a dev
+package optimization for sha2 only (opt-level 3). Development assertions and
+overflow checks, the hashing algorithm, actual-file verification, all cases,
+release settings and dependencies remain unchanged. This is a source-grounded
+performance hypothesis pending the same native candidate, not a measured
+speedup or a proven root cause. No digest cache or identity bypass was added.
+
+`python -m py_compile scripts/ci/run_offline_lifecycle.py
+scripts/ci/test_offline_lifecycle.py` passed. Cargo metadata --no-deps
+--format-version 1 --locked passed after correcting the output path from the
+worktree's absent target directory to the root target directory. No local
+runtime tests were launched; native candidate execution remains required.
+Reviewed the full changed helper/test/profile diff. No source move/deletion,
+new dependency, relaxed capacity oracle or roadmap status change. C-07f,
+C-07g, OBJ-02 and POAM-035 remain open.
