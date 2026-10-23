@@ -29,6 +29,7 @@ mod projection;
 mod repository;
 mod rrflow_kv;
 mod s3;
+mod snapshot;
 mod transaction;
 mod writer;
 
