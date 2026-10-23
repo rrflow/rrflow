@@ -142,9 +142,18 @@ candidate. Linux additionally requires `--cgroup-parent` naming an already
 delegated cgroup; Windows uses an owned Job Object. The driver verifies live
 native limits and process membership rather than trusting environment labels.
 No privileged host setup is implicit. The current runner rejects full
-qualification, cold-cache/reader-pin lanes and multi-estate allocation until
+qualification, reader-pin lanes and multi-estate allocation until
 those facilities exist. macOS constrained-capacity launch is unavailable.
 Characterization results cannot close the profile or 24-hour requirement.
+
+The Linux cold lane stops the owned engine, synchronizes and advises eviction
+only for regular files inside its installed native root, and checks actual
+page residency through bounded, untouched mappings. Nonzero residency fails
+the lane. File inventory, size, memory and elapsed time have frozen bounds;
+per-file observations and the restart/readback receipt remain in the evidence.
+This measures cold startup plus the first independent read, since startup can
+warm pages. It does not assert that later queries are cold. No host-wide cache
+setting changes. The lane is unavailable on other operating systems.
 
 `progress.jsonl` retains typed intents, outcomes, samples and readback with
 bounded record encoding and periodic durable checkpoints. Final reports bind

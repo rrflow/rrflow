@@ -39,7 +39,7 @@ rrd-estate = { path = "../../authority/rrd-estate" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-[target.'cfg(target_os = "macos")'.dev-dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dev-dependencies]
 libc = "0.2"
 
 [[bin]]

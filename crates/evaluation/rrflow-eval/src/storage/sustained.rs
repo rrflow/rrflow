@@ -438,6 +438,24 @@ pub struct LaneEvidence {
     pub acknowledged_readback_verified: bool,
 }
 
+/// Owned-file cache eviction verified before process restart. The measured
+/// interval includes startup and first read; subsequent reads may be warm.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ColdStartEvidence {
+    pub started_ns: u64,
+    pub evicted_ns: u64,
+    pub ready_ns: u64,
+    pub finished_ns: u64,
+    pub files: u64,
+    pub file_bytes: u64,
+    pub pages: u64,
+    pub resident_pages: u64,
+    pub page_bytes: u64,
+    pub inventory_sha256: Digest,
+    pub readback_sha256: Digest,
+}
+
 /// Streaming corpus receipts bind generated input, acknowledged writes and a
 /// second complete readback pass without retaining the corpus in driver memory.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -572,6 +590,7 @@ pub struct SustainedSegment {
     pub started_ns: u64,
     pub finished_ns: u64,
     pub corpus: Option<CorpusEvidence>,
+    pub cold_start: Option<ColdStartEvidence>,
     pub reopens: Option<ReopenEvidence>,
     pub backup: Option<BackupEvidence>,
     /// Frozen before this segment's operations; full candidate/environment and
@@ -954,6 +973,53 @@ pub fn validate_segment(
                 .iter()
                 .any(|lane| lane.lane == CapacityLane::ForcedReopens),
             "reopen lane omitted its raw observations",
+        )?;
+    }
+    if let Some(cold) = &segment.cold_start {
+        require(
+            segment.phase == LoadPhase::Warmup
+                && summary.first_sequence == 0
+                && cold.started_ns <= cold.evicted_ns
+                && cold.evicted_ns <= cold.ready_ns
+                && cold.ready_ns <= cold.finished_ns
+                && cold.finished_ns <= segment.started_ns
+                && cold.finished_ns - cold.started_ns
+                    <= campaign.schedule.lifecycle_ms.get() * NANOSECONDS_PER_MS
+                && cold.files > 0
+                && cold.files
+                    <= campaign
+                        .storage
+                        .installed_configuration
+                        .storage
+                        .recovery_files
+                && cold.file_bytes > 0
+                && cold.file_bytes
+                    <= campaign
+                        .storage
+                        .installed_configuration
+                        .storage
+                        .recovery_read_bytes
+                && cold.pages > 0
+                && cold.resident_pages == 0
+                && cold.page_bytes.is_power_of_two()
+                && (4096..=65536).contains(&cold.page_bytes)
+                && (cold.pages as u128) * (cold.page_bytes as u128) >= cold.file_bytes as u128
+                && (cold.pages as u128) * (cold.page_bytes as u128)
+                    <= cold.file_bytes as u128 + cold.files as u128 * (cold.page_bytes - 1) as u128
+                && segment.lanes.iter().any(|lane| {
+                    lane.lane == CapacityLane::Cold
+                        && lane.repetitions.get() == 1
+                        && digest("c07g.cold-start", cold).as_ref() == Ok(&lane.receipt_sha256)
+                }),
+            "cold lane lacks verified eviction, bounded startup or matching readback",
+        )?;
+    } else {
+        require(
+            !segment
+                .lanes
+                .iter()
+                .any(|lane| lane.lane == CapacityLane::Cold),
+            "cold lane omitted its native residency evidence",
         )?;
     }
     if let Some(backup) = &segment.backup {
@@ -1627,6 +1693,7 @@ mod tests {
             started_ns: 0,
             finished_ns: 1_000_000_000,
             corpus: None,
+            cold_start: None,
             reopens: None,
             backup: None,
             manifest,
@@ -1706,6 +1773,74 @@ mod tests {
                 .latency_over_budget,
             1
         );
+    }
+
+    #[test]
+    fn cold_lane_requires_bounded_native_residency_and_matching_raw_receipt() {
+        let (campaign, mut segment) = fixture();
+        segment.phase = LoadPhase::Warmup;
+        let cold = ColdStartEvidence {
+            started_ns: 0,
+            evicted_ns: 0,
+            ready_ns: 0,
+            finished_ns: 0,
+            files: 2,
+            file_bytes: 4097,
+            pages: 2,
+            resident_pages: 0,
+            page_bytes: 4096,
+            inventory_sha256: digest("fixture-inventory", &1).unwrap(),
+            readback_sha256: digest("fixture-readback", &1).unwrap(),
+        };
+        let bind = |segment: &mut SustainedSegment, cold: ColdStartEvidence| {
+            segment.lanes = vec![LaneEvidence {
+                lane: CapacityLane::Cold,
+                repetitions: limit(1),
+                receipt_sha256: digest("c07g.cold-start", &cold).unwrap(),
+                acknowledged_readback_verified: true,
+            }];
+            segment.cold_start = Some(cold);
+        };
+        bind(&mut segment, cold.clone());
+        validate_segment(&campaign, &segment).unwrap();
+        segment.cold_start = None;
+        assert!(validate_segment(&campaign, &segment)
+            .unwrap_err()
+            .contains("residency"));
+        for invalid in 0..6 {
+            let mut changed = cold.clone();
+            match invalid {
+                0 => changed.resident_pages = 1,
+                1 => {
+                    changed.files = campaign
+                        .storage
+                        .installed_configuration
+                        .storage
+                        .recovery_files
+                        + 1
+                }
+                2 => {
+                    changed.file_bytes = campaign
+                        .storage
+                        .installed_configuration
+                        .storage
+                        .recovery_read_bytes
+                        + 1
+                }
+                3 => changed.evicted_ns = 1,
+                4 => changed.pages = 10,
+                _ => changed.page_bytes = 0,
+            }
+            bind(&mut segment, changed);
+            assert!(validate_segment(&campaign, &segment)
+                .unwrap_err()
+                .contains("cold lane"));
+        }
+        bind(&mut segment, cold);
+        segment.lanes[0].receipt_sha256 = digest("changed", &1).unwrap();
+        assert!(validate_segment(&campaign, &segment)
+            .unwrap_err()
+            .contains("cold lane"));
     }
     #[test]
     fn observed_only_shortened_or_omitted_work_cannot_qualify() {

@@ -456,3 +456,54 @@ Synthetic storage schema/fixture regeneration passed (4.26 seconds). No local
 runtime suite, native campaign or soak executed. Candidate CI, native capacity
 and full profile/24-hour acceptance remain required and unclaimed. Parent
 objective/roadmap/POAM status remains open.
+
+## Owned Linux cold-start lane and SDK candidate correction
+
+Continued from `9416494979e1ba1617fdf3b617a50c8368c68c32` in PR 72.
+The pre-effect PR brief binds this extension to OBJ-02/C-07g/POAM-035.
+Added support/sustained/cold.rs and wired the existing installed campaign:
+kill/reap its owned engine, resolve its installed native root, admit sorted
+inventory under sealed recovery file/metadata/byte limits, reject aliases,
+foreign ownership and cross-device paths, sync each file, issue aligned
+DONTNEED advice and observe page residency without touching mapped data.
+Mappings are at most 64 MiB and residency vectors at most 16 KiB. The lane
+fails on remaining residency; it never changes host-wide cache settings.
+
+Raw bounded progress retains each file identity, size and residency. A typed
+ColdStartEvidence binds aggregate inventory, zero observed residency,
+restart/first-read timings and independently expected readback digest to the
+first warmup segment. The validator requires bounded counts/bytes, plausible
+page totals, ordered lifecycle timing and matching lane digest. Regression
+definitions cover missing raw receipt, resident pages, exceeded file/byte
+limits, invalid timing/page size, impossible page totals and changed digest.
+The launcher reserves this additional lifecycle interval. It measures cold
+startup plus first read; startup can warm pages and residency observations
+are point-in-time, not a guarantee against external future reads.
+
+Read in full: new cold helper; current progress protocol; relevant sustained
+validator, installed driver and smoke, launcher, evaluation instructions,
+SDK endpoint-count assertions, installed configuration storage policy, owning
+C-07 plan and repository change-authoring procedure. Reviewed full patch before
+commit. No implementation was deleted or moved. libc remains the locked
+existing dependency, now enabled for Linux test targets as well as macOS.
+Research: [Linux mincore](https://man7.org/linux/man-pages/man2/mincore.2.html)
+and [posix_fadvise](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html)
+require page-aware observation and make advice alone insufficient. No copied
+upstream engine algorithm. Existing finite progress and explicit unavailable
+platform behavior preserve the trace/resource decisions in the PR brief.
+
+Candidate SDK job 120234601470 failed at .NET's stale 42-operation assertion.
+Inspected all five SDK tests and corrected their same stale literal to the
+43-operation catalogue introduced by storage-only diagnostics. This changes
+expected catalogue size, not authentication, deadlines or response assertions.
+
+`cargo fmt --all` passed. Strict Clippy for rrflow-eval/rrflow-cli all targets
+passed (9.69 seconds, then 1.50 seconds after regression definitions).
+`cargo run -p rrflow-eval --example refresh_storage_contract --locked` passed
+(3.70 seconds); it regenerated synthetic schemas without a native workload.
+`python -m py_compile scripts/ci/run_sustained_capacity.py` passed. These are
+Windows compile/authoring checks; Linux-only code and native eviction still
+require candidate execution. No local runtime suite, capacity effect or soak
+ran. Reader-pin interference, multi-estate allocation, full native damage and
+backup matrix, profile campaigns and 24-hour acceptance remain open. No
+objective, roadmap or POA&M completion status changed.

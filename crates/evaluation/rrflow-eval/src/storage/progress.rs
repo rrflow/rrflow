@@ -80,6 +80,19 @@ pub enum ProgressEvent {
     Failure {
         reason: Id,
     },
+    ColdFile {
+        point: Id,
+        seed: u64,
+        file_identity_sha256: Digest,
+        bytes: u64,
+        pages: u64,
+        resident_pages: u64,
+    },
+    ColdStart {
+        point: Id,
+        seed: u64,
+        observation: ColdStartEvidence,
+    },
     FinalReadback {
         point: Id,
         seed: u64,

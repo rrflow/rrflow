@@ -123,6 +123,8 @@ def main():
     duration = sum(schedule[name] for name in ["setup_ms", "lifecycle_ms", "warmup_ms", "measured_ms", "burst_ms", "drain_ms", "soak_ms"])
     # Lifecycle admission is per lane: pre-load forced reopens and final readback.
     duration += schedule["lifecycle_ms"]
+    if "cold" in campaign["required_lanes"]:
+        duration += schedule["lifecycle_ms"]
     timeout = (duration // 1000 + 600) * len(campaign["points"]) * len(campaign["seeds"])
     require(0 < timeout <= 31 * 86400, "campaign exceeds explicit one-month run bound")
     allocation = campaign["allocation"]

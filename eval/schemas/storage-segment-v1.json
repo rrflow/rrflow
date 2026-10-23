@@ -464,6 +464,77 @@
       ],
       "type": "object"
     },
+    "ColdStartEvidence": {
+      "additionalProperties": false,
+      "description": "Owned-file cache eviction verified before process restart. The measured\ninterval includes startup and first read; subsequent reads may be warm.",
+      "properties": {
+        "evicted_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "file_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inventory_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "page_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pages": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "ready_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resident_pages": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_ns",
+        "evicted_ns",
+        "ready_ns",
+        "finished_ns",
+        "files",
+        "file_bytes",
+        "pages",
+        "resident_pages",
+        "page_bytes",
+        "inventory_sha256",
+        "readback_sha256"
+      ],
+      "type": "object"
+    },
     "CorpusEvidence": {
       "additionalProperties": false,
       "description": "Streaming corpus receipts bind generated input, acknowledged writes and a\nsecond complete readback pass without retaining the corpus in driver memory.",
@@ -2425,6 +2496,16 @@
     },
     "campaign_sha256": {
       "$ref": "#/$defs/Digest"
+    },
+    "cold_start": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ColdStartEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "corpus": {
       "anyOf": [

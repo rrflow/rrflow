@@ -10,6 +10,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::task::JoinSet;
+#[path = "sustained/cold.rs"]
+mod cold;
 #[path = "sustained/corpus.rs"]
 mod corpus;
 #[path = "sustained/lifecycle.rs"]
@@ -325,6 +327,7 @@ impl PointRun<'_> {
             started_ns: started,
             finished_ns: ns(self.clock),
             corpus: None,
+            cold_start: None,
             reopens: None,
             backup: None,
             manifest,
@@ -603,6 +606,7 @@ impl PointRun<'_> {
             started_ns: started,
             finished_ns: ns(self.clock),
             corpus: None,
+            cold_start: None,
             reopens: None,
             backup: backup_receipt,
             manifest,
@@ -863,10 +867,8 @@ fn installed_capacity_workload_smoke() {
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
     if campaign.required_lanes.iter().any(|lane| {
-        matches!(
-            lane,
-            CapacityLane::Cold | CapacityLane::ReaderPinInterference
-        )
+        *lane == CapacityLane::ReaderPinInterference
+            || (*lane == CapacityLane::Cold && !cfg!(target_os = "linux"))
     }) {
         return Err("native cold-cache and retained-reader controls are not available in this installed driver".into());
     }
@@ -974,6 +976,22 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 )
                 .await?,
             );
+            let mut cold_start = if campaign.required_lanes.contains(&CapacityLane::Cold) {
+                Some(
+                    cold::run(
+                        &estate,
+                        &mut child,
+                        &mut work,
+                        campaign,
+                        clock,
+                        Duration::from_millis(lifetime_ms),
+                        &ProgressContext { writer, point },
+                    )
+                    .await?,
+                )
+            } else {
+                None
+            };
             let mut driver = PointRun {
                 campaign,
                 point,
@@ -1081,6 +1099,15 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     .map_err(|_| "installed segment exceeded its frozen deadline")??;
                     if phase == LoadPhase::Warmup && next == 0 {
                         segment.corpus = corpus.take();
+                        segment.cold_start = cold_start.take();
+                        if let Some(raw) = &segment.cold_start {
+                            segment.lanes.push(LaneEvidence {
+                                lane: CapacityLane::Cold,
+                                repetitions: 1u64.try_into()?,
+                                receipt_sha256: digest("c07g.cold-start", raw)?,
+                                acknowledged_readback_verified: true,
+                            });
+                        }
                         segment.reopens = reopens.take();
                         if let Some(raw) = &segment.reopens {
                             segment.lanes.push(LaneEvidence {
