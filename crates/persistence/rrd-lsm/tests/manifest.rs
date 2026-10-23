@@ -1,6 +1,98 @@
 use rrd_lsm::{Error, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION};
 
 #[test]
+fn restarted_writer_preserves_interrupted_temporary_files_and_can_publish() {
+    struct OwnedChild(std::process::Child);
+    impl Drop for OwnedChild {
+        fn drop(&mut self) {
+            if !matches!(self.0.try_wait(), Ok(Some(_))) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+    }
+    for family in ["manifest", "current", "checkpoint"] {
+        let root = tempfile::tempdir().unwrap();
+        let first = Manifest::new(1, None, 100, 0, 1, vec![]).unwrap();
+        let next = Manifest::new(2, Some(first.digest.clone()), 101, 0, 1, vec![]).unwrap();
+        let store = ManifestStore::open(root.path()).unwrap();
+        store.publish(&first, None).unwrap();
+        drop(store);
+        let orphan = match family {
+            "manifest" => root
+                .path()
+                .join("manifests")
+                .join(format!(".{}.1.tmp", next.digest)),
+            "current" => {
+                // The immutable manifest already reached disk before CURRENT.
+                std::fs::write(
+                    root.path()
+                        .join("manifests")
+                        .join(format!("{}.json", next.digest)),
+                    serde_json::to_vec(&next).unwrap(),
+                )
+                .unwrap();
+                root.path().join(".CURRENT.1.tmp")
+            }
+            _ => root.path().join("checkpoints/.held.1.tmp"),
+        };
+        std::fs::write(&orphan, b"interrupted publication must remain unchanged").unwrap();
+        let mut child = OwnedChild(
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "restarted_manifest_writer_child",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("RRFLOW_MANIFEST_RESTART_ROOT", root.path())
+                .env("RRFLOW_MANIFEST_RESTART_FAMILY", family)
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break status;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "bounded {family} restart helper"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        assert!(status.success(), "restarted {family} writer failed");
+        assert_eq!(
+            std::fs::read(&orphan).unwrap(),
+            b"interrupted publication must remain unchanged"
+        );
+        let store = ManifestStore::open_existing(root.path()).unwrap();
+        if family == "checkpoint" {
+            assert_eq!(store.checkpoints().unwrap().len(), 1);
+        } else {
+            assert_eq!(store.current().unwrap().unwrap().1, next);
+        }
+    }
+}
+
+#[test]
+#[ignore = "owned subprocess helper; parent supplies its disposable manifest root"]
+fn restarted_manifest_writer_child() {
+    let root = std::env::var_os("RRFLOW_MANIFEST_RESTART_ROOT").unwrap();
+    let family = std::env::var("RRFLOW_MANIFEST_RESTART_FAMILY").unwrap();
+    assert!(["manifest", "current", "checkpoint"].contains(&family.as_str()));
+    let store = ManifestStore::open_existing(std::path::Path::new(&root)).unwrap();
+    let first = store.current().unwrap().unwrap().1;
+    if family == "checkpoint" {
+        store.checkpoint("held", &first.digest, 101).unwrap();
+    } else {
+        let next = Manifest::new(2, Some(first.digest.clone()), 101, 0, 1, vec![]).unwrap();
+        store.publish(&next, Some(&first.digest)).unwrap();
+    }
+}
+
+#[test]
 #[cfg(any(unix, windows))]
 fn retained_root_rejects_replaced_manifest_directory() {
     let fixture = tempfile::tempdir().unwrap();

@@ -414,6 +414,7 @@ impl CurrentPointer {
 pub struct ManifestStore {
     root: AnchoredPath,
     _lock: File,
+    temporary_nonce: String,
     publication_uncertain: AtomicBool,
     checkpoint_entries: usize,
     checkpoint_budget: crate::ReclamationLimits,
@@ -528,6 +529,14 @@ impl ManifestStore {
                 ));
             }
         }
+        // A process-local counter restarts at one and can collide with bytes
+        // left by a killed publisher. A new writer namespace preserves those
+        // bytes while allowing subsequent create-new publications to proceed.
+        use ring::rand::SecureRandom;
+        let mut nonce = [0u8; 16];
+        ring::rand::SystemRandom::new()
+            .fill(&mut nonce)
+            .map_err(|_| Error::Io(std::io::Error::other("manifest writer entropy unavailable")))?;
         let mut options = OpenOptions::new();
         options.read(true).write(true).truncate(false);
         if create_new {
@@ -556,6 +565,7 @@ impl ManifestStore {
         let store = Self {
             root: root.to_owned(),
             _lock: lock,
+            temporary_nonce: nonce.iter().map(|byte| format!("{byte:02x}")).collect(),
             publication_uncertain: AtomicBool::new(false),
             checkpoint_entries: DEFAULT_CHECKPOINT_ENTRIES,
             checkpoint_budget: crate::ReclamationLimits::default(),
@@ -793,7 +803,8 @@ impl ManifestStore {
             });
         }
         let temporary = directory.join(format!(
-            ".{name}.{}.tmp",
+            ".{name}.{}.{}.tmp",
+            self.temporary_nonce,
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
         self.publication_result(persist_rename(&directory, &temporary, &path, &bytes))?;
@@ -907,8 +918,9 @@ impl ManifestStore {
             }
         }
         let temporary = directory.join(format!(
-            ".{}.{}.tmp",
+            ".{}.{}.{}.tmp",
             manifest.digest,
+            self.temporary_nonce,
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
         persist_rename(&directory, &temporary, &path, &bytes)
@@ -917,7 +929,8 @@ impl ManifestStore {
     fn publish_pointer(&self, pointer: &CurrentPointer) -> Result<()> {
         let path = self.root.join(CURRENT_FILE);
         let temporary = self.root.join(format!(
-            ".CURRENT.{}.tmp",
+            ".CURRENT.{}.{}.tmp",
+            self.temporary_nonce,
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
         persist_rename(&self.root, &temporary, &path, &serde_json::to_vec(pointer)?)

@@ -530,6 +530,11 @@ impl Database {
         let (_, manifest) = manifests
             .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::boundary(
+            crate::crash_test::Point::RecoveryManifest,
+            root.diagnostic_path(),
+        );
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
         let page_cache =
             new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;

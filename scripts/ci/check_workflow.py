@@ -611,6 +611,10 @@ def main() -> None:
         "cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked",
         "cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings",
         "C07C_NATIVE_PAUSE_V1=",
+        "--skip publication_and_reclamation",
+        "publication_and_reclamation --nocapture --test-threads=2",
+        "Require both complete installed publication receipts",
+        "RRFLOW_PUBLICATION_RECEIPT_DIR:",
     ]:
         require(command in diagnostic, f"installed diagnostic qualification missing: {command}")
     require(diagnostic.index("Verify diagnostic protocol") < diagnostic.index("Build explicit diagnostic"),

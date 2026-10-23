@@ -284,3 +284,20 @@ adds serialized sealed admission, typed denial, real ownership observations and
 post-burst drain enforcement. Focused native snapshot/concurrency tests pass;
 exact candidate CI and the complete profile/24-hour matrix remain pending.
 No retained checkpoint is evicted to satisfy the limit.
+
+
+Installed domain crash coverage did not yet compose immutable publication and
+reclamation with authenticated semantic transactions. The
+[installed publication candidate](../../evidence/change-journals/gate-c/c-07c-installed-publication.md)
+extends the same native controls and independent ledger across six maintenance
+boundaries plus compound manifest recovery, for both installation modes.
+Candidate evidence is pending; component proof alone does not close this gap.
+
+
+That installed corpus exposed a real restart defect: counter-only publication
+temporary names could collide with a killed writer's orphan, fencing subsequent
+writes despite readable recovery. The same publication candidate adds a fresh
+per-open random namespace without overwriting interrupted bytes. An independent
+subprocess regression first reproduced native AlreadyExists, then passed for
+manifest/CURRENT/checkpoint publication after correction. Exact installed and
+three-platform candidate acceptance remain pending.
