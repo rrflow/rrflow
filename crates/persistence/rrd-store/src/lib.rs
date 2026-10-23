@@ -94,7 +94,7 @@ pub use rrd_core::{
 pub use rrd_lsm::filesystem;
 pub use rrd_lsm::{
     publish_rename as publish_durable_rename, sync_directory as sync_directory_metadata,
-    DatabaseOptions, MutableLimits, MutableResource,
+    DatabaseOptions, MutableLimits, MutableResource, TailRepairPlan, TailRepairReceipt,
 };
 pub use rrflow_kv::{
     create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,
@@ -102,7 +102,7 @@ pub use rrflow_kv::{
     rrflow_kv_snapshot_all_object_references, rrflow_kv_snapshot_artifact_view,
     rrflow_kv_snapshot_object_references, RrflowKvInitializationFormats, RrflowKvInspection,
     RrflowKvInspector, RrflowKvOpenEvidence, RrflowKvReconciliationEvidence, RrflowKvStore,
-    RRFLOW_KV_OPEN_EVIDENCE_VERSION,
+    RrflowKvTailRepair, RRFLOW_KV_OPEN_EVIDENCE_VERSION,
 };
 pub use s3::{
     ConditionalPut, S3Authentication, S3CompatibleObjectStore, S3MultipartUpload, S3ObjectClient,

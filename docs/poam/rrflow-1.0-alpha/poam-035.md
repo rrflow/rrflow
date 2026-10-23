@@ -201,6 +201,12 @@ and cooperative time using installed policy. It preserves bytes on denial;
 compilation does not qualify recovery-space reserve, an installed repair UX,
 actual exhaustion, host limits or capacity/soak.
 
+The [C-07f native capacity implementation](../../evidence/change-journals/gate-c/c-07f-native-capacity.md)
+adds owned native images, installed failure/recovery histories and explicit
+incomplete-tail candidate repair. Native acceptance, damage/backup matrix,
+recovery reserve, operating profiles and 24-hour soak remain open; compiling
+these paths is not qualification evidence.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

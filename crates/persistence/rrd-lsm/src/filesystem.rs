@@ -368,7 +368,10 @@ impl AnchoredPath {
     fn sync_directory_handle(&self, file: &File) -> io::Result<()> {
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::DirectorySync, self.diagnostic_path())?;
-        native::sync_directory(file)?;
+        let result = native::sync_directory(file);
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::observe_native_error("directory_sync", self.diagnostic_path(), &result);
+        result?;
         #[cfg(test)]
         ticket.directory_synced()?;
         Ok(())
@@ -414,12 +417,17 @@ impl AnchoredPath {
         let (target_parent, target_name, _target_ancestors) = target.parent_handle()?;
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::Rename, self.diagnostic_path())?;
-        native::rename(
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::before_io("rename", self.diagnostic_path());
+        let result = native::rename(
             &source_parent,
             Path::new(&source_name),
             &target_parent,
             Path::new(&target_name),
-        )?;
+        );
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::observe_native_error("rename", self.diagnostic_path(), &result);
+        result?;
         #[cfg(test)]
         ticket.renamed(target.diagnostic_path())?;
         self.parent()
@@ -486,7 +494,14 @@ impl OpenOptions {
         native::file_options(&mut options);
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::Open, path.diagnostic_path())?;
-        let file = cap::open(&parent, Path::new(&name), &options)?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        if self.create || self.create_new {
+            crate::crash_test::before_io("create", path.diagnostic_path());
+        }
+        let result = cap::open(&parent, Path::new(&name), &options);
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::observe_native_error("open", path.diagnostic_path(), &result);
+        let file = result?;
         path.admit_mount(&file)?;
         native::validate_file(&file)?;
         if self.truncate {

@@ -31,6 +31,7 @@ pub struct Process {
     failure: Arc<Mutex<Option<&'static str>>>,
     monitor: Option<JoinHandle<()>>,
     capture: Vec<Capture>,
+    control_input: Option<std::process::ChildStdin>,
 }
 
 impl Process {
@@ -40,7 +41,7 @@ impl Process {
         limit: usize,
         announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
     ) -> io::Result<Self> {
-        Self::start_inner(command, deadline, limit, announcement, None, None)
+        Self::start_inner(command, deadline, limit, announcement, None, None, false)
     }
 
     #[cfg(feature = "crash-test")]
@@ -52,7 +53,57 @@ impl Process {
         lines: mpsc::SyncSender<io::Result<Vec<u8>>>,
         input: &[u8],
     ) -> io::Result<Self> {
-        Self::start_inner(command, deadline, limit, None, Some(lines), Some(input))
+        Self::start_inner(
+            command,
+            deadline,
+            limit,
+            None,
+            Some(lines),
+            Some(input),
+            false,
+        )
+    }
+
+    #[cfg(feature = "crash-test")]
+    #[allow(dead_code)]
+    pub fn start_controlled(
+        command: &mut Command,
+        deadline: Duration,
+        limit: usize,
+        lines: mpsc::SyncSender<io::Result<Vec<u8>>>,
+        input: &[u8],
+    ) -> io::Result<Self> {
+        if input.contains(&b'\n') || input.len() >= 4096 {
+            return Err(io::Error::other(
+                "private capacity control must be one bounded line",
+            ));
+        }
+        Self::start_inner(
+            command,
+            deadline,
+            limit,
+            None,
+            Some(lines),
+            Some(input),
+            true,
+        )
+    }
+
+    #[cfg(feature = "crash-test")]
+    #[allow(dead_code)]
+    pub fn resume_controlled(&mut self, input: &[u8]) -> io::Result<()> {
+        if input.contains(&b'\n') || input.len() >= 512 {
+            return Err(io::Error::other(
+                "private capacity resume must be one bounded line",
+            ));
+        }
+        let mut pipe = self
+            .control_input
+            .take()
+            .ok_or_else(|| io::Error::other("capacity control already consumed"))?;
+        pipe.write_all(input)?;
+        pipe.write_all(b"\n")?;
+        pipe.flush()
     }
 
     fn start_inner(
@@ -62,6 +113,7 @@ impl Process {
         announcement: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
         lines: Option<mpsc::SyncSender<io::Result<Vec<u8>>>>,
         input: Option<&[u8]>,
+        retain_input: bool,
     ) -> io::Result<Self> {
         if let Some(input) = input {
             if input.len() > 4096 {
@@ -82,6 +134,7 @@ impl Process {
             failure: failure.clone(),
             monitor: None,
             capture: Vec::new(),
+            control_input: None,
         };
         process.capture(stdout, limit, announcement, lines);
         process.capture(stderr, limit, None, None);
@@ -111,9 +164,16 @@ impl Process {
             }
         }));
         if let Some(input) = input {
-            // The only writer sends at most one pipe buffer, then EOF. The
+            // The writer sends one bounded control message; resumable callers
+            // retain the private pipe for one subsequent message. The
             // process guard and monitor already own cleanup on any error.
-            stdin.expect("private diagnostic stdin").write_all(input)?;
+            let mut pipe = stdin.expect("private diagnostic stdin");
+            pipe.write_all(input)?;
+            if retain_input {
+                pipe.write_all(b"\n")?;
+                pipe.flush()?;
+                process.control_input = Some(pipe);
+            }
         }
         Ok(process)
     }
@@ -207,6 +267,7 @@ impl Process {
     }
 
     pub fn finish(&mut self) -> Result<Output, String> {
+        self.control_input.take();
         if let Some(monitor) = self.monitor.take() {
             monitor.join().map_err(|_| "child monitor panicked")?;
         }
@@ -241,6 +302,7 @@ impl Process {
 
 impl Drop for Process {
     fn drop(&mut self) {
+        self.control_input.take();
         self.terminate();
         if let Some(monitor) = self.monitor.take() {
             let _ = monitor.join();

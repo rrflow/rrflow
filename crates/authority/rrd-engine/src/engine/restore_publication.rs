@@ -45,7 +45,7 @@ const PUBLICATION_LEASE_FILE: &str = ".publication.lock";
 /// The exclusive offline publication lease of one instance: an advisory lock
 /// on a file beside the restore staging roots, held for the whole apply so two
 /// publications cannot interleave their renames.
-struct PublicationLease {
+pub(super) struct PublicationLease {
     _file: fs::File,
 }
 
@@ -53,6 +53,11 @@ impl PublicationLease {
     fn acquire(paths: &PublicationPaths) -> Result<Self> {
         let path = paths.restores.join(PUBLICATION_LEASE_FILE);
         reject_existing_symlink_path(&paths.project, &path)?;
+        Self::acquire_at(&paths.restores)
+    }
+
+    pub(super) fn acquire_at(restores: &AnchoredPath) -> Result<Self> {
+        let path = restores.join(PUBLICATION_LEASE_FILE);
         let file = OpenOptions::new()
             .read(true)
             .write(true)

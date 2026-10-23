@@ -32,7 +32,10 @@ pub(crate) fn write_vectored(
     } else {
         buffers
     };
-    let written = file.write_vectored(buffers)?;
+    let result = file.write_vectored(buffers);
+    #[cfg(all(feature = "crash-test", not(test)))]
+    crate::crash_test::observe_native_error("write", _path, &result);
+    let written = result?;
     #[cfg(test)]
     ticket.written(
         offset,
@@ -60,7 +63,10 @@ pub(crate) fn write_all(file: &mut File, path: &Path, mut bytes: &[u8]) -> io::R
 pub(crate) fn sync_data(file: &File, _path: &Path) -> io::Result<()> {
     #[cfg(test)]
     let ticket = Ticket::begin(Kind::SyncData, _path)?;
-    file.sync_data()?;
+    let result = file.sync_data();
+    #[cfg(all(feature = "crash-test", not(test)))]
+    crate::crash_test::observe_native_error("sync_data", _path, &result);
+    result?;
     #[cfg(test)]
     ticket.synced()?;
     Ok(())
@@ -69,7 +75,10 @@ pub(crate) fn sync_data(file: &File, _path: &Path) -> io::Result<()> {
 pub(crate) fn sync_all(file: &File, _path: &Path) -> io::Result<()> {
     #[cfg(test)]
     let ticket = Ticket::begin(Kind::SyncAll, _path)?;
-    file.sync_all()?;
+    let result = file.sync_all();
+    #[cfg(all(feature = "crash-test", not(test)))]
+    crate::crash_test::observe_native_error("sync_all", _path, &result);
+    result?;
     #[cfg(test)]
     ticket.synced()?;
     Ok(())

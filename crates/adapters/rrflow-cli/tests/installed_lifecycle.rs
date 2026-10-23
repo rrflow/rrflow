@@ -475,7 +475,9 @@ fn primary_help_exposes_only_the_installed_product_lifecycle() {
     let output = invoke(&["--help"]);
     assert_success(&output, "primary help");
     let help = String::from_utf8(output.stdout).unwrap();
-    for command in ["version", "install", "serve", "ready", "verify", "restore"] {
+    for command in [
+        "version", "install", "serve", "ready", "verify", "restore", "repair",
+    ] {
         assert!(
             help.contains(command),
             "missing {command} from help:\n{help}"

@@ -544,26 +544,7 @@ impl RrflowKvInspector {
     ) -> Result<Self> {
         let database =
             ReadOnlyDatabase::open_anchored_with_options(path, options).map_err(Error::from)?;
-        if keyspaces::RrflowKvKeyCodec::from_application_format(
-            database.manifest().application_format,
-        )
-        .is_none()
-        {
-            return Err(Error::Substrate(format!(
-                "unsupported rrflowKV application format {:?}",
-                database.manifest().application_format
-            )));
-        }
-        let claim_sequence = inspect_sequence(&database, &keyspaces::sequence_watermark_key())?;
-        let runtime_cursor = inspect_sequence(&database, &keyspaces::runtime_cursor_key())?;
-        let control_journal_sequence =
-            inspect_sequence(&database, &keyspaces::control_journal_sequence_key())?;
-        let inspection = RrflowKvInspection {
-            physical: database.inspection().clone(),
-            claim_sequence,
-            runtime_cursor,
-            control_journal_sequence,
-        };
+        let inspection = inspect_database(&database)?;
         Ok(Self {
             database,
             inspection,
@@ -602,6 +583,60 @@ impl crate::access::runtime_state::AccessRead for ReadOnlyDatabase {
         let mut rows = self.scan(start, Some(end)).map_err(Error::from)?;
         rows.truncate(limit);
         Ok(rows)
+    }
+}
+
+fn inspect_database(database: &ReadOnlyDatabase) -> Result<RrflowKvInspection> {
+    if keyspaces::RrflowKvKeyCodec::from_application_format(database.manifest().application_format)
+        .is_none()
+    {
+        return Err(Error::Substrate(format!(
+            "unsupported rrflowKV application format {:?}",
+            database.manifest().application_format
+        )));
+    }
+    let claim_sequence = inspect_sequence(database, &keyspaces::sequence_watermark_key())?;
+    let runtime_cursor = inspect_sequence(database, &keyspaces::runtime_cursor_key())?;
+    let control_journal_sequence =
+        inspect_sequence(database, &keyspaces::control_journal_sequence_key())?;
+    let inspection = RrflowKvInspection {
+        physical: database.inspection().clone(),
+        claim_sequence,
+        runtime_cursor,
+        control_journal_sequence,
+    };
+    Ok(inspection)
+}
+
+/// Explicit offline repair owner; ordinary inspectors retain no mutation API.
+pub struct RrflowKvTailRepair {
+    repair: rrd_lsm::TailRepair,
+    inspection: RrflowKvInspection,
+}
+impl RrflowKvTailRepair {
+    pub fn open_anchored(path: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
+        let repair = rrd_lsm::TailRepair::open_anchored(path, options)?;
+        let inspection = inspect_database(repair.reader())?;
+        Ok(Self { repair, inspection })
+    }
+    pub fn inspection(&self) -> &RrflowKvInspection {
+        &self.inspection
+    }
+    pub fn control_record(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        crate::control::validate_control_key(key)?;
+        let logical = keyspaces::control_record_key(key);
+        let physical = crate::access::runtime_state::checked_key(keyspaces::META, &logical)?;
+        self.repair.reader().get(&physical).map_err(Error::from)
+    }
+    pub fn plan(&self) -> Result<rrd_lsm::TailRepairPlan> {
+        self.repair.plan().map_err(Error::from)
+    }
+    pub fn apply(
+        self,
+        plan: &rrd_lsm::TailRepairPlan,
+        expect: &str,
+    ) -> Result<rrd_lsm::TailRepairReceipt> {
+        self.repair.apply(plan, expect).map_err(Error::from)
     }
 }
 

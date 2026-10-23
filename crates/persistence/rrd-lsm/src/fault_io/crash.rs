@@ -27,6 +27,12 @@ pub enum Point {
     Acknowledged,
     #[cfg(not(test))]
     ReceiptPersisted,
+    #[cfg(not(test))]
+    SegmentBeforeCreate,
+    #[cfg(not(test))]
+    ManifestBeforeCreate,
+    #[cfg(not(test))]
+    CurrentBeforeCreate,
     Unreachable,
 }
 
@@ -112,6 +118,10 @@ fn pause_if(matches: impl FnOnce(&mut Armed) -> bool) {
     assert!(line.len() < 512);
     std::io::stdout().write_all(line.as_bytes()).unwrap();
     std::io::stdout().flush().unwrap();
+    #[cfg(not(test))]
+    if installed::resume_private(&hit, active.deadline) {
+        return;
+    }
     while Instant::now() < active.deadline {
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -169,4 +179,7 @@ mod tests;
 #[path = "crash/installed.rs"]
 mod installed;
 #[cfg(not(test))]
-pub use installed::{boundary, configure_from_stdin, enter_domain, enter_recovery, ScopeGuard};
+pub use installed::{
+    before_io, boundary, configure_from_stdin, enter_domain, enter_recovery, observe_native_error,
+    ScopeGuard,
+};

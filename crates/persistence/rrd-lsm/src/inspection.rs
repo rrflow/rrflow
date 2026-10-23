@@ -6,7 +6,8 @@
 //! the active WAL into private memory. Garbage collection may deliberately
 //! remove unpinned parents and their segments; that clean missing-parent
 //! boundary is not corruption. No create, truncate, reconcile, or repair path
-//! is reachable from this module.
+//! is reachable through the public reader. The explicit repair owner alone may
+//! request an exclusive lease and a validated incomplete-tail prefix.
 
 use crate::database::{wal_path, SEGMENT_DIRECTORY, WAL_DIRECTORY};
 use crate::filesystem::AnchoredPath;
@@ -85,6 +86,14 @@ impl ReadOnlyDatabase {
         root: &AnchoredPath,
         options: DatabaseOptions,
     ) -> Result<Self> {
+        Self::open_inner(root, options, false).map(|(reader, _, _)| reader)
+    }
+
+    pub(crate) fn open_inner(
+        root: &AnchoredPath,
+        options: DatabaseOptions,
+        repair: bool,
+    ) -> Result<(Self, Option<u64>, RecoveryBudget)> {
         let options = options.validate()?;
         let mut budget = RecoveryBudget::new(options.recovery);
         let retained_root = root.pin_directory()?;
@@ -119,7 +128,12 @@ impl ReadOnlyDatabase {
                 error,
             )
         })?;
-        match lock.try_lock_shared() {
+        let lease = if repair {
+            lock.try_lock()
+        } else {
+            lock.try_lock_shared()
+        };
+        match lease {
             Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
                 return Err(Error::DatabaseWriterLock {
@@ -245,8 +259,10 @@ impl ReadOnlyDatabase {
             &mut budget,
             |batch| memtable.apply_owned_recovered(batch, options.mutable_limits),
         )?;
-        if let Some(offset) = recovery.torn_tail {
-            return Err(Error::TornTail { offset });
+        if !repair {
+            if let Some(offset) = recovery.torn_tail {
+                return Err(Error::TornTail { offset });
+            }
         }
 
         let mut relative_files = BTreeSet::<PathBuf>::new();
@@ -292,14 +308,18 @@ impl ReadOnlyDatabase {
             files,
             total_bytes,
         };
-        Ok(Self {
-            _root: retained_root,
-            _lock: lock,
-            manifest,
-            memtable,
-            segments,
-            inspection,
-        })
+        Ok((
+            Self {
+                _root: retained_root,
+                _lock: lock,
+                manifest,
+                memtable,
+                segments,
+                inspection,
+            },
+            recovery.torn_tail,
+            budget,
+        ))
     }
 
     pub fn inspection(&self) -> &DatabaseInspection {

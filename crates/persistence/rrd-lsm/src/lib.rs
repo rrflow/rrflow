@@ -30,6 +30,7 @@ mod reclamation;
 mod recovery_budget;
 mod segment;
 mod snapshot_bundle;
+mod tail_repair;
 mod transaction;
 mod wal;
 mod write_diagnostics;
@@ -97,6 +98,7 @@ pub use snapshot_bundle::{
     SnapshotBundle, SnapshotBundleFile, SnapshotExportBoundary, SnapshotSegment,
     SNAPSHOT_BUNDLE_FORMAT_VERSION, SNAPSHOT_BUNDLE_MAX_BYTES,
 };
+pub use tail_repair::{TailRepair, TailRepairPlan, TailRepairReceipt};
 pub use transaction::{Transaction, TransactionCommit, TransactionRollback};
 pub use wal::{
     recover, recover_from, repair_torn_tail, AppendReceipt, Durability, RecoveredBatch, Recovery,

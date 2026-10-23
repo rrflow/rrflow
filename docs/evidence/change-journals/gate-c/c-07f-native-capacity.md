@@ -1,0 +1,169 @@
+# C-07f owned native capacity and explicit candidate repair
+
+**Status:** active implementation candidate; native acceptance pending
+**Coordinate:** `rrflow://rrflow-instance/data/evidence/change-journal/gate-c/c-07f-native-capacity`
+**Owner:** OBJ-02, C-07f, POAM-035
+
+[PR 71](https://github.com/rrflow/rrflow-development/pull/71) carries the
+pre-effect brief. The branch began at synchronized development/main
+`72dd666b254f3f403d11f942c1180b108cc40d21` and fast-forwarded the PR 65 prerequisite
+through `beb55307a9c54df3eedec45a113084e360a4bdc1`. PR 65 must pass and land
+before this dependent package merges. Neither source is promoted to the
+official repository. Product version remains 1.0.0.
+
+## Brief and implementation traceability
+
+Current behavior had kill-only installed diagnostic pauses and no installed
+explicit torn-tail repair. A partial native WAL write could remain non-ready
+after space returned. The failure oracle requires actual native capacity
+errors, preservation of every prior ACK and exact receipt, atomic uncertain
+effects, explicit recovery where required, distinct subsequent work and reopen.
+It cannot accept simulated StorageFull, permanent denial, partial success,
+silent truncation, damaged-input overwrite or an unowned filesystem.
+
+The diagnostic-primary scope now supports a single nonce/id-bound private-pipe
+resume. Native create/write/sync/rename wrappers observe the original OS error
+without injecting or replacing it. Bounded receipts carry PID, phase, operation,
+role and native code; paths, credentials and payloads are absent. Ordinary
+builds exclude both protocols. The owned process guard closes control pipes,
+caps output, and kills/reaps its children.
+
+The existing installed-crash Estate owns installation, real primary staging,
+session, request identity and public-client flow. Its capacity extension uses
+that owner for a separately admitted small native volume. The corpus fills
+only its create-new filler file, requires the selected native error, freezes
+the affected process, releases filler space, resolves the unknown request and
+checks prior receipt identity and exact rows again after restart. Initial WAL
+reservation is consumed by acknowledged operations, not by mutating WAL bytes.
+The uncertain request is frozen before failure. Existing C-07a ledger checking
+remains the independent result oracle.
+
+ReadOnlyDatabase's existing physical/semantic inspection was factored into one
+internal reader. Public ordinary open still rejects torn tails and cannot
+mutate them. Its explicit native repair owner alone acquires the exclusive
+lease and reads the validated prefix; recovery policy caps remain in force.
+It binds the complete physical inventory, full WAL and prefix hashes, tail
+extent and recovered sequence. A stale plan, complete corrupt frame or altered
+prefix denies truncation. An exact already-truncated prefix permits a sync
+retry. RrflowKvInspector and the repair wrapper reuse the same semantic
+watermark/format lowering rather than introducing another storage model.
+
+Installed repair is composed through RrdEngine and its locator, executable,
+sealed configuration, installed record, token and credential binding. Review
+against the lifecycle contract rejected an initial uncommitted in-place
+wrapper. The final installed implementation copies to an absent candidate,
+changes only its WAL, verifies native physical closure and installed watermarks,
+retains the original under content-addressed quarantine, and publishes the
+candidate under the existing active name. It reuses restore's publication lease.
+A bounded private intent resumes copy/quarantine/publication, an audit in the
+candidate binds before/after inventories, and the existing engine control
+journal records completion. Completed retries return that receipt. General
+locator replacement and full semantic/index repair remain D-11, as with the
+current limited restore-publication profile.
+
+New source boundaries are native `tail_repair`, engine `tail_repair/publication`,
+installed harness `support/capacity`, and CI-owned volume/process controls.
+Characterization retained: ordinary inspection's mutation-free denial,
+installed open/verify damage rejection, existing domain crash schedules,
+existing restore publication, and primary raw-command rejection. New regression
+definitions cover native stale plans, corruption, budgets, ACK prefix and
+exact retries, plus installed interruptions after copy, active quarantine,
+candidate publication and control receipt. No prior implementation lane is
+retained as a fallback.
+
+## Read and effect inventory
+
+Owner/contract reads: README.md; AGENTS.md; alpha objectives; roadmap Gate C and
+C-07; execution-map procedure; POAM-035; installed-lifecycle repair, filesystem,
+configuration and restore sections; CI operations and reusable workflow.
+Relevant implementation reads:
+
+- rrd-lsm database, WAL replay/repair, manifest, inspection, recovery_budget,
+  filesystem and file_io, diagnostic crash/installed controls, lib/error,
+  recovery_limits and existing MVCC/inspection/compaction characterizations.
+- rrd-store rrflow_kv, control, lib and the native options/inspector lowering.
+- rrd-engine installation, installation/lease, estate_layout, core options,
+  restore_publication, token_key/private_file, clock, module/lib exports and
+  installation characterizations.
+- CLI command, installed adapter, installed_crash, installed_lifecycle,
+  installed_reopen, support/process and response/history helpers.
+- C-07a storage model/ledger; run_offline_lifecycle, run_filesystem_containment,
+  Windows offline job ABI and cleanup; workflow checker; local sysinfo 0.39.6
+  disk APIs used for independent mounted-volume admission.
+
+Changed paths are mechanically recorded by the execution inventory and PR
+diff. This record explains intent, replacements and evidence, not another
+global path/status authority.
+
+## Native ownership and research decisions
+
+Linux formats only a new capped regular image and mounts it in a private mount
+namespace using an autoclearing loop device. APFS uses an owned fixed image;
+NTFS uses a new fixed VHD with exact image-to-disk checks before initialization,
+partitioning and formatting. No supplied existing mount/disk can be selected.
+Windows descendants enter a kill-on-close job while suspended; POSIX harnesses
+have owned process groups. Detachment is verified before removing only known
+host fixture files and the empty mount directory. Failed cleanup retains the
+fixture and fails the case. Missing tools/privilege report not-run, not success.
+
+Primary references: [Microsoft Mount-DiskImage](https://learn.microsoft.com/en-us/powershell/module/storage/mount-diskimage),
+[Windows native error codes](https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-),
+[DiskPart](https://learn.microsoft.com/windows-server/administration/windows-commands/diskpart),
+[Apple disk images](https://support.apple.com/en-gb/guide/disk-utility/dskutl11888/mac),
+[Linux ext4](https://cdn.kernel.org/doc/html/latest/admin-guide/ext4.html),
+and [util-linux loop cleanup](https://man7.org/linux/man-pages/man8/umount.8.html).
+No upstream implementation was copied. Native ENOSPC/EDQUOT or documented
+Windows disk-full codes are distinct from application admission, process death,
+OS crash and device power loss.
+
+## Commands and actual results
+
+- `cargo check -p rrflow-cli --features crash-test --all-targets --locked`:
+  diagnostic control passed (11.70 s); installed repair passed (7.14 s);
+  candidate publication passed (5.20 s). These are compilation only.
+- `cargo clippy -p rrflow-cli -p rrd-lsm -p rrd-store -p rrd-engine --features
+  rrflow-cli/crash-test --all-targets --locked -- -D warnings`: passed before
+  candidate refinement (13.29 s), and after candidate/refinement regression
+  definitions (10.37 s). Cache directory was the existing declared local
+  c07d-propagation-build target.
+- Intermediate compiler/lint failures surfaced: private storage_error helper
+  not in scope; nonexistent ledger.validate (correct owner is reconcile);
+  unused imports; Clippy is_multiple_of. Corrected at the owning call sites,
+  without suppression or removal of assertions.
+- `python -m py_compile scripts/ci/run_native_capacity.py
+  scripts/ci/owned_windows_process.py`: passed. PowerShell parser admission of
+  owned_capacity_volume.ps1: passed with no parse errors. These do not execute
+  volume effects or qualify OS behavior.
+- `python scripts/ci/check_workflow.py`: passed after the required capacity step
+  and both ordinary-artifact diagnostic marker exclusions were added.
+- Rust formatting, documentation/navigation generation, execution inventory,
+  generated-surface check and staged-diff checks are performed before commit;
+  exact failures, if any, remain part of the candidate record.
+
+No local runtime test suite, native volume fill, benchmark, soak or privileged
+disk operation ran. The owner requested implementation progress without
+repeated local runtime campaigns. Required remote candidate CI remains the
+merge gate. The existing three-platform installed-crash job now explicitly
+executes the owned volume runner; selecting an ignored case or compiling its
+source does not count as native evidence.
+
+## Remaining acceptance and checklist
+
+Pre-effect brief, grounded boundary reads, canonical destination map,
+characterization preservation, resource/trace/research decisions, negative
+oracles, compile/lint outcomes, and unrun qualification are recorded above.
+Stop on any failed source binding, unowned device, non-capacity error, changed
+ACK/receipt, partial effect, lost preserved input, unbounded work, unsafe
+cleanup or failed candidate pipeline. C-07, OBJ-02 and POAM-035 stay open.
+
+Authoring checks also caught the coordinated-record status vocabulary; the
+journal now declares active status and the documentation policy passes.
+Generated-surface parity passes for 42 HTTP operations, unchanged signal/OpenAPI
+identities and seven signal projections. The repair plan bounds logical copy
+and metadata writes; it does not claim a physical-allocation reservation.
+
+Native capacity acceptance at this exact revision is pending. The complete
+targeted-damage/backup matrix, recovery-space reservation, aggregate process
+and host limits, sustained capacity profiles and actual 24-hour soak remain
+open. The code does not establish PostgreSQL compatibility, retrieval quality,
+provider reasoning, cloud sync, Connectome completion or alpha readiness.

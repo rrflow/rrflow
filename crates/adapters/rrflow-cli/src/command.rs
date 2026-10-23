@@ -71,10 +71,37 @@ pub enum Command {
         #[arg(long = "test-distribution-executable", hide = true)]
         test_distribution_executable: Option<std::path::PathBuf>,
     },
+    /// Explicitly repair only a validated incomplete final WAL frame while stopped.
+    Repair {
+        #[command(subcommand)]
+        action: RepairAction,
+    },
     /// Preview or apply the publication of a verified restore while the estate is stopped.
     Restore {
         #[command(subcommand)]
         action: RestoreAction,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum RepairAction {
+    /// Inspect the installed estate and emit an exact plan without changing bytes.
+    Plan {
+        #[arg(long, default_value = ".")]
+        project: std::path::PathBuf,
+        #[arg(long = "test-distribution-executable", hide = true)]
+        test_distribution_executable: Option<std::path::PathBuf>,
+    },
+    /// Truncate only the incomplete tail approved by this exact plan digest.
+    Apply {
+        #[arg(long, default_value = ".")]
+        project: std::path::PathBuf,
+        #[arg(long)]
+        plan: std::path::PathBuf,
+        #[arg(long)]
+        expect: String,
+        #[arg(long = "test-distribution-executable", hide = true)]
+        test_distribution_executable: Option<std::path::PathBuf>,
     },
 }
 
