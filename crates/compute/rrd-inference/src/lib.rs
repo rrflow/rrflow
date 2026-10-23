@@ -905,6 +905,9 @@ impl FeatureHashBackend {
             .sum::<f64>()
             .sqrt() as f32;
         checkpoint()?;
+        if !norm.is_finite() || norm <= 0.0 {
+            return invalid("feature-hash token contributions have no finite nonzero norm");
+        }
         for value in &mut values {
             *value /= norm;
         }

@@ -100,10 +100,15 @@ unqualified. See the
 
 Repeated-work capacity qualification exposed an existing FeatureHash adapter
 deficiency: signed token contributions can cancel to a zero vector, and its
-normalization divides by zero. The shared output validator rejects the
-non-finite result before acceptance, but the adapter needs an explicit
-zero-norm outcome and a regression under G-01a. This is not fixed by repetition
-admission; its bounded-history fixture uses single-token, nonzero vectors.
+normalization divided by zero. The shared output validator rejected the
+non-finite result before acceptance.
+[PR105](https://github.com/rrflow/rrflow-development/pull/105) now rejects the
+degenerate norm in the adapter itself; its direct/batch/controlled regression
+and recovery check are recorded in the
+[G-01a repair evidence](../../evidence/change-journals/gate-g/g-01a-featurehash-zero-norm.md).
+Candidate CI and broader G-01a qualification remain required. This correction
+is separate from repetition admission; its bounded-history fixture uses
+single-token, nonzero vectors.
 
 [PR104](https://github.com/rrflow/rrflow-development/pull/104) adds optional
 immutable repeated-embedding limits to the same task budget, with bounded
