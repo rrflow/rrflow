@@ -323,3 +323,32 @@ After cleaning that package, `cargo clippy -p rrflow-cli --test installed_crash
 --features crash-test --locked -- -D warnings` passed (20.13 seconds).
 No local runtime test, mount or fill ran. Candidate CI and actual APFS/NTFS/ext4
 capacity matrix remain required; C-07 status is unchanged.
+
+
+## Native create-phase exhaustion
+
+On the same candidate, Windows job 120225089228 passed the fresh WAL
+exhaustion/recovery case (159.11 seconds). The next segment case reached its
+rendezvous, but the observed error's role was WAL, not segment (58.06 seconds,
+failed). The exact-role assertion correctly rejected this as segment proof.
+Data-cluster exhaustion alone does not guarantee create-phase failure on NTFS,
+where resident metadata may still accommodate small new files.
+
+The owned filler now additionally consumes create_new directory entries at the
+selected segment/manifest/CURRENT directory until creation actually returns a
+native capacity error. The installed locator supplies that directory; canonical
+containment and non-symlink checks bind it to the capped owned volume. Each
+successful path is retained for exact cleanup after server termination, with
+at most 8,192 files and the existing 25-second total fill deadline. Only those
+owned paths and the data filler are removed. WAL still uses data-only fill.
+Receipts retain metadata file count and the actual creation capacity code;
+engine failure role and native error remain mandatory and unchanged. No native
+error is substituted and a later-phase error still fails the selected case.
+
+Read: diagnostic boundary/observation code, capped native filesystem wrapper,
+installed locator, WAL warmup and native capacity cleanup. PR brief was updated
+before implementation. `cargo clippy -p rrflow-cli --test installed_crash
+--features crash-test --locked -- -D warnings` passed (15.64 seconds) after
+clearing shared-target artifacts belonging to the G worktree. No local native
+fill/runtime case executed. The next exact-candidate native matrix must prove
+these paths; earlier WAL success does not validate the modified candidate.
