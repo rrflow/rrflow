@@ -322,7 +322,7 @@ fn run(mode: &str) {
             dimensions: 16,
             seed: 97,
             records: 4,
-            read_distribution: ReadKeyDistribution::Uniform,
+            read_distribution: ReadKeyDistribution::Uniform {},
             edges_per_record: 2,
             vectors_per_record: 2,
             payload_bytes: 1024,

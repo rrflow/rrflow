@@ -774,7 +774,7 @@ fn installed_capacity_workload_smoke() {
             dimensions: 16,
             seed: 73,
             records: 8,
-            read_distribution: ReadKeyDistribution::Uniform,
+            read_distribution: ReadKeyDistribution::Uniform {},
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,

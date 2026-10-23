@@ -87,7 +87,7 @@ pub struct CapacityAllocation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ReadKeyDistribution {
-    Uniform,
+    Uniform {},
     HotKey {
         ordinal: u64,
     },
@@ -104,7 +104,7 @@ impl ReadKeyDistribution {
             "invalid read-key corpus",
         )?;
         match self {
-            Self::Uniform => Ok(()),
+            Self::Uniform {} => Ok(()),
             Self::HotKey { ordinal } => require(*ordinal < records, "hot key outside corpus"),
             Self::HotSet {
                 keys,
@@ -129,7 +129,7 @@ impl ReadKeyDistribution {
         let coordinate = seed.wrapping_add(sequence.wrapping_mul(0x9e3779b97f4a7c15));
         let key = mix(coordinate);
         Ok(match self {
-            Self::Uniform => key % records,
+            Self::Uniform {} => key % records,
             Self::HotKey { ordinal } => *ordinal,
             Self::HotSet {
                 keys,
@@ -1793,7 +1793,7 @@ mod tests {
                 forced_reopens: limit(1),
             },
             seeds: vec![7],
-            read_distribution: ReadKeyDistribution::Uniform,
+            read_distribution: ReadKeyDistribution::Uniform {},
             drain: super::super::DrainPolicy {
                 maximum_mutable_growth_bytes: 0,
                 maximum_projected_growth_bytes: 0,
@@ -2028,7 +2028,7 @@ mod tests {
 
     #[test]
     fn read_distribution_is_frozen_bounded_and_selects_the_requested_region() {
-        let uniform = ReadKeyDistribution::Uniform;
+        let uniform = ReadKeyDistribution::Uniform {};
         let hot = ReadKeyDistribution::HotKey { ordinal: 99 };
         let skew = ReadKeyDistribution::HotSet {
             keys: limit(4),
