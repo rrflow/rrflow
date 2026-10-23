@@ -130,3 +130,10 @@ the existing writers now specify UTF-8/LF. Reran all three exact generators;
 whitespace check passed. This removes platform-dependent projection churn.
 Their complete generator source and output diff were reviewed; no catalogue
 semantics changed. Final inventory is regenerated after this evidence entry.
+
+
+Current reference review corrected stale pre-cursor counts in public-contract,
+TypeScript, Python and Rust SDK records from the exported catalogue: 44 HTTP
+operations, three Rust diagnostic methods and 39 typed Rust methods. The same
+five known missing Rust operations remain explicit. Historical evidence counts
+were preserved. This reference correction does not qualify those SDKs.

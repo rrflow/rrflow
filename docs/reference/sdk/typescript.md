@@ -98,7 +98,7 @@ the TypeScript 7 API.
 
 The audited projection contains:
 
-- 43 HTTP operations;
+- 44 HTTP operations;
 - only `200` success envelopes plus the default error envelope;
 - `application/json` as the only declared response media type; and
 - OpenAPI SHA-256
