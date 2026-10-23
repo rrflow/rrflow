@@ -26,6 +26,9 @@ pub enum ServiceError {
     Query(String),
     Inference(String),
     InferenceBusy,
+    InferenceCancelled {
+        execution_may_continue: bool,
+    },
     InferenceDeadlineExceeded {
         execution_may_continue: bool,
     },
@@ -116,6 +119,7 @@ impl ServiceError {
             | Self::ClockUnavailable(_)
             | Self::ClockRollback { .. }
             | Self::AdmissionCancelled
+            | Self::InferenceCancelled { .. }
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
             | Self::StorageAdmission(_)

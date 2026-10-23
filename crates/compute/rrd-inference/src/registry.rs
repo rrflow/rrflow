@@ -27,6 +27,9 @@ pub enum EmbeddingDispatchError {
     DeadlineExceeded {
         execution_may_continue: bool,
     },
+    Cancelled {
+        execution_may_continue: bool,
+    },
     WorkerUnavailable,
     Rejected(Error),
 }
@@ -43,6 +46,12 @@ impl std::fmt::Display for EmbeddingDispatchError {
                 "embedding deadline exceeded; execution may continue: {execution_may_continue}"
             ),
             Self::WorkerUnavailable => formatter.write_str("embedding worker unavailable"),
+            Self::Cancelled {
+                execution_may_continue,
+            } => write!(
+                formatter,
+                "embedding cancelled; execution may continue: {execution_may_continue}"
+            ),
             Self::Rejected(error) => std::fmt::Display::fmt(error, formatter),
         }
     }
@@ -168,13 +177,29 @@ impl EmbeddingExecution {
         requests: Vec<EmbeddingRequest>,
         deadline: Instant,
     ) -> std::result::Result<EmbeddingBatchResult, EmbeddingDispatchError> {
-        check_deadline(Some(deadline), false)?;
+        self.embed_batch_with_control(
+            model,
+            network_policy,
+            requests,
+            EmbeddingExecutionControl::new(deadline, EmbeddingCancellation::default()),
+        )
+    }
+
+    pub fn embed_batch_with_control(
+        self,
+        model: EmbeddingModelSpec,
+        network_policy: NetworkPolicy,
+        requests: Vec<EmbeddingRequest>,
+        control: EmbeddingExecutionControl,
+    ) -> std::result::Result<EmbeddingBatchResult, EmbeddingDispatchError> {
+        control.check()?;
+        let waiting = EmbeddingExecutionControl::new(control.deadline(), control.cancellation());
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
         std::thread::Builder::new()
             .name("rrflow-inference".into())
             .spawn(move || {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    self.embed_batch_inner(&model, network_policy, &requests, Some(deadline))
+                    self.embed_batch_inner(&model, network_policy, &requests, Some(&control))
                 }))
                 .unwrap_or(Err(EmbeddingDispatchError::WorkerUnavailable));
                 // Never block on delivery. A timed-out receiver discards late
@@ -182,23 +207,22 @@ impl EmbeddingExecution {
                 let _ = sender.send(result);
             })
             .map_err(|_| EmbeddingDispatchError::WorkerUnavailable)?;
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        let result = receiver
-            .recv_timeout(remaining)
-            .map_err(|error| match error {
-                std::sync::mpsc::RecvTimeoutError::Timeout => {
-                    EmbeddingDispatchError::DeadlineExceeded {
-                        execution_may_continue: true,
-                    }
+        loop {
+            waiting.check_outstanding(true)?;
+            let remaining = waiting.deadline().saturating_duration_since(Instant::now());
+            // Blocking waits, not spinning. The cancellation wait quantum is
+            // finite; host scheduling can add latency. Deadline never resets.
+            match receiver.recv_timeout(remaining.min(std::time::Duration::from_millis(10))) {
+                Ok(result) => {
+                    waiting.check_outstanding(true)?;
+                    return result;
                 }
-                std::sync::mpsc::RecvTimeoutError::Disconnected => {
-                    EmbeddingDispatchError::WorkerUnavailable
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(EmbeddingDispatchError::WorkerUnavailable)
                 }
-            })?;
-        // A channel that already holds a result can return after the deadline.
-        // The caller's acceptance check must not depend on receive scheduling.
-        check_deadline(Some(deadline), true)?;
-        result
+            }
+        }
     }
 
     fn embed_batch_inner(
@@ -206,9 +230,9 @@ impl EmbeddingExecution {
         model: &EmbeddingModelSpec,
         network_policy: NetworkPolicy,
         requests: &[EmbeddingRequest],
-        deadline: Option<Instant>,
+        control: Option<&EmbeddingExecutionControl>,
     ) -> std::result::Result<EmbeddingBatchResult, EmbeddingDispatchError> {
-        check_deadline(deadline, false)?;
+        check_control(control)?;
         if &self.descriptor.model != model {
             return Err(Error::InvalidRuntime {
                 reason: "embedding backend model differs from the requested model".into(),
@@ -223,13 +247,16 @@ impl EmbeddingExecution {
             .map_err(|_| EmbeddingDispatchError::UnhealthyBackend)?;
         self.require_descriptor(backend.as_ref())?;
         validate_embedding_batch(&self.descriptor, network_policy, requests)?;
-        check_deadline(deadline, false)?;
-        let result = backend.embed_batch(requests);
-        check_deadline(deadline, false)?;
+        check_control(control)?;
+        let result = match control {
+            Some(control) => backend.embed_batch_controlled(requests, control),
+            None => backend.embed_batch(requests).map_err(Into::into),
+        };
+        check_control(control)?;
         let vectors = result?;
         validate_embedding_batch_output(&self.descriptor, requests.len(), &vectors)?;
         self.require_descriptor(backend.as_ref())?;
-        check_deadline(deadline, false)?;
+        check_control(control)?;
         Ok(EmbeddingBatchResult {
             registry_revision: self.registry_revision,
             backend: self.descriptor.clone(),
@@ -245,14 +272,8 @@ impl EmbeddingExecution {
     }
 }
 
-fn check_deadline(
-    deadline: Option<Instant>,
-    execution_may_continue: bool,
+fn check_control(
+    control: Option<&EmbeddingExecutionControl>,
 ) -> std::result::Result<(), EmbeddingDispatchError> {
-    if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
-        return Err(EmbeddingDispatchError::DeadlineExceeded {
-            execution_may_continue,
-        });
-    }
-    Ok(())
+    control.map_or(Ok(()), EmbeddingExecutionControl::check)
 }

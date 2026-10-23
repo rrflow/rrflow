@@ -18,6 +18,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod registry;
 pub use registry::{EmbeddingBackendRegistry, EmbeddingDispatchError, EmbeddingExecution};
+mod execution_control;
+pub use execution_control::{EmbeddingCancellation, EmbeddingExecutionControl};
 
 #[cfg(feature = "fastembed-local")]
 mod fastembed_local;
@@ -468,6 +470,19 @@ pub trait EmbeddingBackend {
     fn embed_batch(&mut self, requests: &[EmbeddingRequest]) -> Result<Vec<VectorValue>> {
         requests.iter().map(|request| self.embed(request)).collect()
     }
+
+    /// Override to observe stop requests during computation. The default
+    /// preserves native batching but cannot interrupt its synchronous call.
+    fn embed_batch_controlled(
+        &mut self,
+        requests: &[EmbeddingRequest],
+        control: &EmbeddingExecutionControl,
+    ) -> std::result::Result<Vec<VectorValue>, EmbeddingDispatchError> {
+        control.check()?;
+        let result = self.embed_batch(requests);
+        control.check()?;
+        result.map_err(Into::into)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -809,6 +824,46 @@ impl EmbeddingBackend for FeatureHashBackend {
     }
 
     fn embed(&mut self, request: &EmbeddingRequest) -> Result<VectorValue> {
+        self.embed_controlled(request, None)
+    }
+
+    fn embed_batch_controlled(
+        &mut self,
+        requests: &[EmbeddingRequest],
+        control: &EmbeddingExecutionControl,
+    ) -> std::result::Result<Vec<VectorValue>, EmbeddingDispatchError> {
+        control.check()?;
+        let result: Result<Vec<_>> = requests
+            .iter()
+            .map(|request| self.embed_controlled(request, Some(control)))
+            .collect();
+        control.check()?;
+        result.map_err(Into::into)
+    }
+}
+
+impl FeatureHashBackend {
+    fn embed_controlled(
+        &mut self,
+        request: &EmbeddingRequest,
+        control: Option<&EmbeddingExecutionControl>,
+    ) -> Result<VectorValue> {
+        self.embed_with_checkpoint(request, || -> Result<()> {
+            if let Some(control) = control {
+                control.check().map_err(|error| Error::InvalidRuntime {
+                    reason: error.to_string(),
+                })?;
+            }
+            Ok(())
+        })
+    }
+
+    fn embed_with_checkpoint(
+        &mut self,
+        request: &EmbeddingRequest,
+        mut checkpoint: impl FnMut() -> Result<()>,
+    ) -> Result<VectorValue> {
+        checkpoint()?;
         if request.bytes.len() > self.descriptor.model.maximum_input_bytes as usize {
             return invalid("embedding input exceeds model byte limit");
         }
@@ -822,7 +877,9 @@ impl EmbeddingBackend for FeatureHashBackend {
             .to_lowercase();
         let mut values = vec![0.0_f32; self.descriptor.model.dimensions as usize];
         let mut tokens = BTreeSet::new();
+        checkpoint()?;
         for token in text.split(|character: char| !character.is_alphanumeric()) {
+            checkpoint()?;
             if !token.is_empty() {
                 tokens.insert(token);
             }
@@ -831,6 +888,7 @@ impl EmbeddingBackend for FeatureHashBackend {
             return invalid("feature-hash input contains no tokens");
         }
         for token in tokens {
+            checkpoint()?;
             let mut identity = b"rrflow-feature-hash-token-v1\0".to_vec();
             identity.extend_from_slice(&self.seed.to_be_bytes());
             identity.extend_from_slice(token.as_bytes());
@@ -846,9 +904,11 @@ impl EmbeddingBackend for FeatureHashBackend {
             .map(|value| f64::from(*value).powi(2))
             .sum::<f64>()
             .sqrt() as f32;
+        checkpoint()?;
         for value in &mut values {
             *value /= norm;
         }
+        checkpoint()?;
         Ok(VectorValue::Dense { values })
     }
 }
@@ -931,4 +991,49 @@ fn invalid<T>(reason: impl Into<String>) -> Result<T> {
     Err(Error::InvalidRuntime {
         reason: reason.into(),
     })
+}
+
+#[cfg(test)]
+mod cooperative_feature_hash_tests {
+    use super::*;
+
+    #[test]
+    fn cancellation_interrupts_real_feature_hash_before_output() {
+        let bytes = (0..100)
+            .map(|index| format!("word{index} "))
+            .collect::<String>()
+            .into_bytes();
+        let request = EmbeddingRequest {
+            job_id: RuntimeId::new("cancel-source").unwrap(),
+            job_digest: digest::sha256_hex(b"cancel-job"),
+            source_digest: digest::sha256_hex(&bytes),
+            media_type: "text/plain".into(),
+            bytes,
+        };
+        let mut backend = FeatureHashBackend::new(32, 99).unwrap();
+        let cancellation = EmbeddingCancellation::default();
+        let control = EmbeddingExecutionControl::new(
+            std::time::Instant::now() + std::time::Duration::from_secs(5),
+            cancellation.clone(),
+        );
+        let mut checkpoints = 0;
+        let stopped = backend.embed_with_checkpoint(&request, || {
+            checkpoints += 1;
+            if checkpoints == 20 {
+                cancellation.cancel();
+            }
+            control.check().map_err(|error| Error::InvalidRuntime {
+                reason: error.to_string(),
+            })
+        });
+        assert!(stopped.is_err());
+        assert_eq!(
+            checkpoints, 20,
+            "real computation continued past cancellation"
+        );
+        assert!(
+            backend.embed(&request).is_ok(),
+            "cancellation corrupted the reusable model"
+        );
+    }
 }

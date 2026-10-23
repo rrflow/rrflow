@@ -141,9 +141,18 @@ fn blocked_embedding_does_not_lock_model_catalogue() {
 
 #[test]
 fn configured_embedding_deadline_returns_while_worker_keeps_its_permit() {
+    interrupted_embedding_keeps_its_permit(false);
+}
+
+#[test]
+fn cancelled_embedding_returns_while_worker_keeps_its_permit() {
+    interrupted_embedding_keeps_its_permit(true);
+}
+
+fn interrupted_embedding_keeps_its_permit(cancel: bool) {
     let (_root, mut engine) = isolated_engine();
     let mut configuration = rrd_contract::EstateConfiguration::default();
-    configuration.reasoning.max_step_elapsed_ms = 250;
+    configuration.reasoning.max_step_elapsed_ms = if cancel { 5_000 } else { 250 };
     configuration.configuration_sha256 =
         rrd_contract::estate_configuration_sha256(&configuration).unwrap();
     configuration.validate().unwrap();
@@ -182,20 +191,26 @@ fn configured_embedding_deadline_returns_while_worker_keeps_its_permit() {
     };
     std::thread::scope(|threads| {
         let (done_tx, done_rx) = mpsc::channel();
+        let cancellation = rrd_inference::EmbeddingCancellation::default();
+        let caller_cancellation = cancellation.clone();
         let (engine, lease, request) = (&engine, &lease, &request);
         threads.spawn(move || {
             done_tx
-                .send(engine.generate_embeddings(
+                .send(engine.generate_embeddings_with_cancellation(
                     &lease.session_id,
                     &lease.token,
                     request,
                     20,
                     "deadline-call",
                     "deadline-call-op",
+                    &caller_cancellation,
                 ))
                 .unwrap();
         });
         entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        if cancel {
+            cancellation.cancel();
+        }
         let observed = done_rx.recv_timeout(Duration::from_secs(2));
         let capacity_held = matches!(
             engine.generate_embeddings(
@@ -212,13 +227,23 @@ fn configured_embedding_deadline_returns_while_worker_keeps_its_permit() {
         let error = observed
             .expect("configured deadline did not return before backend release")
             .unwrap_err();
-        assert!(matches!(
-            error,
-            ServiceError::InferenceDeadlineExceeded {
-                execution_may_continue: true
-            }
-        ));
-        assert_eq!(error.kind(), ServiceErrorKind::DeadlineExceeded);
+        if cancel {
+            assert!(matches!(
+                error,
+                ServiceError::InferenceCancelled {
+                    execution_may_continue: true
+                }
+            ));
+            assert_eq!(error.kind(), ServiceErrorKind::FailedPrecondition);
+        } else {
+            assert!(matches!(
+                error,
+                ServiceError::InferenceDeadlineExceeded {
+                    execution_may_continue: true
+                }
+            ));
+            assert_eq!(error.kind(), ServiceErrorKind::DeadlineExceeded);
+        }
         assert!(!error.retryable());
         assert!(capacity_held);
         let until = std::time::Instant::now() + Duration::from_secs(2);

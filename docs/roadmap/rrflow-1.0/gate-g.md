@@ -104,6 +104,13 @@ explains why timers, attempt limits, cancellation and durable accounting need
 separate proof. No row is complete merely because its contract or unit fixture
 exists. A per-batch deadline cannot close aggregate run accounting.
 
+[PR 101](https://github.com/rrflow/rrflow-development/pull/101) advances row 2
+with process-local cooperative cancellation through the existing embedding
+owner and the actual bundled FeatureHash implementation. It does not qualify
+router dispatch, remote provider cancellation, hard termination, a durable run
+Stop operation or UI controls. The descriptor and wire catalogue are unchanged;
+no adapter is advertised as forcibly stoppable because it implements a trait.
+
 ## Controller learning packages
 
 The [learning contract](../../reference/inference/learning/controller-training.md)

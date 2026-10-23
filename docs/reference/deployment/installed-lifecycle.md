@@ -360,6 +360,11 @@ end-to-end loop prevention, cancellation or a provider cost ceiling. The
 owns aggregate accounting, retries, effort presets, stop/resume and required
 runtime proof. Existing query/context limits remain separately enforced.
 
+The Rust embedded generation API additionally accepts a process-local
+cancellation handle. FeatureHash observes it cooperatively; other adapters
+may finish their current blocking call before releasing admission. This is
+not an installed daemon/UI Stop operation or durable cancellation after restart.
+
 ### Native storage limits
 
 The required `[storage]` configuration separates active-state, output, cache,

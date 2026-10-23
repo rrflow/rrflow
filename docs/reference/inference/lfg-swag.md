@@ -104,6 +104,24 @@ returns. A timeout reports that execution may continue and is not automatically
 retryable. This is not forced adapter cancellation, a durable run limit or an
 implemented SWAG runner. Other calls cannot inherit a fictitious unused budget.
 
+Embedded callers may use `generate_embeddings_with_cancellation` with an
+`EmbeddingCancellation` handle. It shares the ordinary generation path's
+authorization, installed deadline, validation and admission; it cannot extend
+the ceiling. Cancellation is sticky across clones and is checked before
+dispatch and output acceptance. A waiting caller checks the signal in blocking
+waits of at most 10 ms; host scheduling can add latency. That is not a hard
+real-time termination guarantee.
+
+`EmbeddingBackend::embed_batch_controlled` supplies adapters with immutable
+deadline/cancellation checks. Its default preserves native batching and checks
+before and after the synchronous call. The bundled FeatureHash implementation
+also checks during token processing and hashing, between inputs and around
+normalization. Individual bounded string/vector operations are not preempted.
+A non-cooperative adapter, including the current FastEmbed call, retains its
+slot until return even after the caller receives a cancellation outcome.
+There is no public daemon Stop operation, persisted cancellation receipt or
+Connectome Stop control yet; those require the durable run owner below.
+
 ### Research decisions for budget enforcement
 
 Primary-source review on 2026-10-23 supports these separate mechanisms:

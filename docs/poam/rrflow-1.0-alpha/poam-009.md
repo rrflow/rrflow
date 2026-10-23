@@ -104,6 +104,12 @@ The [budget-control sequence](../../roadmap/rrflow-1.0/gate-g.md#budget-control-
 binds those remaining requirements to code owners and falsifying histories.
 POAM-009 remains open; controlled adapter tests do not qualify a real router.
 
+[PR 101](https://github.com/rrflow/rrflow-development/pull/101) propagates a
+sticky embedded cancellation signal into existing execution and FeatureHash
+checkpoints. A non-cooperative adapter retains admission until actual return.
+This is process-local cancellation only; the durable run/receipt and public
+Stop capability remain open.
+
 Invalid-output and identity-denial corpora, same-stamp principal/representation/seat/policy
 route packets, attributed CAS/reopen tests, and separated model/storage measurements pass.
 
