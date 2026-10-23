@@ -21,6 +21,142 @@ fn options(max_versions: usize) -> DatabaseOptions {
 }
 
 #[test]
+fn idle_maintenance_drains_without_flushing_the_acknowledged_mutable_tail() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("idle");
+    let options = DatabaseOptions {
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 4,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    database
+        .write_owned(
+            WriteBatch::new(vec![put("shared", "first")]).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    database.flush_memtable(1).unwrap();
+    let historical = database.begin_transaction().unwrap();
+    let old = database.snapshot();
+    for ordinal in 0..9 {
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("shared", &ordinal.to_string())]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(ordinal + 2).unwrap();
+    }
+    database
+        .write_owned(
+            WriteBatch::new(vec![put("shared", "tail"), put("only-tail", "ack")]).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    let acknowledged = database.snapshot();
+    let wal_start = database.manifest().wal_start_sequence;
+    let durable = database.manifest().durable_sequence;
+    let versions = database.memtable().version_count();
+    assert!(database.compaction_debt_segments() > 0);
+    for _ in 0..30 {
+        if !database.maintenance_step().unwrap() {
+            break;
+        }
+        assert_eq!(database.snapshot().sequence, acknowledged.sequence);
+        assert_eq!(database.manifest().wal_start_sequence, wal_start);
+        assert_eq!(database.manifest().durable_sequence, durable);
+        assert_eq!(database.memtable().version_count(), versions);
+        assert_eq!(
+            historical.get(&database, b"shared").unwrap(),
+            Some(b"first".to_vec())
+        );
+    }
+    assert_eq!(database.compaction_debt_segments(), 0);
+    assert!(!database.maintenance_step().unwrap());
+    assert!(database.maintenance_stats().automatic_compactions > 0);
+    assert_eq!(database.maintenance_stats().automatic_flushes, 0);
+    drop(historical);
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    assert_eq!(reopened.snapshot().sequence, acknowledged.sequence);
+    assert_eq!(
+        reopened.get(b"shared", old).unwrap(),
+        Some(b"first".to_vec())
+    );
+    assert_eq!(
+        reopened.get(b"shared", acknowledged).unwrap(),
+        Some(b"tail".to_vec())
+    );
+    assert_eq!(
+        reopened.get(b"only-tail", acknowledged).unwrap(),
+        Some(b"ack".to_vec())
+    );
+}
+
+#[test]
+fn idle_maintenance_rejects_an_unadmitted_merge_without_publishing_or_flushing() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("denied-idle");
+    let options = DatabaseOptions {
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 4,
+            ..Default::default()
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            input_logical_bytes: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    for ordinal in 0..4 {
+        database
+            .write_owned(
+                WriteBatch::new(vec![put(&format!("k{ordinal}"), "ack")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(ordinal + 1).unwrap();
+    }
+    database
+        .write_owned(
+            WriteBatch::new(vec![put("tail", "ack")]).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    let before = database.manifest().clone();
+    let head = database.snapshot();
+    // A pending reclamation quantum, if any, is separate from compaction.
+    let mut denied = false;
+    for _ in 0..3 {
+        match database.maintenance_step() {
+            Ok(_) => {}
+            Err(Error::MaintenanceLimit { .. }) => {
+                denied = true;
+                break;
+            }
+            Err(error) => panic!("unexpected denial: {error}"),
+        }
+    }
+    assert!(denied);
+    assert_eq!(database.manifest().digest, before.digest);
+    assert_eq!(database.snapshot().sequence, head.sequence);
+    assert_eq!(database.memtable().version_count(), 1);
+    assert_eq!(database.maintenance_stats().failed_compactions, 1);
+    drop(database);
+    let reopened = Database::open(&root).unwrap();
+    for key in ["k0", "k1", "k2", "k3", "tail"] {
+        assert_eq!(
+            reopened.get(key.as_bytes(), head).unwrap(),
+            Some(b"ack".to_vec())
+        );
+    }
+}
+
+#[test]
 fn reserve_denies_wal_flush_and_compaction_without_losing_prior_acknowledgements() {
     // Policy denial against observed native free space, not actual ENOSPC proof.
     for phase in ["wal", "flush", "compaction"] {

@@ -398,6 +398,18 @@ remain subject to the existing validated garbage collector. Total on-disk
 history, higher-level debt, retained snapshots and process memory are separate
 qualification obligations; these controls do not claim those are bounded.
 
+While serving, the existing one-second host sweep offers one engine-owned
+physical maintenance quantum to a single joined worker. Busy ticks are skipped.
+Each admitted quantum either reclaims a bounded pending inventory or performs
+one bounded compaction to reduce L0 debt. It uses the same writer lock and
+configured limits, preserves all MVCC history, and does not flush the active
+mutable tail or advance logical cursors. Shutdown and cancellation stop new
+offers and join any admitted quantum; the cooperative deadline still cannot
+interrupt a blocked filesystem call. Embedded hosts can offer the same work
+through `RrdEngine::maintain_storage`. The
+[idle-maintenance evidence](../../evidence/change-journals/gate-c/c-07d-idle-maintenance.md)
+does not replace installed latency, drain or soak qualification.
+
 Retained mutable generations share an ownership-based pool per opened database:
 `retained_mutable_bytes` (512 MiB), `retained_mutable_versions` (4,194,304) and
 `retained_mutable_generations` (64). A writer reserves a complete copy before

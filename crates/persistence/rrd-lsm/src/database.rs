@@ -1228,32 +1228,8 @@ impl Database {
                 Ok(Some(_)) => {
                     self.maintenance_stats.automatic_flushes =
                         self.maintenance_stats.automatic_flushes.saturating_add(1);
-                    match self.compact_if_needed(self.manifest.created_at) {
-                        Ok(Some(outcome)) => {
-                            self.maintenance_stats.automatic_compactions = self
-                                .maintenance_stats
-                                .automatic_compactions
-                                .saturating_add(1);
-                            self.maintenance_stats.compaction_input_bytes = self
-                                .maintenance_stats
-                                .compaction_input_bytes
-                                .saturating_add(outcome.input_bytes);
-                            self.maintenance_stats.compaction_output_bytes = self
-                                .maintenance_stats
-                                .compaction_output_bytes
-                                .saturating_add(outcome.output_bytes);
-                            self.maintenance_stats.peak_compaction_buffer_bytes = self
-                                .maintenance_stats
-                                .peak_compaction_buffer_bytes
-                                .max(outcome.peak_buffer_bytes);
-                        }
-                        Ok(None) => {}
-                        Err(error) => {
-                            self.maintenance_stats.failed_compactions =
-                                self.maintenance_stats.failed_compactions.saturating_add(1);
-                            return Err(error);
-                        }
-                    }
+                    let result = self.compact_if_needed(self.manifest.created_at);
+                    self.record_automatic_compaction(result)?;
                 }
                 Ok(None) => {}
                 Err(error) => {
@@ -1708,6 +1684,57 @@ impl Database {
         self.compact_inner(&[], at, None, false, true)
     }
 
+    /// One bounded physical housekeeping quantum. No logical write or flush is
+    /// introduced: the mutable tail stays in its acknowledged WAL generation.
+    /// Reclamation and compaction use the same publication owner and configured
+    /// limits as foreground maintenance. A caller decides when to offer work.
+    pub fn maintenance_step(&mut self) -> Result<bool> {
+        self.ensure_writer_ready()?;
+        if self.reclamation_pending {
+            let report = self.garbage_collect()?;
+            self.reclamation_pending = report.has_more;
+            return Ok(true);
+        }
+        if self.compaction_debt_segments() == 0 {
+            return Ok(false);
+        }
+        let result = self.compact_segments_inner(&[], self.manifest.created_at, None, false, true);
+        self.record_automatic_compaction(result)
+    }
+
+    fn record_automatic_compaction(
+        &mut self,
+        result: Result<Option<CompactionOutcome>>,
+    ) -> Result<bool> {
+        match result {
+            Ok(Some(outcome)) => {
+                self.maintenance_stats.automatic_compactions = self
+                    .maintenance_stats
+                    .automatic_compactions
+                    .saturating_add(1);
+                self.maintenance_stats.compaction_input_bytes = self
+                    .maintenance_stats
+                    .compaction_input_bytes
+                    .saturating_add(outcome.input_bytes);
+                self.maintenance_stats.compaction_output_bytes = self
+                    .maintenance_stats
+                    .compaction_output_bytes
+                    .saturating_add(outcome.output_bytes);
+                self.maintenance_stats.peak_compaction_buffer_bytes = self
+                    .maintenance_stats
+                    .peak_compaction_buffer_bytes
+                    .max(outcome.peak_buffer_bytes);
+                Ok(true)
+            }
+            Ok(None) => Ok(false),
+            Err(error) => {
+                self.maintenance_stats.failed_compactions =
+                    self.maintenance_stats.failed_compactions.saturating_add(1);
+                Err(error)
+            }
+        }
+    }
+
     fn compact_inner(
         &mut self,
         protected: &[Snapshot],
@@ -1717,6 +1744,18 @@ impl Database {
         retain_all_versions: bool,
     ) -> Result<Option<CompactionOutcome>> {
         self.flush_memtable_inner(at, None)?;
+        self.compact_segments_inner(protected, at, failure, force, retain_all_versions)
+    }
+
+    fn compact_segments_inner(
+        &mut self,
+        protected: &[Snapshot],
+        at: u64,
+        failure: Option<(CompactionBoundary, FailureMode)>,
+        force: bool,
+        retain_all_versions: bool,
+    ) -> Result<Option<CompactionOutcome>> {
+        self.ensure_writer_ready()?;
         let started = Instant::now();
         let Some(candidate) = self.select_compaction_candidate(force, started)? else {
             return Ok(None);

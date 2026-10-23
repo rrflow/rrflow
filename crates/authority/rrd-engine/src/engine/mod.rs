@@ -112,6 +112,7 @@ mod function;
 mod inference;
 mod installation;
 mod invocation;
+mod maintenance;
 mod memory_estate;
 mod model;
 mod query;

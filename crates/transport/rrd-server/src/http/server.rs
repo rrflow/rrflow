@@ -227,11 +227,7 @@ impl RrdHttpServer {
     }
 
     pub async fn serve(self) -> Result<()> {
-        if self.tls.is_some() {
-            return self.serve_until(std::future::pending()).await;
-        }
-        let listener = tokio::net::TcpListener::from_std(self.listener)?;
-        axum::serve(listener, self.app).await.map_err(HttpError::Io)
+        self.serve_until(std::future::pending()).await
     }
 
     pub async fn serve_until<F>(self, shutdown: F) -> Result<()>
@@ -240,6 +236,14 @@ impl RrdHttpServer {
     {
         let listener = tokio::net::TcpListener::from_std(self.listener)?;
         let state = self.state;
+        let maintenance_state = Arc::clone(&state);
+        let maintenance = super::maintenance::MaintenanceWorker::start(move || {
+            if maintenance_state.service.maintain_storage().is_err() {
+                // Existing native counters retain failure counts. Never log
+                // source payloads or make a failed quantum a success receipt.
+                tracing::warn!(target: "rrd_server::maintenance", "bounded storage maintenance quantum failed");
+            }
+        })?;
         let serve = async move {
             if let Some(acceptor) = self.tls {
                 return serve_mtls(listener, self.app, acceptor, shutdown).await;
@@ -255,8 +259,11 @@ impl RrdHttpServer {
         loop {
             tokio::select! {
                 result = &mut serve => return result,
-                _ = sweep.tick() => state.service.reap_storage_cursors()
-                    .map_err(|error| HttpError::Contract(error.to_string()))?,
+                _ = sweep.tick() => {
+                    state.service.reap_storage_cursors()
+                        .map_err(|error| HttpError::Contract(error.to_string()))?;
+                    maintenance.offer()?;
+                }
             }
         }
     }

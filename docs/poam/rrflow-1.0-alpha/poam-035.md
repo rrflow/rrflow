@@ -491,3 +491,11 @@ native soak is still required. Linux10 completed and verified backup within
 the unchanged 30-second deadline, but failed drain with 43 maintenance-debt
 segments and retained measured-load failures. Idle maintenance progress and
 latency remain C-07d/g deficiencies; no profile or 24-hour qualification follows.
+
+The [bounded idle-maintenance implementation](../../evidence/change-journals/gate-c/c-07d-idle-maintenance.md)
+offers one admitted physical quantum through RrdEngine and the server's existing
+sweep, with nonblocking lock admission, skipped busy ticks and joined shutdown.
+Native histories preserve mutable WAL acknowledgements and historical readers
+while debt drains; owning storage/engine/HTTP tests pass. Installed comparison
+must still prove drain and latency under load. Windows16 also failed a real
+2.048-second resource gap; sampling and 24-hour qualification remain open.

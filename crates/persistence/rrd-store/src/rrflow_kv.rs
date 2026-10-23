@@ -484,6 +484,18 @@ impl RrflowKvStore {
         self.lock()?.flush_memtable(at).map_err(Error::from)
     }
 
+    /// Offer one physical maintenance quantum without queuing behind a reader
+    /// or writer. Busy is a skipped offer, not a second worker or a retry loop.
+    pub fn try_maintenance_step(&self) -> Result<bool> {
+        match self.database.try_lock() {
+            Ok(mut database) => database.maintenance_step().map_err(Error::from),
+            Err(std::sync::TryLockError::WouldBlock) => Ok(false),
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(Error::Substrate("rrflowKV database lock poisoned".into()))
+            }
+        }
+    }
+
     pub fn manifest(&self) -> Result<Manifest> {
         Ok(self.lock()?.manifest().clone())
     }
@@ -1426,6 +1438,18 @@ mod tests {
     };
     use rrd_lsm::{FailureMode, WriteBatch, WriteBoundary};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn idle_maintenance_does_not_queue_behind_the_database_owner() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = RrflowKvStore::open(&directory.path().join("idle")).unwrap();
+        let owner = store.lock().unwrap();
+        assert!(!store.try_maintenance_step().unwrap());
+        drop(owner);
+        // Opening a store can leave one physical reclamation quantum.
+        store.try_maintenance_step().unwrap();
+        assert!(!store.try_maintenance_step().unwrap());
+    }
 
     #[test]
     fn reconciliation_evidence_fails_on_counter_regression() {
