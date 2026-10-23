@@ -80,6 +80,107 @@ does not prove the provider did no work; record uncertainty and avoid an
 unapproved duplicate charge or external effect. Cancellation must account for
 work still running, including CPU work that cannot be immediately stopped.
 
+## User-selected effort and run budgets
+
+Users must be able to choose how long the engine may work. A request for a
+short answer cannot silently become hours of research, repeated planning or
+provider retries. This is a required runtime behavior under G-01/G-02/G-05;
+it is not implemented by the existing configuration types alone.
+
+The current `ReasoningLimits` exposes `max_run_elapsed_ms`, `max_steps` and
+`max_step_elapsed_ms`. Installation validates and seals these values, and
+capabilities report them, but `governed-reasoning-runner` remains unavailable.
+The shipped values are 900,000 ms, 256 steps and 60,000 ms per step. Their
+existence is not evidence of an enforced 15-minute reasoning timeout. The
+[installed configuration boundary](../deployment/installed-lifecycle.md#reasoning-limit-configuration)
+explains what an operator can configure today.
+
+The current embedding execution path consumes `max_step_elapsed_ms`:
+`RrdEngine::generate_embeddings_at` binds one monotonic deadline before input
+preparation and passes it to `EmbeddingExecution::embed_batch_until`.
+Caller waiting and output acceptance are bounded; a late result is discarded.
+The existing single execution permit stays with a blocking adapter until it
+returns. A timeout reports that execution may continue and is not automatically
+retryable. This is not forced adapter cancellation, a durable run limit or an
+implemented SWAG runner. Other calls cannot inherit a fictitious unused budget.
+
+### Research decisions for budget enforcement
+
+Primary-source review on 2026-10-23 supports these separate mechanisms:
+
+- [Tokio timeout](https://docs.rs/tokio/latest/tokio/time/fn.timeout.html) and
+  [blocking task ownership](https://docs.rs/tokio/latest/tokio/task/fn.spawn_blocking.html)
+  distinguish a stopped wait from stopping non-yielding work. RRFlow therefore
+  retains admission for the actual worker and never interprets a timeout as
+  provider termination. Hard execution-stop profiles require a qualified
+  cooperative adapter or an owned process termination boundary; unsupported
+  adapters must be rejected before claiming that guarantee.
+- [Temporal activity timeouts](https://docs.temporal.io/encyclopedia/detecting-activity-failures)
+  distinguish one attempt from elapsed time across the activity's attempts.
+  RRFlow's analogous choice is one original durable run deadline with narrower
+  child deadlines. Retry and resume cannot create a new allowance. This is a
+  design inference, not adoption of Temporal or its lifecycle.
+- [LangGraph recursion handling](https://docs.langchain.com/oss/python/langgraph/graph-api#recursion-limit)
+  provides a step ceiling and remaining-step signal. RRFlow must also charge
+  individual dispatched attempts and elapsed time: a step counter alone cannot
+  stop a single blocked adapter or account for parallel attempts.
+- [AWS timeout and retry guidance](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)
+  explains retry amplification and uncertain effects after a timeout. RRFlow
+  keeps one attempt owner, classifies uncertainty, and requires bounded retry
+  admission against the same remaining budget. Backoff is not a budget reset.
+
+No external framework, service dependency or upstream implementation is added.
+The [Gate G execution sequence](../../roadmap/rrflow-1.0/gate-g.md#budget-control-delivery-sequence)
+owns implementation order and the failing histories required for acceptance.
+
+### Aggregate run requirements
+
+Extend that same engine-owned revision and eventual run admission with:
+
+| User control | Required engine semantics |
+|---|---|
+| Effort selection | Quick, balanced, thorough and custom are editable finite policy presets, not provider names or extra authority. Preview exact resolved limits before submission; the label alone cannot claim a time/cost bound. Thorough or extended work requires the user's selection and never becomes an automatic fallback. |
+| Total elapsed time | One deadline starts at run admission and includes queueing, analysis, reads, planning, inference, context escalation, retry delays and validation. A child step inherits the earlier of the run deadline and its step deadline. Internal exploratory work still consumes elapsed time; measuring it does not require recording private thoughts. |
+| Steps and attempts | Count each admitted step and each dispatched attempt, including failures, retries, model fallback and repeated context acquisition. A fresh prompt ID, branch, session or worker does not reset the same run's consumed budget. Per-step retry limits and the aggregate attempt cap are explicit. |
+| Tokens and spend | Reserve bounded input/output usage and cost before dispatch where the adapter can enforce them; charge attempts and late work. Unknown usage/cost is reported as unknown, never zero. If a required hard ceiling cannot be enforced by an adapter, reject that profile before dispatch. |
+| Repetition/no progress | A configurable finite repetition threshold stops repeated equivalent requests with no new authorized input, evidence or accepted transition. Identity uses semantic request/configuration/source coordinates, not changing timestamps or correlation IDs. A stop reports insufficient progress; it does not assert that a repeated question is logically invalid. |
+| Stop, resume and extend | Cancellation prevents new dispatch and requests cancellation of active work. Report active/uncertain provider work until reconciled; returning to the UI does not prove a remote call stopped. Resume retains consumed steps/attempts/cost and the original deadline. An expired or exhausted run needs a separately authorized extension with explicit limits, never an automatic fresh allowance. |
+
+Estate policy, project preferences and per-run choices resolve to one effective
+budget with provenance and a digest. Per-run choices may narrow estate caps.
+SWAG may recommend more effort or reduce work, but cannot grant itself an
+extension. A connector, plugin, fallback adapter or UI client cannot reset or
+replace the engine's budget owner. Independently running external clients are
+outside RRFlow's execution control; the engine must still enforce admission
+for the effects they request through it.
+
+G-02's durable run/receipt authority owns consumption and outstanding dispatch
+reservations. Concurrent workers cannot each spend the same remainder. Bind
+the original deadline and clock policy to that authority; an in-process
+monotonic clock measures elapsed work, but a persisted monotonic timestamp
+alone cannot survive restart. Pausing or restarting does not extend the hard
+wall-clock deadline. Clock uncertainty/rollback uses the installed clock
+policy and denies further dispatch when remaining time cannot be established.
+
+Exhaustion produces a bounded partial-result receipt with the stop reason,
+limit and consumed values, completed outputs/evidence, and unresolved work.
+Distinguish elapsed-time, steps, attempts, tokens/spend, repetition,
+cancellation, provider-unavailable and uncertain-effect outcomes. Do not call
+partial work complete, retry silently or discard an acknowledged effect when
+the budget expires. Observability records public decisions and outcomes,
+never a schema or transcript of private model reasoning.
+
+Acceptance requires installed histories, not only timer or contract unit tests:
+an endlessly context-requesting controller, repeated malformed output, fallback
+cycles, no-progress requests, a blocked provider, cancellation with late output,
+lost response/restart, clock rollback and competing workers. Each must stop
+new dispatch at the configured bound, preserve accepted effects and remaining
+budget, expose partial/uncertain state and require explicit authorization to
+extend. A controlled backend proves mechanism; the selected real adapter must
+also demonstrate its cancellation/timeout and accounting limits. H-06 presents
+the same effective budget and stop receipts through Connectome; it does not
+enforce a separate browser timer or create a parallel run lifecycle.
+
 ## Cache identity and sharing
 
 Model KV cache is disposable inference acceleration. It is not rrflowKV,

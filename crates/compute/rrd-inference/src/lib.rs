@@ -484,6 +484,17 @@ fn dispatch_embedding_batch(
     requests: &[EmbeddingRequest],
 ) -> Result<Vec<VectorValue>> {
     let descriptor = backend.descriptor().clone();
+    validate_embedding_batch(&descriptor, network_policy, requests)?;
+    let vectors = backend.embed_batch(requests)?;
+    validate_embedding_batch_output(&descriptor, requests.len(), &vectors)?;
+    Ok(vectors)
+}
+
+fn validate_embedding_batch(
+    descriptor: &EmbeddingBackendDescriptor,
+    network_policy: NetworkPolicy,
+    requests: &[EmbeddingRequest],
+) -> Result<()> {
     descriptor.validate()?;
     if network_policy == NetworkPolicy::Deny && descriptor.network == NetworkRequirement::Required {
         return invalid("embedding request denies the network required by its backend");
@@ -533,14 +544,21 @@ fn dispatch_embedding_batch(
         return invalid("embedding batch exceeds the backend output value limit");
     }
 
-    let vectors = backend.embed_batch(requests)?;
-    if vectors.len() != requests.len() {
+    Ok(())
+}
+
+fn validate_embedding_batch_output(
+    descriptor: &EmbeddingBackendDescriptor,
+    expected: usize,
+    vectors: &[VectorValue],
+) -> Result<()> {
+    if vectors.len() != expected {
         return invalid("embedding backend returned an unexpected batch shape");
     }
-    for vector in &vectors {
+    for vector in vectors {
         validate_embedding_value(vector, &descriptor.model)?;
     }
-    Ok(vectors)
+    Ok(())
 }
 
 fn validate_embedding_value(value: &VectorValue, model: &EmbeddingModelSpec) -> Result<()> {

@@ -74,6 +74,18 @@ Existing model-manifest validation admits the three route-proposal grammar,
 not an arbitrary endpoint-selector model or unbound LoRA sidecar. No training,
 Spark hardware, runtime admission extension or promotion is qualified here.
 
+Inspection at `ff11edf6ec8da7461955cb4eb349fb81828a2f09` confirms that
+`ReasoningLimits` is validated/sealed by installation and exposed by server
+capabilities, but no governed reasoning runner consumes its aggregate elapsed,
+step and per-step ceilings. Defaults therefore cannot prove prevention of
+hours-long work or repeated retries. The
+[effort and run-budget contract](../../reference/inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+and Gate G acceptance now explicitly require finite user-selected effort,
+aggregate accounting, no-progress stopping and non-resetting cancellation/
+resume. Connectome must not advertise those controls as operational while
+the capability is unavailable. This remains an implementation deficiency;
+the clarification does not close this item.
+
 ## Owning gates
 
 D-05, G-01 through G-06; I-03/I-07 for governed improvement
@@ -83,6 +95,14 @@ Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
 [Gate I](../../roadmap/rrflow-1.0/gate-i.md).
 
 ## Closure evidence
+
+[PR 100](https://github.com/rrflow/rrflow-development/pull/100) adds a configured
+deadline to the existing embedding execution path. Late output is rejected and
+the admitted worker keeps its slot until actual return. This addresses caller
+waiting, not forced adapter cancellation or aggregate reasoning-run budgets.
+The [budget-control sequence](../../roadmap/rrflow-1.0/gate-g.md#budget-control-delivery-sequence)
+binds those remaining requirements to code owners and falsifying histories.
+POAM-009 remains open; controlled adapter tests do not qualify a real router.
 
 Invalid-output and identity-denial corpora, same-stamp principal/representation/seat/policy
 route packets, attributed CAS/reopen tests, and separated model/storage measurements pass.

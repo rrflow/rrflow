@@ -1,6 +1,7 @@
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 /// Process-owned executable adapters and their immutable admitted descriptors.
 /// This is not a durable scheduler. Selection never executes an adapter.
@@ -22,6 +23,11 @@ struct RegisteredBackend {
 pub enum EmbeddingDispatchError {
     Busy,
     UnhealthyBackend,
+    /// The result was not accepted. A dispatched blocking adapter may still run.
+    DeadlineExceeded {
+        execution_may_continue: bool,
+    },
+    WorkerUnavailable,
     Rejected(Error),
 }
 
@@ -30,6 +36,13 @@ impl std::fmt::Display for EmbeddingDispatchError {
         match self {
             Self::Busy => formatter.write_str("embedding execution capacity is occupied"),
             Self::UnhealthyBackend => formatter.write_str("embedding backend lock is poisoned"),
+            Self::DeadlineExceeded {
+                execution_may_continue,
+            } => write!(
+                formatter,
+                "embedding deadline exceeded; execution may continue: {execution_may_continue}"
+            ),
+            Self::WorkerUnavailable => formatter.write_str("embedding worker unavailable"),
             Self::Rejected(error) => std::fmt::Display::fmt(error, formatter),
         }
     }
@@ -141,6 +154,61 @@ impl EmbeddingExecution {
         network_policy: NetworkPolicy,
         requests: &[EmbeddingRequest],
     ) -> std::result::Result<EmbeddingBatchResult, EmbeddingDispatchError> {
+        self.embed_batch_inner(model, network_policy, requests, None)
+    }
+
+    /// Bound caller waiting and result acceptance by one absolute monotonic
+    /// deadline. This does not forcibly stop synchronous adapter code. The
+    /// owned worker retains the existing single admission until it returns;
+    /// timeout never permits another worker to accumulate behind it.
+    pub fn embed_batch_until(
+        self,
+        model: EmbeddingModelSpec,
+        network_policy: NetworkPolicy,
+        requests: Vec<EmbeddingRequest>,
+        deadline: Instant,
+    ) -> std::result::Result<EmbeddingBatchResult, EmbeddingDispatchError> {
+        check_deadline(Some(deadline), false)?;
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        std::thread::Builder::new()
+            .name("rrflow-inference".into())
+            .spawn(move || {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    self.embed_batch_inner(&model, network_policy, &requests, Some(deadline))
+                }))
+                .unwrap_or(Err(EmbeddingDispatchError::WorkerUnavailable));
+                // Never block on delivery. A timed-out receiver discards late
+                // output, while the lease has remained with actual execution.
+                let _ = sender.send(result);
+            })
+            .map_err(|_| EmbeddingDispatchError::WorkerUnavailable)?;
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let result = receiver
+            .recv_timeout(remaining)
+            .map_err(|error| match error {
+                std::sync::mpsc::RecvTimeoutError::Timeout => {
+                    EmbeddingDispatchError::DeadlineExceeded {
+                        execution_may_continue: true,
+                    }
+                }
+                std::sync::mpsc::RecvTimeoutError::Disconnected => {
+                    EmbeddingDispatchError::WorkerUnavailable
+                }
+            })?;
+        // A channel that already holds a result can return after the deadline.
+        // The caller's acceptance check must not depend on receive scheduling.
+        check_deadline(Some(deadline), true)?;
+        result
+    }
+
+    fn embed_batch_inner(
+        self,
+        model: &EmbeddingModelSpec,
+        network_policy: NetworkPolicy,
+        requests: &[EmbeddingRequest],
+        deadline: Option<Instant>,
+    ) -> std::result::Result<EmbeddingBatchResult, EmbeddingDispatchError> {
+        check_deadline(deadline, false)?;
         if &self.descriptor.model != model {
             return Err(Error::InvalidRuntime {
                 reason: "embedding backend model differs from the requested model".into(),
@@ -154,8 +222,14 @@ impl EmbeddingExecution {
             .lock()
             .map_err(|_| EmbeddingDispatchError::UnhealthyBackend)?;
         self.require_descriptor(backend.as_ref())?;
-        let vectors = dispatch_embedding_batch(backend.as_mut(), network_policy, requests)?;
+        validate_embedding_batch(&self.descriptor, network_policy, requests)?;
+        check_deadline(deadline, false)?;
+        let result = backend.embed_batch(requests);
+        check_deadline(deadline, false)?;
+        let vectors = result?;
+        validate_embedding_batch_output(&self.descriptor, requests.len(), &vectors)?;
         self.require_descriptor(backend.as_ref())?;
+        check_deadline(deadline, false)?;
         Ok(EmbeddingBatchResult {
             registry_revision: self.registry_revision,
             backend: self.descriptor.clone(),
@@ -169,4 +243,16 @@ impl EmbeddingExecution {
         }
         Ok(())
     }
+}
+
+fn check_deadline(
+    deadline: Option<Instant>,
+    execution_may_continue: bool,
+) -> std::result::Result<(), EmbeddingDispatchError> {
+    if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+        return Err(EmbeddingDispatchError::DeadlineExceeded {
+            execution_may_continue,
+        });
+    }
+    Ok(())
 }
