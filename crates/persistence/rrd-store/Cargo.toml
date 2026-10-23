@@ -14,6 +14,7 @@ rrd-core = { path = "../../kernel/rrd-core" }
 rrd-lsm = { path = "../rrd-lsm" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.11"
 tracing = { workspace = true }
 
 [dev-dependencies]

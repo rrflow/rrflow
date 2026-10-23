@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "CampaignStatus": {
+      "enum": [
+        "completed",
+        "failed",
+        "interrupted",
+        "not_run"
+      ],
+      "type": "string"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+      "type": "string"
+    },
+    "Limit": {
+      "format": "uint64",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "NativeAllocationKind": {
+      "enum": [
+        "cgroup_v2",
+        "windows_job"
+      ],
+      "type": "string"
+    },
+    "NativeAllocationReceipt": {
+      "additionalProperties": false,
+      "description": "Launcher receipt, retained with samples. Its digest binds declared native\ncontrols; the installed driver separately checks live kernel membership.",
+      "properties": {
+        "engine_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "harness_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "host_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "host_logical_cpus": {
+          "$ref": "#/$defs/Limit"
+        },
+        "kind": {
+          "$ref": "#/$defs/NativeAllocationKind"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Digest"
+        },
+        "vcpus": {
+          "$ref": "#/$defs/Limit"
+        }
+      },
+      "required": [
+        "format_version",
+        "kind",
+        "nonce",
+        "engine_bytes",
+        "host_bytes",
+        "harness_sha256",
+        "vcpus",
+        "host_logical_cpus"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allocation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NativeAllocationReceipt"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "campaign_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "cleanup_confirmed": {
+      "type": "boolean"
+    },
+    "elapsed_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "exit_code": {
+      "format": "int64",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "$ref": "#/$defs/CampaignStatus"
+    }
+  },
+  "required": [
+    "format_version",
+    "campaign_sha256",
+    "status",
+    "cleanup_confirmed",
+    "elapsed_ms"
+  ],
+  "title": "StorageLaunchReceipt",
+  "type": "object"
+}

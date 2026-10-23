@@ -82,7 +82,7 @@ pub use segment::{
     ProjectedReadBatch, ProjectedReadBudget, ProjectedReadEvidence, ProjectedReadOutcome,
     ProjectedReadProjection, ProjectedReadRange, ProjectedReadRequest, ProjectedReadResource,
     ProjectedReadStream, Segment, SegmentCompressionPolicy, SegmentOpenEvidence,
-    SegmentRowGroupBudget, COMPRESSION_BASIS_POINTS,
+    SegmentRowGroupBudget, SourcePageMemory, SourcePageStats, COMPRESSION_BASIS_POINTS,
     DEFAULT_COMPRESSION_MAXIMUM_PAGE_LOGICAL_BYTES,
     DEFAULT_COMPRESSION_MINIMUM_SAVINGS_BASIS_POINTS, DEFAULT_MAX_ACTIVE_READ_VIEWS,
     DEFAULT_MAX_BATCH_ALLOCATED_BYTES, DEFAULT_MAX_BATCH_ROWS, DEFAULT_MAX_OUTPUT_BUFFER_BYTES,
@@ -91,15 +91,18 @@ pub use segment::{
     DEFAULT_MAX_PROJECTED_READ_RUNS, DEFAULT_MAX_VERSIONS_EXAMINED, DEFAULT_PAGE_CACHE_BYTES,
     DEFAULT_PAGE_CACHE_PROTECTED_CAPACITY_BASIS_POINTS, DEFAULT_PROJECTED_OUTPUT_BYTES,
     DEFAULT_ROW_GROUP_MAX_ROWS, DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY,
-    PROJECTED_READ_CONTRACT_VERSION, SEGMENT_FORMAT_VERSION, SEGMENT_KEY_CODEC_DIGEST,
-    SEGMENT_OPEN_EVIDENCE_VERSION, SEGMENT_PAGE_FORMAT_DIGEST, SEGMENT_SCHEMA_DIGEST,
+    DEFAULT_SOURCE_PAGE_BYTES, PROJECTED_READ_CONTRACT_VERSION, SEGMENT_FORMAT_VERSION,
+    SEGMENT_KEY_CODEC_DIGEST, SEGMENT_OPEN_EVIDENCE_VERSION, SEGMENT_PAGE_FORMAT_DIGEST,
+    SEGMENT_SCHEMA_DIGEST,
 };
 pub use snapshot_bundle::{
     SnapshotBundle, SnapshotBundleFile, SnapshotExportBoundary, SnapshotSegment,
     SNAPSHOT_BUNDLE_FORMAT_VERSION, SNAPSHOT_BUNDLE_MAX_BYTES,
 };
 pub use tail_repair::{TailRepair, TailRepairPlan, TailRepairReceipt};
-pub use transaction::{Transaction, TransactionCommit, TransactionRollback};
+pub use transaction::{
+    Transaction, TransactionCommit, TransactionLimits, TransactionResource, TransactionRollback,
+};
 pub use wal::{
     recover, recover_from, repair_torn_tail, AppendReceipt, Durability, RecoveredBatch, Recovery,
     WalBatch, WalWriter, WAL_FORMAT_VERSION, WAL_MAX_PAYLOAD_BYTES,
