@@ -150,3 +150,11 @@ Final publication checks: generated-surface parity (44 operations), navigation,
 inventory, documentation policy, workflow policy and diff whitespace passed.
 Qualification admission refinement passed installed_reopen Clippy (2.56s).
 No runtime acceptance or merge is claimed.
+
+
+A follow-up authoring review found that Completed-but-unqualified campaigns
+could return command success. The pre-edit PR refinement now requires a true
+qualification verdict for Qualification-purpose installed and offline CLI
+success; completed insufficient evidence stays on disk. The CLI binds its
+purpose check to the verified campaign digest. Characterization keeps its
+explicit unqualified success semantics. No acceptance threshold changed.

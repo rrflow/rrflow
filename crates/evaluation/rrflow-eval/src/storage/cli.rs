@@ -65,7 +65,12 @@ pub fn run(args: &[String]) -> Result<()> {
             std::io::stdout().lock().write_all(&pretty(&result)?)
                 .map_err(|e| e.to_string())?;
             require(result.status == CampaignStatus::Completed,
-                "campaign did not complete; failure evidence retained")
+                "campaign did not complete; failure evidence retained")?;
+            let campaign: StorageCampaign = decode(&read(&Path::new(directory).join("campaign.json"))?)?;
+            require(campaign.sha256()? == result.campaign_sha256,
+                "campaign changed after evidence verification")?;
+            require(campaign.purpose != CampaignPurpose::Qualification || result.qualification_passed,
+                "campaign completed but qualification requirements were not met")
         }
         ["validate", path] => {
             let manifest: StorageManifest = decode(&read(Path::new(path))?)?;

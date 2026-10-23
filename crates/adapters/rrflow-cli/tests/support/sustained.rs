@@ -768,6 +768,10 @@ fn installed_sustained_capacity() {
         result.is_ok(),
         "installed sustained driver failed: {result:?}"
     );
+    assert!(
+        campaign.purpose != CampaignPurpose::Qualification || report.qualification_passed,
+        "campaign completed but did not satisfy its frozen qualification requirements"
+    );
 }
 
 /// Short executable integration of the campaign's actual workload adapter.
