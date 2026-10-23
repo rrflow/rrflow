@@ -31,3 +31,10 @@ checks run before commit. No local runtime suite ran, as directed. Native
 acceptance is pending. Checklist: pre-effect scope, source replacement,
 independent value/physical oracles, failure evidence and not-run checks bound;
 no roadmap/POAM closure. C-07f continues separately in dependent draft PR 71.
+
+Follow-up at `1487b11881df5d9a528fa86a58126cbfa5569fbe`: candidate run
+39887010297 passed kernel-storage and optional LSM. Its verify job rejected
+argument ordering because `scripts/ci/check_workflow.py` recognizes the locked
+command prefix literally. Move --no-fail-fast after --locked, preserving all
+arguments and the policy's exact required prefix. The policy is unchanged.
+`python scripts/ci/check_workflow.py` passes; no runtime suite was run locally.
