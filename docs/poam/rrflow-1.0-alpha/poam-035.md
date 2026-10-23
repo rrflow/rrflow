@@ -295,8 +295,13 @@ Linux17's setup-failure observation retained L0 debt despite available process
 memory and earlier compactions. The
 [bounded candidate-discovery repair](../../evidence/change-journals/gate-c/c-07d-compaction-candidate-progress.md)
 proves and repairs an oldest-prefix blockage that hid later admitted ranges.
-Snapshot/reopen and existing maintenance assertions remain required. Native
-scale comparison is pending; the failed operating point is not reclassified.
+Snapshot/reopen and existing maintenance assertions remain required. The
+[Linux18 comparison](../../evidence/change-journals/gate-c/c-07d-compaction-native-comparison.md)
+completed all 1,000 corpus acknowledgements/readbacks and both forced reopens
+under unchanged limits, with zero observed L0 debt after setup. It then failed
+the unchanged 30-second backup-interference deadline. The earlier setup blocker
+is cleared in this characterization; the operating point remains failed and
+backup timing, full profiles and soak qualification remain open.
 
 Native run 39979675928 failed the macOS existing/WAL capacity case after a
 real filler ENOSPC: the client returned resource denial without a selected
