@@ -1206,18 +1206,50 @@ async fn run_estate(
                 session_ordinal,
             )
             .await?;
-            let mut corpus = Some(
-                corpus::seed(
-                    &estate,
-                    &mut work,
-                    campaign,
-                    &ProgressContext { writer, point },
-                    clock,
-                    &mut session_ordinal,
-                    &mut session_opened,
-                )
-                .await?,
-            );
+            let seeded = corpus::seed(
+                &estate,
+                &mut work,
+                campaign,
+                &ProgressContext { writer, point },
+                clock,
+                &mut session_ordinal,
+                &mut session_opened,
+            )
+            .await;
+            if seeded.is_err() {
+                // Preserve a single supplemental observation before owned
+                // cleanup removes the failed estate. This is not a workload
+                // segment and cannot qualify the campaign or hide its error.
+                let status = if let Some(child) = &child {
+                    match tokio::time::timeout(
+                        Duration::from_secs(5),
+                        sample(&work, child.id(), clock, &allocation),
+                    )
+                    .await
+                    {
+                        Ok(Ok(observation)) => {
+                            if writer
+                                .record_event(&ProgressEvent::Resource {
+                                    segment: writer.next_index(),
+                                    sample: Box::new(observation),
+                                })
+                                .and_then(|_| writer.checkpoint_progress())
+                                .is_ok()
+                            {
+                                "observed"
+                            } else {
+                                "artifact-denied"
+                            }
+                        }
+                        Ok(Err(_)) => "unavailable",
+                        Err(_) => "timeout",
+                    }
+                } else {
+                    "unavailable"
+                };
+                eprintln!("native_setup_failure_observation={status}");
+            }
+            let mut corpus = Some(seeded?);
             // Fresh session for the bounded lifecycle lane, avoiding inherited
             // setup age. Subsequent load still rotates joined session segments.
             session_opened = Instant::now() - Duration::from_secs(120);

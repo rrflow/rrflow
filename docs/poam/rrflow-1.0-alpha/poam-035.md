@@ -553,3 +553,13 @@ write can now offer at most one immutable compaction quantum once a configured
 input quantum or hard L0 capacity accumulates, while preserving its mutable
 WAL tail. Smaller debt stays idle-eligible. This does not guarantee progress under every policy or
 close native growth/latency qualification; the failed comparison is retained.
+
+Linux16 on the foreground-debt candidate also failed hard L0 admission after
+ordinal 376 in 46721 ms. Its progress artifact contained zero resource
+observations at failed setup; cleanup removed the live diagnostic opportunity.
+The [setup-failure observation](../../evidence/change-journals/gate-c/c-07g-setup-failure-observation.md)
+attempts one bounded public diagnostic read before teardown while preserving
+the original rejection and failed campaign. It changes no storage policy or
+qualification threshold. Successful diagnostic capture and a causal repair
+still need installed evidence; neither preceding local suite resolves this
+capacity failure.
