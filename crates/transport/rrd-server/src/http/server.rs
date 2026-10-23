@@ -3,6 +3,7 @@ use super::*;
 pub struct RrdHttpServer {
     listener: TcpListener,
     app: Router,
+    state: Arc<AppState>,
     tls: Option<TlsAcceptor>,
 }
 
@@ -206,8 +207,13 @@ impl RrdHttpServer {
         let app = Router::new()
             .route(&websocket_endpoint.path, get(websocket_upgrade))
             .fallback(any(dispatch))
-            .with_state(state);
-        Ok(Self { listener, app, tls })
+            .with_state(Arc::clone(&state));
+        Ok(Self {
+            listener,
+            app,
+            state,
+            tls,
+        })
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -221,11 +227,7 @@ impl RrdHttpServer {
     }
 
     pub async fn serve(self) -> Result<()> {
-        if self.tls.is_some() {
-            return self.serve_until(std::future::pending()).await;
-        }
-        let listener = tokio::net::TcpListener::from_std(self.listener)?;
-        axum::serve(listener, self.app).await.map_err(HttpError::Io)
+        self.serve_until(std::future::pending()).await
     }
 
     pub async fn serve_until<F>(self, shutdown: F) -> Result<()>
@@ -233,13 +235,37 @@ impl RrdHttpServer {
         F: Future<Output = ()> + Send + 'static,
     {
         let listener = tokio::net::TcpListener::from_std(self.listener)?;
-        if let Some(acceptor) = self.tls {
-            return serve_mtls(listener, self.app, acceptor, shutdown).await;
+        let state = self.state;
+        let maintenance_state = Arc::clone(&state);
+        let maintenance = super::maintenance::MaintenanceWorker::start(move || {
+            if maintenance_state.service.maintain_storage().is_err() {
+                // Existing native counters retain failure counts. Never log
+                // source payloads or make a failed quantum a success receipt.
+                tracing::warn!(target: "rrd_server::maintenance", "bounded storage maintenance quantum failed");
+            }
+        })?;
+        let serve = async move {
+            if let Some(acceptor) = self.tls {
+                return serve_mtls(listener, self.app, acceptor, shutdown).await;
+            }
+            axum::serve(listener, self.app)
+                .with_graceful_shutdown(shutdown)
+                .await
+                .map_err(HttpError::Io)
+        };
+        tokio::pin!(serve);
+        let mut sweep = tokio::time::interval(std::time::Duration::from_secs(1));
+        sweep.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                result = &mut serve => return result,
+                _ = sweep.tick() => {
+                    state.service.reap_storage_cursors()
+                        .map_err(|error| HttpError::Contract(error.to_string()))?;
+                    maintenance.offer()?;
+                }
+            }
         }
-        axum::serve(listener, self.app)
-            .with_graceful_shutdown(shutdown)
-            .await
-            .map_err(HttpError::Io)
     }
 }
 

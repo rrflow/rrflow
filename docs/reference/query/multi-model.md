@@ -51,6 +51,24 @@ integer, unsigned-integer, or string type. Decimal and mixed-type ordering are
 rejected during binding. Only `cursor = <unsigned>` selects the exact event
 cursor path; other cursor comparisons retain the current authoritative scan.
 
+Exact record/relation ID equality and ordered ID intervals select complete
+authenticated identity histories. A uniquely typed relation endpoint selects
+its adjacency range and expands complete relation histories before temporal
+filtering, preserving moves and retirement. These addressed paths capture
+schema metadata without scanning the full source family. Their plan's source
+cursor is the requested known prefix, a conservative freshness coordinate like
+traversal, rather than the last mutation in an unrelated family. They do not
+reuse a family index artifact. Other index/corpus paths retain their actual
+family watermarks; MATCH still uses corpus-wide lexical statistics.
+
+The combined `StampedQueryPipeline::run` used by the public query operation
+charges schema/source capture and execution's semantic version/proof reads
+against one `max_storage_keys` budget and reports their combined evidence.
+Exhaustion is reported as resource exhaustion. Separately invoked bind and
+execute operations retain their per-call budgets; their caller must compose
+those operations explicitly. This semantic-read budget is not a process RSS
+ceiling or a claim that unrelated control/index-catalogue work is metered by it.
+
 ## Verified implementation boundary
 
 The focused query corpus commits records, relations, events, claims, series,
