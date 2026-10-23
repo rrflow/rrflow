@@ -1239,6 +1239,17 @@ impl Database {
         protected: Option<&[Snapshot]>,
     ) -> Result<()> {
         self.reclaim_if_pending()?;
+        // A busy writer must not depend on the idle worker winning this lock.
+        // Offer one immutable quantum once a full configured source quantum
+        // accumulates (or hard capacity is reached). Smaller debt remains idle-
+        // eligible. Never flush the mutable tail or loop to drain housekeeping.
+        let foreground_threshold =
+            (self.compaction.max_input_segments as u64).min(self.compaction_limits.l0_segments);
+        let maintenance_offered = self.compaction_debt_segments() > 0
+            && self.l0_segment_count() as u64 >= foreground_threshold;
+        if maintenance_offered {
+            self.offer_write_compaction(protected)?;
+        }
         let projected_bytes = self.wal_payload_bytes.saturating_add(payload_bytes);
         let projected_versions = self.memtable.version_count().saturating_add(batch.len());
         let active = self.memtable.version_count() != 0;
@@ -1255,23 +1266,8 @@ impl Database {
                 Ok(Some(_)) => {
                     self.maintenance_stats.automatic_flushes =
                         self.maintenance_stats.automatic_flushes.saturating_add(1);
-                    let result = self.compact_for_write(protected);
-                    match self.record_automatic_compaction(result) {
-                        Ok(_) => {}
-                        // The merge's hard limits still stop that merge before
-                        // publication. At this soft trigger, leave the debt
-                        // visible and let the unchanged hard L0, reclamation
-                        // and mutable admission below decide if the write fits.
-                        Err(Error::MaintenanceLimit {
-                            resource:
-                                crate::MaintenanceResource::InputBytes
-                                | crate::MaintenanceResource::InputLogicalBytes
-                                | crate::MaintenanceResource::InputVersions
-                                | crate::MaintenanceResource::OutputSegments
-                                | crate::MaintenanceResource::ElapsedMs,
-                            ..
-                        }) => {}
-                        Err(error) => return Err(error),
+                    if !maintenance_offered {
+                        self.offer_write_compaction(protected)?;
                     }
                 }
                 Ok(None) => {}
@@ -1288,15 +1284,11 @@ impl Database {
             .filter(|segment| segment.descriptor.level == 0)
             .count() as u64;
         if l0_segments >= self.compaction_limits.l0_segments {
-            self.compact_for_write(protected)?;
-            let remaining = self
-                .segments
-                .iter()
-                .filter(|segment| segment.descriptor.level == 0)
-                .count() as u64;
+            // The single offered quantum above has already had its chance.
+            // Preserve rejection before WAL append rather than retrying work.
             self.compaction_limits.check(
                 crate::MaintenanceResource::L0Segments,
-                remaining.saturating_add(1),
+                l0_segments.saturating_add(1),
             )?;
         }
         self.reclaim_if_pending()?;
@@ -1315,13 +1307,32 @@ impl Database {
         &mut self,
         protected: Option<&[Snapshot]>,
     ) -> Result<Option<CompactionOutcome>> {
-        self.compact_inner(
+        self.compact_segments_inner(
             protected.unwrap_or(&[]),
             self.manifest.created_at,
             None,
             false,
             protected.is_none(),
         )
+    }
+
+    fn offer_write_compaction(&mut self, protected: Option<&[Snapshot]>) -> Result<()> {
+        let result = self.compact_for_write(protected);
+        match self.record_automatic_compaction(result) {
+            Ok(_) => Ok(()),
+            // A denied optional merge leaves debt visible. The hard L0,
+            // reclamation and mutable admission still decide if the write fits.
+            Err(Error::MaintenanceLimit {
+                resource:
+                    crate::MaintenanceResource::InputBytes
+                    | crate::MaintenanceResource::InputLogicalBytes
+                    | crate::MaintenanceResource::InputVersions
+                    | crate::MaintenanceResource::OutputSegments
+                    | crate::MaintenanceResource::ElapsedMs,
+                ..
+            }) => Ok(()),
+            Err(error) => Err(error),
+        }
     }
 
     fn record_memtable_peak(&mut self) {

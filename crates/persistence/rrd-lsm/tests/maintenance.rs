@@ -21,6 +21,85 @@ fn options(max_versions: usize) -> DatabaseOptions {
 }
 
 #[test]
+fn ordinary_writes_pay_down_immutable_debt_without_flushing_their_wal_tail() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("foreground-debt");
+    let config = DatabaseOptions {
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 4,
+            max_input_segments: 4,
+            target_segment_bytes: 128,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, config).unwrap();
+    let value = "x".repeat(64);
+    let operations = (0..12)
+        .map(|key| put(&format!("key-{key:02}"), &value))
+        .collect();
+    database
+        .write_owned(
+            WriteBatch::new(operations).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    let snapshot = database.snapshot();
+    database.flush_memtable(1).unwrap();
+    assert_eq!(database.l0_segment_count(), 12);
+    let immutable_sequence = database.manifest().durable_sequence;
+    let wal_start = database.manifest().wal_start_sequence;
+    for ordinal in 0..10 {
+        let before = database.maintenance_stats().automatic_compactions;
+        let wal_bytes = database.wal_payload_bytes();
+        database
+            .write_owned(
+                WriteBatch::new(vec![put(&format!("tail-{ordinal}"), "ack")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        assert!(database.maintenance_stats().automatic_compactions - before <= 1);
+        assert_eq!(database.memtable().version_count(), ordinal + 1);
+        assert!(database.wal_payload_bytes() > wal_bytes);
+        assert_eq!(database.manifest().durable_sequence, immutable_sequence);
+        assert_eq!(database.manifest().wal_start_sequence, wal_start);
+        assert_eq!(database.maintenance_stats().automatic_flushes, 0);
+        for key in 0..12 {
+            assert_eq!(
+                database
+                    .get(format!("key-{key:02}").as_bytes(), snapshot)
+                    .unwrap(),
+                Some(value.as_bytes().to_vec())
+            );
+        }
+    }
+    assert_eq!(
+        database.compaction_debt_segments(),
+        0,
+        "ordinary writes must offer bounded debt progress"
+    );
+    assert!(database.maintenance_stats().automatic_compactions > 0);
+    drop(database);
+    let reopened = Database::open_with_options(&root, config).unwrap();
+    for ordinal in 0..10 {
+        assert_eq!(
+            reopened
+                .get(format!("tail-{ordinal}").as_bytes(), reopened.snapshot())
+                .unwrap(),
+            Some(b"ack".to_vec())
+        );
+    }
+    for key in 0..12 {
+        assert_eq!(
+            reopened
+                .get(format!("key-{key:02}").as_bytes(), snapshot)
+                .unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+}
+
+#[test]
 fn soft_compaction_denial_preserves_write_room_until_the_hard_l0_cap() {
     let directory = tempdir().unwrap();
     let root = directory.path().join("soft-versus-hard");
@@ -148,6 +227,11 @@ fn idle_maintenance_drains_without_flushing_the_acknowledged_mutable_tail() {
     let wal_start = database.manifest().wal_start_sequence;
     let durable = database.manifest().durable_sequence;
     let versions = database.memtable().version_count();
+    assert_eq!(
+        database.maintenance_stats().automatic_compactions,
+        0,
+        "sub-quantum debt stays available to idle upkeep"
+    );
     assert!(database.compaction_debt_segments() > 0);
     for _ in 0..30 {
         if !database.maintenance_step().unwrap() {

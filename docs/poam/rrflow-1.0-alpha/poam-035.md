@@ -543,3 +543,13 @@ Neither run qualifies a capacity profile or the 24-hour soak. Linux13 also
 retained debt after completing backup; the sustained driver's segment-local
 backup join may delay later offered requests and needs separate scheduling
 evidence before those failures are attributed wholly to the engine.
+
+Linux15 on the partitioned-flush candidate still failed hard L0 admission,
+after corpus ordinal 290 in 73634 ms, earlier than Linux14. The
+[foreground debt repair](../../evidence/change-journals/gate-c/c-07d-foreground-debt-progress.md)
+addresses a reproduced omission: ordinary writes below flush targets offered
+no maintenance, leaving nine units of seeded debt unchanged. Each incoming
+write can now offer at most one immutable compaction quantum once a configured
+input quantum or hard L0 capacity accumulates, while preserving its mutable
+WAL tail. Smaller debt stays idle-eligible. This does not guarantee progress under every policy or
+close native growth/latency qualification; the failed comparison is retained.

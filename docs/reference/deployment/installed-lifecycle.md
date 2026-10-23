@@ -417,6 +417,17 @@ merge cannot by itself consume otherwise available write capacity. Native I/O,
 corruption and publication uncertainty are not ignored. Cleanup ownership begins
 before partition creation, including when idle work fails before publication.
 
+Writers also offer one immutable compaction quantum when L0 debt between
+flushes reaches a full configured input-segment quantum, or the hard L0 cap
+if smaller. Smaller debt remains eligible for idle upkeep. The offer runs
+before a flush needs additional slots; if no earlier quantum
+was offered, a newly flushed table can trigger one afterward. A write never
+loops to drain debt or offers a second compaction at saturation. This path does
+not flush the mutable tail as a side effect of housekeeping. The same hard
+admission and protected-snapshot rules apply; failed admission is backpressure,
+not permission to exceed the cap. The [foreground debt record](../../evidence/change-journals/gate-c/c-07d-foreground-debt-progress.md)
+separates this component behavior from installed capacity evidence.
+
 While serving, the existing one-second host sweep offers one engine-owned
 physical maintenance quantum to a single joined worker. Busy ticks are skipped.
 Each admitted quantum either reclaims a bounded pending inventory or performs

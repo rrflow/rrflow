@@ -178,7 +178,19 @@ fn idle_maintenance_reclaims_superseded_versions_without_losing_owned_history() 
     use rrd_store::Durability;
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("tracked-history");
-    let store = RrflowKvStore::open(&path).unwrap();
+    // Isolate idle retention below the foreground source-quantum threshold.
+    // Input byte/version and hard L0 limits stay at their defaults.
+    let store = RrflowKvStore::open_with_options(
+        &path,
+        DatabaseOptions {
+            compaction: rrd_lsm::CompactionPolicy {
+                max_input_segments: 64,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let mut tx = store.begin_transaction().unwrap();
     tx.put(b"hot".to_vec(), b"initial".to_vec()).unwrap();
     tx.put(b"deleted".to_vec(), b"initial".to_vec()).unwrap();
