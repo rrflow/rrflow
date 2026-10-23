@@ -130,6 +130,16 @@
           "minimum": 0,
           "type": "integer"
         },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "outstanding_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -157,6 +167,8 @@
         }
       },
       "required": [
+        "native_transactions",
+        "native_transaction_bytes",
         "active_read_views",
         "pinned_read_bytes",
         "mutable_bytes",

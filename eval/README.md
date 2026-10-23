@@ -196,3 +196,9 @@ Installed read retention has per-open active-view and pinned-byte ceilings.
 Requests can lower these limits but cannot raise them. Storage observations
 report actual physical views separately from retained output-buffer bytes;
 campaign drain checks require both view and pin counts to return to baseline.
+
+Native transactions separately enforce an aggregate owner count and owned-buffer
+reservation. These restart-only installed ceilings are visible in configuration;
+actual counts/bytes are observed in storage diagnostics and must drain to
+baseline. The reservation charges vector capacities and explicit record/handoff
+representations; allocator metadata and caller input are not process-RSS proof.

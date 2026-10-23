@@ -234,6 +234,13 @@ binds per-open ceilings to sealed installation policy and exposes actual
 owner observations for drain validation. Candidate runtime acceptance is
 pending; this does not establish the installed retained-reader workload.
 
+Native physical transactions also lacked aggregate owner/write-buffer admission,
+and the store retained a second copy of runtime snapshot writes. The
+[C-07g transaction-owner correction](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md#aggregate-native-transaction-ownership-and-copy-removal)
+adds sealed native ceilings and actual-owner release, removes duplicate intent
+buffers, and preserves uncertainty when receipt lookup is resource-starved.
+Candidate runtime acceptance remains pending.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

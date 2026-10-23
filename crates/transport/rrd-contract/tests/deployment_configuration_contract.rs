@@ -76,14 +76,22 @@ fn read_retention_ceiling_is_positive_bounded_and_sealed() {
     let baseline = EstateConfiguration::from_input(1, input()).unwrap();
     for (views, bytes) in [(0, 1), (65_537, 1), (1, 0), (1, (1 << 40) + 1)] {
         let mut invalid = input();
+        invalid.storage.native_transactions = views;
+        invalid.storage.native_transaction_bytes = bytes;
+        assert!(EstateConfiguration::from_input(1, invalid).is_err());
+        let mut invalid = input();
         invalid.storage.active_read_views = views;
         invalid.storage.pinned_read_bytes = bytes;
         assert!(EstateConfiguration::from_input(1, invalid).is_err());
     }
-    for field in 0..2 {
+    for field in 0..4 {
         let mut changed = input();
         if field == 0 {
             changed.storage.active_read_views += 1;
+        } else if field == 1 {
+            changed.storage.native_transactions += 1;
+        } else if field == 2 {
+            changed.storage.native_transaction_bytes += 1;
         } else {
             changed.storage.pinned_read_bytes += 1;
         }

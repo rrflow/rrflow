@@ -845,6 +845,11 @@ fn diagnostic_storage(
         admission: if evidence_level == DiagnosticStorageEvidenceLevel::RrflowKvCounters {
             let queue = engine.transaction_admission_snapshot()?;
             Some(DiagnosticStorageAdmission {
+                native_transactions: counter(evidence.native_transactions, "native_transactions")?,
+                native_transaction_bytes: counter(
+                    evidence.native_transaction_bytes,
+                    "native_transaction_bytes",
+                )?,
                 active_read_views: counter(evidence.active_read_views, "active_read_views")?,
                 pinned_read_bytes: counter(evidence.pinned_read_bytes, "pinned_read_bytes")?,
                 retained_mutable_bytes: counter(

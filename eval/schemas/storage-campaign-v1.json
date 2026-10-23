@@ -666,13 +666,23 @@
           "type": "boolean"
         },
         "active_read_views": {
-          "description": "Actual live physical view/batch owners and conservative aggregate pin charge.",
+          "description": "Actual live physical read views and conservative aggregate pin charge.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
         },
         "fenced": {
           "type": "boolean"
+        },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         },
         "outstanding_logical_bytes": {
           "format": "uint64",
@@ -708,6 +718,8 @@
         }
       },
       "required": [
+        "native_transactions",
+        "native_transaction_bytes",
         "active_read_views",
         "pinned_read_bytes",
         "retained_mutable_bytes",
@@ -1308,6 +1320,17 @@
           "minimum": 0,
           "type": "integer"
         },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "description": "Native transaction owner count and logical buffer capacity; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "page_cache_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1421,6 +1444,8 @@
         }
       },
       "required": [
+        "native_transactions",
+        "native_transaction_bytes",
         "active_read_views",
         "pinned_read_bytes",
         "recovery_reserve_bytes",

@@ -24,7 +24,7 @@ use rrd_lsm::{
     Snapshot, SnapshotBundleFile, WriteLockWait, WritePathDiagnostics,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
@@ -122,7 +122,6 @@ pub struct RrflowKvInspector {
 struct RrflowKvTransaction<'a> {
     store: &'a RrflowKvStore,
     transaction: rrd_lsm::Transaction,
-    runtime_snapshot_writes: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
     begin_mutex_wait_ns: u64,
 }
 
@@ -144,26 +143,17 @@ impl StorageTransaction for RrflowKvTransaction<'_> {
     }
 
     fn put(&mut self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        self.transaction.put(key.clone(), value.clone())?;
-        if key.starts_with(&keyspaces::space_prefix(keyspaces::RUNTIME_SNAPSHOTS)) {
-            self.runtime_snapshot_writes.insert(key, Some(value));
-        }
-        Ok(())
+        self.transaction.put(key, value).map_err(Error::from)
     }
 
     fn delete(&mut self, key: Vec<u8>) -> Result<()> {
-        self.transaction.delete(key.clone())?;
-        if key.starts_with(&keyspaces::space_prefix(keyspaces::RUNTIME_SNAPSHOTS)) {
-            self.runtime_snapshot_writes.insert(key, None);
-        }
-        Ok(())
+        self.transaction.delete(key).map_err(Error::from)
     }
 
     fn commit(self: Box<Self>, durability: Durability) -> Result<TransactionCommit> {
         let Self {
             store,
             transaction,
-            runtime_snapshot_writes,
             begin_mutex_wait_ns,
         } = *self;
         let diagnostics_enabled = store
@@ -174,9 +164,13 @@ impl StorageTransaction for RrflowKvTransaction<'_> {
         let commit_mutex_wait_ns = commit_lock_started.map_or(0, |started| {
             u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX)
         });
-        let snapshot_handles = runtime_snapshot_writes
-            .values()
-            .flatten()
+        let snapshot_prefix = keyspaces::space_prefix(keyspaces::RUNTIME_SNAPSHOTS);
+        let removes_snapshot = transaction
+            .pending_prefix(&snapshot_prefix)
+            .any(|(_, value)| value.is_none());
+        let snapshot_handles = transaction
+            .pending_prefix(&snapshot_prefix)
+            .filter_map(|(_, value)| value)
             .map(|bytes| {
                 let handle: SnapshotHandle = serde_json::from_slice(bytes)?;
                 handle.validate()?;
@@ -221,7 +215,7 @@ impl StorageTransaction for RrflowKvTransaction<'_> {
                 return Err(error.into());
             }
         };
-        if runtime_snapshot_writes.values().any(Option::is_none) {
+        if removes_snapshot {
             reconcile_runtime_checkpoints(&mut database, None, 0)?;
         }
         let (first_sequence, last_sequence) = outcome
@@ -807,7 +801,6 @@ impl StorageEngine for RrflowKvStore {
         Ok(Box::new(RrflowKvTransaction {
             store: self,
             transaction,
-            runtime_snapshot_writes: BTreeMap::new(),
             begin_mutex_wait_ns,
         }))
     }
@@ -845,6 +838,7 @@ impl StorageEngine for RrflowKvStore {
         let compaction = database.compaction_policy();
         let maintenance_stats = database.maintenance_stats();
         let memtable = database.memtable().profile();
+        let (native_transactions, native_transaction_bytes) = database.transaction_ownership()?;
         let (active_read_views, pinned_read_bytes) = database.read_view_ownership()?;
         Ok(PhysicalStoreEvidence {
             backend: "rrflow_kv".into(),
@@ -852,6 +846,8 @@ impl StorageEngine for RrflowKvStore {
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),
+            native_transactions: Some(native_transactions),
+            native_transaction_bytes: Some(native_transaction_bytes),
             active_read_views: Some(active_read_views),
             pinned_read_bytes: Some(pinned_read_bytes),
             retained_mutable_bytes: Some(database.mutable_memory().stats().accounted_bytes as u64),

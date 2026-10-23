@@ -6,6 +6,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    TransactionLimit {
+        resource: crate::TransactionResource,
+        limit: usize,
+        observed: usize,
+    },
     DiskAdmission {
         available: u64,
         required: u64,
@@ -104,6 +109,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::TransactionLimit { resource, limit, observed } => write!(formatter, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::Io(error) => write!(formatter, "RRD LSM I/O: {error}"),
             Self::IoContext {
                 operation,

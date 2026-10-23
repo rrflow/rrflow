@@ -1371,7 +1371,9 @@ pub fn validate_segment(
             if let Some(admission) = &storage.admission {
                 let limits = &campaign.storage.installed_configuration.storage;
                 require(
-                    admission.active_read_views <= limits.active_read_views
+                    admission.native_transactions <= limits.native_transactions
+                        && admission.native_transaction_bytes <= limits.native_transaction_bytes
+                        && admission.active_read_views <= limits.active_read_views
                         && admission.pinned_read_bytes <= limits.pinned_read_bytes,
                     "physical read owners exceed installed retention admission",
                 )?;
@@ -1914,6 +1916,8 @@ mod tests {
         use super::super::{DrainOwnership, DrainSample};
         let (campaign, segment) = fixture();
         let owner = DrainOwnership {
+            native_transactions: 0,
+            native_transaction_bytes: 0,
             active_read_views: 0,
             pinned_read_bytes: 0,
             mutable_bytes: 10,
@@ -1953,7 +1957,7 @@ mod tests {
             super::super::drain::check(&campaign, &[&warmup, row], &row.point, row.seed)
         };
         check(&drain).unwrap();
-        for field in 0..10 {
+        for field in 0..12 {
             let mut bad = drain.clone();
             let value = bad.drain_tail[0].ownership.as_mut().unwrap();
             match field {
@@ -1966,7 +1970,9 @@ mod tests {
                 6 => value.active = true,
                 7 => value.fenced = true,
                 8 => value.active_read_views = 1,
-                _ => value.pinned_read_bytes = 1,
+                9 => value.pinned_read_bytes = 1,
+                10 => value.native_transactions = 1,
+                _ => value.native_transaction_bytes = 1,
             }
             assert!(
                 check(&bad).is_err(),

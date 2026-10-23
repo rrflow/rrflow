@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 12334d8bad21d6326f49262111dcbbae9c6ec89f41f5a1615cc0049a7e50a1dc
+// OpenAPI SHA-256: e30eb4d3002df2664069336a7bd2933ecd058698e0f58a779fdbae7a7f464175
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3368,6 +3368,13 @@ export interface operations {
                                         /** Format: uint64 */
                                         mutable_versions: number;
                                         /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Native transaction owner count and logical buffer capacity; restart required.
+                                         */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
                                         page_cache_bytes: number;
                                         /** Format: uint64 */
                                         pinned_read_bytes: number;
@@ -3647,6 +3654,13 @@ export interface operations {
                                         mutable_accounted_bytes: number;
                                         /** Format: uint64 */
                                         mutable_versions: number;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Native transaction owner count and logical buffer capacity; restart required.
+                                         */
+                                        native_transactions: number;
                                         /** Format: uint64 */
                                         page_cache_bytes: number;
                                         /** Format: uint64 */
@@ -11136,6 +11150,10 @@ export interface operations {
                                         active_read_views: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /** Format: uint64 */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
                                         outstanding_logical_bytes: number;
                                         /**
                                          * Format: uint64
@@ -13711,6 +13729,10 @@ export interface operations {
                                         active_read_views: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /** Format: uint64 */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
                                         outstanding_logical_bytes: number;
                                         /**
                                          * Format: uint64
@@ -14099,6 +14121,10 @@ export interface operations {
                                     active_read_views: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
+                                    native_transaction_bytes: number;
+                                    /** Format: uint64 */
+                                    native_transactions: number;
+                                    /** Format: uint64 */
                                     outstanding_logical_bytes: number;
                                     /**
                                      * Format: uint64
@@ -14324,6 +14350,10 @@ export interface operations {
                                      */
                                     active_read_views: number;
                                     fenced: boolean;
+                                    /** Format: uint64 */
+                                    native_transaction_bytes: number;
+                                    /** Format: uint64 */
+                                    native_transactions: number;
                                     /** Format: uint64 */
                                     outstanding_logical_bytes: number;
                                     /**

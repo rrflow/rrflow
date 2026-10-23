@@ -161,6 +161,9 @@ impl From<rrd_store::Error> for ServiceError {
     fn from(value: rrd_store::Error) -> Self {
         let message = value.to_string();
         match value {
+            // Transaction-owner exhaustion can occur while resolving an already
+            // published commit. Only a proven-absent outcome permits rejection.
+            rrd_store::Error::TransactionLimit { .. } => Self::Storage(message),
             rrd_store::Error::WriteBatchLimit { .. }
             | rrd_store::Error::MutableLimit { .. }
             | rrd_store::Error::MaintenanceLimit { .. }

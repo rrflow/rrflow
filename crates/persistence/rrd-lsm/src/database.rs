@@ -98,6 +98,7 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    pub transaction_limits: crate::TransactionLimits,
     /// Per-open aggregate ownership ceilings, independent of caller budgets.
     pub active_read_views: usize,
     pub pinned_read_bytes: u64,
@@ -123,6 +124,7 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            transaction_limits: crate::TransactionLimits::default(),
             active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
             pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
@@ -159,6 +161,7 @@ impl DatabaseOptions {
         self.segment_io.validate()?;
         self.segment_row_group_budget.validate()?;
         self.segment_compression.validate()?;
+        self.transaction_limits.validate()?;
         self.maintenance.validate()?;
         self.mutable_limits.validate()?;
         if self.mutable_retention.accounted_bytes < self.mutable_limits.accounted_bytes
@@ -475,7 +478,9 @@ impl Database {
             maintenance_stats: MaintenanceStats::default(),
             wal_payload_bytes: 0,
             writer_requires_reopen: None,
-            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
+            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::new(
+                options.transaction_limits,
+            )),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
             active_read_view_limit: options.active_read_views,
             pinned_read_byte_limit: options.pinned_read_bytes,
@@ -626,7 +631,9 @@ impl Database {
             maintenance_stats,
             wal_payload_bytes,
             writer_requires_reopen: None,
-            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
+            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::new(
+                options.transaction_limits,
+            )),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
             active_read_view_limit: options.active_read_views,
             pinned_read_byte_limit: options.pinned_read_bytes,
@@ -655,6 +662,11 @@ impl Database {
 
     pub fn mutable_memory(&self) -> crate::MutableMemory {
         self.mutable_memory.clone()
+    }
+
+    /// Coherent aggregate native transaction owner/buffer charge observation.
+    pub fn transaction_ownership(&self) -> Result<(u64, u64)> {
+        self.transaction_snapshots.ownership()
     }
 
     /// Aggregate live stream ownership; returned batches own separate output reservations.

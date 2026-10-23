@@ -451,6 +451,8 @@ pub struct DiagnosticRrflowKvSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiagnosticStorageAdmission {
+    pub native_transactions: u64,
+    pub native_transaction_bytes: u64,
     /// Actual live physical read views and conservative aggregate pin charge.
     pub active_read_views: u64,
     pub pinned_read_bytes: u64,
