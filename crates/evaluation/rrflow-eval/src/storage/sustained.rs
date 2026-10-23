@@ -833,6 +833,11 @@ impl CampaignWriter {
             .into_inner()
             .map_err(|_| "progress writer poisoned")?
             .finish()?;
+        let progress_audit =
+            super::progress::verify_progress(&self.directory, &progress, &self.campaign, status)?;
+        for row in self.totals.values() {
+            progress_audit.check_readback_order(&row.point, row.seed, row.finished_ns)?;
+        }
         let artifact_bytes = self
             .bytes
             .checked_add(progress.bytes)
@@ -1487,12 +1492,8 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
     let identity = campaign.sha256()?;
     let result_bytes = read_bounded(&directory.join("result.json"), MAX_DOCUMENT_BYTES)?;
     let result: CampaignResult = decode(&result_bytes)?;
-    super::progress::verify(
-        directory,
-        &result.progress,
-        &identity,
-        campaign.evidence.total_bytes.get(),
-    )?;
+    let mut progress_audit =
+        super::progress::verify_progress(directory, &result.progress, &campaign, result.status)?;
     require(
         result.format_version == 1
             && result.campaign_sha256 == identity
@@ -1522,6 +1523,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
             "campaign artifact quota exceeded",
         )?;
         let segment: SustainedSegment = decode(&raw)?;
+        progress_audit.bind_segment(&segment)?;
         let summary = validate_next(
             &campaign,
             &segment,
@@ -1534,6 +1536,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
         previous = Some(digest("rrflow-storage-segment-v1", &segment)?);
         last_finished = segment.finished_ns;
     }
+    progress_audit.require_bound(result.status)?;
     if let Some(failed) = &result.failed_segment {
         require(
             matches!(
@@ -1841,6 +1844,150 @@ mod tests {
         assert!(validate_segment(&campaign, &segment)
             .unwrap_err()
             .contains("cold lane"));
+    }
+
+    #[test]
+    fn campaign_completion_requires_final_readback_and_raw_cold_reconciliation() {
+        use super::super::progress::{verify_progress, ProgressJournal};
+        let (mut campaign, mut segment) = fixture();
+        campaign.required_lanes.push(CapacityLane::Cold);
+        let point = campaign.points[0].id.clone();
+        let seed = campaign.seeds[0];
+        let file_identity = digest("native-file-fixture", &1).unwrap();
+        let cold = ColdStartEvidence {
+            started_ns: 0,
+            evicted_ns: 1,
+            ready_ns: 2,
+            finished_ns: 3,
+            files: 1,
+            file_bytes: 4097,
+            pages: 2,
+            resident_pages: 0,
+            page_bytes: 4096,
+            inventory_sha256: digest(
+                "c07g.cold-inventory",
+                &(
+                    digest("c07g.cold-inventory", &seed).unwrap(),
+                    &file_identity,
+                ),
+            )
+            .unwrap(),
+            readback_sha256: digest("readback", &1).unwrap(),
+        };
+        let file = ProgressEvent::ColdFile {
+            point: point.clone(),
+            seed,
+            file_identity_sha256: file_identity,
+            bytes: 4097,
+            page_bytes: 4096,
+            pages: 2,
+            resident_pages: 0,
+        };
+        let observed = ProgressEvent::ColdStart {
+            point: point.clone(),
+            seed,
+            observation: cold.clone(),
+        };
+        let final_readback = ProgressEvent::FinalReadback {
+            point,
+            seed,
+            killed_pid: 1,
+            reopened_pid: 2,
+            seed_records: campaign.allocation.records.get(),
+            working_slots: 0,
+            states_sha256: digest("states", &1).unwrap(),
+            started_ns: 10,
+            finished_ns: 20,
+        };
+        let write = |events: &[ProgressEvent]| {
+            let directory = tempfile::tempdir().unwrap();
+            let mut journal =
+                ProgressJournal::create(directory.path(), &campaign.sha256().unwrap()).unwrap();
+            for event in events {
+                journal.append(event, MAX_DOCUMENT_BYTES).unwrap();
+            }
+            (journal.finish().unwrap(), directory)
+        };
+        let events = vec![file.clone(), observed.clone(), final_readback.clone()];
+        let (receipt, directory) = write(&events);
+        let mut audit = verify_progress(
+            directory.path(),
+            &receipt,
+            &campaign,
+            CampaignStatus::Completed,
+        )
+        .unwrap();
+        assert!(audit.require_bound(CampaignStatus::Completed).is_err());
+        assert!(audit
+            .check_readback_order(&segment.point, segment.seed, 21)
+            .is_err());
+        segment.finished_ns = 10;
+        segment.cold_start = Some(cold.clone());
+        audit.bind_segment(&segment).unwrap();
+        audit.require_bound(CampaignStatus::Completed).unwrap();
+        assert!(audit.bind_segment(&segment).is_err());
+
+        for omission in 0..3 {
+            let mut missing = events.clone();
+            missing.remove(omission);
+            let (receipt, directory) = write(&missing);
+            assert!(verify_progress(
+                directory.path(),
+                &receipt,
+                &campaign,
+                CampaignStatus::Completed
+            )
+            .is_err());
+        }
+        let (receipt, directory) = write(std::slice::from_ref(&file));
+        verify_progress(
+            directory.path(),
+            &receipt,
+            &campaign,
+            CampaignStatus::Interrupted,
+        )
+        .unwrap();
+        for invalid in 0..6 {
+            let mut changed = events.clone();
+            match invalid {
+                0 => {
+                    let ProgressEvent::ColdFile { resident_pages, .. } = &mut changed[0] else {
+                        unreachable!()
+                    };
+                    *resident_pages = 1;
+                }
+                1 => {
+                    let ProgressEvent::ColdStart { observation, .. } = &mut changed[1] else {
+                        unreachable!()
+                    };
+                    observation.file_bytes += 1;
+                }
+                2 => {
+                    let ProgressEvent::ColdStart { observation, .. } = &mut changed[1] else {
+                        unreachable!()
+                    };
+                    observation.inventory_sha256 = digest("wrong", &1).unwrap();
+                }
+                3 => changed.push(final_readback.clone()),
+                4 => {
+                    let ProgressEvent::FinalReadback { seed_records, .. } = &mut changed[2] else {
+                        unreachable!()
+                    };
+                    *seed_records = 0;
+                }
+                _ => changed.push(ProgressEvent::Failure {
+                    reason: "failed-after-readback".to_owned().try_into().unwrap(),
+                }),
+            }
+            let (receipt, directory) = write(&changed);
+            assert!(verify_progress(
+                directory.path(),
+                &receipt,
+                &campaign,
+                CampaignStatus::Completed
+            )
+            .is_err());
+        }
     }
     #[test]
     fn observed_only_shortened_or_omitted_work_cannot_qualify() {

@@ -507,3 +507,42 @@ require candidate execution. No local runtime suite, capacity effect or soak
 ran. Reader-pin interference, multi-estate allocation, full native damage and
 backup matrix, profile campaigns and 24-hour acceptance remain open. No
 objective, roadmap or POA&M completion status changed.
+## Streamed progress reconciliation and completion enforcement
+
+Continued from `8c1dabca4ab0457c5a697bd067345e6a0946e767`; updated PR 72's
+brief before implementation. Exact progress bytes previously did not prove
+that a completed result contained final post-reopen readback or that cold
+aggregate receipts agreed with raw file events. The existing progress owner
+now streams a bounded accumulator per declared point/seed (maximum 32 x 32),
+checks page size/count and frozen inventory bounds, folds each raw identity,
+and matches cold aggregate counts, residency and digest. Offline campaign
+verification consumes each matching cold segment once; completed artifacts
+cannot omit an observed cold receipt. Partial interrupted/failed observations
+remain admissible without implying completion.
+
+Completed results require exactly one bounded final readback for every
+point/seed, complete requested seed count, bounded working slots, valid process
+identities and lifecycle duration, no retained failure, and readback after all
+finished offered-load segments. The writer enforces progress and temporal
+completion before publishing a result; offline verification repeats these
+checks and additionally binds raw cold observations to segment receipts.
+No day-long list of operations or files is retained. File observations now
+include native page size so their page counts can be checked exactly.
+
+Read/reviewed: complete progress module, sustained writer/aggregate verifier
+and fixtures, cold recorder, generated progress schema. Added negative
+regression definitions for omitted raw/aggregate/final events, partial cold
+advice, changed bytes/digests, nonzero residency, repeated final readback,
+incomplete seed count, failure after readback, segment mismatch/repetition and
+readback preceding load. This is evidence validation, not authentication of
+an arbitrary third-party measurement. No runtime policy or authority changes;
+no upstream algorithm, new dependency, source deletion or move.
+
+Strict Clippy initially rejected an unnecessary clone in a regression fixture;
+changed it to slice::from_ref. Strict Clippy for rrflow-eval/rrflow-cli all
+targets then passed (1.43 seconds); schema refresh passed (3.57 seconds).
+Final temporal-order additions were formatted and strictly linted again.
+No local runtime tests, capacity effects or soak ran. Required candidate CI
+owns execution. C-07g still lacks installed retained-reader interference,
+multi-estate capacity execution and full profile/24-hour evidence; Gate C,
+OBJ-02 and POAM-035 remain open. Full diff reviewed before commit.

@@ -287,6 +287,7 @@ mod linux {
                 seed,
                 file_identity_sha256: identity.clone(),
                 bytes: before.len(),
+                page_bytes: page,
                 pages,
                 resident_pages,
             })?;

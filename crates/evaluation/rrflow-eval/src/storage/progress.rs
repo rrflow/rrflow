@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use std::{
+    collections::BTreeMap,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::Path,
@@ -85,6 +86,7 @@ pub enum ProgressEvent {
         seed: u64,
         file_identity_sha256: Digest,
         bytes: u64,
+        page_bytes: u64,
         pages: u64,
         resident_pages: u64,
     },
@@ -196,11 +198,12 @@ impl ProgressJournal {
     }
 }
 
-pub(super) fn verify(
+fn scan(
     directory: &Path,
     receipt: &ProgressReceipt,
     identity: &Digest,
     total_bound: u64,
+    mut observe: impl FnMut(&ProgressEvent) -> Result<()>,
 ) -> Result<()> {
     require(
         receipt.bytes <= total_bound && receipt.records > 0 && receipt.records <= MAX_EXACT_INTEGER,
@@ -243,6 +246,7 @@ pub(super) fn verify(
                 "progress repeated its campaign header",
             )?;
         }
+        observe(&event)?;
         count += 1;
         size = size
             .checked_add(line.len() as u64)
@@ -262,6 +266,246 @@ pub(super) fn verify(
         count == receipt.records && size == receipt.bytes && actual == receipt.sha256.as_str(),
         "progress records or digest differ",
     )
+}
+
+#[derive(Default)]
+struct PointAudit {
+    files: u64,
+    bytes: u64,
+    pages: u64,
+    page_bytes: Option<u64>,
+    resident_pages: u64,
+    inventory: Option<Digest>,
+    cold: Option<Digest>,
+    final_readback_started: Option<u64>,
+}
+
+/// One small accumulator per declared point/seed, never one per file/attempt.
+pub(super) struct ProgressAudit {
+    points: BTreeMap<(Id, u64), PointAudit>,
+    failed: bool,
+}
+
+impl ProgressAudit {
+    fn new(campaign: &StorageCampaign) -> Self {
+        Self {
+            points: campaign
+                .points
+                .iter()
+                .flat_map(|point| {
+                    campaign
+                        .seeds
+                        .iter()
+                        .map(move |seed| ((point.id.clone(), *seed), PointAudit::default()))
+                })
+                .collect(),
+            failed: false,
+        }
+    }
+
+    fn observe(&mut self, campaign: &StorageCampaign, event: &ProgressEvent) -> Result<()> {
+        match event {
+            ProgressEvent::Failure { .. } => self.failed = true,
+            ProgressEvent::ColdFile {
+                point,
+                seed,
+                file_identity_sha256,
+                bytes,
+                page_bytes,
+                pages,
+                resident_pages,
+            } => {
+                let state = self
+                    .points
+                    .get_mut(&(point.clone(), *seed))
+                    .ok_or("cold file names an undeclared point or seed")?;
+                require(
+                    state.cold.is_none() && state.final_readback_started.is_none(),
+                    "cold file follows completed observation",
+                )?;
+                require(
+                    page_bytes.is_power_of_two()
+                        && (4096..=65536).contains(page_bytes)
+                        && *resident_pages <= *pages
+                        && *pages == bytes.div_ceil(*page_bytes)
+                        && state.page_bytes.is_none_or(|prior| prior == *page_bytes),
+                    "cold file page counts are impossible",
+                )?;
+                state.page_bytes = Some(*page_bytes);
+                for (total, value) in [
+                    (&mut state.files, 1),
+                    (&mut state.bytes, *bytes),
+                    (&mut state.pages, *pages),
+                    (&mut state.resident_pages, *resident_pages),
+                ] {
+                    *total = total
+                        .checked_add(value)
+                        .ok_or("cold progress count overflow")?;
+                }
+                let policy = &campaign.storage.installed_configuration.storage;
+                require(
+                    state.files <= policy.recovery_files
+                        && state.bytes <= policy.recovery_read_bytes,
+                    "cold progress exceeds frozen inventory admission",
+                )?;
+                let prior = match state.inventory.take() {
+                    Some(hash) => hash,
+                    None => digest("c07g.cold-inventory", seed)?,
+                };
+                state.inventory = Some(digest(
+                    "c07g.cold-inventory",
+                    &(prior, file_identity_sha256),
+                )?);
+            }
+            ProgressEvent::ColdStart {
+                point,
+                seed,
+                observation,
+            } => {
+                let state = self
+                    .points
+                    .get_mut(&(point.clone(), *seed))
+                    .ok_or("cold receipt names an undeclared point or seed")?;
+                require(
+                    state.cold.is_none()
+                        && state.final_readback_started.is_none()
+                        && state.files > 0
+                        && state.pages > 0
+                        && state.resident_pages == 0
+                        && observation.files == state.files
+                        && observation.file_bytes == state.bytes
+                        && observation.pages == state.pages
+                        && Some(observation.page_bytes) == state.page_bytes
+                        && observation.resident_pages == state.resident_pages
+                        && state.inventory.as_ref() == Some(&observation.inventory_sha256),
+                    "cold receipt differs from raw file observations",
+                )?;
+                state.cold = Some(digest("c07g.cold-start", observation)?);
+            }
+            ProgressEvent::FinalReadback {
+                point,
+                seed,
+                killed_pid,
+                reopened_pid,
+                seed_records,
+                working_slots,
+                started_ns,
+                finished_ns,
+                ..
+            } => {
+                let state = self
+                    .points
+                    .get_mut(&(point.clone(), *seed))
+                    .ok_or("final readback names an undeclared point or seed")?;
+                require(
+                    state.final_readback_started.is_none()
+                        && *killed_pid > 0
+                        && *reopened_pid > 0
+                        && *seed_records == campaign.allocation.records.get()
+                        && *working_slots <= campaign.evidence.segment_attempts.get()
+                        && started_ns <= finished_ns
+                        && finished_ns - started_ns
+                            <= campaign.schedule.lifecycle_ms.get() * 1_000_000,
+                    "final readback is duplicate, incomplete or outside lifecycle admission",
+                )?;
+                state.final_readback_started = Some(*started_ns);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn finish(&self, campaign: &StorageCampaign, status: CampaignStatus) -> Result<()> {
+        if status == CampaignStatus::Completed {
+            require(
+                !self.failed
+                    && self.points.values().all(|point| {
+                        point.final_readback_started.is_some()
+                            && (point.files == 0 || point.cold.is_some())
+                    }),
+                "completed campaign omitted final readback or retained a failure",
+            )?;
+            if campaign.required_lanes.contains(&CapacityLane::Cold) {
+                require(
+                    self.points.values().all(|point| point.cold.is_some()),
+                    "completed campaign omitted required cold observations",
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn bind_segment(&mut self, segment: &SustainedSegment) -> Result<()> {
+        self.check_readback_order(&segment.point, segment.seed, segment.finished_ns)?;
+        if let Some(cold) = &segment.cold_start {
+            let state = self
+                .points
+                .get_mut(&(segment.point.clone(), segment.seed))
+                .ok_or("cold segment names undeclared point or seed")?;
+            require(
+                state.cold.take().as_ref() == Some(&digest("c07g.cold-start", cold)?),
+                "cold segment differs from progress observations or repeats them",
+            )?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn check_readback_order(
+        &self,
+        point: &Id,
+        seed: u64,
+        finished_ns: u64,
+    ) -> Result<()> {
+        let state = self
+            .points
+            .get(&(point.clone(), seed))
+            .ok_or("segment names undeclared point or seed")?;
+        require(
+            state
+                .final_readback_started
+                .is_none_or(|start| start >= finished_ns),
+            "final readback precedes completed offered load",
+        )
+    }
+
+    pub(super) fn require_bound(&self, status: CampaignStatus) -> Result<()> {
+        if status == CampaignStatus::Completed {
+            require(
+                self.points.values().all(|point| point.cold.is_none()),
+                "completed campaign omitted observed cold receipt from segments",
+            )?;
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn verify_progress(
+    directory: &Path,
+    receipt: &ProgressReceipt,
+    campaign: &StorageCampaign,
+    status: CampaignStatus,
+) -> Result<ProgressAudit> {
+    let identity = campaign.sha256()?;
+    let mut audit = ProgressAudit::new(campaign);
+    scan(
+        directory,
+        receipt,
+        &identity,
+        campaign.evidence.total_bytes.get(),
+        |event| audit.observe(campaign, event),
+    )?;
+    audit.finish(campaign, status)?;
+    Ok(audit)
+}
+
+#[cfg(test)]
+fn verify(
+    directory: &Path,
+    receipt: &ProgressReceipt,
+    identity: &Digest,
+    total_bound: u64,
+) -> Result<()> {
+    scan(directory, receipt, identity, total_bound, |_| Ok(()))
 }
 
 #[cfg(test)]
