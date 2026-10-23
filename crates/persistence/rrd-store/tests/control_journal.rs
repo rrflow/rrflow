@@ -209,7 +209,15 @@ fn small_journal_pages_remain_bounded_after_growth_and_reopen() {
             .is_empty());
         assert!(engine.control().journal_since(0, 0).is_err());
         // Pagination must not disable the existing byte admission ceiling.
-        assert!(engine.control().journal_since(0, 96).is_err());
+        let denied = engine.control().journal_since(0, 96).unwrap_err();
+        assert!(
+            matches!(denied, Error::ProjectedReadLimit {
+            resource: rrd_store::ProjectedReadResource::OutputBufferBytes,
+            limit: 8192,
+            observed,
+        } if observed > 8192),
+            "{denied}"
+        );
         let resources = engine.physical_store_evidence().unwrap();
         assert_eq!(resources.native_transactions, Some(0));
     }

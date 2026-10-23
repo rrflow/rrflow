@@ -2,6 +2,33 @@ use super::*;
 use rrd_store::RrflowKvStore;
 
 #[test]
+fn projected_read_denial_preserves_durable_uncertainty_and_read_pressure() {
+    let denial = || rrd_store::Error::ProjectedReadLimit {
+        resource: rrd_store::ProjectedReadResource::OutputBufferBytes,
+        limit: 8192,
+        observed: 8480,
+    };
+    let durable = ServiceError::from(denial());
+    assert_eq!(durable.kind(), crate::ServiceErrorKind::Internal);
+    assert!(!durable.retryable());
+    for read in [
+        crate::engine::error::storage_read_error(denial()),
+        crate::engine::error::query_storage_error(denial()),
+        ServiceError::from(rrd_query::Error::from(denial())),
+    ] {
+        assert_eq!(read.kind(), crate::ServiceErrorKind::ResourceExhausted);
+        assert!(!read.retryable());
+        assert!(read.to_string().contains("8192"));
+        assert!(read.to_string().contains("8480"));
+    }
+    let corruption = rrd_store::Error::Substrate("corrupt journal".into());
+    assert_eq!(
+        crate::engine::error::storage_read_error(corruption).kind(),
+        crate::ServiceErrorKind::Internal
+    );
+}
+
+#[test]
 fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     let policy = rrd_contract::StorageLimits {
         checkpoint_entries: 7,

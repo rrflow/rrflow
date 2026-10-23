@@ -32,7 +32,10 @@ impl std::error::Error for Error {}
 
 impl From<rrd_store::Error> for Error {
     fn from(value: rrd_store::Error) -> Self {
-        if matches!(value, rrd_store::Error::SourcePageLimit { .. }) {
+        if matches!(
+            value,
+            rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. }
+        ) {
             Self::StorageAdmission(value.to_string())
         } else if matches!(value, rrd_store::Error::RuntimeReadBudgetExceeded { .. }) {
             Self::Budget(value.to_string())

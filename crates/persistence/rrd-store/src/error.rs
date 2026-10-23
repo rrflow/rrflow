@@ -6,6 +6,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    /// Native read admission. Durable callers still need outcome reconciliation.
+    ProjectedReadLimit {
+        resource: rrd_lsm::ProjectedReadResource,
+        limit: u64,
+        observed: u64,
+    },
     SourcePageLimit {
         limit: usize,
         observed: usize,
@@ -145,6 +151,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
+            Error::ProjectedReadLimit { resource, limit, observed } => write!(f, "projected-read {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::SourcePageLimit { limit, observed } => write!(f, "source page allocation limit {limit} would be exceeded by {observed}"),
             Error::CheckpointLimit { limit, observed } => write!(f, "checkpoint entry limit {limit} would be exceeded by {observed}"),
             Error::TransactionLimit { resource, limit, observed } => write!(f, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
@@ -243,6 +250,15 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::ProjectedReadLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::ProjectedReadLimit {
+                resource,
+                limit,
+                observed,
+            },
             rrd_lsm::Error::SourcePageLimit { limit, observed } => {
                 Self::SourcePageLimit { limit, observed }
             }

@@ -451,3 +451,11 @@ but failed backup interference at the 128 MiB projected-output ceiling; exact
 candidate native comparison remains required. Projected-read admission still
 loses its typed classification through generic substrate/internal errors.
 These bounded repairs and failed characterizations do not close C-07.
+
+The [read-only denial repair](../../evidence/change-journals/gate-c/c-07e-projected-read-denials.md)
+preserves projected-read resource identity through store/query/engine layers.
+A real public cursor request now reports ResourceExhausted, releases resources
+after denial and admits a correctly budgeted retry. Generic durable conversion
+continues to preserve uncertainty; this does not reclassify backup failures as
+safe rejection. Store/query suites pass 291 tests and engine passes 165 with
+two existing ignored. Exact candidate CI and native qualification remain open.

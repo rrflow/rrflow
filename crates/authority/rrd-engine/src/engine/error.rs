@@ -164,7 +164,8 @@ impl From<rrd_store::Error> for ServiceError {
             // Owner exhaustion or source-page pressure can obstruct an already
             // published commit. Only a proven-absent outcome permits rejection.
             rrd_store::Error::TransactionLimit { .. }
-            | rrd_store::Error::SourcePageLimit { .. } => Self::Storage(message),
+            | rrd_store::Error::SourcePageLimit { .. }
+            | rrd_store::Error::ProjectedReadLimit { .. } => Self::Storage(message),
             rrd_store::Error::WriteBatchLimit { .. }
             | rrd_store::Error::MutableLimit { .. }
             | rrd_store::Error::MaintenanceLimit { .. }
@@ -223,7 +224,7 @@ impl From<rrd_query::Error> for ServiceError {
 /// through storage reads that precede the query pipeline.
 pub(super) fn query_storage_error(error: rrd_store::Error) -> ServiceError {
     match error {
-        rrd_store::Error::SourcePageLimit { .. } => {
+        rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. } => {
             ServiceError::StorageAdmission(error.to_string())
         }
         other => ServiceError::Query(other.to_string()),
@@ -234,7 +235,7 @@ pub(super) fn query_storage_error(error: rrd_store::Error) -> ServiceError {
 /// effect was rejected. Durable callers must use the ordinary conversion.
 pub(super) fn storage_read_error(error: rrd_store::Error) -> ServiceError {
     match error {
-        rrd_store::Error::SourcePageLimit { .. } => {
+        rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. } => {
             ServiceError::StorageAdmission(error.to_string())
         }
         other => ServiceError::from(other),
