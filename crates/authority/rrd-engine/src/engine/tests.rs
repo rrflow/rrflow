@@ -96,6 +96,7 @@ mod lifecycle;
 mod memory_estate;
 mod native_inference;
 mod query_transaction;
+mod reasoning_budget;
 mod recovery;
 mod security;
 mod subscription;

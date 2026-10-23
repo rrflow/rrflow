@@ -76,6 +76,12 @@ http_dispatch_catalogue! {
     SessionRenew => ("session-renew", RrdOperation::SessionRenew),
     SubscriptionClose => ("subscription-close", RrdOperation::SubscriptionClose),
     SubscriptionOpen => ("subscription-open", RrdOperation::SubscriptionOpen),
+    EmbeddingBuiltinActivate => ("embedding-builtin-activate", RrdOperation::ReasoningWrite),
+    TaskBudgetConfigure => ("task-budget-configure", RrdOperation::ReasoningWrite),
+    TaskBudgetRead => ("task-budget-read", RrdOperation::ReasoningRead),
+    TaskBudgetStop => ("task-budget-stop", RrdOperation::ReasoningWrite),
+    TaskEmbeddingExecute => ("task-embedding-execute", RrdOperation::ReasoningWrite),
+    TaskAttemptRead => ("task-attempt-read", RrdOperation::ReasoningRead),
     TaskClose => ("task-close", RrdOperation::TaskWrite),
     TaskList => ("task-list", RrdOperation::TaskRead),
     TaskOpen => ("task-open", RrdOperation::TaskWrite),
@@ -233,6 +239,18 @@ impl AppState {
             Some(HttpDispatch::FlightList) => self.list_prompt_flights(&headers, &body, now),
             Some(HttpDispatch::FlightRead) => self.read_prompt_flight(&headers, &body, now),
             Some(HttpDispatch::TaskOpen) => self.open_task(&headers, &body, now),
+            Some(HttpDispatch::EmbeddingBuiltinActivate) => {
+                self.activate_builtin_embedding(&headers, &body, now)
+            }
+            Some(HttpDispatch::TaskBudgetConfigure) => {
+                self.configure_task_budget(&headers, &body, now)
+            }
+            Some(HttpDispatch::TaskBudgetRead) => self.read_task_budget(&headers, &body, now),
+            Some(HttpDispatch::TaskBudgetStop) => self.stop_task_budget(&headers, &body, now),
+            Some(HttpDispatch::TaskEmbeddingExecute) => {
+                self.execute_task_embedding(&headers, &body, now)
+            }
+            Some(HttpDispatch::TaskAttemptRead) => self.read_task_attempt(&headers, &body, now),
             Some(HttpDispatch::TaskClose) => self.close_task(&headers, &body, now),
             Some(HttpDispatch::TaskList) => self.list_tasks(&headers, &body, now),
             Some(HttpDispatch::TaskRead) => self.read_task(&headers, &body, now),

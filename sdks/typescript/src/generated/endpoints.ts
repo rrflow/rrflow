@@ -1,6 +1,6 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377
-export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377" as const;
+// OpenAPI SHA-256: 28fdf404064be9b507ed2bc2780242ce15237eabe86cee5a7297af4470d4da3c
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "28fdf404064be9b507ed2bc2780242ce15237eabe86cee5a7297af4470d4da3c" as const;
 
 export const endpoints = {
   "audit-export": {
@@ -62,6 +62,12 @@ export const endpoints = {
     "path": "/v1/diagnostics/read",
     "authentication": "session_bearer",
     "mutation": false
+  },
+  "embedding-builtin-activate": {
+    "method": "POST",
+    "path": "/v1/embedding/builtin/activate",
+    "authentication": "session_bearer",
+    "mutation": true
   },
   "estate-read": {
     "method": "POST",
@@ -183,9 +189,39 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": true
   },
+  "task-attempt-read": {
+    "method": "POST",
+    "path": "/v1/tasks/attempt/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-budget-configure": {
+    "method": "POST",
+    "path": "/v1/tasks/budget/configure",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-budget-read": {
+    "method": "POST",
+    "path": "/v1/tasks/budget/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-budget-stop": {
+    "method": "POST",
+    "path": "/v1/tasks/budget/stop",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
   "task-close": {
     "method": "POST",
     "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-embedding-execute": {
+    "method": "POST",
+    "path": "/v1/tasks/embedding/execute",
     "authentication": "session_bearer",
     "mutation": true
   },

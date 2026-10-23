@@ -223,7 +223,7 @@ func TestSecurityDeadlinesErrorsAndGeneratedCoverage(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "deadline has expired") {
 		t.Fatalf("unexpected deadline result: %v", err)
 	}
-	if len(endpoints) != 42 || !endpoints[OperationBackupCreate].Mutation ||
+	if len(endpoints) != 48 || !endpoints[OperationBackupCreate].Mutation ||
 		!endpoints[OperationTransactionPreview].Mutation ||
 		endpoints[OperationCapabilitiesRead].Authentication != "public" {
 		t.Fatalf("generated endpoint catalogue is incomplete: %#v", endpoints)
