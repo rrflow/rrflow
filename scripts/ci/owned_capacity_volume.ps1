@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory=$true)][ValidateRange(128,2048)][int]$SizeMiB
 )
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $fixtureRoot = (Resolve-Path -LiteralPath $Fixture).ProviderPath.TrimEnd('\')
 if ((Split-Path -Leaf $fixtureRoot) -notmatch '^rrflow-capacity-[a-zA-Z0-9_-]+$') { throw 'Not an owned capacity fixture' }
 if ((Get-Item -LiteralPath $fixtureRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Fixture is a reparse point' }
@@ -15,8 +16,9 @@ if ($Action -eq 'Detach') {
         if ($image.Attached) { Dismount-DiskImage -ImagePath $imagePath }
         if ((Get-DiskImage -ImagePath $imagePath).Attached) { throw 'Owned image remains attached' }
     }
-    @{ detached = $true; image = $imagePath } | ConvertTo-Json -Compress
-    exit 0
+    [Console]::Out.WriteLine((@{ detached = $true; image = $imagePath } | ConvertTo-Json -Compress))
+    [Console]::Out.Flush()
+    return
 }
 if (Test-Path -LiteralPath $imagePath) { throw 'Refusing to format an existing image' }
 if ($imagePath.Contains('"') -or $imagePath.Contains("`n") -or $imagePath.Contains("`r")) { throw 'Invalid image command path' }
@@ -74,6 +76,9 @@ if (!$partition.DriveLetter -or $partition.DiskNumber -ne $disk.Number) { throw 
 Require-OwnedDisk
 $volume = $partition | Format-Volume -FileSystem NTFS -NewFileSystemLabel 'RRFlowCapacity' -Confirm:$false -Force
 if ($volume.FileSystem -ne 'NTFS' -or $volume.DriveLetter -ne $partition.DriveLetter) { throw 'Owned NTFS format differs' }
-@{ root = "$($partition.DriveLetter):\"; filesystem = 'ntfs'; image = $imagePath;
+$receipt = @{ root = "$($partition.DriveLetter):\"; filesystem = 'ntfs'; image = $imagePath;
    disk_number = $disk.Number; disk_unique_id = $disk.UniqueId; volume_id = $volume.UniqueId;
    total_bytes = $volume.Size } | ConvertTo-Json -Compress
+
+[Console]::Out.WriteLine($receipt)
+[Console]::Out.Flush()

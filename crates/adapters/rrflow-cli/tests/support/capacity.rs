@@ -214,9 +214,9 @@ async fn read_values(
         query: text,
         parameters: BTreeMap::new(),
         budget: QueryBudget {
-            max_storage_keys: 150_000,
+            max_storage_keys: 100_000,
             max_rows: 1024,
-            max_output_bytes: rrd_contract::MAX_QUERY_OUTPUT_BYTES,
+            max_output_bytes: 512 * 1024,
             max_batch_rows: 64,
             max_memory_bytes: 64 * 1024 * 1024,
             max_spill_bytes: 64 * 1024 * 1024,

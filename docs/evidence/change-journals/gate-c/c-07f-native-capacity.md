@@ -210,3 +210,28 @@ Primary API references read for this correction:
 and [fixed-allocation flag](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/ne-virtdisk-create_virtual_disk_flag).
 The new native call is compiled/parsed only locally; candidate NTFS execution
 must establish whether the host supports the requested owned image.
+
+## Native candidate boundary corrections
+
+Run 39891012307 reached the actual installed corpus on Linux and Windows, then
+rejected its 150,000-key query request against the sealed 100,000-key ceiling.
+The bounded windows now also respect the default 512 KiB output ceiling. Reads
+included the installed TOML defaults; no engine ceiling was raised.
+
+Windows estate integration exposed a native mandatory-lock conflict while
+inspection issued an EOF read on the empty MANIFEST.LOCK through another
+handle. Inspection now hashes exactly its pre-admitted extent and rechecks the
+length afterward. Empty files need no read; the exclusive repair lease is
+retained throughout. Short files, growth and corrupted contents still fail.
+Existing native tail-repair and installed interruption/readback regressions
+exercise the boundary; this is a storage fix, not a skipped platform assertion.
+
+The APFS control failed before the corpus without retaining its native error;
+that evidence is insufficient to identify a root cause. The image runner now
+retains the failed native tool and bounded stderr/stdout for owned-image
+commands only. Windows detach also returned an empty structured response;
+its script now writes and flushes UTF-8 JSON directly instead of relying on a
+pipeline followed by process exit. Empty responses still fail qualification.
+No new host operation ran locally.
+
+The exact-extent correction passed `cargo clippy -p rrd-lsm --all-targets --locked -- -D warnings` in 6.19 seconds. PowerShell parsing and Python syntax compilation passed. Native runtime acceptance remains candidate-CI work, not a local run.

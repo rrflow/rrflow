@@ -451,9 +451,13 @@ fn inspect_file(
     let mut digest = Sha256::new();
     let mut bytes = 0u64;
     let mut buffer = [0u8; 64 * 1024];
-    loop {
+    // Hash only the admitted extent. An empty manifest lock has no bytes to
+    // read; on Windows even an EOF probe through a second handle conflicts
+    // with our retained exclusive lease. Do not weaken or drop that lease.
+    while bytes < expected_bytes {
         budget.tick()?;
-        let read = file.read(&mut buffer).map_err(|error| {
+        let count = (expected_bytes - bytes).min(buffer.len() as u64) as usize;
+        let read = file.read(&mut buffer[..count]).map_err(|error| {
             Error::io(
                 "reading file for inspection digest",
                 path.diagnostic_path(),
@@ -473,7 +477,7 @@ fn inspect_file(
             ));
         }
     }
-    if bytes != expected_bytes {
+    if bytes != expected_bytes || file.metadata()?.len() != expected_bytes {
         return Err(Error::InvalidManifest(
             "inspection file length changed".into(),
         ));
