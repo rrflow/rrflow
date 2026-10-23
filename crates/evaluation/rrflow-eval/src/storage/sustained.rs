@@ -278,6 +278,13 @@ impl StorageCampaign {
             self.allocation.engine_bytes.get() <= self.allocation.host_bytes.get()
                 && self.allocation.estates.get() == self.storage.budgets.estates.get()
                 && self.allocation.engine_bytes.get() == self.storage.budgets.process_bytes.get()
+                && self
+                    .storage
+                    .budgets
+                    .aggregate_process_bytes
+                    .is_none_or(|pool| pool == self.allocation.engine_bytes)
+                && (self.allocation.estates.get() == 1
+                    || self.storage.budgets.aggregate_process_bytes.is_some())
                 && self.allocation.host_bytes.get() == self.storage.budgets.host_bytes.get(),
             "allocation and storage budget identity differ",
         )?;
@@ -1798,6 +1805,7 @@ pub(super) mod tests {
             serde_json::from_str(include_str!("../../tests/fixtures/storage/manifest.json"))
                 .unwrap();
         manifest.evidence_class = EvidenceClass::NativeCapacity;
+        manifest.budgets.estates = limit(1);
         let mut result: StorageResult =
             serde_json::from_str(include_str!("../../tests/fixtures/storage/result.json")).unwrap();
         result.manifest_sha256 = manifest_digest(&manifest).unwrap();
