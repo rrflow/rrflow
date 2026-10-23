@@ -459,3 +459,10 @@ after denial and admits a correctly budgeted retry. Generic durable conversion
 continues to preserve uncertainty; this does not reclassify backup failures as
 safe rejection. Store/query suites pass 291 tests and engine passes 165 with
 two existing ignored. Exact candidate CI and native qualification remain open.
+
+The [scoped commit-constraint repair](../../evidence/change-journals/gate-c/c-07g-scoped-constraint-reads.md)
+removes unrelated-scope record/relation reads from stable-schema validation.
+Endpoint/pair histories and selected-key counts are checked against the
+full-state constraint oracle, including native reopen. This advances the
+POAM-034 scale prerequisite without closing its remaining unique-value-index
+requirement or substituting for native C-07 capacity/soak acceptance.
