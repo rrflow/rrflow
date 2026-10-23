@@ -1944,8 +1944,25 @@ fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedP
         PageSource::File { file, selected, io } => {
             let mut bytes = MutableBuffer::new(descriptor.physical_bytes);
             bytes.resize(descriptor.physical_bytes, 0);
-            let actual_io =
-                io.read_exact_at(*selected, file, descriptor.offset, bytes.as_slice_mut())?;
+            // A row group retains a complete key/version chain and can exceed
+            // the soft page target. The I/O policy bounds each native request,
+            // not that authenticated page. Do not expose any bytes until every
+            // chunk has been acquired and the full stored-page digest matches.
+            let mut actual_io = *selected;
+            let mut offset = descriptor.offset;
+            if descriptor.physical_bytes == 0 {
+                actual_io = io.read_exact_at(actual_io, file, offset, bytes.as_slice_mut())?;
+            } else {
+                for chunk in bytes
+                    .as_slice_mut()
+                    .chunks_mut(io.policy().max_request_bytes)
+                {
+                    actual_io = io.read_exact_at(actual_io, file, offset, chunk)?;
+                    offset = offset.checked_add(chunk.len() as u64).ok_or_else(|| {
+                        Error::InvalidSegment("v6 page read offset overflow".into())
+                    })?;
+                }
+            }
             let buffer = Buffer::from(bytes);
             let allocated = buffer.capacity();
             verify_stored_page(buffer.as_slice(), descriptor)?;
