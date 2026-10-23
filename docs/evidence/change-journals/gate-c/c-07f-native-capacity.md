@@ -418,3 +418,4 @@ This is a native capacity result for that exact candidate, not full-candidate
 acceptance: its macOS offline lifecycle deadline failed and later source
 changes require new CI. No local disk-exhaustion workload ran, no 24-hour
 campaign ran, and no capacity-profile or roadmap completion status changed.
+The evidence export initially used Windows CRLF; the whitespace check exposed it. Normalized the JSON to LF without changing parsed receipts, then repeated the check.
