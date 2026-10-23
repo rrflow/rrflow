@@ -733,3 +733,11 @@ Validation: full six-package all-target strict Clippy passed (12.21s, then 4.63s
 ## Candidate strict uniform-distribution decoding correction
 
 Candidate `69e415526fa9d5efc2a17e3d4111c1bc8906d435`, run `39905826617`, product-operations job `120257998649`, failed the existing negative decode oracle: Serde accepted `{"kind":"uniform","keys":1}` for the internally tagged unit variant despite enum-level deny_unknown_fields. The pre-edit PR brief records the correction. Changed only the Rust uniform representation to an empty struct variant, preserving `{"kind":"uniform"}` and its distribution algorithm, then updated all five construction/match sites and affected projections. The unchanged negative oracle must pass in the next candidate; no unknown field is reclassified as accepted. Read the full distribution enum/validation/selection/regression function and every call site. No local runtime suite executed; compile/projection checks and native candidate CI remain the acceptance path. No gate/status change.
+
+
+Dependency correction: incorporated native ext4 inode admission commit 5627c07e.
+The inventory generator refused the unmerged index; the shell then incorrectly
+continued and published merge 03e83faf with inventory conflict markers. No CI
+acceptance is claimed for that revision. Regenerated the mechanical inventory
+after resolving the index, checked documentation and whitespace, and published
+a normal corrective commit without rewriting history.
