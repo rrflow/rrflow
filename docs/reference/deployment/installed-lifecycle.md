@@ -354,6 +354,26 @@ remain subject to the existing validated garbage collector. Total on-disk
 history, higher-level debt, retained snapshots and process memory are separate
 qualification obligations; these controls do not claim those are bounded.
 
+Retained mutable generations share an ownership-based pool per opened database:
+`retained_mutable_bytes` (512 MiB), `retained_mutable_versions` (4,194,304) and
+`retained_mutable_generations` (64). A writer reserves a complete copy before
+copy-on-write and before WAL append; cancellation releases only the owners it
+actually drops. Readers can retain their charge after the database closes.
+The byte charge covers keys, values and version records, excluding allocator
+and tree overhead. Independently reopened pools do not establish a host quota.
+
+The normal write path now invokes bounded reachability reclamation after
+publication and on reopen, before appending the incoming batch. Controls are
+`reclamation_inventory_entries` (262,144), `reclamation_metadata_bytes` (64 MiB),
+`reclamation_delete_files` (1,024), `reclamation_delete_bytes` (1 GiB), and
+`reclamation_elapsed_ms` (30,000). Current, captured-reader and checkpoint
+manifests protect their files. Complete admitted inventories and protected
+references are checked before deletion; damaged references fail closed.
+Partial deletion cycles synchronize completed removals and retain pending work.
+A single file larger than the deletion budget reports explicit pressure.
+Elapsed limits are cooperative and cannot interrupt native filesystem calls.
+These controls do not qualify actual disk exhaustion or sustained capacity.
+
 Apply, interrupted installation, reopen, inspection, backup restore and restore
 publication lower the same sealed policy into native storage options. A low
 replay limit denies access without modifying authoritative bytes; inspection

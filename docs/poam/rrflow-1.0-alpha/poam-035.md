@@ -183,6 +183,12 @@ through packages a-h under OBJ-02.
 
 Roadmap owner: [Gate C](../../roadmap/rrflow-1.0/gate-c.md).
 
+The [retained-generation and installed reclamation change](../../evidence/change-journals/gate-c/c-07de-retained-reclamation.md)
+adds configured pre-WAL copy admission and bounded native reclamation to normal
+writes. Compilation is recorded separately from pending candidate CI. This
+remediates implementation gaps without closing queue admission, recovery space,
+real exhaustion, capacity profiles, soak or aggregate host-memory qualification.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

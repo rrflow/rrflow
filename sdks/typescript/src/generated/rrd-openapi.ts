@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 7ef6b88399359d1075138e328d910ca301e8de360cbd19cc6c5f993c3314c8f0
+// OpenAPI SHA-256: 68a17b8757c21aa38a881d75b8c3340dafafed0b8d6d2875be1a1e86dcab653c
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3350,6 +3350,22 @@ export interface operations {
                                         /** Format: uint64 */
                                         projected_output_bytes: number;
                                         /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
                                         wal_flush_target_bytes: number;
                                     };
                                 };
@@ -3582,6 +3598,22 @@ export interface operations {
                                         page_cache_bytes: number;
                                         /** Format: uint64 */
                                         projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
                                         /** Format: uint64 */
                                         wal_flush_target_bytes: number;
                                     };

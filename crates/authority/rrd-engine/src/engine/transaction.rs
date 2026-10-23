@@ -362,6 +362,7 @@ impl RrdEngine {
                                     | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::MutableLimit { .. }
                                     | rrd_store::Error::MaintenanceLimit { .. }
+                                    | rrd_store::Error::ReclamationLimit { .. }
                                     | rrd_store::Error::RuntimeConflict { .. }
                                     | rrd_store::Error::TransactionConflict { .. }
                                     | rrd_store::Error::DanglingRuntimeReference(_)

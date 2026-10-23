@@ -1025,6 +1025,46 @@
           "minimum": 0,
           "type": "integer"
         },
+        "reclamation_delete_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_delete_files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_inventory_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_metadata_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_generations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "wal_flush_target_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1043,7 +1083,15 @@
         "compaction_input_versions",
         "compaction_output_segments",
         "compaction_elapsed_ms",
-        "compaction_l0_segments"
+        "compaction_l0_segments",
+        "retained_mutable_bytes",
+        "retained_mutable_versions",
+        "retained_mutable_generations",
+        "reclamation_inventory_entries",
+        "reclamation_metadata_bytes",
+        "reclamation_delete_files",
+        "reclamation_delete_bytes",
+        "reclamation_elapsed_ms"
       ],
       "type": "object"
     },

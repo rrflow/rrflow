@@ -2,7 +2,7 @@ use super::format::PageKind;
 use super::{
     key_at, offset_at, sequence_at, valid_at, KeySpine, PageCacheAccess, PageLoadEvidence, Segment,
 };
-use crate::{Error, Manifest, Memtable, ProjectedOutputMemory, Result, Snapshot};
+use crate::{Error, Manifest, ProjectedOutputMemory, Result, Snapshot};
 use arrow_buffer::{Buffer, MutableBuffer};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -436,15 +436,17 @@ impl ActiveReadViews {
         })
     }
 
-    pub(crate) fn manifests(registry: &Arc<Mutex<Self>>) -> Result<Vec<Manifest>> {
+    pub(crate) fn visit_manifests(
+        registry: &Arc<Mutex<Self>>,
+        mut visit: impl FnMut(&Manifest) -> Result<()>,
+    ) -> Result<()> {
         let views = registry
             .lock()
             .map_err(|_| Error::PoisonedReadViewRegistry)?;
-        Ok(views
-            .manifests
-            .values()
-            .map(|entry| entry.manifest.clone())
-            .collect())
+        for entry in views.manifests.values() {
+            visit(&entry.manifest)?;
+        }
+        Ok(())
     }
 }
 
@@ -518,7 +520,7 @@ impl Drop for ReadViewLease {
 pub(crate) struct ReadView {
     pub sequence: u64,
     pub manifest: String,
-    pub memtable: Arc<Memtable>,
+    pub memtable: Arc<crate::mutable_memory::MutableGeneration>,
     pub segments: Vec<Arc<Segment>>,
     pub pinned_bytes: u64,
 }
@@ -953,7 +955,7 @@ impl RunCursor {
 
 #[derive(Debug)]
 struct MemtableProjectedCursor {
-    table: Arc<Memtable>,
+    table: Arc<crate::mutable_memory::MutableGeneration>,
     ranges: Arc<[ProjectedReadRange]>,
     read_sequence: u64,
     after: Option<Vec<u8>>,

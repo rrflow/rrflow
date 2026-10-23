@@ -60,6 +60,14 @@ test("public negotiation retries transport loss and validates the ArkType envelo
               compaction_output_segments: 256,
               compaction_elapsed_ms: 30000,
               compaction_l0_segments: 64,
+              retained_mutable_bytes: 536870912,
+              retained_mutable_versions: 4194304,
+              retained_mutable_generations: 64,
+              reclamation_inventory_entries: 262144,
+              reclamation_metadata_bytes: 67108864,
+              reclamation_delete_files: 1024,
+              reclamation_delete_bytes: 1073741824,
+              reclamation_elapsed_ms: 30000,
             },
             reasoning: {
               max_run_elapsed_ms: 900_000,
@@ -82,7 +90,7 @@ test("public negotiation retries transport loss and validates the ArkType envelo
               max_elapsed_ms: 30_000,
             },
             configuration_sha256:
-              "a8c50eaf57e5a749eb7a6f65bc0a61ffff21b771044f7225789bf0d6ca63324c",
+              "234b19e7ce250615faa119c297c6a4a13ca590cd88639975cb297037f12ecac2",
           },
           instance: { kind: "instance", id: "sdk-test" },
           capabilities: [],

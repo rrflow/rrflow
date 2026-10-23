@@ -57,7 +57,15 @@ final class RrdClientTest {
                                     Map.entry("compaction_input_versions", 4194304L),
                                     Map.entry("compaction_output_segments", 256L),
                                     Map.entry("compaction_elapsed_ms", 30000L),
-                                    Map.entry("compaction_l0_segments", 64L)),
+                                    Map.entry("compaction_l0_segments", 64L),
+                                    Map.entry("retained_mutable_bytes", 536870912L),
+                                    Map.entry("retained_mutable_versions", 4194304L),
+                                    Map.entry("retained_mutable_generations", 64L),
+                                    Map.entry("reclamation_inventory_entries", 262144L),
+                                    Map.entry("reclamation_metadata_bytes", 67108864L),
+                                    Map.entry("reclamation_delete_files", 1024L),
+                                    Map.entry("reclamation_delete_bytes", 1073741824L),
+                                    Map.entry("reclamation_elapsed_ms", 30000L)),
                             "reasoning", Map.of(
                                     "max_run_elapsed_ms", 900000,
                                     "max_steps", 256,
@@ -76,7 +84,7 @@ final class RrdClientTest {
                                     "max_spill_bytes", 268435456,
                                     "max_elapsed_ms", 30000),
                             "configuration_sha256",
-                            "a8c50eaf57e5a749eb7a6f65bc0a61ffff21b771044f7225789bf0d6ca63324c"),
+                            "234b19e7ce250615faa119c297c6a4a13ca590cd88639975cb297037f12ecac2"),
                     "instance", Map.of("kind", "instance", "id", "sdk-test"),
                     "capabilities", List.of())));
         });

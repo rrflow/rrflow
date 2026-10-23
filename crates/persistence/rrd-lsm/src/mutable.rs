@@ -23,6 +23,9 @@ impl Default for MutableLimits {
 pub enum MutableResource {
     AccountedBytes,
     Versions,
+    RetainedAccountedBytes,
+    RetainedVersions,
+    Generations,
 }
 
 impl MutableResource {
@@ -30,6 +33,9 @@ impl MutableResource {
         match self {
             Self::AccountedBytes => "accounted bytes",
             Self::Versions => "versions",
+            Self::RetainedAccountedBytes => "active and retained accounted bytes",
+            Self::RetainedVersions => "active and retained versions",
+            Self::Generations => "active and retained generations",
         }
     }
 }

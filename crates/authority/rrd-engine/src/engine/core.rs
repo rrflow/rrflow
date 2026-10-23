@@ -37,6 +37,21 @@ pub(super) fn installed_storage_options(
     options.compaction_limits.output_segments = policy.compaction_output_segments;
     options.compaction_limits.elapsed_ms = policy.compaction_elapsed_ms;
     options.compaction_limits.l0_segments = policy.compaction_l0_segments;
+    options.mutable_retention.accounted_bytes =
+        native("retained_mutable_bytes", policy.retained_mutable_bytes)?;
+    options.mutable_retention.versions = native(
+        "retained_mutable_versions",
+        policy.retained_mutable_versions,
+    )?;
+    options.mutable_retention.generations = native(
+        "retained_mutable_generations",
+        policy.retained_mutable_generations,
+    )?;
+    options.reclamation.inventory_entries = policy.reclamation_inventory_entries;
+    options.reclamation.metadata_bytes = policy.reclamation_metadata_bytes;
+    options.reclamation.delete_files = policy.reclamation_delete_files;
+    options.reclamation.delete_bytes = policy.reclamation_delete_bytes;
+    options.reclamation.elapsed_ms = policy.reclamation_elapsed_ms;
     Ok(options)
 }
 

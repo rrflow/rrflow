@@ -13,6 +13,14 @@ compaction_input_versions = 4194304
 compaction_output_segments = 256
 compaction_elapsed_ms = 30000
 compaction_l0_segments = 64
+retained_mutable_bytes = 536870912
+retained_mutable_versions = 4194304
+retained_mutable_generations = 64
+reclamation_inventory_entries = 262144
+reclamation_metadata_bytes = 67108864
+reclamation_delete_files = 1024
+reclamation_delete_bytes = 1073741824
+reclamation_elapsed_ms = 30000
 
 [clock]
 maximum_rollback_ms = 0

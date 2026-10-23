@@ -611,6 +611,22 @@ impl ManifestStore {
     }
 
     pub fn load(&self, digest: &str) -> Result<Manifest> {
+        self.load_inner(digest, None)
+    }
+
+    pub(crate) fn load_bounded(
+        &self,
+        digest: &str,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<Manifest> {
+        self.load_inner(digest, Some(budget))
+    }
+
+    fn load_inner(
+        &self,
+        digest: &str,
+        budget: Option<&mut crate::reclamation::ReclamationBudget>,
+    ) -> Result<Manifest> {
         if !is_sha256(digest) {
             return Err(Error::InvalidManifest(
                 "manifest lookup requires a SHA-256 identity".into(),
@@ -628,7 +644,10 @@ impl ManifestStore {
                 "manifest is not a regular non-symlink file".into(),
             ));
         }
-        let bytes = path.read()?;
+        let bytes = match budget {
+            Some(budget) => budget.read_metadata(&path)?,
+            None => path.read()?,
+        };
         let manifest: Manifest = serde_json::from_slice(&bytes)?;
         manifest.validate()?;
         if manifest.digest != digest {
@@ -701,9 +720,31 @@ impl ManifestStore {
     }
 
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {
+        self.checkpoints_inner(None)
+    }
+
+    pub(crate) fn checkpoints_bounded(
+        &self,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<Vec<Checkpoint>> {
+        self.checkpoints_inner(Some(budget))
+    }
+
+    fn checkpoints_inner(
+        &self,
+        mut budget: Option<&mut crate::reclamation::ReclamationBudget>,
+    ) -> Result<Vec<Checkpoint>> {
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let mut checkpoints = Vec::new();
-        for entry in directory.read_dir()? {
+        let mut entries = Vec::new();
+        for entry in directory.entries()? {
+            if let Some(budget) = budget.as_deref_mut() {
+                budget.entry()?;
+            }
+            entries.push(entry?);
+        }
+        entries.sort_by(|left, right| left.relative_path().cmp(right.relative_path()));
+        for entry in entries {
             if entry
                 .relative_path()
                 .extension()
@@ -712,9 +753,16 @@ impl ManifestStore {
             {
                 continue;
             }
-            let checkpoint: Checkpoint = serde_json::from_slice(&entry.read()?)?;
+            let bytes = match budget.as_deref_mut() {
+                Some(budget) => budget.read_metadata(&entry)?,
+                None => entry.read()?,
+            };
+            let checkpoint: Checkpoint = serde_json::from_slice(&bytes)?;
             checkpoint.validate()?;
-            let manifest = self.load(&checkpoint.manifest)?;
+            let manifest = match budget.as_deref_mut() {
+                Some(budget) => self.load_bounded(&checkpoint.manifest, budget)?,
+                None => self.load(&checkpoint.manifest)?,
+            };
             if manifest.generation != checkpoint.generation {
                 return Err(Error::InvalidManifest(format!(
                     "checkpoint {:?} generation differs from its manifest",

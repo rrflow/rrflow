@@ -242,6 +242,14 @@ pub struct StorageLimits {
     pub compaction_output_segments: u64,
     pub compaction_elapsed_ms: u64,
     pub compaction_l0_segments: u64,
+    pub retained_mutable_bytes: u64,
+    pub retained_mutable_versions: u64,
+    pub retained_mutable_generations: u64,
+    pub reclamation_inventory_entries: u64,
+    pub reclamation_metadata_bytes: u64,
+    pub reclamation_delete_files: u64,
+    pub reclamation_delete_bytes: u64,
+    pub reclamation_elapsed_ms: u64,
 }
 
 impl Default for StorageLimits {
@@ -259,6 +267,14 @@ impl Default for StorageLimits {
             compaction_output_segments: 256,
             compaction_elapsed_ms: 30_000,
             compaction_l0_segments: 64,
+            retained_mutable_bytes: 536_870_912,
+            retained_mutable_versions: 4_194_304,
+            retained_mutable_generations: 64,
+            reclamation_inventory_entries: 262_144,
+            reclamation_metadata_bytes: 67_108_864,
+            reclamation_delete_files: 1_024,
+            reclamation_delete_bytes: 1_073_741_824,
+            reclamation_elapsed_ms: 30_000,
         }
     }
 }
@@ -326,6 +342,51 @@ impl StorageLimits {
             self.compaction_l0_segments,
             65_536,
         )?;
+        validate_nonzero_max(
+            "storage retained_mutable_bytes",
+            self.retained_mutable_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage retained_mutable_versions",
+            self.retained_mutable_versions,
+            MAX_VERSIONS,
+        )?;
+        validate_nonzero_max(
+            "storage retained_mutable_generations",
+            self.retained_mutable_generations,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_inventory_entries",
+            self.reclamation_inventory_entries,
+            1 << 24,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_metadata_bytes",
+            self.reclamation_metadata_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_delete_files",
+            self.reclamation_delete_files,
+            1 << 20,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_delete_bytes",
+            self.reclamation_delete_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_elapsed_ms",
+            self.reclamation_elapsed_ms,
+            3_600_000,
+        )?;
+        if self.retained_mutable_bytes < self.mutable_accounted_bytes
+            || self.retained_mutable_versions < self.mutable_versions
+        {
+            return invalid("retained mutable limits must accommodate one full active generation");
+        }
         if self.compaction_l0_segments < 8 {
             return invalid(
                 "storage compaction_l0_segments must accommodate the native L0 trigger of eight",
