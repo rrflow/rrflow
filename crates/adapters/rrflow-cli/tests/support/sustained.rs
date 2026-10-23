@@ -426,6 +426,7 @@ impl PointRun<'_> {
             None
         };
         let mut attempts = Vec::new();
+        let mut failure = ReadbackFailures::default();
         let mut joins = JoinSet::new();
         let mut backup = JoinSet::new();
         let deadline = Duration::from_millis(campaign.schedule.operation_deadline_ms.get());
@@ -438,7 +439,7 @@ impl PointRun<'_> {
                 tokio::select! {
                     biased;
                     result=joins.join_next(), if !joins.is_empty() => {
-                        collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,writer)?;
+                        collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,&mut failure,writer)?;
                     }
                     _=tokio::time::sleep_until(next_sample) => {
                         if resources.len() as u64>=campaign.evidence.samples_per_segment.get() {return Err("resource sample cap exhausted".into());}
@@ -470,28 +471,54 @@ impl PointRun<'_> {
                         at,
                         operation,
                         Err("driver-concurrency-limit".into()),
+                        None,
                         true,
                     ),
                     started,
                     &mut attempts,
                     &mut ledger,
+                    &mut failure,
                     writer,
                 )?;
             } else {
                 let at = scheduled(sequence);
                 joins.spawn(async move {
                     let began = ns(clock);
-                    let result = tokio::time::timeout(deadline, work.execute(&operation))
+                    let expires = tokio::time::Instant::now() + deadline;
+                    let result = tokio::time::timeout_at(expires, work.execute(&operation))
                         .await
                         .map_err(|_| "operation-deadline".to_owned())
                         .and_then(std::convert::identity);
-                    (sequence, at, began, ns(clock), operation, result, false)
+                    // API latency ends at its actual response. Independent oracle
+                    // work stays inside this same admitted client slot/deadline,
+                    // so it cannot pause the next offered segment or grow tasks.
+                    let finished = ns(clock);
+                    let verification = if result.is_ok() {
+                        Some(
+                            tokio::time::timeout_at(expires, work.verify(&operation))
+                                .await
+                                .map_err(|_| "readback-deadline".to_owned())
+                                .and_then(std::convert::identity),
+                        )
+                    } else {
+                        None
+                    };
+                    (
+                        sequence,
+                        at,
+                        began,
+                        finished,
+                        operation,
+                        result,
+                        verification,
+                        false,
+                    )
                 });
             }
         }
         while !joins.is_empty() {
             tokio::select! {
-                result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,writer)?,
+                result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,&mut failure,writer)?,
                 _=tokio::time::sleep_until(next_sample) => {
                     if resources.len() as u64>=campaign.evidence.samples_per_segment.get(){return Err("resource sample cap exhausted".into());}
                     resources.push(self.sample(writer).await?);
@@ -525,65 +552,27 @@ impl PointRun<'_> {
                 }
             }
         }
-        let mut verified = true;
-        let mut failure = ReadbackFailures::default();
+        let verified = failure.count == 0;
         if let Some(observation) = &backup_receipt {
             writer.record_event(&ProgressEvent::Backup {
                 segment: writer.next_index(),
                 observation: observation.clone(),
             })?;
         }
+        // Each working slot appears at most once in this admitted segment.
+        // Only an independently verified response advances its next generation.
         for operation in &prepared {
-            if tokio::time::Instant::now() >= next_sample {
-                if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
-                    return Err("readback resource sample cap exhausted".into());
+            if ledger.readback.iter().any(|observation| {
+                matches!(observation,
+                Readback::Present { logical_id, .. } if logical_id.as_str() == operation.id)
+            }) {
+                if let Some(write) = operation.write {
+                    self.generations[write.slot as usize] = write
+                        .generation
+                        .checked_add(1)
+                        .filter(|n| *n <= MAX_EXACT_INTEGER)
+                        .ok_or("working slot generation overflow")?;
                 }
-                resources.push(self.sample(writer).await?);
-                next_sample = tokio::time::Instant::now()
-                    + Duration::from_millis(campaign.schedule.sample_ms.get());
-            }
-            let before = ledger.readback.len();
-            if let Some(attempt) = attempts
-                .iter()
-                .find(|a| a.logical_id.as_str() == operation.id)
-            {
-                match attempt.outcome {
-                    LoadOutcome::Acknowledged => {
-                        let verification = self.workload.verify(operation).await;
-                        if let Err(error) = verification {
-                            verified = false;
-                            failure.record(&operation.id, &error)?;
-                        } else {
-                            if let Some(write) = operation.write {
-                                self.generations[write.slot as usize] = write
-                                    .generation
-                                    .checked_add(1)
-                                    .filter(|n| *n <= MAX_EXACT_INTEGER)
-                                    .ok_or("working slot generation overflow")?;
-                            }
-                            ledger.readback.push(Readback::Present {
-                                logical_id: attempt.logical_id.clone(),
-                                request_sha256: operation.request_sha256.clone(),
-                                effect_sha256: operation.effect_sha256.clone(),
-                                receipt_sha256: attempt.result_sha256.clone(),
-                                applications: 1u64.try_into().unwrap(),
-                            });
-                        }
-                    }
-                    LoadOutcome::Rejected => ledger.readback.push(Readback::Absent {
-                        logical_id: attempt.logical_id.clone(),
-                    }),
-                    _ => {
-                        verified = false;
-                        failure.record(&operation.id, attempt.result_sha256.as_str())?;
-                    }
-                }
-            }
-            if ledger.readback.len() > before {
-                writer.record_event(&ProgressEvent::Readback {
-                    segment: writer.next_index(),
-                    observation: ledger.readback[before].clone(),
-                })?;
             }
         }
         let offered_end = self.clock + Duration::from_nanos(scheduled(first + count));
@@ -763,13 +752,15 @@ type Completion = (
     u64,
     Prepared,
     DriverResult<workload::Completed>,
+    Option<DriverResult<()>>,
     bool,
 );
 fn collect(
-    (sequence, scheduled_ns, started_ns, finished_ns, operation, result, rejected): Completion,
+    (sequence, scheduled_ns, started_ns, finished_ns, operation, result, verification, rejected): Completion,
     segment_start: u64,
     attempts: &mut Vec<LoadAttempt>,
     ledger: &mut AcknowledgementLedger,
+    failure: &mut ReadbackFailures,
     writer: &CampaignWriter,
 ) -> DriverResult<()> {
     let (outcome, result_sha256, recorded) = match result {
@@ -802,6 +793,29 @@ fn collect(
             },
         ),
     };
+    let readback = match outcome {
+        LoadOutcome::Acknowledged => match verification {
+            Some(Ok(())) => Some(Readback::Present {
+                logical_id: evidence_id(&operation.id),
+                request_sha256: operation.request_sha256.clone(),
+                effect_sha256: operation.effect_sha256.clone(),
+                receipt_sha256: result_sha256.clone(),
+                applications: 1u64.try_into().unwrap(),
+            }),
+            Some(Err(error)) => {
+                failure.record(&operation.id, &error)?;
+                None
+            }
+            None => return Err("acknowledged worker omitted independent verification".into()),
+        },
+        LoadOutcome::Rejected => Some(Readback::Absent {
+            logical_id: evidence_id(&operation.id),
+        }),
+        _ => {
+            failure.record(&operation.id, result_sha256.as_str())?;
+            None
+        }
+    };
     ledger.attempts.push(Attempt {
         attempt_id: evidence_id(format!("attempt-{sequence}")),
         logical_id: evidence_id(&operation.id),
@@ -826,6 +840,13 @@ fn collect(
         segment: writer.next_index(),
         attempt: attempts.last().ok_or("missing completed attempt")?.clone(),
     })?;
+    if let Some(observation) = readback {
+        writer.record_event(&ProgressEvent::Readback {
+            segment: writer.next_index(),
+            observation: observation.clone(),
+        })?;
+        ledger.readback.push(observation);
+    }
     Ok(())
 }
 
