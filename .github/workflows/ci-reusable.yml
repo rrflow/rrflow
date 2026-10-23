@@ -47,10 +47,26 @@ jobs:
         run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
       - name: Test engine rejected-commit recovery and reuse
         run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
         run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
+
       - name: Test overlapping reader checkpoint and reclamation histories
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture
@@ -125,10 +141,26 @@ jobs:
         run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
       - name: Test engine rejected-commit recovery and reuse
         run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
         run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
+
       - name: Test overlapping reader checkpoint and reclamation histories
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture
@@ -283,7 +315,7 @@ jobs:
         if: ${{ matrix.name == 'service-protocol' }}
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test cohesive engine subsystem
-        run: cargo test $PACKAGE_SELECTION --all-targets --locked
+        run: cargo test $PACKAGE_SELECTION --all-targets --locked --no-fail-fast
       - name: Deny cohesive engine subsystem warnings
         run: cargo clippy $PACKAGE_SELECTION --all-targets --locked -- -D warnings
 
@@ -387,7 +419,7 @@ jobs:
           shared-key: linux-feature-${{ matrix.package }}-test-debug0-lld1
           cache-on-failure: false
       - name: Test package optional features
-        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked
+        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked --no-fail-fast
       - name: Deny package optional-feature warnings
         run: cargo clippy -p ${{ matrix.package }} --all-targets --all-features --locked -- -D warnings
 

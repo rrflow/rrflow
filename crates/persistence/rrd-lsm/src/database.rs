@@ -1,10 +1,10 @@
 use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SharedIoContext};
+use crate::mutable::MutableCharge;
 use crate::segment::{
     new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
     ReadView, SharedPageCache,
 };
-use crate::wal::replay_file;
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
 use crate::{
     AppendReceipt, Checkpoint, Durability, Error, Manifest, ManifestStore, Memtable,
@@ -28,10 +28,10 @@ pub const DEFAULT_COMPACTION_MAX_INPUT_SEGMENTS: usize = 16;
 pub const DEFAULT_COMPACTION_TARGET_SEGMENT_BYTES: usize = 8 * 1024 * 1024;
 pub const DEFAULT_MAX_COMPACTION_LEVEL: u8 = 6;
 
-/// Synchronous write-path maintenance limits. Crossing either limit stalls the
-/// next writer while the existing WAL-backed memtable is published. This keeps
-/// recovery work and resident mutable state bounded without acknowledging a
-/// write whose maintenance publication failed.
+/// Synchronous soft write-path maintenance targets. Crossing either target
+/// stalls the next writer while the existing WAL-backed memtable is published.
+/// One batch may exceed a soft target, but must fit the separate hard mutable
+/// limits. Neither policy bounds retained generations or whole-process memory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaintenancePolicy {
     pub wal_payload_max_bytes: usize,
@@ -98,38 +98,73 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Output allocation cap shared by projected streams of this open instance.
+    pub projected_output_bytes: usize,
     pub page_cache_bytes: usize,
     pub page_cache_policy: PageCachePolicy,
     pub segment_io: SegmentIoPolicy,
     pub segment_row_group_budget: SegmentRowGroupBudget,
     pub segment_compression: SegmentCompressionPolicy,
     pub maintenance: MaintenancePolicy,
+    pub mutable_limits: crate::MutableLimits,
+    pub mutable_retention: crate::MutableRetentionLimits,
     pub compaction: CompactionPolicy,
+    pub compaction_limits: crate::CompactionLimits,
+    pub reclamation: crate::ReclamationLimits,
+    pub recovery: crate::RecoveryLimits,
 }
 
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
             page_cache_policy: PageCachePolicy::default(),
             segment_io: SegmentIoPolicy::default(),
             segment_row_group_budget: SegmentRowGroupBudget::default(),
             segment_compression: SegmentCompressionPolicy::default(),
             maintenance: MaintenancePolicy::default(),
+            mutable_limits: crate::MutableLimits::default(),
+            mutable_retention: crate::MutableRetentionLimits::default(),
             compaction: CompactionPolicy::default(),
+            compaction_limits: crate::CompactionLimits::default(),
+            reclamation: crate::ReclamationLimits::default(),
+            recovery: crate::RecoveryLimits::default(),
         }
     }
 }
 
 impl DatabaseOptions {
-    fn validate(self) -> Result<Self> {
+    pub(crate) fn validate(self) -> Result<Self> {
+        if self.projected_output_bytes == 0 {
+            return Err(Error::InvalidConfiguration(
+                "projected output byte capacity must be greater than zero".into(),
+            ));
+        }
         self.page_cache_policy
             .protected_capacity_bytes(self.page_cache_bytes)?;
         self.segment_io.validate()?;
         self.segment_row_group_budget.validate()?;
         self.segment_compression.validate()?;
         self.maintenance.validate()?;
+        self.mutable_limits.validate()?;
+        if self.mutable_retention.accounted_bytes < self.mutable_limits.accounted_bytes
+            || self.mutable_retention.versions < self.mutable_limits.versions
+            || self.mutable_retention.generations == 0
+        {
+            return Err(Error::InvalidConfiguration(
+                "mutable retention must cover active limits and at least one generation".into(),
+            ));
+        }
         self.compaction.validate()?;
+        self.compaction_limits.validate()?;
+        self.reclamation.validate()?;
+        self.recovery.validate()?;
+        if self.compaction_limits.l0_segments < self.compaction.l0_compaction_trigger as u64 {
+            return Err(Error::InvalidConfiguration(
+                "L0 hard capacity is below its compaction trigger".into(),
+            ));
+        }
         Ok(self)
     }
 }
@@ -144,6 +179,7 @@ pub struct MaintenanceStats {
     pub oversized_batches: u64,
     pub peak_wal_payload_bytes: usize,
     pub peak_memtable_versions: usize,
+    pub peak_accounted_memtable_bytes: usize,
     pub automatic_compactions: u64,
     pub failed_compactions: u64,
     pub compaction_input_bytes: u64,
@@ -197,6 +233,10 @@ pub struct GarbageCollectionReport {
     pub removed_manifests: Vec<String>,
     pub removed_segments: Vec<String>,
     pub removed_wals: Vec<String>,
+    pub examined_entries: u64,
+    pub metadata_bytes: u64,
+    pub removed_bytes: u64,
+    pub has_more: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -292,7 +332,8 @@ pub struct Database {
     manifests: ManifestStore,
     manifest: Manifest,
     wal: WalWriter,
-    memtable: Arc<Memtable>,
+    memtable: Arc<crate::mutable_memory::MutableGeneration>,
+    mutable_memory: crate::MutableMemory,
     segments: Vec<Arc<Segment>>,
     page_cache: SharedPageCache,
     segment_io: SharedIoContext,
@@ -300,12 +341,17 @@ pub struct Database {
     segment_row_group_budget: SegmentRowGroupBudget,
     segment_compression: SegmentCompressionPolicy,
     maintenance: MaintenancePolicy,
+    mutable_limits: crate::MutableLimits,
     compaction: CompactionPolicy,
+    compaction_limits: crate::CompactionLimits,
+    reclamation: crate::ReclamationLimits,
+    reclamation_pending: bool,
     maintenance_stats: MaintenanceStats,
     wal_payload_bytes: usize,
     writer_requires_reopen: Option<&'static str>,
     transaction_snapshots: Arc<crate::transaction::TransactionSnapshots>,
     active_read_views: Arc<std::sync::Mutex<ActiveReadViews>>,
+    projected_output: crate::ProjectedOutputMemory,
     write_path_diagnostics: Option<WritePathCollector>,
 }
 
@@ -387,12 +433,14 @@ impl Database {
         let manifest = new_manifest(1, None, 0, 0, 1, Vec::new(), application_format)?;
         let wal = WalWriter::create_at_anchored(&wal_path(&root, 1), 1)?;
         manifests.publish(&manifest, None)?;
+        let mutable_memory = crate::MutableMemory::new(options.mutable_retention);
         Ok(Self {
             root: root.to_owned(),
             manifests,
             manifest,
             wal,
-            memtable: Arc::new(Memtable::default()),
+            memtable: mutable_memory.empty(0),
+            mutable_memory,
             segments: Vec::new(),
             page_cache: new_page_cache_with_policy(
                 options.page_cache_bytes,
@@ -403,12 +451,17 @@ impl Database {
             segment_row_group_budget: options.segment_row_group_budget,
             segment_compression: options.segment_compression,
             maintenance: options.maintenance,
+            mutable_limits: options.mutable_limits,
             compaction: options.compaction,
+            compaction_limits: options.compaction_limits,
+            reclamation: options.reclamation,
+            reclamation_pending: true,
             maintenance_stats: MaintenanceStats::default(),
             wal_payload_bytes: 0,
             writer_requires_reopen: None,
             transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
     }
@@ -436,24 +489,28 @@ impl Database {
         let total_started = Instant::now();
         validate_existing_database_layout(&root)?;
         let options = options.validate()?;
+        let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
         let manifests = ManifestStore::open_existing_anchored(&root)?;
         let (_, manifest) = manifests
-            .current()?
+            .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
         let page_cache =
             new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
-        let segment_bytes = manifest
-            .segments
-            .iter()
-            .map(|segment| segment.bytes)
-            .sum::<u64>();
+        let mut segment_bytes = 0u64;
+        for segment in &manifest.segments {
+            recovery_budget.file(segment.bytes)?;
+            segment_bytes = segment_bytes.checked_add(segment.bytes).ok_or_else(|| {
+                Error::InvalidManifest("recovery segment byte count overflow".into())
+            })?;
+        }
         let segments_started = Instant::now();
         let mut segments = Vec::with_capacity(manifest.segments.len());
         let mut segment_open_evidence = SegmentOpenEvidence::default();
         for expected in &manifest.segments {
+            recovery_budget.tick()?;
             let segment_path = root
                 .join(SEGMENT_DIRECTORY)
                 .join(format!("{}.seg", expected.id));
@@ -479,14 +536,19 @@ impl Database {
         let mut memtable = Memtable::at_sequence(manifest.durable_sequence);
         let wal_started = Instant::now();
         let mut wal_file = OpenOptions::new().read(true).write(true).open(&path)?;
-        let recovery = replay_file(&mut wal_file, manifest.wal_start_sequence, |batch| {
-            #[cfg(all(feature = "crash-test", not(test)))]
-            crate::crash_test::boundary(
-                crate::crash_test::Point::RecoveryRead,
-                root.diagnostic_path(),
-            );
-            memtable.apply_owned_recovered(batch)
-        })?;
+        let recovery = crate::wal::replay_file_bounded(
+            &mut wal_file,
+            manifest.wal_start_sequence,
+            &mut recovery_budget,
+            |batch| {
+                #[cfg(all(feature = "crash-test", not(test)))]
+                crate::crash_test::boundary(
+                    crate::crash_test::Point::RecoveryRead,
+                    root.diagnostic_path(),
+                );
+                memtable.apply_owned_recovered(batch, options.mutable_limits)
+            },
+        )?;
         if let Some(offset) = recovery.torn_tail {
             return Err(Error::TornTail { offset });
         }
@@ -495,6 +557,7 @@ impl Database {
         let maintenance_stats = MaintenanceStats {
             peak_wal_payload_bytes: wal_payload_bytes,
             peak_memtable_versions: memtable.version_count(),
+            peak_accounted_memtable_bytes: memtable.approximate_bytes(),
             ..MaintenanceStats::default()
         };
         let wal = WalWriter::from_recovered_file(&path, wal_file, recovery)?;
@@ -521,12 +584,14 @@ impl Database {
             total_ms = total_started.elapsed().as_millis() as u64,
             "rrflowKV LSM open phases completed"
         );
+        let mutable_memory = crate::MutableMemory::new(options.mutable_retention);
         Ok(Self {
             root: root.to_owned(),
             manifests,
             manifest,
             wal,
-            memtable: Arc::new(memtable),
+            memtable: Arc::new(mutable_memory.wrap(memtable)?),
+            mutable_memory,
             segments: segments.into_iter().map(Arc::new).collect(),
             page_cache,
             segment_io,
@@ -534,12 +599,17 @@ impl Database {
             segment_row_group_budget: options.segment_row_group_budget,
             segment_compression: options.segment_compression,
             maintenance: options.maintenance,
+            mutable_limits: options.mutable_limits,
             compaction: options.compaction,
+            compaction_limits: options.compaction_limits,
+            reclamation: options.reclamation,
+            reclamation_pending: true,
             maintenance_stats,
             wal_payload_bytes,
             writer_requires_reopen: None,
             transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
     }
@@ -560,6 +630,14 @@ impl Database {
         Snapshot {
             sequence: self.memtable.maximum_sequence(),
         }
+    }
+
+    pub fn mutable_memory(&self) -> crate::MutableMemory {
+        self.mutable_memory.clone()
+    }
+
+    pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {
+        self.projected_output.clone()
     }
 
     /// Captures one immutable logical/physical read view and returns a bounded
@@ -629,6 +707,7 @@ impl Database {
             request.budget,
             cache_access,
             lease,
+            self.projected_output.clone(),
         ))
     }
 
@@ -820,8 +899,11 @@ impl Database {
         failure: Option<(WriteBoundary, FailureMode)>,
     ) -> Result<AppendReceipt> {
         self.ensure_writer_ready()?;
+        let charge = MutableCharge::batch(batch)?;
+        self.mutable_limits.check(charge)?;
         let payload = batch.encode()?;
-        self.prepare_write(batch, payload.len())?;
+        self.prepare_write(batch, payload.len(), charge)?;
+        let prepared_mutable = self.mutable_memory.prepare(&self.memtable, charge)?;
         inject_write_failure(failure, WriteBoundary::Prepared)?;
         let append_durability = append_durability(durability, failure);
         let receipt = self
@@ -829,11 +911,21 @@ impl Database {
             .append_encoded_write_batch(batch, &payload, append_durability)?;
         self.inject_post_append_failure(failure)?;
         self.inject_post_wal_failure(failure, &receipt)?;
-        Arc::make_mut(&mut self.memtable).apply_write_batch(
-            batch,
-            receipt.first_sequence,
-            receipt.last_sequence,
-        )?;
+        if prepared_mutable
+            .apply(
+                &mut self.memtable,
+                batch,
+                receipt.first_sequence,
+                receipt.last_sequence,
+            )
+            .is_err()
+        {
+            // WAL may already be durable. Never report this as an absent write.
+            self.writer_requires_reopen = Some("mutable-publication");
+            return Err(Error::RecoveryRequired {
+                boundary: "mutable-publication",
+            });
+        }
         self.wal_payload_bytes = self.wal_payload_bytes.saturating_add(payload.len());
         self.record_memtable_peak();
         self.inject_post_visibility_failure(failure)?;
@@ -883,6 +975,8 @@ impl Database {
         mut diagnostics: Option<PendingWriteDiagnostics>,
     ) -> Result<AppendReceipt> {
         self.ensure_writer_ready()?;
+        let charge = MutableCharge::batch(&batch)?;
+        self.mutable_limits.check(charge)?;
         let mutation_count = batch.len();
         let encode_started = diagnostics.is_some().then(PhaseClock::start);
         let payload = batch.encode()?;
@@ -895,7 +989,7 @@ impl Database {
         }
         let payload_bytes = payload.len();
         let maintenance_started = diagnostics.is_some().then(PhaseClock::start);
-        self.prepare_write(&batch, payload.len())?;
+        self.prepare_write(&batch, payload.len(), charge)?;
         if let Some(started) = maintenance_started {
             diagnostics
                 .as_mut()
@@ -903,6 +997,7 @@ impl Database {
                 .phases
                 .maintenance = started.finish();
         }
+        let prepared_mutable = self.mutable_memory.prepare(&self.memtable, charge)?;
         inject_write_failure(failure, WriteBoundary::Prepared)?;
         let append_durability = append_durability(durability, failure);
         let receipt = if let Some(diagnostics) = diagnostics.as_mut() {
@@ -923,11 +1018,21 @@ impl Database {
         self.inject_post_append_failure(failure)?;
         self.inject_post_wal_failure(failure, &receipt)?;
         let apply_started = diagnostics.is_some().then(PhaseClock::start);
-        Arc::make_mut(&mut self.memtable).apply_owned_write_batch(
-            batch,
-            receipt.first_sequence,
-            receipt.last_sequence,
-        )?;
+        if prepared_mutable
+            .apply_owned(
+                &mut self.memtable,
+                batch,
+                receipt.first_sequence,
+                receipt.last_sequence,
+            )
+            .is_err()
+        {
+            // WAL may already be durable. Never report this as an absent write.
+            self.writer_requires_reopen = Some("mutable-publication");
+            return Err(Error::RecoveryRequired {
+                boundary: "mutable-publication",
+            });
+        }
         if let Some(started) = apply_started {
             diagnostics
                 .as_mut()
@@ -1027,13 +1132,22 @@ impl Database {
         }
     }
 
-    fn prepare_write(&mut self, batch: &WriteBatch, payload_bytes: usize) -> Result<()> {
+    fn prepare_write(
+        &mut self,
+        batch: &WriteBatch,
+        payload_bytes: usize,
+        charge: MutableCharge,
+    ) -> Result<()> {
+        self.reclaim_if_pending()?;
         let projected_bytes = self.wal_payload_bytes.saturating_add(payload_bytes);
         let projected_versions = self.memtable.version_count().saturating_add(batch.len());
         let active = self.memtable.version_count() != 0;
         if active
             && (projected_bytes > self.maintenance.wal_payload_max_bytes
-                || projected_versions > self.maintenance.memtable_max_versions)
+                || projected_versions > self.maintenance.memtable_max_versions
+                || self
+                    .mutable_limits
+                    .needs_flush(self.memtable.charge(), charge))
         {
             self.maintenance_stats.write_stalls =
                 self.maintenance_stats.write_stalls.saturating_add(1);
@@ -1076,6 +1190,26 @@ impl Database {
                 }
             }
         }
+        let l0_segments = self
+            .segments
+            .iter()
+            .filter(|segment| segment.descriptor.level == 0)
+            .count() as u64;
+        if l0_segments >= self.compaction_limits.l0_segments {
+            self.compact_if_needed(self.manifest.created_at)?;
+            let remaining = self
+                .segments
+                .iter()
+                .filter(|segment| segment.descriptor.level == 0)
+                .count() as u64;
+            self.compaction_limits.check(
+                crate::MaintenanceResource::L0Segments,
+                remaining.saturating_add(1),
+            )?;
+        }
+        self.reclaim_if_pending()?;
+        self.mutable_limits
+            .check(self.memtable.charge().checked_add(charge)?)?;
         if payload_bytes > self.maintenance.wal_payload_max_bytes
             || batch.len() > self.maintenance.memtable_max_versions
         {
@@ -1086,6 +1220,10 @@ impl Database {
     }
 
     fn record_memtable_peak(&mut self) {
+        self.maintenance_stats.peak_accounted_memtable_bytes = self
+            .maintenance_stats
+            .peak_accounted_memtable_bytes
+            .max(self.memtable.approximate_bytes());
         self.maintenance_stats.peak_wal_payload_bytes = self
             .maintenance_stats
             .peak_wal_payload_bytes
@@ -1130,6 +1268,15 @@ impl Database {
             self.wal.sync()?;
             return Ok(None);
         }
+        let l0_segments = self
+            .segments
+            .iter()
+            .filter(|segment| segment.descriptor.level == 0)
+            .count() as u64;
+        self.compaction_limits.check(
+            crate::MaintenanceResource::L0Segments,
+            l0_segments.saturating_add(1),
+        )?;
         let sequence = self.wal.sync()?;
         inject_failure(failure, FlushBoundary::WalSynced)?;
         let (segment, _) = Segment::write_from_memtable_with_cache(
@@ -1167,10 +1314,11 @@ impl Database {
         )?;
         self.manifests.publish(&next, Some(&self.manifest.digest))?;
         self.wal = successor;
-        self.memtable = Arc::new(Memtable::at_sequence(sequence));
+        self.memtable = self.mutable_memory.empty(sequence);
         self.wal_payload_bytes = 0;
         self.segments.push(Arc::new(segment));
         self.manifest = next.clone();
+        self.reclamation_pending = true;
         inject_failure(failure, FlushBoundary::ManifestPublished)?;
         Ok(Some(next))
     }
@@ -1352,10 +1500,11 @@ impl Database {
         )?;
         self.manifests.publish(&manifest, Some(&previous))?;
         self.wal = successor;
-        self.memtable = Arc::new(Memtable::at_sequence(source_sequence));
+        self.memtable = self.mutable_memory.empty(source_sequence);
         self.wal_payload_bytes = 0;
         self.segments = imported;
         self.manifest = manifest.clone();
+        self.reclamation_pending = true;
         inject_snapshot_install_failure(failure, SnapshotInstallBoundary::ManifestPublished)?;
         Ok(manifest)
     }
@@ -1437,10 +1586,11 @@ impl Database {
         )?;
         self.manifests.publish(&manifest, Some(&previous))?;
         self.wal = successor;
-        self.memtable = Arc::new(Memtable::at_sequence(source_sequence));
+        self.memtable = self.mutable_memory.empty(source_sequence);
         self.wal_payload_bytes = 0;
         self.segments = imported;
         self.manifest = manifest.clone();
+        self.reclamation_pending = true;
         inject_snapshot_install_failure(failure, SnapshotInstallBoundary::ManifestPublished)?;
         Ok(manifest)
     }
@@ -1449,8 +1599,8 @@ impl Database {
     /// exactly the versions observable at `protected` snapshots and at the
     /// current durable head. Input selection is bounded and records are merged
     /// through forward-only segment cursors. Output is partitioned at key
-    /// boundaries, so the working set is bounded by the configured target plus
-    /// one key's complete MVCC history.
+    /// boundaries. Hard input byte/version limits include every version of a
+    /// hot key before decoding; the output target alone is not a hard bound.
     ///
     /// Named checkpoints keep their original manifests and segments and are
     /// handled independently by garbage collection.
@@ -1478,7 +1628,6 @@ impl Database {
     /// cannot act as a lifetime-tracked reclamation lease. Explicit compaction
     /// supplies the precise protected snapshot set and may prune history.
     pub fn compact_if_needed(&mut self, at: u64) -> Result<Option<CompactionOutcome>> {
-        self.flush_memtable_inner(at, None)?;
         self.compact_inner(&[], at, None, false, true)
     }
 
@@ -1491,9 +1640,32 @@ impl Database {
         retain_all_versions: bool,
     ) -> Result<Option<CompactionOutcome>> {
         self.flush_memtable_inner(at, None)?;
+        let started = Instant::now();
         let Some(candidate) = self.select_compaction_candidate(force) else {
             return Ok(None);
         };
+        let mut logical_bytes = 0u64;
+        let mut versions = 0u64;
+        let mut physical_bytes = 0u64;
+        for index in &candidate.indices {
+            let segment = &self.segments[*index];
+            physical_bytes = physical_bytes
+                .checked_add(segment.descriptor.bytes)
+                .ok_or_else(|| Error::InvalidSegment("compaction physical byte overflow".into()))?;
+            logical_bytes = logical_bytes
+                .checked_add(segment.compaction_logical_bytes()?)
+                .ok_or_else(|| Error::InvalidSegment("compaction logical byte overflow".into()))?;
+            versions = versions
+                .checked_add(segment.descriptor.entries)
+                .ok_or_else(|| Error::InvalidSegment("compaction version count overflow".into()))?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputBytes, physical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputLogicalBytes, logical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputVersions, versions)?;
+            self.compaction_limits.check_elapsed(started)?;
+        }
         let durable = self.manifest.durable_sequence;
         let mut protected_sequences = protected
             .iter()
@@ -1504,16 +1676,13 @@ impl Database {
         protected_sequences.insert(durable);
         let previous_manifest = self.manifest.digest.clone();
         let input_segments = candidate.indices.len();
-        let input_bytes = candidate.indices.iter().try_fold(0u64, |total, index| {
-            total
-                .checked_add(self.segments[*index].descriptor.bytes)
-                .ok_or_else(|| Error::InvalidSegment("compaction input bytes overflow".into()))
-        })?;
+        let input_bytes = physical_bytes;
         let merge = self.merge_compaction_candidate(
             &candidate,
             durable,
             &protected_sequences,
             retain_all_versions,
+            started,
         )?;
         let CompactionMerge {
             segments: compacted_segments,
@@ -1523,6 +1692,7 @@ impl Database {
             output_bytes,
             peak_buffer_bytes,
         } = merge;
+        self.compaction_limits.check_elapsed(started)?;
         inject_compaction_failure(failure, CompactionBoundary::SegmentSynced)?;
         let selected = candidate.indices.iter().copied().collect::<BTreeSet<_>>();
         let mut descriptors = self
@@ -1549,6 +1719,7 @@ impl Database {
             descriptors,
             self.manifest.application_format,
         )?;
+        self.compaction_limits.check_elapsed(started)?;
         self.manifests
             .publish(&next, Some(previous_manifest.as_str()))?;
         let mut retained_segments = std::mem::take(&mut self.segments)
@@ -1559,6 +1730,7 @@ impl Database {
         retained_segments.extend(compacted_segments.into_iter().map(Arc::new));
         self.segments = retained_segments;
         self.manifest = next.clone();
+        self.reclamation_pending = true;
         inject_compaction_failure(failure, CompactionBoundary::ManifestPublished)?;
         Ok(Some(CompactionOutcome {
             previous_manifest,
@@ -1713,6 +1885,7 @@ impl Database {
         durable: u64,
         protected_sequences: &BTreeSet<u64>,
         retain_all_versions: bool,
+        started: Instant,
     ) -> Result<CompactionMerge> {
         let selected = candidate.indices.iter().copied().collect::<BTreeSet<_>>();
         let mut cursors = candidate
@@ -1738,9 +1911,11 @@ impl Database {
             .min()
             .map(<[u8]>::to_vec)
         {
+            self.compaction_limits.check_elapsed(started)?;
             let mut versions = BTreeMap::<u64, Option<Box<[u8]>>>::new();
             for (cursor, record) in cursors.iter_mut().zip(current.iter_mut()) {
                 while record.as_ref().is_some_and(|record| record.key == key) {
+                    self.compaction_limits.check_elapsed(started)?;
                     let observed = record.take().expect("record was checked");
                     match versions.get(&observed.version.sequence) {
                         Some(existing) if existing != &observed.version.value => {
@@ -1764,24 +1939,19 @@ impl Database {
                     .map(|(sequence, value)| VersionedValue { sequence, value })
                     .collect::<Vec<_>>()
             } else {
-                protected_sequences
+                let retained_sequences = protected_sequences
                     .iter()
                     .filter_map(|sequence| {
                         versions
                             .range(..=*sequence)
                             .next_back()
-                            .map(|(sequence, value)| {
-                                (
-                                    *sequence,
-                                    VersionedValue {
-                                        sequence: *sequence,
-                                        value: value.clone(),
-                                    },
-                                )
-                            })
+                            .map(|(sequence, _)| *sequence)
                     })
-                    .collect::<BTreeMap<_, _>>()
-                    .into_values()
+                    .collect::<BTreeSet<_>>();
+                versions
+                    .into_iter()
+                    .filter(|(sequence, _)| retained_sequences.contains(sequence))
+                    .map(|(sequence, value)| VersionedValue { sequence, value })
                     .collect::<Vec<_>>()
             };
             let tombstone_only = retained.iter().all(|version| version.value.is_none());
@@ -1799,6 +1969,11 @@ impl Database {
             if !buffered.is_empty()
                 && buffered_bytes.saturating_add(group_bytes) > self.compaction.target_segment_bytes
             {
+                self.compaction_limits.check_elapsed(started)?;
+                self.compaction_limits.check(
+                    crate::MaintenanceResource::OutputSegments,
+                    compacted_segments.len() as u64 + 1,
+                )?;
                 let segment = self.write_compaction_partition(
                     std::mem::take(&mut buffered),
                     durable,
@@ -1814,6 +1989,11 @@ impl Database {
             buffered.insert(key, retained);
         }
         if !buffered.is_empty() {
+            self.compaction_limits.check_elapsed(started)?;
+            self.compaction_limits.check(
+                crate::MaintenanceResource::OutputSegments,
+                compacted_segments.len() as u64 + 1,
+            )?;
             let segment =
                 self.write_compaction_partition(buffered, durable, candidate.target_level)?;
             output_bytes = output_bytes.saturating_add(segment.descriptor.bytes);
@@ -1848,54 +2028,119 @@ impl Database {
         Ok(segment)
     }
 
-    /// Removes physical objects unreachable from `CURRENT` or a named
-    /// checkpoint. The inventory is fully validated before the first delete.
+    fn reclaim_if_pending(&mut self) -> Result<()> {
+        if self.reclamation_pending {
+            let report = self.garbage_collect()?;
+            self.reclamation_pending = report.has_more;
+            if report.has_more {
+                // Finish finite cleanup across retries before creating more debt.
+                return Err(Error::ReclamationPending);
+            }
+        }
+        Ok(())
+    }
+
+    /// Reclaims a bounded prefix only after validating the complete admitted
+    /// current/view/checkpoint reachability closure and candidate inventory.
     pub fn garbage_collect(&self) -> Result<GarbageCollectionReport> {
         self.ensure_writer_ready()?;
-        let mut manifests = BTreeMap::new();
-        manifests.insert(self.manifest.digest.clone(), self.manifest.clone());
-        for manifest in ActiveReadViews::manifests(&self.active_read_views)? {
-            manifests.entry(manifest.digest.clone()).or_insert(manifest);
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.reclamation);
+        let mut retained_manifests = BTreeSet::new();
+        let mut retained_segments = BTreeMap::new();
+        let mut retained_wals = BTreeSet::new();
+        retain_manifest(
+            &self.manifest,
+            &mut retained_manifests,
+            &mut retained_segments,
+            &mut retained_wals,
+            &mut budget,
+        )?;
+        ActiveReadViews::visit_manifests(&self.active_read_views, |manifest| {
+            retain_manifest(
+                manifest,
+                &mut retained_manifests,
+                &mut retained_segments,
+                &mut retained_wals,
+                &mut budget,
+            )
+        })?;
+        for checkpoint in self.manifests.checkpoints_bounded(&mut budget)? {
+            if !retained_manifests.contains(&checkpoint.manifest) {
+                let manifest = self
+                    .manifests
+                    .load_bounded(&checkpoint.manifest, &mut budget)?;
+                retain_manifest(
+                    &manifest,
+                    &mut retained_manifests,
+                    &mut retained_segments,
+                    &mut retained_wals,
+                    &mut budget,
+                )?;
+            }
         }
-        for checkpoint in self.manifests.checkpoints()? {
-            manifests
-                .entry(checkpoint.manifest.clone())
-                .or_insert(self.manifests.load(&checkpoint.manifest)?);
-        }
-        let retained_manifests = manifests.keys().cloned().collect::<BTreeSet<_>>();
-        let retained_segments = manifests
-            .values()
-            .flat_map(|manifest| manifest.segments.iter().map(|segment| segment.id.clone()))
-            .collect::<BTreeSet<_>>();
-        let retained_wals = manifests
-            .values()
-            .map(|manifest| format!("{:020}.wal", manifest.wal_start_sequence))
-            .collect::<BTreeSet<_>>();
-
         let manifest_directory = self.root.join("manifests");
         let segment_directory = self.root.join(SEGMENT_DIRECTORY);
         let wal_directory = self.root.join(WAL_DIRECTORY);
+        // A missing protected object is damage, not permission to clean up the
+        // remaining evidence. Validate references before the first delete.
+        for identity in &retained_manifests {
+            self.manifests.load_bounded(identity, &mut budget)?;
+        }
+        for (identity, bytes) in &retained_segments {
+            budget.entry()?;
+            let metadata = segment_directory
+                .join(format!("{identity}.seg"))
+                .metadata()?;
+            if !metadata.is_file() || metadata.len() != *bytes {
+                return Err(Error::InvalidManifest("protected reclamation segment is missing, non-regular or has a different length".into()));
+            }
+        }
+        for name in &retained_wals {
+            budget.entry()?;
+            if !wal_directory.join(name).metadata()?.is_file() {
+                return Err(Error::InvalidManifest(
+                    "protected reclamation WAL is not a regular file".into(),
+                ));
+            }
+        }
+        let segment_ids = retained_segments.into_keys().collect::<BTreeSet<_>>();
+        let manifest_candidates = unreachable_files(
+            &manifest_directory,
+            "json",
+            &retained_manifests,
+            &mut budget,
+        )?;
+        let segment_candidates =
+            unreachable_files(&segment_directory, "seg", &segment_ids, &mut budget)?;
+        let wal_candidates = unreachable_files(&wal_directory, "wal", &retained_wals, &mut budget)?;
+        budget.tick()?;
         let mut report = GarbageCollectionReport {
-            retained_manifests: retained_manifests.iter().cloned().collect(),
-            retained_segments: retained_segments.iter().cloned().collect(),
-            retained_wals: retained_wals.iter().cloned().collect(),
+            retained_manifests: retained_manifests.into_iter().collect(),
+            retained_segments: segment_ids.into_iter().collect(),
+            retained_wals: retained_wals.into_iter().collect(),
             ..GarbageCollectionReport::default()
         };
-        let manifest_candidates =
-            unreachable_files(&manifest_directory, "json", &retained_manifests)?;
-        let segment_candidates = unreachable_files(&segment_directory, "seg", &retained_segments)?;
-        let wal_candidates = unreachable_files(&wal_directory, "wal", &retained_wals)?;
-        remove_candidates(
+        report.has_more |= remove_candidates(
             &manifest_directory,
             manifest_candidates,
             &mut report.removed_manifests,
+            &mut budget,
         )?;
-        remove_candidates(
+        report.has_more |= remove_candidates(
             &segment_directory,
             segment_candidates,
             &mut report.removed_segments,
+            &mut budget,
         )?;
-        remove_candidates(&wal_directory, wal_candidates, &mut report.removed_wals)?;
+        report.has_more |= remove_candidates(
+            &wal_directory,
+            wal_candidates,
+            &mut report.removed_wals,
+            &mut budget,
+        )?;
+        report.examined_entries = budget.entries;
+        report.metadata_bytes = budget.metadata_bytes;
+        report.removed_bytes = budget.deleted_bytes;
         Ok(report)
     }
 
@@ -2080,6 +2325,10 @@ impl Database {
 
     pub fn memtable(&self) -> &Memtable {
         &self.memtable
+    }
+
+    pub fn mutable_limits(&self) -> crate::MutableLimits {
+        self.mutable_limits
     }
 
     pub fn maintenance_policy(&self) -> MaintenancePolicy {
@@ -2314,14 +2563,46 @@ fn inject_compaction_failure(
     Ok(())
 }
 
+fn retain_manifest(
+    manifest: &Manifest,
+    manifests: &mut BTreeSet<String>,
+    segments: &mut BTreeMap<String, u64>,
+    wals: &mut BTreeSet<String>,
+    budget: &mut crate::reclamation::ReclamationBudget,
+) -> Result<()> {
+    budget.entry()?;
+    if manifests.contains(&manifest.digest) {
+        return Ok(());
+    }
+    budget.charge_entries(manifest.segments.len() as u64)?;
+    manifest.validate()?;
+    manifests.insert(manifest.digest.clone());
+    wals.insert(format!("{:020}.wal", manifest.wal_start_sequence));
+    for segment in &manifest.segments {
+        budget.tick()?;
+        if let Some(previous) = segments.insert(segment.id.clone(), segment.bytes) {
+            if previous != segment.bytes {
+                return Err(Error::InvalidManifest(
+                    "protected manifests disagree about segment length".into(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn unreachable_files(
     directory: &AnchoredPath,
     extension: &str,
     retained: &BTreeSet<String>,
-) -> Result<Vec<(AnchoredPath, String)>> {
+    budget: &mut crate::reclamation::ReclamationBudget,
+) -> Result<Vec<(AnchoredPath, String, u64)>> {
     let mut candidates = Vec::new();
-    for entry in directory.read_dir()? {
-        if !entry.metadata()?.is_file()
+    for entry in directory.entries()? {
+        budget.entry()?;
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        if !metadata.is_file()
             || entry
                 .relative_path()
                 .extension()
@@ -2340,15 +2621,13 @@ fn unreachable_files(
             .relative_path()
             .file_stem()
             .and_then(|value| value.to_str())
-            .ok_or_else(|| Error::InvalidManifest("non-UTF-8 storage object name".into()))?
-            .to_owned();
-        let retained_identity = if extension == "wal" {
-            retained.contains(&file_name)
+            .ok_or_else(|| Error::InvalidManifest("non-UTF-8 storage object name".into()))?;
+        if !retained.contains(if extension == "wal" {
+            file_name.as_str()
         } else {
-            retained.contains(&identity)
-        };
-        if !retained_identity {
-            candidates.push((entry, file_name));
+            identity
+        }) {
+            candidates.push((entry, file_name, metadata.len()));
         }
     }
     candidates.sort_by(|left, right| left.1.cmp(&right.1));
@@ -2357,15 +2636,34 @@ fn unreachable_files(
 
 fn remove_candidates(
     directory: &AnchoredPath,
-    candidates: Vec<(AnchoredPath, String)>,
+    candidates: Vec<(AnchoredPath, String, u64)>,
     removed: &mut Vec<String>,
-) -> Result<()> {
-    for (path, file_name) in candidates {
-        path.remove_file()?;
-        removed.push(file_name);
+    budget: &mut crate::reclamation::ReclamationBudget,
+) -> Result<bool> {
+    let result = (|| {
+        for (path, file_name, bytes) in candidates {
+            if !budget.admit_delete(bytes)? {
+                return Ok(true);
+            }
+            path.remove_file()?;
+            removed.push(file_name);
+        }
+        Ok(false)
+    })();
+    // Even a partial or failed deletion cycle synchronizes completed removals.
+    let sync = if removed.is_empty() {
+        Ok(())
+    } else {
+        directory.sync_directory().map_err(Error::Io)
+    };
+    match result {
+        Err(error) => {
+            let _ = sync;
+            Err(error)
+        }
+        Ok(more) => {
+            sync?;
+            Ok(more)
+        }
     }
-    if !removed.is_empty() {
-        directory.sync_directory()?;
-    }
-    Ok(())
 }

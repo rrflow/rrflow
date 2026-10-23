@@ -19,8 +19,8 @@
     "versions"
   ],
   "identity": {
-    "instance": "instance-56c5f218cd3b36c14014abec",
-    "estate": "estate-56c5f218cd3b36c14014abec",
+    "instance": "instance-bf7f090ab80a7ef308ac8aad",
+    "estate": "estate-bf7f090ab80a7ef308ac8aad",
     "principal": "sdk-conformance",
     "api_key": "sdk-conformance-key"
   },
@@ -106,7 +106,7 @@
     }
   },
   "query": {
-    "scope": "instance:instance-56c5f218cd3b36c14014abec",
+    "scope": "instance:instance-bf7f090ab80a7ef308ac8aad",
     "query": "FROM record:document AT VALID 100 KNOWN HEAD WHERE id = \"sdk-conformance\" PROJECT id, title EXPLAIN CONTRACT",
     "parameters": {},
     "budget": {
@@ -121,7 +121,7 @@
   },
   "vector": {
     "ensure": {
-      "scope": "instance:instance-56c5f218cd3b36c14014abec",
+      "scope": "instance:instance-bf7f090ab80a7ef308ac8aad",
       "collection_id": "documents",
       "vectors": [
         {
@@ -135,7 +135,7 @@
       ]
     },
     "search": {
-      "scope": "instance:instance-56c5f218cd3b36c14014abec",
+      "scope": "instance:instance-bf7f090ab80a7ef308ac8aad",
       "valid_at": 100,
       "collection_id": "documents",
       "vector_name": "title",
@@ -155,7 +155,7 @@
   },
   "changefeed": {
     "read": {
-      "scope": "instance:instance-56c5f218cd3b36c14014abec",
+      "scope": "instance:instance-bf7f090ab80a7ef308ac8aad",
       "after_cursor": 0,
       "limit": 128
     },

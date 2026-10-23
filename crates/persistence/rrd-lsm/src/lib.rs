@@ -21,8 +21,13 @@ mod error;
 pub mod filesystem;
 mod inspection;
 mod io;
+mod maintenance_limits;
 mod manifest;
 mod memtable;
+mod mutable;
+mod mutable_memory;
+mod reclamation;
+mod recovery_budget;
 mod segment;
 mod snapshot_bundle;
 mod transaction;
@@ -55,10 +60,15 @@ pub use database::{
 pub use error::{Error, Result};
 pub use inspection::{DatabaseInspection, InspectionFile, ReadOnlyDatabase};
 pub use io::{SegmentIoMode, SegmentIoPolicy, SegmentIoStats, DEFAULT_SEGMENT_IO_REQUEST_BYTES};
+pub use maintenance_limits::{CompactionLimits, MaintenanceResource};
 pub use manifest::{
     Checkpoint, CurrentPointer, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION,
 };
 pub use memtable::{Memtable, MemtableProfile, VersionedValue};
+pub use mutable::{MutableLimits, MutableResource};
+pub use mutable_memory::{MutableMemory, MutableMemoryStats, MutableRetentionLimits};
+pub use reclamation::{ReclamationLimits, ReclamationResource};
+pub use recovery_budget::{RecoveryLimits, RecoveryResource};
 #[cfg(feature = "physical-policy-lab")]
 pub use segment::{
     run_physical_policy_trial, CachePolicyObservation, CandidateDecision, CodecObservation,
@@ -67,18 +77,19 @@ pub use segment::{
     PHYSICAL_POLICY_EVIDENCE_VERSION,
 };
 pub use segment::{
-    PageCachePolicy, PageCacheStats, ProjectedReadBatch, ProjectedReadBudget,
-    ProjectedReadEvidence, ProjectedReadOutcome, ProjectedReadProjection, ProjectedReadRange,
-    ProjectedReadRequest, ProjectedReadResource, ProjectedReadStream, Segment,
-    SegmentCompressionPolicy, SegmentOpenEvidence, SegmentRowGroupBudget, COMPRESSION_BASIS_POINTS,
+    PageCachePolicy, PageCacheStats, ProjectedOutputMemory, ProjectedOutputStats,
+    ProjectedReadBatch, ProjectedReadBudget, ProjectedReadEvidence, ProjectedReadOutcome,
+    ProjectedReadProjection, ProjectedReadRange, ProjectedReadRequest, ProjectedReadResource,
+    ProjectedReadStream, Segment, SegmentCompressionPolicy, SegmentOpenEvidence,
+    SegmentRowGroupBudget, COMPRESSION_BASIS_POINTS,
     DEFAULT_COMPRESSION_MAXIMUM_PAGE_LOGICAL_BYTES,
     DEFAULT_COMPRESSION_MINIMUM_SAVINGS_BASIS_POINTS, DEFAULT_MAX_ACTIVE_READ_VIEWS,
     DEFAULT_MAX_BATCH_ALLOCATED_BYTES, DEFAULT_MAX_BATCH_ROWS, DEFAULT_MAX_OUTPUT_BUFFER_BYTES,
     DEFAULT_MAX_OUTPUT_ROWS, DEFAULT_MAX_PAGE_LOGICAL_BYTES, DEFAULT_MAX_PAGE_REQUESTS,
     DEFAULT_MAX_PINNED_READ_BYTES, DEFAULT_MAX_PROJECTED_READ_RANGES,
     DEFAULT_MAX_PROJECTED_READ_RUNS, DEFAULT_MAX_VERSIONS_EXAMINED, DEFAULT_PAGE_CACHE_BYTES,
-    DEFAULT_PAGE_CACHE_PROTECTED_CAPACITY_BASIS_POINTS, DEFAULT_ROW_GROUP_MAX_ROWS,
-    DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY,
+    DEFAULT_PAGE_CACHE_PROTECTED_CAPACITY_BASIS_POINTS, DEFAULT_PROJECTED_OUTPUT_BYTES,
+    DEFAULT_ROW_GROUP_MAX_ROWS, DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY,
     PROJECTED_READ_CONTRACT_VERSION, SEGMENT_FORMAT_VERSION, SEGMENT_KEY_CODEC_DIGEST,
     SEGMENT_OPEN_EVIDENCE_VERSION, SEGMENT_PAGE_FORMAT_DIGEST, SEGMENT_SCHEMA_DIGEST,
 };

@@ -63,7 +63,7 @@ version, which remains frozen at `1.0.0` by the
 [version policy](../release/version-policy.md).
 
 The deterministic OpenAPI projection is currently bound to SHA-256
-`24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb`.
+`ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against
@@ -276,3 +276,8 @@ python3 scripts/ci/check_generated_surfaces.py --check
 
 Full engine, client, cross-language, crash/reopen, resource, and deployment
 suites are run only where their owning gate names them as acceptance evidence.
+
+Default installation-policy fixture regeneration uses the typed owning contract:
+`cargo run --locked -p rrd-contract --example refresh_installation_contract`.
+This offline projection refresh performs no engine workload and produces no
+native qualification evidence. Review the resulting policy and digest changes.

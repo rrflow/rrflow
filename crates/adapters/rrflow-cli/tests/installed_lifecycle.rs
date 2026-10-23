@@ -583,7 +583,38 @@ fn installed_lifecycle(mode: &str) {
     let configuration_file = root.path().join("estate-configuration.toml");
     std::fs::write(
         &configuration_file,
-        r#"format_version = 2
+        r#"format_version = 3
+
+[storage]
+mutable_accounted_bytes = 134217728
+mutable_versions = 1048576
+projected_output_bytes = 134217728
+page_cache_bytes = 4194304
+wal_flush_target_bytes = 67108864
+memtable_flush_target_versions = 524288
+compaction_input_bytes = 1073741824
+compaction_input_logical_bytes = 268435456
+compaction_input_versions = 4194304
+compaction_output_segments = 256
+compaction_elapsed_ms = 30000
+compaction_l0_segments = 64
+retained_mutable_bytes = 536870912
+retained_mutable_versions = 4194304
+retained_mutable_generations = 64
+reclamation_inventory_entries = 262144
+reclamation_metadata_bytes = 67108864
+reclamation_delete_files = 1024
+reclamation_delete_bytes = 1073741824
+reclamation_elapsed_ms = 30000
+transaction_admission_requests = 64
+transaction_admission_bytes = 67108864
+transaction_admission_wait_ms = 30000
+recovery_metadata_bytes = 67108864
+recovery_files = 262144
+recovery_read_bytes = 1099511627776
+recovery_wal_bytes = 268435456
+recovery_wal_frames = 1048576
+recovery_elapsed_ms = 120000
 
 [clock]
 maximum_rollback_ms = 0

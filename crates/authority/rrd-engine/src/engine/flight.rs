@@ -289,10 +289,7 @@ impl RrdEngine {
 
             // The gate closes the in-process race with a unique-index
             // installation that may be proving rows in this same table.
-            let _transaction_guard = self
-                .transaction_gate
-                .lock()
-                .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+            let _transaction_guard = self.admit_transaction(&commit, request_id, operation_id)?;
             match self.storage.runtime().commit(&commit) {
                 Ok(outcome) => {
                     if outcome.first_cursor + schema_offset != record_cursor {

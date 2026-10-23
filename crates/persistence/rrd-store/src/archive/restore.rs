@@ -40,6 +40,27 @@ pub fn restore_logical_archive_to_new_root_with_progress(
     target: &(impl AnchorInput + ?Sized),
     at: u64,
     populate_staging: impl FnOnce(&AnchoredPath) -> Result<()>,
+    progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
+) -> Result<LogicalRestoreReport> {
+    restore_logical_archive_to_new_root_with_options(
+        archive,
+        target,
+        at,
+        crate::DatabaseOptions::default(),
+        populate_staging,
+        progress,
+    )
+}
+
+/// Restores with one process-local native policy for staging creation, replay,
+/// resume and every verification reopen. Callbacks retain their existing
+/// responsibility for any additional state they populate in private staging.
+pub fn restore_logical_archive_to_new_root_with_options(
+    archive: &(impl AnchorInput + ?Sized),
+    target: &(impl AnchorInput + ?Sized),
+    at: u64,
+    options: crate::DatabaseOptions,
+    populate_staging: impl FnOnce(&AnchoredPath) -> Result<()>,
     mut progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
 ) -> Result<LogicalRestoreReport> {
     let archive = &archive.anchor().map_err(archive_io)?;
@@ -64,7 +85,7 @@ pub fn restore_logical_archive_to_new_root_with_progress(
         ));
     }
     let resumed = staging.try_exists().map_err(archive_io)?;
-    let engine = RrflowKvStore::open(&staging)?;
+    let engine = RrflowKvStore::open_with_options(&staging, options)?;
     let mut prefix = reconcile_staging_prefix(archive, &expected, &engine)?;
     if receipt_path.try_exists().map_err(archive_io)? {
         let receipt = load_receipt::<RestoreReceipt>(&receipt_path)?;
@@ -140,11 +161,11 @@ pub fn restore_logical_archive_to_new_root_with_progress(
     engine.flush(at)?;
     drop(engine);
 
-    let reopened = RrflowKvStore::open(&staging)?;
+    let reopened = RrflowKvStore::open_with_options(&staging, options)?;
     verify_watermarks(&reopened, &expected)?;
     drop(reopened);
     populate_staging(&staging)?;
-    let reopened = RrflowKvStore::open(&staging)?;
+    let reopened = RrflowKvStore::open_with_options(&staging, options)?;
     verify_watermarks(&reopened, &expected)?;
     drop(reopened);
     if target.try_exists().map_err(archive_io)? {

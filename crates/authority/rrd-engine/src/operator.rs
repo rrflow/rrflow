@@ -76,12 +76,7 @@ impl RrdEngine {
 
     pub fn assert_claim(&self, claim: &Claim) -> OperatorResult<rrd_store::AppendOutcome> {
         claim.validate()?;
-        let _gate = self
-            .transaction_gate
-            .lock()
-            .map_err(|_| -> Box<dyn std::error::Error> {
-                "transaction gate lock is poisoned".into()
-            })?;
+        let _gate = self.admit_transaction(claim, "", "")?;
         let scope = ScopeId::new(format!("instance:{}", self.instance_id()))?;
         let read = self.storage.runtime().read_stamp(&scope)?;
         let previous =

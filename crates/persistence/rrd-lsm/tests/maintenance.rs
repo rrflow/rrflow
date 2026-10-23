@@ -104,3 +104,139 @@ fn zero_maintenance_limits_fail_before_creating_storage() {
     assert!(matches!(error, Error::InvalidConfiguration(_)));
     assert!(!root.exists());
 }
+
+#[test]
+fn retained_generations_reject_before_wal_and_release_on_actual_owner_drop() {
+    use rrd_lsm::{
+        MutableResource, ProjectedReadBudget, ProjectedReadProjection, ProjectedReadRange,
+        ProjectedReadRequest,
+    };
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("native");
+    let mut policy = options(100);
+    policy.mutable_retention.generations = 2;
+    let mut database = Database::create_with_options(&root, policy).unwrap();
+    let memory = database.mutable_memory();
+    let write = |value: &str| WriteBatch::new(vec![put("key", value)]).unwrap();
+    let reader = |database: &Database| {
+        database
+            .begin_projected_read(ProjectedReadRequest {
+                ranges: vec![ProjectedReadRange::all()],
+                projection: ProjectedReadProjection::KeyValue,
+                snapshot: database.snapshot(),
+                budget: ProjectedReadBudget::default(),
+            })
+            .unwrap()
+    };
+    database
+        .write_owned(write("one"), Durability::Authoritative)
+        .unwrap();
+    let mut first = reader(&database);
+    database
+        .write_owned(write("two"), Durability::Authoritative)
+        .unwrap();
+    let mut second = reader(&database);
+    assert_eq!(memory.stats().generations, 2);
+    assert_eq!(memory.stats().versions, 3);
+    let wal = root.join("wal").join("00000000000000000001.wal");
+    let before = std::fs::read(&wal).unwrap();
+    assert!(matches!(
+        database.write_owned(write("three"), Durability::Authoritative),
+        Err(Error::MutableLimit {
+            resource: MutableResource::Generations,
+            ..
+        })
+    ));
+    assert_eq!(std::fs::read(&wal).unwrap(), before);
+    assert_eq!(database.snapshot().sequence, 2);
+    assert_eq!(memory.stats().denied_writes, 1);
+    second.cancel().unwrap();
+    database
+        .write_owned(write("three"), Durability::Authoritative)
+        .unwrap();
+    assert_eq!(memory.stats().versions, 4);
+    drop(database);
+    assert_eq!(memory.stats().generations, 1);
+    let batch = first.next_batch().unwrap().unwrap();
+    assert_eq!(batch.value(0), Some(b"one".as_slice()));
+    first.cancel().unwrap();
+    assert_eq!(memory.stats().accounted_bytes, 0);
+    assert_eq!(batch.value(0), Some(b"one".as_slice()));
+    let reopened = Database::open(&root).unwrap();
+    assert_eq!(
+        reopened.get(b"key", reopened.snapshot()).unwrap(),
+        Some(b"three".to_vec())
+    );
+}
+
+#[test]
+fn installed_write_maintenance_reclaims_only_an_admitted_prefix() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("native");
+    let mut policy = options(1);
+    policy.reclamation.delete_files = 1;
+    let mut database = Database::create_with_options(&root, policy).unwrap();
+    let write = |database: &mut Database, value: &str| {
+        for _ in 0..100 {
+            let before = database.snapshot().sequence;
+            match database.write_owned(
+                WriteBatch::new(vec![put("key", value)]).unwrap(),
+                Durability::Authoritative,
+            ) {
+                Ok(_) => return,
+                Err(Error::ReclamationPending) => assert_eq!(database.snapshot().sequence, before),
+                Err(error) => panic!("unexpected maintenance error: {error}"),
+            }
+        }
+        panic!("bounded cleanup failed to drain");
+    };
+    write(&mut database, "one");
+    database.flush_memtable(1).unwrap();
+    let pinned = database.checkpoint("retain", 2).unwrap();
+    write(&mut database, "two");
+    database.flush_memtable(3).unwrap();
+    database.compact(&[], 4).unwrap();
+    let report = database.garbage_collect().unwrap();
+    assert!(
+        report.removed_manifests.len() + report.removed_segments.len() + report.removed_wals.len()
+            <= 1
+    );
+    assert!(report.retained_manifests.contains(&pinned.manifest));
+    assert!(database.release_checkpoint("retain").unwrap());
+    for index in 0..12 {
+        write(&mut database, &index.to_string());
+    }
+    assert!(!root
+        .join("manifests")
+        .join(format!("{}.json", pinned.manifest))
+        .exists());
+    assert_eq!(
+        database.get(b"key", database.snapshot()).unwrap(),
+        Some(b"11".to_vec())
+    );
+}
+
+#[test]
+fn reclamation_inventory_denial_preserves_incoming_wal_and_unreachable_files() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("native");
+    let database = Database::create(&root).unwrap();
+    drop(database);
+    let orphan = root.join("manifests").join("orphan.json");
+    std::fs::write(&orphan, b"evidence").unwrap();
+    let mut policy = options(100);
+    policy.reclamation.inventory_entries = 1;
+    let mut database = Database::open_with_options(&root, policy).unwrap();
+    let wal = root.join("wal").join("00000000000000000001.wal");
+    let before = std::fs::read(&wal).unwrap();
+    assert!(matches!(
+        database.write_owned(
+            WriteBatch::new(vec![put("key", "denied")]).unwrap(),
+            Durability::Authoritative
+        ),
+        Err(Error::ReclamationLimit { .. })
+    ));
+    assert_eq!(std::fs::read(&wal).unwrap(), before);
+    assert_eq!(std::fs::read(&orphan).unwrap(), b"evidence");
+    assert_eq!(database.snapshot().sequence, 0);
+}

@@ -45,6 +45,29 @@ output surviving database/stream disposal. Weak-owner and registry checks
 cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
 ownership regressions, not aggregate RSS, installed reclamation or soak proof.
 
+The native partitions also require `mutable_admission`: configured writer and
+read-only reopen denial preserves typed byte/version errors and existing file
+bytes; admitted inspection recovers exact semantic and control identities. The
+existing semantic and engine admission suites include both native mutable
+resources through prior-ACK/rejection/reopen/replay/abort/next-work histories.
+These component tests do not qualify installed configuration.
+
+The native partitions also require the `configured_` histories in
+`logical_archive_resilience` and `backup_catalogue`: one native policy follows
+logical/application restore, partial-prefix resume, catalogue/control replay
+and verification reopens. Rejected work stays private; an adequate policy
+resumes exact runtime/control/object evidence without duplicate effects.
+Denied replay preserves file bytes. These are component restore limits, not
+installed configuration binding, aggregate recovery memory or capacity proof.
+
+Those same partitions separately require `projected_output_limits` and
+`segment::output::tests`. These qualify output-byte admission before allocation,
+last-owner release through buffer clones/slices, concurrent readers, failed
+batch construction and retained output through reclamation/reopen. The native
+pool is scoped to one database-open instance and excludes source pages, caller
+copies and allocator metadata; these checks do not establish total-memory or
+installed capacity limits.
+
 The same native partitions require the `interleaved` filter in
 `projected_read_adversarial`, with a five-minute step limit. Nine fixed histories
 combine two reader stamps, a pinned transaction, mixed-family writes/deletes,
@@ -56,6 +79,12 @@ survive database close and disposable-directory removal. Mapped raw, bounded
 raw and bounded adaptive-LZ4 paths must report that they were exercised. This
 is native component lifetime evidence, not installed reclamation or memory
 capacity qualification.
+
+The same three native partitions require `mutable_limits`: hard active-state
+byte/version admission, pre-effect rejection, hot-key pressure with held
+history, and writer/read-only WAL replay denial followed by exact recovery.
+This accounts active key/value/version charges; it does not establish aggregate
+heap/RSS, installed configuration binding or whole-startup work limits.
 
 The same three native partitions require `write_diagnostics` and
 `rrflow_kv_operator`. Uncontended timing may be zero; measured phases/waits

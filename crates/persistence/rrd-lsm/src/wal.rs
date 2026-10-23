@@ -414,6 +414,30 @@ where
 pub(crate) fn replay_file<F>(
     file: &mut File,
     starting_sequence: u64,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    replay_file_inner(file, starting_sequence, None, replay)
+}
+
+pub(crate) fn replay_file_bounded<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    budget: &mut crate::recovery_budget::RecoveryBudget,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    replay_file_inner(file, starting_sequence, Some(budget), replay)
+}
+
+fn replay_file_inner<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    mut budget: Option<&mut crate::recovery_budget::RecoveryBudget>,
     mut replay: F,
 ) -> Result<RecoverySummary>
 where
@@ -426,6 +450,9 @@ where
     }
     file.seek(SeekFrom::Start(0))?;
     let length = file.metadata()?.len();
+    if let Some(budget) = budget.as_deref_mut() {
+        budget.wal(length)?;
+    }
     if length < FILE_HEADER_BYTES as u64 {
         return Err(Error::Corruption {
             offset: 0,
@@ -441,6 +468,9 @@ where
     let mut torn_tail = None;
     let mut payload_bytes = 0usize;
     while offset < length {
+        if let Some(budget) = budget.as_deref_mut() {
+            budget.frame()?;
+        }
         let remaining = length - offset;
         if remaining < RECORD_HEADER_BYTES as u64 {
             torn_tail = Some(offset);
@@ -504,6 +534,15 @@ where
                     reason: "sequence overflow".into(),
                 })?;
         offset = end;
+    }
+    if file.metadata()?.len() != length {
+        return Err(Error::Corruption {
+            offset,
+            reason: "WAL length changed during recovery".into(),
+        });
+    }
+    if let Some(budget) = budget {
+        budget.tick()?;
     }
     Ok(RecoverySummary {
         recovered_through: expected_sequence.saturating_sub(1),

@@ -69,6 +69,43 @@ compaction/GC, terminal admission reuse and reopen using the existing independen
 model. Its bounded physical matrix does not close native memory, aggregate
 output admission or installed reclamation obligations.
 
+### C-07d native mutable admission and replay gap
+
+At `f4e404be38a0c21a4a3665b1907bad2226f5c13a`, maintenance still exposes
+only soft targets. Behavioral characterization with a new unenforced policy
+surface accepted excessive atomic versions, grew hot-key state beyond its cap,
+and materialized WAL state beyond a configured budget. The
+[native mutable-limit record](../../evidence/change-journals/gate-c/c-07d-mutable-limits.md)
+binds the repair and exact tests. Both native open paths must deny excessive
+materialization without changing storage bytes. Active logical charge excludes
+retained generations, allocator overhead and temporary decoding. Installed
+bootstrap/configuration binding, aggregate memory and maintenance/queue/work
+limits remain open; local native tests do not close this deficiency.
+
+### Mutable admission adapter gap
+
+Combining accepted main `dde6ef86d278b8c59cf1f61ebc2d3923186396d5`
+with the native policy in PR 65 reproduced both byte and version rejections as
+generic internal errors with prepared commit intent still present. Store open
+wrappers also erased replay-limit classification, and store read-only inspection
+could not receive explicit native options. The [propagation baseline](../../evidence/change-journals/gate-c/c-07d-limit-propagation-baseline.md)
+and [implementation evidence](../../evidence/change-journals/gate-c/c-07d-limit-propagation.md)
+bind typed propagation, absent-outcome intent cleanup and configured inspection.
+Its joined histories must preserve prior acknowledgements and permit later work.
+Installed startup/restore configuration, aggregate resource bounds and sustained
+capacity remain open; this repair does not qualify or close C-07.
+
+### Restore policy bypass
+
+At the local PR 67 dependency, logical restore and nested application catalogue/
+control replay opened native stores with defaults. Characterization accepted
+work despite explicitly insufficient byte/version policies. The [restore
+policy evidence](../../evidence/change-journals/gate-c/c-07d-restore-limits.md)
+binds the reproduction and options-aware canonical restore/verify paths.
+Partial-prefix rejection, exact resume and post-population replay checks are
+component evidence. Installed configuration projection, aggregate recovery
+resources, real exhaustion and sustained capacity remain open.
+
 ### Diagnostic timing oracle deficiency
 
 During the pending mutable-limit/accepted reader-history combination, the
@@ -78,6 +115,17 @@ Its strictly-positive assumption exceeds the monotonic clock contract. The
 retains actual timings and checks independent outer bounds, exact forwarded
 context and durable effects. It does not qualify contention performance,
 resource enforcement or close this POA&M item.
+
+### C-07d immutable maintenance admission
+
+Inspection at `4dc1b43764c4f48f35f532ca2a575811e8587cb8` found count-only
+compaction admission and complete hot-key history materialization. The
+[bounded compaction implementation](../../evidence/change-journals/gate-c/c-07d-bounded-compaction.md)
+adds installed byte/version/output/deadline/L0 limits, typed pressure and
+ownership-preserving pruning. New history/pressure oracles are compiled but
+unrun locally at the owner's direction. Candidate CI, native memory, installed
+reclamation, real exhaustion and sustained capacity remain required; this is
+implementation inventory, not closure evidence.
 
 ## Impact
 
@@ -112,6 +160,17 @@ or require a particular new public endpoint.
 
 ### Qualification impact
 
+At accepted `dde6ef86d278b8c59cf1f61ebc2d3923186396d5`, projected reads
+bound each batch and each stream's cumulative output but do not share output
+admission across successive streams. Retained batches and individual Arrow
+clones can outlive terminal streams. A policy-surface reproduction accepted a
+second 97-byte output while the first remained retained under a nominal
+97-byte pool, and accepted zero capacity. The
+[retained-output baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
+binds native preallocation reservation and last-allocation-owner release.
+Its per-open-instance output cap is not a bound on independent reopen pools,
+other memory families or installed total memory. C-07d/e remain open.
+
 Component success could be mistaken for safe production growth, a true
 disk-full result, power-loss durability or bounded multi-estate operation.
 Storage-level success cannot establish native graph/vector scale, complete
@@ -123,6 +182,24 @@ SQL compatibility, model execution or UI/provider conformance.
 through packages a-h under OBJ-02.
 
 Roadmap owner: [Gate C](../../roadmap/rrflow-1.0/gate-c.md).
+
+The [retained-generation and installed reclamation change](../../evidence/change-journals/gate-c/c-07de-retained-reclamation.md)
+adds configured pre-WAL copy admission and bounded native reclamation to normal
+writes. Compilation is recorded separately from pending candidate CI. This
+remediates implementation gaps without closing queue admission, recovery space,
+real exhaustion, capacity profiles, soak or aggregate host-memory qualification.
+
+The [finite transaction-admission change](../../evidence/change-journals/gate-c/c-07d-transaction-admission.md)
+adds configured count/byte/wait admission to the existing serialization owner
+and denies growth while bounded reclamation still has work. Its native runtime
+acceptance remains pending; transport cancellation, recovery headroom and the
+capacity/soak obligations are not closed by compilation.
+
+The [recovery-admission change](../../evidence/change-journals/gate-c/c-07d-recovery-admission.md)
+bounds native reopen and inspection metadata, file/read work, WAL size/frames
+and cooperative time using installed policy. It preserves bytes on denial;
+compilation does not qualify recovery-space reserve, an installed repair UX,
+actual exhaustion, host limits or capacity/soak.
 
 ## Closure evidence
 

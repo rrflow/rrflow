@@ -53,9 +53,10 @@ pub use capability_surface::{
 pub use deployment::{
     estate_configuration_sha256, ClockPolicy, DeploymentForm, DeploymentProfile,
     EndpointPresentation, EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity,
-    ReasoningLimits, RecallLimits, StorageProfileKind, DEPLOYMENT_PROFILE_CONTRACT_VERSION,
-    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS,
-    MAX_REASONING_STEPS, MAX_REASONING_STEP_ELAPSED_MS,
+    ReasoningLimits, RecallLimits, StorageLimits, StorageProfileKind,
+    DEPLOYMENT_PROFILE_CONTRACT_VERSION, ESTATE_CONFIGURATION_FORMAT_VERSION,
+    MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS, MAX_REASONING_STEPS,
+    MAX_REASONING_STEP_ELAPSED_MS,
 };
 pub use diagnostic::{
     DiagnosticAuthority, DiagnosticCoverage, DiagnosticGraphDifference,
@@ -217,7 +218,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb";
+    "ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;

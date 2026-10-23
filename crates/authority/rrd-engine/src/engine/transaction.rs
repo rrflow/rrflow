@@ -131,10 +131,7 @@ impl RrdEngine {
         request
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
-        let _transaction_guard = self
-            .transaction_gate
-            .lock()
-            .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         let actual_digest = request.computed_operation_sha256();
         if actual_digest != request.operation_sha256 {
             return Err(ServiceError::OperationDigestMismatch);
@@ -360,6 +357,10 @@ impl RrdEngine {
                                 error,
                                 rrd_store::Error::Kernel(_)
                                     | rrd_store::Error::WriteBatchLimit { .. }
+                                    | rrd_store::Error::MutableLimit { .. }
+                                    | rrd_store::Error::MaintenanceLimit { .. }
+                                    | rrd_store::Error::ReclamationPending
+                                    | rrd_store::Error::ReclamationLimit { .. }
                                     | rrd_store::Error::RuntimeConflict { .. }
                                     | rrd_store::Error::TransactionConflict { .. }
                                     | rrd_store::Error::DanglingRuntimeReference(_)

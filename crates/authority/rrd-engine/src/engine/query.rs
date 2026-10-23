@@ -345,9 +345,8 @@ impl RrdEngine {
         // prove existing rows and publish its enforcement bit without a write
         // racing between those two events.
         let _transaction_guard = requires_unique_install
-            .then(|| self.transaction_gate.lock())
-            .transpose()
-            .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+            .then(|| self.admit_transaction(&definition, request_id, operation_id))
+            .transpose()?;
         let current = if requires_unique_install {
             repository
                 .load()

@@ -36,6 +36,15 @@ fn physical_rows(storage: &dyn StorageEngine) -> Vec<(Vec<u8>, Vec<u8>)> {
 }
 
 fn reject_oversized_plan(storage: &dyn StorageEngine) -> Vec<(Vec<u8>, Vec<u8>)> {
+    reject_plan(storage, 4096, 4096, None)
+}
+
+fn reject_plan(
+    storage: &dyn StorageEngine,
+    count: usize,
+    object_bytes: usize,
+    mutable_resource: Option<rrd_store::MutableResource>,
+) -> Vec<(Vec<u8>, Vec<u8>)> {
     let seeded = commit(storage);
     assert_eq!((seeded.records, seeded.relations), (2, 1));
     let before = physical_rows(storage);
@@ -58,17 +67,26 @@ fn reject_oversized_plan(storage: &dyn StorageEngine) -> Vec<(Vec<u8>, Vec<u8>)>
         at: 200,
         actor: "admission-oracle".into(),
         expected_cursor: seeded.cursor,
-        mutations: (0..4096)
+        mutations: (0..count)
             .map(|index| RuntimeMutation::Claim {
-                claim: claim(index, "x".repeat(4096)),
+                claim: claim(index, "x".repeat(object_bytes)),
             })
             .collect(),
     };
     request.validate().unwrap();
     let rejected_id = request.digest();
-    assert!(matches!(storage.runtime().commit(&request),
-        Err(Error::WriteBatchLimit { resource: rrd_lsm::WriteBatchResource::EncodedBytes, limit, observed })
-            if limit == 16 * 1024 * 1024 && observed > limit));
+    let error = storage.runtime().commit(&request).unwrap_err();
+    if let Some(expected) = mutable_resource {
+        assert!(
+            matches!(error, Error::MutableLimit { resource, limit, observed }
+            if resource == expected && observed > limit),
+            "wrong admission failure: {error}"
+        );
+    } else {
+        assert!(matches!(error,
+            Error::WriteBatchLimit { resource: rrd_lsm::WriteBatchResource::EncodedBytes, limit, observed }
+                if limit == 16 * 1024 * 1024 && observed > limit));
+    }
     assert_eq!(
         physical_rows(storage),
         before,
@@ -125,6 +143,41 @@ fn oversized_semantic_plan_preserves_all_physical_effects_on_kv_and_reopen() {
         physical_rows(&RrflowKvStore::open(&root).unwrap()),
         expected
     );
+}
+
+#[test]
+fn mutable_limits_preserve_graph_function_receipts_and_all_physical_rows_across_reopen() {
+    for (limits, resource) in [
+        (
+            rrd_store::MutableLimits {
+                accounted_bytes: 128 * 1024,
+                versions: 8192,
+            },
+            rrd_store::MutableResource::AccountedBytes,
+        ),
+        (
+            rrd_store::MutableLimits {
+                accounted_bytes: 8 * 1024 * 1024,
+                versions: 256,
+            },
+            rrd_store::MutableResource::Versions,
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("mutable-admission");
+        let options = || rrd_store::DatabaseOptions {
+            mutable_limits: limits,
+            ..Default::default()
+        };
+        let expected = {
+            let storage = RrflowKvStore::create_new_with_options(&root, options()).unwrap();
+            reject_plan(&storage, 256, 1024, Some(resource))
+        };
+        assert_eq!(
+            physical_rows(&RrflowKvStore::open_existing_with_options(&root, options()).unwrap()),
+            expected
+        );
+    }
 }
 
 fn commit(storage: &dyn StorageEngine) -> PublicEvidence {

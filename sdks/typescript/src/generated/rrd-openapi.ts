@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb
+// OpenAPI SHA-256: ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3321,6 +3321,71 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one
@@ -3523,6 +3588,71 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one

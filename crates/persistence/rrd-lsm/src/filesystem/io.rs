@@ -83,3 +83,15 @@ pub(crate) fn read_exact(file: &mut File, bytes: &mut [u8]) -> io::Result<()> {
     ticket.done()?;
     Ok(())
 }
+
+/// Read at most the caller's admitted bytes while preserving the native
+/// fault-observation boundary used by ordinary metadata reads.
+pub(crate) fn read_to_limit(file: File, _path: &Path, limit: u64) -> io::Result<Vec<u8>> {
+    #[cfg(test)]
+    let ticket = Ticket::begin(Kind::Read, _path)?;
+    let mut bytes = Vec::new();
+    file.take(limit).read_to_end(&mut bytes)?;
+    #[cfg(test)]
+    ticket.done()?;
+    Ok(bytes)
+}

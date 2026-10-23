@@ -1,4 +1,5 @@
 mod format;
+mod output;
 #[cfg(feature = "physical-policy-lab")]
 mod physical_policy_lab;
 mod reader;
@@ -31,6 +32,9 @@ pub use self::format::{
     DEFAULT_COMPRESSION_MINIMUM_SAVINGS_BASIS_POINTS, DEFAULT_ROW_GROUP_MAX_ROWS,
     DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY, SEGMENT_FORMAT_VERSION,
     SEGMENT_KEY_CODEC_DIGEST, SEGMENT_PAGE_FORMAT_DIGEST, SEGMENT_SCHEMA_DIGEST,
+};
+pub use self::output::{
+    ProjectedOutputMemory, ProjectedOutputStats, DEFAULT_PROJECTED_OUTPUT_BYTES,
 };
 #[cfg(feature = "physical-policy-lab")]
 pub use self::physical_policy_lab::{
@@ -1074,6 +1078,19 @@ impl Segment {
 
     pub fn visible_versions(&self, read_sequence: u64) -> Result<Vec<(Vec<u8>, VersionedValue)>> {
         self.visible_from(&[], None, read_sequence)
+    }
+
+    /// Sum authenticated decoded page lengths without loading page contents.
+    /// This includes key spines, offsets, sequence columns and value payloads.
+    pub(crate) fn compaction_logical_bytes(&self) -> Result<u64> {
+        self.row_groups
+            .iter()
+            .flat_map(|group| &group.pages)
+            .try_fold(0u64, |total, page| {
+                total.checked_add(page.logical_bytes as u64).ok_or_else(|| {
+                    Error::InvalidSegment("compaction decoded input overflow".into())
+                })
+            })
     }
 
     pub(crate) fn record_cursor(&self) -> SegmentRecordCursor<'_> {

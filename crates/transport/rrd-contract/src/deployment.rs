@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub const DEPLOYMENT_PROFILE_CONTRACT_VERSION: u16 = 1;
-pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 2;
+pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 3;
 pub const MAX_CLOCK_ROLLBACK_MS: u64 = 3_600_000;
 pub const MAX_REASONING_RUN_ELAPSED_MS: u64 = 3_600_000;
 pub const MAX_REASONING_STEPS: u64 = 10_000;
@@ -224,6 +224,240 @@ impl RecallLimits {
     }
 }
 
+/// Installed native storage limits. These bound separately accounted owners,
+/// not total process RSS. Changing them requires a new governed configuration
+/// and reopening storage; they are never hot-applied by a client.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StorageLimits {
+    pub mutable_accounted_bytes: u64,
+    pub mutable_versions: u64,
+    pub projected_output_bytes: u64,
+    pub page_cache_bytes: u64,
+    pub wal_flush_target_bytes: u64,
+    pub memtable_flush_target_versions: u64,
+    pub compaction_input_bytes: u64,
+    pub compaction_input_logical_bytes: u64,
+    pub compaction_input_versions: u64,
+    pub compaction_output_segments: u64,
+    pub compaction_elapsed_ms: u64,
+    pub compaction_l0_segments: u64,
+    pub retained_mutable_bytes: u64,
+    pub retained_mutable_versions: u64,
+    pub retained_mutable_generations: u64,
+    pub reclamation_inventory_entries: u64,
+    pub reclamation_metadata_bytes: u64,
+    pub reclamation_delete_files: u64,
+    pub reclamation_delete_bytes: u64,
+    pub reclamation_elapsed_ms: u64,
+    pub transaction_admission_requests: u64,
+    pub transaction_admission_bytes: u64,
+    pub transaction_admission_wait_ms: u64,
+    pub recovery_metadata_bytes: u64,
+    pub recovery_files: u64,
+    pub recovery_read_bytes: u64,
+    pub recovery_wal_bytes: u64,
+    pub recovery_wal_frames: u64,
+    pub recovery_elapsed_ms: u64,
+}
+
+impl Default for StorageLimits {
+    fn default() -> Self {
+        Self {
+            mutable_accounted_bytes: 128 * 1024 * 1024,
+            mutable_versions: 1_048_576,
+            projected_output_bytes: 128 * 1024 * 1024,
+            page_cache_bytes: 4 * 1024 * 1024,
+            wal_flush_target_bytes: 64 * 1024 * 1024,
+            memtable_flush_target_versions: 524_288,
+            compaction_input_bytes: 1024 * 1024 * 1024,
+            compaction_input_logical_bytes: 256 * 1024 * 1024,
+            compaction_input_versions: 4_194_304,
+            compaction_output_segments: 256,
+            compaction_elapsed_ms: 30_000,
+            compaction_l0_segments: 64,
+            retained_mutable_bytes: 536_870_912,
+            retained_mutable_versions: 4_194_304,
+            retained_mutable_generations: 64,
+            reclamation_inventory_entries: 262_144,
+            reclamation_metadata_bytes: 67_108_864,
+            reclamation_delete_files: 1_024,
+            reclamation_delete_bytes: 1_073_741_824,
+            reclamation_elapsed_ms: 30_000,
+            transaction_admission_requests: 64,
+            transaction_admission_bytes: 67_108_864,
+            transaction_admission_wait_ms: 30_000,
+            recovery_metadata_bytes: 67_108_864,
+            recovery_files: 262_144,
+            recovery_read_bytes: 1_099_511_627_776,
+            recovery_wal_bytes: 268_435_456,
+            recovery_wal_frames: 1_048_576,
+            recovery_elapsed_ms: 120_000,
+        }
+    }
+}
+
+impl StorageLimits {
+    pub fn validate(&self) -> Result<()> {
+        // Fixed protocol ceilings keep admission finite across platforms;
+        // the native adapter additionally checks host-size conversion.
+        const MAX_BYTES: u64 = 1 << 40;
+        const MAX_VERSIONS: u64 = 1 << 32;
+        for (name, value) in [
+            (
+                "storage mutable_accounted_bytes",
+                self.mutable_accounted_bytes,
+            ),
+            (
+                "storage projected_output_bytes",
+                self.projected_output_bytes,
+            ),
+            (
+                "storage wal_flush_target_bytes",
+                self.wal_flush_target_bytes,
+            ),
+        ] {
+            validate_nonzero_max(name, value, MAX_BYTES)?;
+        }
+        validate_nonzero_max(
+            "storage mutable_versions",
+            self.mutable_versions,
+            MAX_VERSIONS,
+        )?;
+        validate_nonzero_max(
+            "storage memtable_flush_target_versions",
+            self.memtable_flush_target_versions,
+            self.mutable_versions,
+        )?;
+
+        validate_nonzero_max(
+            "storage compaction_input_bytes",
+            self.compaction_input_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_input_logical_bytes",
+            self.compaction_input_logical_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_input_versions",
+            self.compaction_input_versions,
+            MAX_VERSIONS,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_output_segments",
+            self.compaction_output_segments,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_elapsed_ms",
+            self.compaction_elapsed_ms,
+            3_600_000,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_l0_segments",
+            self.compaction_l0_segments,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage retained_mutable_bytes",
+            self.retained_mutable_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage retained_mutable_versions",
+            self.retained_mutable_versions,
+            MAX_VERSIONS,
+        )?;
+        validate_nonzero_max(
+            "storage retained_mutable_generations",
+            self.retained_mutable_generations,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_inventory_entries",
+            self.reclamation_inventory_entries,
+            1 << 24,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_metadata_bytes",
+            self.reclamation_metadata_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_delete_files",
+            self.reclamation_delete_files,
+            1 << 20,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_delete_bytes",
+            self.reclamation_delete_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage reclamation_elapsed_ms",
+            self.reclamation_elapsed_ms,
+            3_600_000,
+        )?;
+        if self.retained_mutable_bytes < self.mutable_accounted_bytes
+            || self.retained_mutable_versions < self.mutable_versions
+        {
+            return invalid("retained mutable limits must accommodate one full active generation");
+        }
+        validate_nonzero_max(
+            "storage transaction_admission_requests",
+            self.transaction_admission_requests,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage transaction_admission_bytes",
+            self.transaction_admission_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage transaction_admission_wait_ms",
+            self.transaction_admission_wait_ms,
+            3_600_000,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_metadata_bytes",
+            self.recovery_metadata_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max("storage recovery_files", self.recovery_files, 1 << 24)?;
+        validate_nonzero_max(
+            "storage recovery_read_bytes",
+            self.recovery_read_bytes,
+            1 << 50,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_wal_bytes",
+            self.recovery_wal_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_wal_frames",
+            self.recovery_wal_frames,
+            1 << 32,
+        )?;
+        validate_nonzero_max(
+            "storage recovery_elapsed_ms",
+            self.recovery_elapsed_ms,
+            3_600_000,
+        )?;
+        if self.compaction_l0_segments < 8 {
+            return invalid(
+                "storage compaction_l0_segments must accommodate the native L0 trigger of eight",
+            );
+        }
+        if self.page_cache_bytes > MAX_BYTES {
+            return invalid("storage page_cache_bytes exceeds the protocol ceiling");
+        }
+        Ok(())
+    }
+}
+
 /// Operator-authored input. Revision and digest are assigned by the engine,
 /// so neither can be forged or silently retained across an edit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -231,6 +465,7 @@ impl RecallLimits {
 pub struct EstateConfigurationInput {
     pub format_version: u16,
     pub clock: ClockPolicy,
+    pub storage: StorageLimits,
     pub reasoning: ReasoningLimits,
     pub recall: RecallLimits,
     pub query: QueryBudget,
@@ -244,6 +479,7 @@ impl EstateConfigurationInput {
             ));
         }
         self.clock.validate()?;
+        self.storage.validate()?;
         self.reasoning.validate()?;
         self.recall.validate()?;
         self.query.validate()
@@ -259,6 +495,7 @@ pub struct EstateConfiguration {
     pub format_version: u16,
     pub revision: u64,
     pub clock: ClockPolicy,
+    pub storage: StorageLimits,
     pub reasoning: ReasoningLimits,
     pub recall: RecallLimits,
     pub query: QueryBudget,
@@ -275,6 +512,7 @@ impl EstateConfiguration {
             format_version: input.format_version,
             revision,
             clock: input.clock,
+            storage: input.storage,
             reasoning: input.reasoning,
             recall: input.recall,
             query: input.query,
@@ -288,6 +526,7 @@ impl EstateConfiguration {
         EstateConfigurationInput {
             format_version: self.format_version,
             clock: self.clock.clone(),
+            storage: self.storage.clone(),
             reasoning: self.reasoning.clone(),
             recall: self.recall.clone(),
             query: self.query.clone(),
@@ -357,6 +596,7 @@ impl Default for EstateConfiguration {
                 clock: ClockPolicy {
                     maximum_rollback_ms: 0,
                 },
+                storage: StorageLimits::default(),
                 reasoning: ReasoningLimits {
                     max_run_elapsed_ms: 900_000,
                     max_steps: 256,
@@ -380,6 +620,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
         configuration.format_version,
         configuration.revision,
         &configuration.clock,
+        &configuration.storage,
         &configuration.reasoning,
         &configuration.recall,
         &configuration.query,
@@ -388,7 +629,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
         crate::ContractError(format!("configuration digest encoding failed: {error}"))
     })?;
     let mut bytes = Vec::with_capacity(40 + encoded.len());
-    bytes.extend_from_slice(b"rrflow-estate-configuration-v2\0");
+    bytes.extend_from_slice(b"rrflow-estate-configuration-v3\0");
     bytes.extend_from_slice(&encoded);
     Ok(sha256_bytes(&bytes))
 }
