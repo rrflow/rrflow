@@ -824,6 +824,7 @@ fn explicit_configuration_is_sealed_and_apply_does_not_reread_it() {
         r#"format_version = 3
 
 [storage]
+recovery_reserve_bytes = 16777216
 mutable_accounted_bytes = 134217728
 mutable_versions = 1048576
 projected_output_bytes = 134217728

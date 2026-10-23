@@ -684,3 +684,14 @@ no execution or acceptance requirement changed. Local PyYAML parsed the fixed
 workflow successfully and rejected the prior committed bytes at the reported
 position; repository workflow policy passed. This was syntax validation only,
 not a local engine test. Candidate CI must restart on the corrected head.
+
+Dependency merge: incorporated C-07f `9f0f3bf3` native reserve admission after
+its source/projection review. Resolved conflicts in generated SDKs, synthetic
+receipts, current reference digests and inventory by regenerating from the
+combined owners, preserving the storage-only endpoint and drain contract.
+The combined OpenAPI digest is
+`f675d37054cd59fbc001b8eb73c183dade10444b3168b81aac23f6d9c6339b3e`;
+all 43 operations and seven signal projections pass parity. Storage campaign
+and result schemas now include the installed reserve as well as drain policy.
+Execution inventory and whitespace checks passed. Native C-07f receipts from
+ebb702 remain tied to that historical candidate, not this combined revision.

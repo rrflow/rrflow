@@ -15,12 +15,14 @@ use std::sync::Arc;
 #[path = "filesystem/io.rs"]
 pub(crate) mod file_io;
 mod native;
+pub(crate) mod space;
 
 #[cfg(test)]
 use crate::fault_io::{Kind, Ticket};
 
 #[derive(Debug)]
 struct Root {
+    recovery_reserve_bytes: u64,
     file: File,
     mount: native::MountIdentity,
     // Windows write-through publication uses native names. Retaining every
@@ -84,12 +86,35 @@ impl AnchoredPath {
             root: Arc::new(Root {
                 file,
                 mount,
+                recovery_reserve_bytes: 0,
                 _ancestors: ancestors,
                 _parent: None,
             }),
             relative: PathBuf::new(),
             diagnostic: absolute,
         })
+    }
+
+    pub(crate) fn with_recovery_reserve(&self, bytes: u64) -> io::Result<Self> {
+        Ok(Self {
+            root: Arc::new(Root {
+                recovery_reserve_bytes: bytes,
+                file: self.root.file.try_clone()?,
+                mount: self.root.mount.clone(),
+                _ancestors: Vec::new(),
+                _parent: Some(self.root.clone()),
+            }),
+            relative: self.relative.clone(),
+            diagnostic: self.diagnostic.clone(),
+        })
+    }
+
+    pub(crate) fn recovery_reserve(&self) -> u64 {
+        self.root.recovery_reserve_bytes
+    }
+
+    pub(crate) fn admit_disk(&self, bytes: u64, new_file: bool) -> crate::Result<()> {
+        space::admit(&self.root.file, self.recovery_reserve(), bytes, new_file)
     }
 
     pub fn join(&self, relative: impl AsRef<Path>) -> Self {
@@ -153,6 +178,7 @@ impl AnchoredPath {
                 file,
                 mount: self.root.mount.clone(),
                 _ancestors: ancestors,
+                recovery_reserve_bytes: self.root.recovery_reserve_bytes,
                 _parent: Some(self.root.clone()),
             }),
             relative: PathBuf::new(),
@@ -184,6 +210,7 @@ impl AnchoredPath {
                 file,
                 mount: self.root.mount.clone(),
                 _ancestors: ancestors,
+                recovery_reserve_bytes: self.root.recovery_reserve_bytes,
                 _parent: Some(self.root.clone()),
             }),
             relative: PathBuf::new(),

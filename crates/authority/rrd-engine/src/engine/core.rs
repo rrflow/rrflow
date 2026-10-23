@@ -18,7 +18,10 @@ pub(super) fn installed_storage_options(
             ))
         })
     };
-    let mut options = rrd_store::DatabaseOptions::default();
+    let mut options = rrd_store::DatabaseOptions {
+        recovery_reserve_bytes: policy.recovery_reserve_bytes,
+        ..rrd_store::DatabaseOptions::default()
+    };
     options.mutable_limits.accounted_bytes =
         native("mutable_accounted_bytes", policy.mutable_accounted_bytes)?;
     options.mutable_limits.versions = native("mutable_versions", policy.mutable_versions)?;

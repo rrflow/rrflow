@@ -792,6 +792,7 @@ impl Segment {
             std::process::id(),
             TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
+        temporary.admit_disk(encoded.bytes.len() as u64, true)?;
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -984,6 +985,7 @@ impl Segment {
             std::process::id(),
             TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
+        temporary.admit_disk(bytes.len() as u64, true)?;
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)

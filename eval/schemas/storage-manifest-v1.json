@@ -1128,6 +1128,12 @@
           "minimum": 0,
           "type": "integer"
         },
+        "recovery_reserve_bytes": {
+          "description": "Bytes to keep available beyond each native WAL/immutable allocation.\nRequires restart; racy admission cannot replace actual I/O error handling.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "recovery_wal_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1175,6 +1181,7 @@
         }
       },
       "required": [
+        "recovery_reserve_bytes",
         "mutable_accounted_bytes",
         "mutable_versions",
         "projected_output_bytes",

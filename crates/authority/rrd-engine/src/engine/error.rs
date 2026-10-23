@@ -164,6 +164,7 @@ impl From<rrd_store::Error> for ServiceError {
             rrd_store::Error::WriteBatchLimit { .. }
             | rrd_store::Error::MutableLimit { .. }
             | rrd_store::Error::MaintenanceLimit { .. }
+            | rrd_store::Error::DiskAdmission { .. }
             | rrd_store::Error::RecoveryLimit { .. }
             | rrd_store::Error::ReclamationPending
             | rrd_store::Error::ReclamationLimit { .. } => Self::StorageAdmission(message),

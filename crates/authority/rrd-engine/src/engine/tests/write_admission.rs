@@ -1,6 +1,25 @@
 use super::*;
 use rrd_store::RrflowKvStore;
 
+#[test]
+fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
+    let policy = rrd_contract::StorageLimits {
+        recovery_reserve_bytes: 32 * 1024 * 1024,
+        ..Default::default()
+    };
+    let native = crate::engine::core::installed_storage_options(&policy).unwrap();
+    assert_eq!(native.recovery_reserve_bytes, policy.recovery_reserve_bytes);
+    let error = rrd_store::Error::DiskAdmission {
+        available: 100,
+        required: 200,
+        reserve: 50,
+    };
+    assert!(matches!(
+        ServiceError::from(error),
+        ServiceError::StorageAdmission(_)
+    ));
+}
+
 fn domain_evidence(engine: &RrdEngine, prior_commit: &str, rejected_commit: &str) -> Value {
     let storage = &engine.storage;
     let sequence = storage.claims().sequence().unwrap();

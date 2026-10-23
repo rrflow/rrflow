@@ -72,6 +72,23 @@ fn configuration_rejects_invalid_limits_and_digest_drift() {
 }
 
 #[test]
+fn recovery_reserve_is_positive_bounded_and_sealed() {
+    let baseline = EstateConfiguration::from_input(1, input()).unwrap();
+    for reserve in [0, (1 << 40) + 1] {
+        let mut invalid = input();
+        invalid.storage.recovery_reserve_bytes = reserve;
+        assert!(EstateConfiguration::from_input(1, invalid).is_err());
+    }
+    let mut changed = input();
+    changed.storage.recovery_reserve_bytes += 1;
+    let changed = EstateConfiguration::from_input(1, changed).unwrap();
+    assert_ne!(baseline.configuration_sha256, changed.configuration_sha256);
+    let mut tampered = baseline;
+    tampered.storage.recovery_reserve_bytes += 1;
+    assert!(tampered.validate().is_err());
+}
+
+#[test]
 fn clock_rollback_policy_is_strict_bounded_and_digest_bound() {
     let strict = EstateConfiguration::from_input(1, input()).unwrap();
     assert_eq!(strict.clock.maximum_rollback_ms, 0);
