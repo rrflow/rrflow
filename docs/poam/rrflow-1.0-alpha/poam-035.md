@@ -311,6 +311,10 @@ Linux19's diagnostic repeat on the preceding binary failed earlier at corpus
 ordinal 608 with an unclassified internal API rejection, despite resident memory
 below its cap and no failed flush/compaction counters. Its cause remains open;
 Linux18's successful setup does not establish repeatability.
+The [Linux20 candidate comparison](../../evidence/change-journals/gate-c/c-07g-projected-frontier-native.md)
+also stopped at ordinal 608 with an internal API rejection before backup, while
+remaining below the resident cap. The read-work repair is locally proved but
+does not resolve this rejection; precise error attribution remains required.
 
 Native run 39979675928 failed the macOS existing/WAL capacity case after a
 real filler ENOSPC: the client returned resource denial without a selected
