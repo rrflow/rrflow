@@ -498,3 +498,31 @@ generated-surface checks passed before staging.
 ### Candidate SDK identity projection correction
 
 Starting revision: `9f0f3bf3b3e0bcd41411308a4086f268ce38be76`. Required candidate run `39902969502` exposed a stale shared corpus: optional-engine job `120248753326` and macOS estate job `120248753430` failed the existing `shared_sdk_corpus_identity_matches_bundled_installation` assertion; SDK job `120248753437` independently reported the same planned identity `304f5c8569d429363f7d65c1`. The new sealed default recovery reserve changes the deterministic installation identity. Read the complete shared corpus, its typed validation, the identity characterization and the installation projection example. Refreshed the six instance/estate/scope occurrences in `fixtures/rrd-sdk-conformance-v1.json`; all payloads, expectations and anchor bytes remain intact. PR brief was posted before this correction. No local runtime suite executed; the next candidate must repeat the unchanged identity and five-language conformance oracles. No gate/status change.
+
+
+### Linux selected-create exhaustion correction, 2026-10-23
+
+Candidate `1c4361be7ce788100a627a0e76a25286de43b38e` run 39903727016,
+job 120251115161 passed seven native capacity cases; existing/current-before-create
+failed waiting for the selected native error (60-second event deadline). Both
+ordinary domain histories passed. No merge or eight-case acceptance is claimed.
+The old data-first filler stopped on one metadata allocation error, which did
+not establish that the selected different filename could not fit an ext4
+indexed directory. This is a fixture inference, not a proven engine failure.
+
+The pre-edit PR refinement binds the repair to the same native oracle. The
+owned Linux image now requests 4,096 inodes and admits at most 8,192. For
+create-boundary cases only, metadata is exhausted before data through the
+already-open filler; fstatvfs must report zero free inodes. That observed
+counter is emitted in the case receipt. WAL still exhausts data alone;
+APFS/NTFS retain data-first metadata fill. Exact owned filler cleanup and
+selected native ENOSPC/readback requirements remain. No timeout increased.
+Source: [mke2fs inode-count option](https://man7.org/linux/man-pages/man8/mke2fs.8.html).
+No upstream code imported. Read and reviewed full Filler/Drop/resume control,
+owned Linux volume creation/admission and native log failure. Local runtime
+or disk effects remain not run; candidate CI must prove the correction.
+
+Authoring checks: crash-test installed_crash Clippy with warnings denied passed
+(18.61s on Windows; Linux branch requires native CI). Navigation, inventory,
+documentation policy and diff whitespace checks passed. Python controller
+syntax compiled without executing volume operations. No native acceptance yet.
