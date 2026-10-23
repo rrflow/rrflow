@@ -398,6 +398,13 @@ remain subject to the existing validated garbage collector. Total on-disk
 history, higher-level debt, retained snapshots and process memory are separate
 qualification obligations; these controls do not claim those are bounded.
 
+A compaction-budget denial at a soft write-triggered flush defers that optional
+merge and retains its debt/failure counters. The incoming write still must pass
+hard L0, reclamation and mutable admission before WAL append; a failed optional
+merge cannot by itself consume otherwise available write capacity. Native I/O,
+corruption and publication uncertainty are not ignored. Cleanup ownership begins
+before partition creation, including when idle work fails before publication.
+
 While serving, the existing one-second host sweep offers one engine-owned
 physical maintenance quantum to a single joined worker. Busy ticks are skipped.
 Each admitted quantum either reclaims a bounded pending inventory or performs

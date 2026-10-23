@@ -21,6 +21,94 @@ fn options(max_versions: usize) -> DatabaseOptions {
 }
 
 #[test]
+fn soft_compaction_denial_preserves_write_room_until_the_hard_l0_cap() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("soft-versus-hard");
+    let options = DatabaseOptions {
+        maintenance: MaintenancePolicy {
+            wal_payload_max_bytes: usize::MAX,
+            memtable_max_versions: 1,
+        },
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 2,
+            ..Default::default()
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            input_logical_bytes: 1,
+            l0_segments: 4,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    let mut acknowledged = Vec::new();
+    for ordinal in 0..4 {
+        let key = format!("key-{ordinal}");
+        database
+            .write_owned(
+                WriteBatch::new(vec![put(&key, "ack")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap_or_else(|error| panic!("write {ordinal} fits hard capacity: {error}"));
+        acknowledged.push((key, database.snapshot()));
+        assert!(database.l0_segment_count() < options.compaction_limits.l0_segments as usize);
+    }
+    assert!(database.maintenance_stats().failed_compactions > 0);
+    let head = database.snapshot();
+    let denied = database.write_owned(
+        WriteBatch::new(vec![put("denied", "no-effect")]).unwrap(),
+        Durability::Authoritative,
+    );
+    assert!(
+        matches!(denied, Err(Error::MaintenanceLimit { .. })),
+        "{denied:?}"
+    );
+    assert_eq!(database.snapshot().sequence, head.sequence);
+    assert_eq!(database.l0_segment_count(), 4);
+    drop(database);
+    let database = Database::open_with_options(&root, options).unwrap();
+    assert_eq!(database.snapshot().sequence, head.sequence);
+    assert_eq!(database.get(b"denied", head).unwrap(), None);
+    for (key, snapshot) in &acknowledged {
+        assert_eq!(
+            database.get(key.as_bytes(), *snapshot).unwrap(),
+            Some(b"ack".to_vec())
+        );
+    }
+    drop(database);
+    // Explicitly sufficient maintenance admission permits recovery. The hard
+    // L0 cap and historical read identities remain exactly the same.
+    let mut sufficient = options;
+    sufficient.compaction_limits.input_logical_bytes = 4096;
+    let mut database = Database::open_with_options(&root, sufficient).unwrap();
+    for _ in 0..16 {
+        if !database.maintenance_step().unwrap() {
+            break;
+        }
+    }
+    assert_eq!(database.compaction_debt_segments(), 0);
+    database
+        .write_owned(
+            WriteBatch::new(vec![put("denied", "now-accepted")]).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    assert_eq!(database.snapshot().sequence, head.sequence + 1);
+    for (key, snapshot) in acknowledged {
+        assert_eq!(
+            database.get(key.as_bytes(), snapshot).unwrap(),
+            Some(b"ack".to_vec())
+        );
+    }
+    drop(database);
+    let database = Database::open_with_options(&root, sufficient).unwrap();
+    assert_eq!(
+        database.get(b"denied", database.snapshot()).unwrap(),
+        Some(b"now-accepted".to_vec())
+    );
+}
+
+#[test]
 fn idle_maintenance_drains_without_flushing_the_acknowledged_mutable_tail() {
     let directory = tempdir().unwrap();
     let root = directory.path().join("idle");
@@ -154,6 +242,77 @@ fn idle_maintenance_rejects_an_unadmitted_merge_without_publishing_or_flushing()
             Some(b"ack".to_vec())
         );
     }
+}
+
+#[test]
+fn failed_idle_partition_is_reclaimed_before_another_quantum() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("idle-partition");
+    let options = DatabaseOptions {
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 2,
+            target_segment_bytes: 64,
+            ..Default::default()
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            output_segments: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    for ordinal in 0..2 {
+        let value = ordinal.to_string().repeat(128);
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("a", &value), put("z", &value)]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(ordinal + 1).unwrap();
+    }
+    assert!(database.maintenance_step().unwrap()); // pending flush cleanup
+    let count_segments = || std::fs::read_dir(root.join("segments")).unwrap().count();
+    let baseline = count_segments();
+    let manifest = database.manifest().digest.clone();
+    for _ in 0..2 {
+        assert!(matches!(
+            database.maintenance_step(),
+            Err(Error::MaintenanceLimit {
+                resource: rrd_lsm::MaintenanceResource::OutputSegments,
+                ..
+            })
+        ));
+        assert_eq!(database.manifest().digest, manifest);
+        assert_eq!(
+            count_segments(),
+            baseline + 1,
+            "one unpublished partition retained"
+        );
+        assert!(
+            database.maintenance_step().unwrap(),
+            "next quantum must own cleanup"
+        );
+        assert_eq!(count_segments(), baseline);
+        for key in [b"a", b"z"] {
+            assert_eq!(
+                database.get(key, database.snapshot()).unwrap(),
+                Some("1".repeat(128).into_bytes())
+            );
+        }
+    }
+    database
+        .write_owned(
+            WriteBatch::new(vec![put("tail", "ack")]).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    drop(database);
+    let database = Database::open_with_options(&root, options).unwrap();
+    assert_eq!(
+        database.get(b"tail", database.snapshot()).unwrap(),
+        Some(b"ack".to_vec())
+    );
 }
 
 #[test]

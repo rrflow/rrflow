@@ -1229,7 +1229,23 @@ impl Database {
                     self.maintenance_stats.automatic_flushes =
                         self.maintenance_stats.automatic_flushes.saturating_add(1);
                     let result = self.compact_if_needed(self.manifest.created_at);
-                    self.record_automatic_compaction(result)?;
+                    match self.record_automatic_compaction(result) {
+                        Ok(_) => {}
+                        // The merge's hard limits still stop that merge before
+                        // publication. At this soft trigger, leave the debt
+                        // visible and let the unchanged hard L0, reclamation
+                        // and mutable admission below decide if the write fits.
+                        Err(Error::MaintenanceLimit {
+                            resource:
+                                crate::MaintenanceResource::InputBytes
+                                | crate::MaintenanceResource::InputLogicalBytes
+                                | crate::MaintenanceResource::InputVersions
+                                | crate::MaintenanceResource::OutputSegments
+                                | crate::MaintenanceResource::ElapsedMs,
+                            ..
+                        }) => {}
+                        Err(error) => return Err(error),
+                    }
                 }
                 Ok(None) => {}
                 Err(error) => {
@@ -1771,6 +1787,9 @@ impl Database {
         protected_sequences.insert(durable);
         let previous_manifest = self.manifest.digest.clone();
         let input_segments = candidate.indices.len();
+        // Partition creation can fail before a replacement manifest exists.
+        // Keep cleanup owned even when an idle quantum began without a flush.
+        self.reclamation_pending = true;
         let merge = self.merge_compaction_candidate(
             &candidate,
             durable,
@@ -1824,7 +1843,6 @@ impl Database {
         retained_segments.extend(compacted_segments.into_iter().map(Arc::new));
         self.segments = retained_segments;
         self.manifest = next.clone();
-        self.reclamation_pending = true;
         inject_compaction_failure(failure, CompactionBoundary::ManifestPublished)?;
         Ok(Some(CompactionOutcome {
             previous_manifest,

@@ -80,6 +80,21 @@ fn error(value: impl std::fmt::Display) -> String {
 fn engine_error_label(message: &str) -> Option<&'static str> {
     if let Some(detail) = message.strip_prefix("StorageAdmission(\"") {
         for (prefix, label) in [
+            ("maintenance input_bytes limit ", "maintenance-input-bytes"),
+            (
+                "maintenance input_logical_bytes limit ",
+                "maintenance-input-logical",
+            ),
+            (
+                "maintenance input_versions limit ",
+                "maintenance-input-versions",
+            ),
+            (
+                "maintenance output_segments limit ",
+                "maintenance-output-segments",
+            ),
+            ("maintenance elapsed_ms limit ", "maintenance-elapsed"),
+            ("maintenance l0_segments limit ", "maintenance-l0-segments"),
             ("transaction admission ", "storage-admission-queue"),
             ("transaction request ", "storage-admission-request"),
             ("transaction ", "storage-admission-transaction"),
@@ -142,6 +157,27 @@ fn client_error(value: rrd_client::Error) -> String {
 
 #[test]
 fn diagnostic_labels_never_copy_server_details_or_imply_outcomes() {
+    for (resource, label) in [
+        ("input_bytes", "maintenance-input-bytes"),
+        ("input_logical_bytes", "maintenance-input-logical"),
+        ("input_versions", "maintenance-input-versions"),
+        ("output_segments", "maintenance-output-segments"),
+        ("elapsed_ms", "maintenance-elapsed"),
+        ("l0_segments", "maintenance-l0-segments"),
+    ] {
+        assert_eq!(
+            engine_error_label(&format!(
+                "StorageAdmission(\"maintenance {resource} limit secret suffix\")"
+            )),
+            Some(label)
+        );
+        // The complete API label and digest must also fit campaign evidence.
+        assert!(format!("api-resourceexhausted-{label}:{}", "a".repeat(64)).len() <= 128);
+    }
+    assert_eq!(
+        engine_error_label("StorageAdmission(\"maintenance input_bytes_private limit secret\")"),
+        Some("storage-admission-maintenance")
+    );
     assert_eq!(
         engine_error_label("StorageAdmission(\"mutable secret suffix\")"),
         Some("storage-admission-mutable")

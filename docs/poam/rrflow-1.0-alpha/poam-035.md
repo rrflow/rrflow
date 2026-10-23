@@ -499,3 +499,12 @@ Native histories preserve mutable WAL acknowledgements and historical readers
 while debt drains; owning storage/engine/HTTP tests pass. Installed comparison
 must still prove drain and latency under load. Windows16 also failed a real
 2.048-second resource gap; sampling and 24-hour qualification remain open.
+
+The [soft-compaction admission repair](../../evidence/change-journals/gate-c/c-07d-soft-maintenance-admission.md)
+preserves write admission below hard capacity when an optional merge cannot
+fit its own hard budget, while retaining hard saturation denial and cleanup
+ownership for unpublished partitions. The native component histories pass.
+Linux11 failed during corpus setup with a maintenance denial after 807 retained
+acknowledgements; its prior label did not identify the precise resource. New
+closed resource labels improve that evidence, but native comparison and debt
+convergence remain required before claiming recovery of that operating point.
