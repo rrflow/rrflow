@@ -78,6 +78,27 @@ fn error(value: impl std::fmt::Display) -> String {
 // never used to infer effects or retryability. Return constants, not message
 // slices: even an arbitrary server body can disclose only an allowlisted label.
 fn engine_error_label(message: &str) -> Option<&'static str> {
+    if let Some(detail) = message.strip_prefix("StorageAdmission(\"") {
+        for (prefix, label) in [
+            ("transaction admission ", "storage-admission-queue"),
+            ("transaction request ", "storage-admission-request"),
+            ("transaction ", "storage-admission-transaction"),
+            ("write batch ", "storage-admission-batch"),
+            ("mutable ", "storage-admission-mutable"),
+            ("maintenance ", "storage-admission-maintenance"),
+            ("recovery ", "storage-admission-recovery"),
+            ("reclamation ", "storage-admission-reclamation"),
+            (
+                "bounded reclamation ",
+                "storage-admission-reclamation-pending",
+            ),
+            ("disk admission ", "storage-admission-disk"),
+        ] {
+            if detail.starts_with(prefix) {
+                return Some(label);
+            }
+        }
+    }
     let variant = message.split_once('(').map_or(message, |(name, _)| name);
     match variant {
         "TransactionQuota" => Some("transaction-quota"),
@@ -121,6 +142,18 @@ fn client_error(value: rrd_client::Error) -> String {
 
 #[test]
 fn diagnostic_labels_never_copy_server_details_or_imply_outcomes() {
+    assert_eq!(
+        engine_error_label("StorageAdmission(\"mutable secret suffix\")"),
+        Some("storage-admission-mutable")
+    );
+    assert_eq!(
+        engine_error_label("StorageAdmission(\"transaction admission secret suffix\")"),
+        Some("storage-admission-queue")
+    );
+    assert_eq!(
+        engine_error_label("StorageAdmission(\"transaction secret suffix\")"),
+        Some("storage-admission-transaction")
+    );
     assert_eq!(
         engine_error_label("TransactionQuota"),
         Some("transaction-quota")
