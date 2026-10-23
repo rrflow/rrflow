@@ -770,7 +770,39 @@ impl Segment {
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<(Self, AnchoredPath)> {
-        let encoded = encode(table, row_group_budget, compression_policy)?;
+        Self::write_encoded_with_cache(
+            directory,
+            encode(table, row_group_budget, compression_policy)?,
+            compression_policy,
+            cache,
+            io,
+        )
+    }
+
+    pub(crate) fn write_from_versions_with_cache<'a>(
+        directory: &AnchoredPath,
+        versions: impl Iterator<Item = (&'a [u8], &'a [VersionedValue])> + Clone,
+        row_group_budget: SegmentRowGroupBudget,
+        compression_policy: SegmentCompressionPolicy,
+        cache: SharedPageCache,
+        io: SharedIoContext,
+    ) -> Result<(Self, AnchoredPath)> {
+        Self::write_encoded_with_cache(
+            directory,
+            format::encode_versions(versions, row_group_budget, compression_policy)?,
+            compression_policy,
+            cache,
+            io,
+        )
+    }
+
+    fn write_encoded_with_cache(
+        directory: &AnchoredPath,
+        encoded: format::EncodedSegment,
+        compression_policy: SegmentCompressionPolicy,
+        cache: SharedPageCache,
+        io: SharedIoContext,
+    ) -> Result<(Self, AnchoredPath)> {
         let write_evidence = encoded.evidence;
         let path = directory.join(format!("{}.seg", encoded.checksum));
         directory.create_dir_all()?;

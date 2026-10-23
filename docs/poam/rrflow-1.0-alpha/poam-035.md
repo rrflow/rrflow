@@ -530,3 +530,16 @@ macOS capacity qualification also has metadata-fill deadline failures in PR79
 and PR82, and PR76's offline lifecycle exceeded its deadline before either
 complete storage-history receipt. These
 remain unqualified; no bypass or relaxed acceptance follows.
+
+The [partitioned-flush repair](../../evidence/change-journals/gate-c/c-07d-partitioned-flush.md)
+replaces a whole-table immutable output with bounded key-range partitions,
+admitted before output and published by one manifest. It preserves complete
+version chains and recovery at the existing flush boundaries. Linux14 still
+hit the hard L0 segment limit during corpus setup on PR96; the observed
+whole-table/compaction-range asymmetry is a scaling deficiency, not proof of
+that failure's complete cause. Windows18 failed an actual 3.069-second resource
+sample gap after 62 retained segments, with host compilation overlapping.
+Neither run qualifies a capacity profile or the 24-hour soak. Linux13 also
+retained debt after completing backup; the sustained driver's segment-local
+backup join may delay later offered requests and needs separate scheduling
+evidence before those failures are attributed wholly to the engine.

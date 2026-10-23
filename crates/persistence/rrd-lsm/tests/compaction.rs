@@ -106,6 +106,17 @@ fn blocked_l0_can_clear_lower_level_overlap_without_exceeding_input_budget() {
     }
     database.compact(&[], 2).unwrap().unwrap();
     let mut acknowledged = vec![(database.snapshot(), baseline)];
+    // Seed deliberately wide L0 inputs, then test compaction under the smaller
+    // target. Normal flushes now partition at that same immutable target.
+    drop(database);
+    let seed_options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            target_segment_bytes: 4096,
+            ..options.compaction
+        },
+        ..options
+    };
+    let mut database = Database::open_with_options(&root, seed_options).unwrap();
     for ordinal in 0..4 {
         let value = format!("{ordinal}").repeat(512);
         database
@@ -117,6 +128,8 @@ fn blocked_l0_can_clear_lower_level_overlap_without_exceeding_input_budget() {
         acknowledged.push((database.snapshot(), value));
         database.flush_memtable(ordinal + 3).unwrap();
     }
+    drop(database);
+    let mut database = Database::open_with_options(&root, options).unwrap();
     let relief = database
         .compact_if_needed(10)
         .unwrap()
@@ -642,17 +655,15 @@ fn explicit_compaction_promotes_a_single_segment() {
 fn leveled_compaction_streams_into_key_partitioned_outputs() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("database");
-    let mut database = Database::create_with_options(
-        &root,
-        DatabaseOptions {
-            compaction: CompactionPolicy {
-                target_segment_bytes: 512,
-                ..CompactionPolicy::default()
-            },
-            ..DatabaseOptions::default()
+    let options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            target_segment_bytes: 512,
+            ..CompactionPolicy::default()
         },
-    )
-    .unwrap();
+        ..DatabaseOptions::default()
+    };
+    // Build large input segments independently of the compaction output policy.
+    let mut database = Database::create(&root).unwrap();
     for phase in 0..3 {
         let operations = (0..32)
             .map(|index| {
@@ -668,6 +679,8 @@ fn leveled_compaction_streams_into_key_partitioned_outputs() {
         database.flush_memtable(phase + 1).unwrap();
     }
     let snapshot = database.snapshot();
+    drop(database);
+    let mut database = Database::open_with_options(&root, options).unwrap();
     let outcome = database.compact(&[], 10).unwrap().unwrap();
     assert_eq!(outcome.source_level, 0);
     assert_eq!(outcome.target_level, 1);

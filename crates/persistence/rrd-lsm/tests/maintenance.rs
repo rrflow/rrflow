@@ -260,7 +260,9 @@ fn failed_idle_partition_is_reclaimed_before_another_quantum() {
         },
         ..Default::default()
     };
-    let mut database = Database::create_with_options(&root, options).unwrap();
+    // Seed broad inputs under the normal output target. The intentionally tiny
+    // target/output cap below is the compaction failure being characterized.
+    let mut database = Database::create(&root).unwrap();
     for ordinal in 0..2 {
         let value = ordinal.to_string().repeat(128);
         database
@@ -271,6 +273,8 @@ fn failed_idle_partition_is_reclaimed_before_another_quantum() {
             .unwrap();
         database.flush_memtable(ordinal + 1).unwrap();
     }
+    drop(database);
+    let mut database = Database::open_with_options(&root, options).unwrap();
     assert!(database.maintenance_step().unwrap()); // pending flush cleanup
     let count_segments = || std::fs::read_dir(root.join("segments")).unwrap().count();
     let baseline = count_segments();

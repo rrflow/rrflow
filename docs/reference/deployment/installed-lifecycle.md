@@ -398,6 +398,18 @@ remain subject to the existing validated garbage collector. Total on-disk
 history, higher-level debt, retained snapshots and process memory are separate
 qualification obligations; these controls do not claim those are bounded.
 
+Flushes partition the mutable table at key boundaries using the native
+`CompactionPolicy::target_segment_bytes` output target (8 MiB default), also
+used for compaction. This is a logical payload target, not a physical-file or
+RSS cap; one complete version chain stays together even when larger. The plan
+borrows boundary keys and checks the complete output count against both L0
+and output-segment limits before syncing or creating output. Each partition
+uses the existing v6 writer; one manifest publishes every partition and the
+successor WAL together. Failed partial output remains unreachable and is
+reclaimed by the existing collector. The cooperative maintenance deadline
+applies before publication. The [partitioned-flush evidence](../../evidence/change-journals/gate-c/c-07d-partitioned-flush.md)
+does not establish installed capacity or a completed soak.
+
 A compaction-budget denial at a soft write-triggered flush defers that optional
 merge and retains its debt/failure counters. The incoming write still must pass
 hard L0, reclamation and mutable admission before WAL append; a failed optional
