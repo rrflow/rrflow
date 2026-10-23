@@ -461,7 +461,15 @@ impl PointRun<'_> {
             if joins.len() as u64 >= self.point.clients.get() {
                 let at = ns(clock);
                 collect(
-                    (sequence, scheduled(sequence), at, at, operation, None, true),
+                    (
+                        sequence,
+                        scheduled(sequence),
+                        at,
+                        at,
+                        operation,
+                        Err("driver-concurrency-limit".into()),
+                        true,
+                    ),
                     started,
                     &mut attempts,
                     &mut ledger,
@@ -473,8 +481,8 @@ impl PointRun<'_> {
                     let began = ns(clock);
                     let result = tokio::time::timeout(deadline, work.execute(&operation))
                         .await
-                        .ok()
-                        .and_then(std::result::Result::ok);
+                        .map_err(|_| "operation-deadline".to_owned())
+                        .and_then(std::convert::identity);
                     (sequence, at, began, ns(clock), operation, result, false)
                 });
             }
@@ -516,6 +524,7 @@ impl PointRun<'_> {
             }
         }
         let mut verified = true;
+        let mut failure = ReadbackFailures::default();
         if let Some(observation) = &backup_receipt {
             writer.record_event(&ProgressEvent::Backup {
                 segment: writer.next_index(),
@@ -538,7 +547,11 @@ impl PointRun<'_> {
             {
                 match attempt.outcome {
                     LoadOutcome::Acknowledged => {
-                        if self.workload.verify(operation).await.is_ok() {
+                        let verification = self.workload.verify(operation).await;
+                        if let Err(error) = verification {
+                            verified = false;
+                            failure.record(&operation.id, &error)?;
+                        } else {
                             if let Some(write) = operation.write {
                                 self.generations[write.slot as usize] = write
                                     .generation
@@ -553,14 +566,15 @@ impl PointRun<'_> {
                                 receipt_sha256: attempt.result_sha256.clone(),
                                 applications: 1u64.try_into().unwrap(),
                             });
-                        } else {
-                            verified = false;
                         }
                     }
                     LoadOutcome::Rejected => ledger.readback.push(Readback::Absent {
                         logical_id: attempt.logical_id.clone(),
                     }),
-                    _ => verified = false,
+                    _ => {
+                        verified = false;
+                        failure.record(&operation.id, attempt.result_sha256.as_str())?;
+                    }
                 }
             }
             if ledger.readback.len() > before {
@@ -616,7 +630,7 @@ impl PointRun<'_> {
                 } else {
                     CaseStatus::Failed
                 },
-                faults: vec![],
+                faults: failure.finish(),
                 limitation: if verified {
                     None
                 } else {
@@ -657,13 +671,96 @@ impl PointRun<'_> {
     }
 }
 
+// One rolling failure digest bounds retained provenance independently of
+// segment attempt count. It includes each failed logical identity and cause.
+#[derive(Default)]
+struct ReadbackFailures {
+    count: u64,
+    digest: Option<Digest>,
+}
+impl ReadbackFailures {
+    fn record(&mut self, logical_id: &str, cause: &str) -> DriverResult<()> {
+        self.count = self.count.checked_add(1).ok_or("failure count overflow")?;
+        self.digest = Some(digest(
+            "c07g.readback-failures",
+            &(&self.digest, logical_id, cause),
+        )?);
+        Ok(())
+    }
+    fn finish(self) -> Vec<Failure> {
+        self.digest.map_or_else(Vec::new, |artifact_sha256| {
+            vec![Failure {
+                phase: FailurePhase::Readback,
+                code: evidence_id("independent-readback-failed"),
+                occurrence: self.count.try_into().expect("nonempty failure history"),
+                artifact_sha256,
+            }]
+        })
+    }
+}
+fn failure_code(error: &str) -> Id {
+    if error == "operation-deadline" {
+        return evidence_id(error);
+    }
+    if let Some((code, detail)) = error.split_once(':') {
+        if (code.starts_with("api-") || code.starts_with("client-"))
+            && code.len() <= 80
+            && code.bytes().all(|b| b.is_ascii_lowercase() || b == b'-')
+            && detail.len() == 64
+            && detail.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return evidence_id(code);
+        }
+    }
+    evidence_id("request-or-oracle-failed")
+}
+
+#[test]
+fn failed_campaign_preserves_closed_cause_and_readback_provenance() {
+    assert_eq!(
+        failure_code("operation-deadline").as_str(),
+        "operation-deadline"
+    );
+    let sanitized = format!("api-conflict:{}", "a".repeat(64));
+    assert_eq!(failure_code(&sanitized).as_str(), "api-conflict");
+    assert_eq!(
+        failure_code("api-secret:private detail").as_str(),
+        "request-or-oracle-failed"
+    );
+    let manifest: StorageManifest = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../evaluation/rrflow-eval/tests/fixtures/storage/manifest.json"
+    )))
+    .unwrap();
+    let mut result: StorageResult = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../evaluation/rrflow-eval/tests/fixtures/storage/result.json"
+    )))
+    .unwrap();
+    result.manifest_sha256 = manifest_digest(&manifest).unwrap();
+    result.cases[0].status = CaseStatus::Failed;
+    result.cases[0].faults.clear();
+    assert_eq!(
+        validate_result(&manifest, &result).unwrap_err(),
+        "failed case must retain failure provenance"
+    );
+    let mut failure = ReadbackFailures::default();
+    failure.record("logical-a", &sanitized).unwrap();
+    failure.record("logical-b", "readback differs").unwrap();
+    result.cases[0].faults = failure.finish();
+    assert_eq!(result.cases[0].faults[0].occurrence.get(), 2);
+    let report = validate_result(&manifest, &result).unwrap();
+    assert_eq!(report.failed, 1);
+    assert!(!report.contract_passed);
+}
+
 type Completion = (
     u64,
     u64,
     u64,
     u64,
     Prepared,
-    Option<workload::Completed>,
+    DriverResult<workload::Completed>,
     bool,
 );
 fn collect(
@@ -674,25 +771,25 @@ fn collect(
     writer: &CampaignWriter,
 ) -> DriverResult<()> {
     let (outcome, result_sha256, recorded) = match result {
-        Some(result) => (
+        Ok(result) => (
             LoadOutcome::Acknowledged,
             result.receipt_sha256.clone(),
             AttemptOutcome::Acknowledged {
                 receipt_sha256: result.receipt_sha256,
             },
         ),
-        None if rejected => (
+        Err(_) if rejected => (
             LoadOutcome::Rejected,
             digest("c07g.saturated", &sequence)?,
             AttemptOutcome::Rejected {
                 reason: evidence_id("driver-concurrency-limit"),
             },
         ),
-        None => (
+        Err(error) => (
             LoadOutcome::Uncertain,
-            digest("c07g.uncertain", &sequence)?,
+            digest("c07g.request-failure", &(sequence, &error))?,
             AttemptOutcome::Uncertain {
-                reason: evidence_id("request-failed-or-deadline"),
+                reason: failure_code(&error),
             },
         ),
     };
