@@ -3,7 +3,7 @@
 use rrd_client::{RequestOptions, RrdClient, Session};
 use rrd_contract::*;
 use rrflow_eval::storage::{digest, Digest, ReadKeyDistribution, StorageLoadKind, WriteTransition};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -172,51 +172,142 @@ impl Workload {
             .map_err(error)
     }
     pub async fn initialize(&self) -> Result<()> {
-        let tables = [
-            ("capacity_document", DataLogicalModel::Document),
-            ("capacity_link", DataLogicalModel::GraphRelation),
-            ("capacity_vector", DataLogicalModel::Vector),
-        ]
-        .into_iter()
-        .map(|(name, model)| {
-            (
-                id(name),
-                DataTableSchema {
-                    model,
-                    mode: DataSchemaMode::Schemaless,
-                    properties: BTreeMap::new(),
-                    allow_additional_properties: false,
+        let lease = self
+            .client
+            .begin_transaction(
+                &self.session,
+                BeginTransaction {
+                    scope: id("data"),
+                    timeout_ms: 60_000,
                 },
+                options("capacity-schema-begin"),
             )
-        })
-        .collect();
-        let mutations = vec![
-            TransactionMutation::PutSchema {
-                registry: DataSchemaRegistry {
-                    revision: 1,
-                    migration: "installed capacity corpus".into(),
-                    catalogue: DataCatalogueIdentity::default(),
-                    tables,
-                    records: BTreeMap::new(),
-                    relations: BTreeMap::new(),
-                    events: BTreeMap::new(),
+            .await
+            .map_err(error)?;
+        let initialized = async {
+            let snapshot = self
+                .client
+                .read_data_schema(
+                    &self.session,
+                    ReadDataSchema {
+                        scope: self.scope(),
+                        max_storage_keys: self
+                            .query_budget
+                            .max_storage_keys
+                            .min(u64::from(MAX_DATA_SNAPSHOT_STORAGE_KEYS))
+                            as u32,
+                    },
+                    RequestOptions::read("capacity-schema-read", "capacity-schema-read").unwrap(),
+                )
+                .await
+                .map_err(error)?;
+            check(
+                snapshot.known_at_cursor == lease.read_cursor,
+                "database changed while planning capacity schema",
+            )?;
+            let mut registry = snapshot.schema.ok_or("installed schema is absent")?;
+            registry.revision = registry
+                .revision
+                .checked_add(1)
+                .ok_or("schema revision overflow")?;
+            registry.migration = "installed capacity corpus".into();
+            for (name, model) in [
+                ("capacity_document", DataLogicalModel::Document),
+                ("capacity_link", DataLogicalModel::GraphRelation),
+                ("capacity_vector", DataLogicalModel::Vector),
+            ] {
+                check(
+                    !registry.tables.contains_key(&id(name)),
+                    "capacity table already exists",
+                )?;
+                registry.tables.insert(
+                    id(name),
+                    DataTableSchema {
+                        model,
+                        mode: if model == DataLogicalModel::Vector {
+                            DataSchemaMode::Schemaless
+                        } else {
+                            DataSchemaMode::Strict
+                        },
+                        properties: BTreeMap::new(),
+                        allow_additional_properties: false,
+                    },
+                );
+            }
+            registry.records.insert(
+                id("capacity_document"),
+                DataRecordSchema {
+                    properties: BTreeMap::from([
+                        (
+                            "body".into(),
+                            DataPropertySchema {
+                                value_type: DataValueType::String,
+                                required: false,
+                            },
+                        ),
+                        (
+                            "revision".into(),
+                            DataPropertySchema {
+                                value_type: DataValueType::Unsigned,
+                                required: false,
+                            },
+                        ),
+                    ]),
+                    ..Default::default()
                 },
-            },
-            TransactionMutation::PutRecord {
-                reference: reference("capacity_document", "anchor"),
-                valid_from: self.valid_at,
-                valid_to: None,
-                properties: BTreeMap::new(),
-            },
-        ];
-        self.commit(
-            "capacity-schema",
-            CommitTransaction {
-                operation_sha256: transaction_operation_sha256(&mutations),
-                mutations,
-            },
-        )
-        .await?;
+            );
+            registry.relations.insert(
+                id("capacity_link"),
+                DataRelationSchema {
+                    from: BTreeSet::from([id("capacity_document")]),
+                    to: BTreeSet::from([id("capacity_document")]),
+                    properties: BTreeMap::from([(
+                        "revision".into(),
+                        DataPropertySchema {
+                            value_type: DataValueType::Unsigned,
+                            required: true,
+                        },
+                    )]),
+                    ..Default::default()
+                },
+            );
+            let mutations = vec![
+                TransactionMutation::PutSchema { registry },
+                TransactionMutation::PutRecord {
+                    reference: reference("capacity_document", "anchor"),
+                    valid_from: self.valid_at,
+                    valid_to: None,
+                    properties: BTreeMap::new(),
+                },
+            ];
+            self.client
+                .commit_transaction(
+                    &self.session,
+                    &lease.transaction_id,
+                    CommitTransaction {
+                        operation_sha256: transaction_operation_sha256(&mutations),
+                        mutations,
+                    },
+                    options("capacity-schema"),
+                )
+                .await
+                .map_err(error)?;
+            Ok::<(), String>(())
+        }
+        .await;
+        if initialized.is_err() {
+            // Cleanup cannot turn a failed initialization into success.
+            let _ = self
+                .client
+                .abort_transaction(
+                    &self.session,
+                    &lease.transaction_id,
+                    AbortTransaction {},
+                    options("capacity-schema-abort"),
+                )
+                .await;
+        }
+        initialized?;
         self.client
             .ensure_vector_collection(
                 &self.session,
@@ -289,8 +380,13 @@ impl Workload {
     }
     pub fn prepare_load(&self, operation: String, write: WriteTransition) -> Result<Prepared> {
         let key = format!("working-slot-{:020}", write.slot);
+        let mut view = self.clone();
+        view.valid_at = self
+            .valid_at
+            .checked_add(write.generation)
+            .ok_or("working generation valid-time overflow")?;
         let mut request =
-            self.prepare(key.clone(), StorageLoadKind::MixedWrite, write.generation)?;
+            view.prepare(key.clone(), StorageLoadKind::MixedWrite, write.generation)?;
         if write.retired() {
             let mut targets = vec![(
                 DataLogicalModel::Document,
@@ -313,7 +409,7 @@ impl Workload {
                 .map(|(model, reference)| TransactionMutation::RetireData {
                     model,
                     target: DataTarget::Reference { reference },
-                    effective_at: self.valid_at,
+                    effective_at: view.valid_at,
                 })
                 .collect::<Vec<_>>();
             request.mutation = Some(CommitTransaction {
@@ -487,10 +583,17 @@ impl Workload {
     }
     pub async fn verify(&self, request: &Prepared) -> Result<()> {
         if request.kind == StorageLoadKind::MixedWrite {
+            let mut view = self.clone();
+            if let Some(write) = request.write {
+                view.valid_at = self
+                    .valid_at
+                    .checked_add(write.generation)
+                    .ok_or("working generation valid-time overflow")?;
+            }
             if request.write.is_some_and(WriteTransition::retired) {
-                self.verify_absent(&request.key).await
+                view.verify_absent(&request.key).await
             } else {
-                self.verify_key(&request.key, request.revision).await
+                view.verify_key(&request.key, request.revision).await
             }
         } else {
             let ordinal = self.read_ordinal(request.revision)?;
