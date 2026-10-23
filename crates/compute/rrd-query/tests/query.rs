@@ -19,6 +19,11 @@ use rrd_store::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "query/adjacency_reads.rs"]
+mod adjacency_reads;
+#[path = "query/identity_reads.rs"]
+mod identity_reads;
+
 fn value(value: &str) -> RuntimeValue {
     RuntimeValue::String(value.into())
 }

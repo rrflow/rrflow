@@ -1075,6 +1075,81 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
     assert_eq!(diagnostics.read.runtime_manifest_sha256.len(), 64);
     assert_eq!(diagnostics.changes.head_cursor, runtime_head);
     assert_eq!(diagnostics.schema.as_ref().unwrap().revision, 2);
+    let physical = client
+        .read_storage_diagnostics(
+            &session,
+            rrd_contract::ReadStorageDiagnostics {
+                scope: format!("instance:{}", client.instance_id()),
+            },
+            RequestOptions::read("storage-only", "storage-only").unwrap(),
+        )
+        .await
+        .unwrap();
+    physical.validate().unwrap();
+    assert_eq!(physical.profile, StorageProfileKind::RrflowKv);
+    assert!(physical.rrflow_kv.is_some());
+    assert!(physical.admission.is_some());
+    let cursor_request = |action| rrd_contract::InspectStorageCursor {
+        scope: format!("instance:{}", client.instance_id()),
+        cursor_id: rrd_contract::CorrelationId::new("native-inspection").unwrap(),
+        action,
+    };
+    assert!(client
+        .inspect_storage_cursor(
+            &websocket_limited_session,
+            cursor_request(rrd_contract::StorageCursorAction::Open {
+                batch_rows: 1,
+                batch_bytes: 4096,
+                lifetime_ms: 30_000
+            }),
+            RequestOptions::read("cursor-denied", "cursor-denied").unwrap()
+        )
+        .await
+        .is_err());
+    let held = client
+        .inspect_storage_cursor(
+            &session,
+            cursor_request(rrd_contract::StorageCursorAction::Open {
+                batch_rows: 1,
+                batch_bytes: 4096,
+                lifetime_ms: 30_000,
+            }),
+            RequestOptions::read("cursor-open", "cursor-open").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(held.rows > 0 && held.allocated_bytes > 0);
+    let cancelled = client
+        .inspect_storage_cursor(
+            &session,
+            cursor_request(rrd_contract::StorageCursorAction::CancelSource {}),
+            RequestOptions::read("cursor-cancel", "cursor-cancel").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!cancelled.source_open);
+    assert_eq!(cancelled.page_sha256, held.page_sha256);
+    assert!(
+        client
+            .inspect_storage_cursor(
+                &session,
+                cursor_request(rrd_contract::StorageCursorAction::Release {}),
+                RequestOptions::read("cursor-release", "cursor-release").unwrap()
+            )
+            .await
+            .unwrap()
+            .released
+    );
+    assert!(client
+        .read_storage_diagnostics(
+            &websocket_limited_session,
+            rrd_contract::ReadStorageDiagnostics {
+                scope: format!("instance:{}", client.instance_id())
+            },
+            RequestOptions::read("storage-forbidden", "storage-forbidden").unwrap()
+        )
+        .await
+        .is_err());
     assert!(diagnostics.models.models.iter().any(|model| {
         model.id.as_str() == "document"
             && model.kind == rrd_contract::DiagnosticModelKind::Record

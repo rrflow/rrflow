@@ -118,6 +118,7 @@ mod query;
 mod query_export;
 mod query_transaction;
 mod restore_publication;
+mod storage_cursor;
 mod tail_repair;
 pub use tail_repair::{InstalledTailRepairPlan, InstalledTailRepairReceipt};
 mod retrieval;

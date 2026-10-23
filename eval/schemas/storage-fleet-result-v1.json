@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "CampaignStatus": {
+      "enum": [
+        "completed",
+        "failed",
+        "interrupted",
+        "not_run"
+      ],
+      "type": "string"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "campaign_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "isolated_latency_passed": {
+      "type": "boolean"
+    },
+    "qualification_passed": {
+      "type": "boolean"
+    },
+    "status": {
+      "$ref": "#/$defs/CampaignStatus"
+    },
+    "trials": {
+      "items": {
+        "$ref": "#/$defs/Digest"
+      },
+      "maxItems": 96,
+      "type": "array"
+    }
+  },
+  "required": [
+    "format_version",
+    "campaign_sha256",
+    "status",
+    "trials",
+    "isolated_latency_passed",
+    "qualification_passed"
+  ],
+  "title": "FleetResult",
+  "type": "object"
+}

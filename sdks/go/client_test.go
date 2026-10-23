@@ -66,6 +66,7 @@ func TestCapabilitiesRetryAndIdentity(t *testing.T) {
 						"mutable_accounted_bytes":        134217728,
 						"mutable_versions":               1048576,
 						"projected_output_bytes":         134217728,
+						"source_page_bytes":              268435456,
 						"page_cache_bytes":               4194304,
 						"wal_flush_target_bytes":         67108864,
 						"memtable_flush_target_versions": 524288,
@@ -223,7 +224,8 @@ func TestSecurityDeadlinesErrorsAndGeneratedCoverage(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "deadline has expired") {
 		t.Fatalf("unexpected deadline result: %v", err)
 	}
-	if len(endpoints) != 42 || !endpoints[OperationBackupCreate].Mutation ||
+	if len(endpoints) != 44 || !endpoints[OperationBackupCreate].Mutation ||
+		endpoints[OperationDiagnosticsStorageCursor].Authentication != "session_bearer" ||
 		!endpoints[OperationTransactionPreview].Mutation ||
 		endpoints[OperationCapabilitiesRead].Authentication != "public" {
 		t.Fatalf("generated endpoint catalogue is incomplete: %#v", endpoints)
