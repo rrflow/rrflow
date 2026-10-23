@@ -851,6 +851,10 @@ impl StorageEngine for RrflowKvStore {
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),
+            retained_mutable_bytes: Some(database.mutable_memory().stats().accounted_bytes as u64),
+            retained_projected_bytes: Some(
+                database.projected_output_memory().stats().reserved_bytes as u64,
+            ),
             memtable_versions: Some(database.memtable().version_count() as u64),
             memtable_bytes: Some(database.memtable().approximate_bytes() as u64),
             memtable_keys: Some(memtable.key_count as u64),

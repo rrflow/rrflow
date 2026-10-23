@@ -1276,6 +1276,7 @@ fn rrflow_kv_storage_counters() -> rrd_contract::DiagnosticRrflowKvSnapshot {
 fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
     use rrd_contract::{DiagnosticStorageEvidenceLevel as Level, StorageProfileKind as Profile};
     let storage = |profile, evidence_level, rrflow_kv| rrd_contract::DiagnosticStorageSnapshot {
+        admission: None,
         observed_at_unix_ms: 1_000,
         profile,
         evidence_level,

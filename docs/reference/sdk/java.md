@@ -129,7 +129,7 @@ checked-in `OperationId.java` contains:
 - wire operation name, HTTP method, route template, first authentication
   scheme, and mutation flag for each constant; and
 - OpenAPI SHA-256
-  `ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae`.
+  `58273fc2418b1e8d2085f8f91fe05be06fdc42eafbeb7d6a8a24082affdbb163`.
 
 An earlier flat record incorrectly said 34 routes when the generator, enum,
 unit assertion, public catalogue, and OpenAPI projection contained 33. The

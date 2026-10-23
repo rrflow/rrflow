@@ -2,8 +2,8 @@ use super::*;
 use rrd_contract::{
     DiagnosticMaintenanceSnapshot, DiagnosticMemtableSnapshot, DiagnosticPageCacheSnapshot,
     DiagnosticRrflowKvSnapshot, DiagnosticSegmentIoMode, DiagnosticSegmentIoSnapshot,
-    DiagnosticSegmentSetSnapshot, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
-    DiagnosticWriteAheadLogSnapshot, MAX_MESSAGE_BYTES,
+    DiagnosticSegmentSetSnapshot, DiagnosticStorageAdmission, DiagnosticStorageEvidenceLevel,
+    DiagnosticStorageSnapshot, DiagnosticWriteAheadLogSnapshot, MAX_MESSAGE_BYTES,
 };
 use rrd_store::PhysicalStoreEvidence;
 
@@ -811,6 +811,26 @@ fn diagnostic_storage(
         profile: engine.storage_profile_kind,
         evidence_level,
         rrflow_kv,
+        admission: if evidence_level == DiagnosticStorageEvidenceLevel::RrflowKvCounters {
+            let queue = engine.transaction_admission_snapshot()?;
+            Some(DiagnosticStorageAdmission {
+                retained_mutable_bytes: counter(
+                    evidence.retained_mutable_bytes,
+                    "retained_mutable_bytes",
+                )?,
+                retained_projected_bytes: counter(
+                    evidence.retained_projected_bytes,
+                    "retained_projected_bytes",
+                )?,
+                outstanding_requests: queue.outstanding_requests,
+                outstanding_logical_bytes: queue.logical_bytes,
+                queued_requests: queue.queued_requests as u64,
+                active: queue.active,
+                fenced: queue.fenced,
+            })
+        } else {
+            None
+        },
     })
 }
 

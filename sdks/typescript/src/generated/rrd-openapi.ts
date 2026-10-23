@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae
+// OpenAPI SHA-256: 58273fc2418b1e8d2085f8f91fe05be06fdc42eafbeb7d6a8a24082affdbb163
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -11077,13 +11077,33 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
-                                /**
-                                 * @description Process-local physical storage observation for the instance's storage
-                                 *     profile. It carries `observation` authority: counters are measured at
-                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
-                                 *     process reopens its store.
-                                 */
                                 storage: {
+                                    /**
+                                     * @description Process-local physical storage observation for the instance's storage
+                                     *     profile. It carries `observation` authority: counters are measured at
+                                     *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                     *     process reopens its store.
+                                     */
+                                    admission?: {
+                                        active: boolean;
+                                        fenced: boolean;
+                                        /** Format: uint64 */
+                                        outstanding_logical_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Includes the active request plus admitted waiters, matching admission.
+                                         */
+                                        outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        queued_requests: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                         */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_projected_bytes: number;
+                                    } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
                                     /** Format: uint64 */
@@ -13625,13 +13645,33 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
-                                /**
-                                 * @description Process-local physical storage observation for the instance's storage
-                                 *     profile. It carries `observation` authority: counters are measured at
-                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
-                                 *     process reopens its store.
-                                 */
                                 storage: {
+                                    /**
+                                     * @description Process-local physical storage observation for the instance's storage
+                                     *     profile. It carries `observation` authority: counters are measured at
+                                     *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                     *     process reopens its store.
+                                     */
+                                    admission?: {
+                                        active: boolean;
+                                        fenced: boolean;
+                                        /** Format: uint64 */
+                                        outstanding_logical_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Includes the active request plus admitted waiters, matching admission.
+                                         */
+                                        outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        queued_requests: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                         */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_projected_bytes: number;
+                                    } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
                                     /** Format: uint64 */

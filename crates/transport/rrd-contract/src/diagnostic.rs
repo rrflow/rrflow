@@ -430,18 +430,44 @@ pub struct DiagnosticRrflowKvSnapshot {
 /// process reopens its store.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct DiagnosticStorageAdmission {
+    /// Logical owner charges; these are not allocator or process RSS bytes.
+    pub retained_mutable_bytes: u64,
+    pub retained_projected_bytes: u64,
+    /// Includes the active request plus admitted waiters, matching admission.
+    pub outstanding_requests: u64,
+    pub outstanding_logical_bytes: u64,
+    pub queued_requests: u64,
+    pub active: bool,
+    pub fenced: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DiagnosticStorageSnapshot {
     pub observed_at_unix_ms: u64,
     pub profile: StorageProfileKind,
     pub evidence_level: DiagnosticStorageEvidenceLevel,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rrflow_kv: Option<DiagnosticRrflowKvSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission: Option<DiagnosticStorageAdmission>,
 }
 
 impl DiagnosticStorageSnapshot {
     pub fn validate(&self) -> crate::Result<()> {
         if self.observed_at_unix_ms == 0 {
             return invalid("diagnostic storage observation time must be greater than zero");
+        }
+        if let Some(admission) = &self.admission {
+            if self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
+                || admission
+                    .queued_requests
+                    .checked_add(u64::from(admission.active))
+                    != Some(admission.outstanding_requests)
+            {
+                return invalid("storage admission ownership or evidence level differs");
+            }
         }
         match (self.profile, self.evidence_level, &self.rrflow_kv) {
             (

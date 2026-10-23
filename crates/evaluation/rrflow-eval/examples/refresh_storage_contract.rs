@@ -1,8 +1,8 @@
 //! Refresh synthetic contract projections after an intentional contract change.
 //! This does not run a workload or produce native storage qualification.
 use rrflow_eval::storage::{
-    catalogue_digest, manifest_digest, schema, validate_result, EvidenceClass, StorageManifest,
-    StorageResult, ValidationReport,
+    catalogue_digest, manifest_digest, schema, validate_result, CampaignResult, EvidenceClass,
+    StorageCampaign, StorageManifest, StorageResult, SustainedSegment, ValidationReport,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -48,6 +48,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write(
         &schemas.join("storage-report-v1.json"),
         &schema::<ValidationReport>(),
+    )?;
+    write(
+        &schemas.join("storage-campaign-v1.json"),
+        &schema::<StorageCampaign>(),
+    )?;
+    write(
+        &schemas.join("storage-segment-v1.json"),
+        &schema::<SustainedSegment>(),
+    )?;
+    write(
+        &schemas.join("storage-campaign-result-v1.json"),
+        &schema::<CampaignResult>(),
     )?;
     println!("refreshed synthetic storage contract projections; no native workload executed");
     Ok(())

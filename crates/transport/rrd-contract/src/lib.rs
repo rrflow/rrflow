@@ -67,11 +67,11 @@ pub use diagnostic::{
     DiagnosticRetentionPin, DiagnosticRetentionSnapshot, DiagnosticRrflowKvSnapshot,
     DiagnosticRuntimeReference, DiagnosticSectionSnapshot, DiagnosticSegmentIoMode,
     DiagnosticSegmentIoSnapshot, DiagnosticSegmentSetSnapshot, DiagnosticSnapshot,
-    DiagnosticSnapshotLease, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
-    DiagnosticVectorArtifactCatalogueSnapshot, DiagnosticVectorArtifactKind,
-    DiagnosticVectorArtifactSnapshot, DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot,
-    DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
-    MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
+    DiagnosticSnapshotLease, DiagnosticStorageAdmission, DiagnosticStorageEvidenceLevel,
+    DiagnosticStorageSnapshot, DiagnosticVectorArtifactCatalogueSnapshot,
+    DiagnosticVectorArtifactKind, DiagnosticVectorArtifactSnapshot,
+    DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot, DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION,
+    MAX_DIAGNOSTIC_AUDIT_RECORDS, MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
 };
 pub use endpoint_binding::{
     endpoint_profile_sha256, BindingKind, BindingLimits, CredentialReference, DeclaredFootprint,
@@ -218,7 +218,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae";
+    "58273fc2418b1e8d2085f8f91fe05be06fdc42eafbeb7d6a8a24082affdbb163";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;

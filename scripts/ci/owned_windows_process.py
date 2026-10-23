@@ -16,7 +16,8 @@ from windows_offline import (Information, JobLimits, P, Startup, U32, api, boole
                              close, kernel, quiesce_job)
 
 
-def run_owned(arguments, *, env, timeout=600, limit=8 * 1024 * 1024):
+def run_owned(arguments, *, env, timeout=600, limit=8 * 1024 * 1024,
+              process_memory_bytes=None, job_memory_bytes=None, on_bound=None):
     import msvcrt
     streams = [bytearray(), bytearray()]
     exceeded = threading.Event()
@@ -27,6 +28,14 @@ def run_owned(arguments, *, env, timeout=600, limit=8 * 1024 * 1024):
         # Child handles and output pipes must stay valid until the tree quiesces.
         limits = JobLimits()
         limits.basic.flags = 0x2000
+        if process_memory_bytes is not None or job_memory_bytes is not None:
+            require(isinstance(process_memory_bytes, int) and isinstance(job_memory_bytes, int)
+                    and 0 < process_memory_bytes <= job_memory_bytes < 2**63,
+                    "invalid native job memory allocation")
+            # Windows limits committed virtual memory, not an RSS estimate.
+            limits.basic.flags |= 0x100 | 0x200
+            limits.process_memory = process_memory_bytes
+            limits.job_memory = job_memory_bytes
         try:
             boolean(api(kernel, "SetInformationJobObject", w.BOOL, P, U32, P, U32)(
                 job, 9, c.byref(limits), c.sizeof(limits)), "bind capacity job lifetime")
@@ -74,6 +83,8 @@ def run_owned(arguments, *, env, timeout=600, limit=8 * 1024 * 1024):
             stack.callback(api(kernel, "TerminateProcess", w.BOOL, P, U32), information.process, 1)
             boolean(api(kernel, "AssignProcessToJobObject", w.BOOL, P, P)(job, information.process),
                     "assign capacity child before execution")
+            if on_bound is not None:
+                on_bound()
             require(api(kernel, "ResumeThread", U32, P)(information.thread) != 0xFFFFFFFF,
                     "resume capacity child")
             wait = api(kernel, "WaitForSingleObject", U32, P, U32)

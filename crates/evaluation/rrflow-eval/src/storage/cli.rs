@@ -39,12 +39,28 @@ pub fn run(args: &[String]) -> Result<()> {
                 "manifest" => schema::<StorageManifest>(),
                 "result" => schema::<StorageResult>(),
                 "report" => schema::<ValidationReport>(),
-                _ => return Err("schema expects manifest, result or report".into()),
+                "campaign" => schema::<StorageCampaign>(),
+                "segment" => schema::<SustainedSegment>(),
+                "campaign-result" => schema::<CampaignResult>(),
+                _ => return Err("unknown storage schema projection".into()),
             };
             std::io::stdout()
                 .lock()
                 .write_all(&pretty(&generated)?)
                 .map_err(|e| e.to_string())
+        }
+        ["campaign", "validate", path] => {
+            let campaign: StorageCampaign = decode(&read(Path::new(path))?)?;
+            println!("valid storage campaign: {} purpose={:?}; no workload executed",
+                campaign.sha256()?.as_str(), campaign.purpose);
+            Ok(())
+        }
+        ["campaign", "verify", directory] => {
+            let result = verify_campaign(Path::new(directory))?;
+            std::io::stdout().lock().write_all(&pretty(&result)?)
+                .map_err(|e| e.to_string())?;
+            require(result.status == CampaignStatus::Completed,
+                "campaign did not complete; failure evidence retained")
         }
         ["validate", path] => {
             let manifest: StorageManifest = decode(&read(Path::new(path))?)?;
@@ -80,6 +96,6 @@ pub fn run(args: &[String]) -> Result<()> {
             );
             Ok(())
         }
-        _ => Err("usage: rrflow-eval storage schema <manifest|result|report> | validate <manifest> | verify <manifest> <result> <new-report>".into()),
+        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result> | validate <manifest> | verify <manifest> <result> <new-report> | campaign validate <campaign> | campaign verify <directory>".into()),
     }
 }

@@ -207,6 +207,12 @@ incomplete-tail candidate repair. Native acceptance, damage/backup matrix,
 recovery reserve, operating profiles and 24-hour soak remain open; compiling
 these paths is not qualification evidence.
 
+The [C-07g sustained implementation](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md)
+adds bounded campaign evidence, independent mixed-family installed readback,
+live retained/queue telemetry and explicit native resource launch controls.
+Its full corpus/lifecycle lanes and native qualification remain in progress;
+no actual 24-hour result is implied by these implementation files.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

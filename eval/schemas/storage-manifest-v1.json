@@ -592,6 +592,55 @@
       ],
       "type": "object"
     },
+    "DiagnosticStorageAdmission": {
+      "additionalProperties": false,
+      "description": "Process-local physical storage observation for the instance's storage\nprofile. It carries `observation` authority: counters are measured at\n`observed_at_unix_ms`, are not bound to the read stamp, and reset when the\nprocess reopens its store.",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "fenced": {
+          "type": "boolean"
+        },
+        "outstanding_logical_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_requests": {
+          "description": "Includes the active request plus admitted waiters, matching admission.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "queued_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_bytes": {
+          "description": "Logical owner charges; these are not allocator or process RSS bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_projected_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "retained_mutable_bytes",
+        "retained_projected_bytes",
+        "outstanding_requests",
+        "outstanding_logical_bytes",
+        "queued_requests",
+        "active",
+        "fenced"
+      ],
+      "type": "object"
+    },
     "DiagnosticStorageEvidenceLevel": {
       "description": "How much physical evidence the instance's storage profile reports.",
       "oneOf": [
@@ -609,8 +658,17 @@
     },
     "DiagnosticStorageSnapshot": {
       "additionalProperties": false,
-      "description": "Process-local physical storage observation for the instance's storage\nprofile. It carries `observation` authority: counters are measured at\n`observed_at_unix_ms`, are not bound to the read stamp, and reset when the\nprocess reopens its store.",
       "properties": {
+        "admission": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiagnosticStorageAdmission"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "evidence_level": {
           "$ref": "#/$defs/DiagnosticStorageEvidenceLevel"
         },
