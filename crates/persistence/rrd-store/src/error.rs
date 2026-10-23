@@ -6,6 +6,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    DiskAdmission {
+        available: u64,
+        required: u64,
+        reserve: u64,
+    },
     /// Propagated from the substrate.
     Substrate(String),
     /// Known admission rejection before this batch's domain publication.
@@ -132,6 +137,7 @@ impl fmt::Display for Error {
             Error::RecoveryLimit { resource, limit, observed } => write!(f, "recovery {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::ReclamationPending => write!(f, "bounded reclamation has remaining work; retry before admitting another write"),
             Error::ReclamationLimit { resource, limit, observed } => write!(f, "reclamation {} limit {limit} would be exceeded by {observed}", resource.as_str()),
+            Error::DiskAdmission { available, required, reserve } => write!(f, "disk admission requires {required} bytes including {reserve} recovery reserve; observed {available}"),
             Error::MaintenanceLimit { resource, limit, observed } => write!(f, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::MutableLimit { resource, limit, observed } => write!(
                 f, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()
@@ -238,6 +244,15 @@ impl From<rrd_lsm::Error> for Error {
                 resource,
                 limit,
                 observed,
+            },
+            rrd_lsm::Error::DiskAdmission {
+                available,
+                required,
+                reserve,
+            } => Self::DiskAdmission {
+                available,
+                required,
+                reserve,
             },
             rrd_lsm::Error::MaintenanceLimit {
                 resource,

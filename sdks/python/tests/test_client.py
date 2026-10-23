@@ -84,6 +84,7 @@ def test_public_negotiation_retries_transport_loss_and_validates_envelope() -> N
                         "recovery_wal_bytes": 268435456,
                         "recovery_wal_frames": 1048576,
                         "recovery_elapsed_ms": 120000,
+                        "recovery_reserve_bytes": 16777216,
                     },
                     "reasoning": {
                         "max_run_elapsed_ms": 900_000,

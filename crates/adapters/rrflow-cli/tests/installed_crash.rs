@@ -1,4 +1,6 @@
 //! Explicit diagnostic-primary proof. Never a default distribution artifact.
+#[path = "support/capacity.rs"]
+mod capacity;
 #[path = "support/process.rs"]
 mod process;
 
@@ -27,6 +29,8 @@ const PREFIX: &str = "C07C_NATIVE_PAUSE_V1=";
 
 struct Estate {
     temp: tempfile::TempDir,
+    _volume_project: Option<tempfile::TempDir>,
+    working: PathBuf,
     binary: PathBuf,
     project: PathBuf,
     identity: String,
@@ -37,16 +41,14 @@ struct Estate {
 impl Estate {
     fn command(&self) -> Command {
         let mut command = Command::new(&self.binary);
-        command
-            .env_clear()
-            .current_dir(self.temp.path().join("working"));
+        command.env_clear().current_dir(&self.working);
         for name in ["SystemRoot", "WINDIR"] {
             if let Some(value) = std::env::var_os(name) {
                 command.env(name, value);
             }
         }
         for name in ["HOME", "USERPROFILE", "TMP", "TEMP", "TMPDIR", "PATH"] {
-            command.env(name, self.temp.path().join("working"));
+            command.env(name, &self.working);
         }
         command
     }
@@ -66,6 +68,10 @@ impl Estate {
     }
 
     fn install(mode: &str) -> Self {
+        Self::install_at(mode, None, false)
+    }
+
+    fn install_at(mode: &str, volume: Option<&std::path::Path>, flush_each: bool) -> Self {
         let temp = tempfile::tempdir().unwrap();
         let binary = temp.path().join(if cfg!(windows) {
             "rrflow.exe"
@@ -74,14 +80,26 @@ impl Estate {
         });
         process::stage_executable(std::path::Path::new(env!("CARGO_BIN_EXE_rrflow")), &binary)
             .unwrap();
-        let project = temp.path().join("project");
+        let volume_project = volume.map(|root| {
+            tempfile::Builder::new()
+                .prefix("rrflow-estate-")
+                .tempdir_in(root)
+                .unwrap()
+        });
+        let estate_root = volume_project
+            .as_ref()
+            .map_or(temp.path(), |owner| owner.path());
+        let project = estate_root.join("project");
+        let working = estate_root.join("working");
         std::fs::create_dir(&project).unwrap();
-        std::fs::create_dir(temp.path().join("working")).unwrap();
+        std::fs::create_dir(&working).unwrap();
         if mode == "existing" {
             std::fs::write(project.join("README.md"), "owned project\n").unwrap();
         }
         let mut estate = Self {
             temp,
+            _volume_project: volume_project,
+            working,
             binary,
             project,
             identity: String::new(),
@@ -93,6 +111,18 @@ impl Estate {
             .as_str()
             .unwrap()
             .to_owned();
+        let configuration = estate.temp.path().join("configuration.toml");
+        let mut policy = include_str!(
+            "../../../authority/rrd-engine/assets/install/default-estate-configuration-v3.toml"
+        )
+        .to_owned();
+        if flush_each {
+            policy = policy.replace(
+                "wal_flush_target_bytes = 67108864",
+                "wal_flush_target_bytes = 1",
+            );
+        }
+        std::fs::write(&configuration, policy).unwrap();
         let preview = estate.invoke(&[
             "install",
             "plan",
@@ -102,6 +132,8 @@ impl Estate {
             mode,
             "--project",
             estate.project.to_str().unwrap(),
+            "--configuration",
+            configuration.to_str().unwrap(),
         ]);
         let path = estate.temp.path().join("plan.json");
         std::fs::write(&path, serde_json::to_vec(&preview).unwrap()).unwrap();
@@ -139,13 +171,24 @@ impl Estate {
             .arg(&self.project)
             .args(["--bind", "127.0.0.1:0"]);
         let (send, lines) = mpsc::sync_channel(4);
-        let child = process::Process::start_observed(
-            &mut command,
-            Duration::from_secs(180),
-            LIMIT,
-            send,
-            &serde_json::to_vec(control).unwrap(),
-        )
+        let input = serde_json::to_vec(control).unwrap();
+        let child = if control["resume"] == true {
+            process::Process::start_controlled(
+                &mut command,
+                Duration::from_secs(180),
+                LIMIT,
+                send,
+                &input,
+            )
+        } else {
+            process::Process::start_observed(
+                &mut command,
+                Duration::from_secs(180),
+                LIMIT,
+                send,
+                &input,
+            )
+        }
         .unwrap();
         Child { child, lines }
     }

@@ -135,16 +135,39 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
 
     def test_child_deadline_and_output_limit_are_enforced(self):
         start = time.monotonic()
+        observed = []
         with self.assertRaisesRegex(RuntimeError, "deadline"):
-            runner.run(sys.executable, "-c", "import time; time.sleep(30)", timeout=0.2)
+            runner.run(sys.executable, "-c", "import time; print('before timeout', flush=True); time.sleep(30)",
+                       timeout=0.2, on_completion=observed.append)
+        self.assertEqual(len(observed), 1)
+        self.assertNotEqual(observed[0].returncode, 0)
         self.assertLess(time.monotonic() - start, 5)
         with self.assertRaisesRegex(RuntimeError, "output"):
-            runner.run(sys.executable, "-c", "import sys; sys.stdout.write('x' * 1000000)", output_limit=1024)
+            runner.run(sys.executable, "-c", "import sys; sys.stdout.write('x' * 1000000)",
+                       output_limit=1024, on_completion=observed.append)
+        self.assertEqual(len(observed), 2)
+        self.assertLessEqual(len(observed[-1].stdout), 1024)
         with self.assertRaisesRegex(RuntimeError, "exit status"):
             runner.run(sys.executable, "-c", "raise SystemExit(3)")
         output = runner.run(sys.executable, "-c", "import sys; print('out'); print('err', file=sys.stderr)")
         self.assertEqual(output.stdout.strip(), "out")
         self.assertEqual(output.stderr.strip(), "err")
+
+    def test_partial_progress_cannot_retain_arbitrary_output_or_credentials(self):
+        case = sorted(runner.REQUIRED_CASES)[0]
+        result = runner.subprocess.CompletedProcess([], 1,
+            f'test {case} ... ok\ntest unknown_secret_case ... FAILED\n'
+            'native_lifecycle_receipt={"mode":"fresh","credential":"never retain me"}\n'
+            'native_storage_history={"mode":"not a fixture","private":"never retain me"}\n'
+            'native_storage_history={invalid}\nprivate output never retain me\n',
+            'native readiness output stdout_bytes=123 stderr_bytes=0\nsecret never retain me\n')
+        progress = runner.partial_lifecycle_progress(result)
+        self.assertEqual(progress["cases"], [{"case": case, "status": "ok", "occurrences": 1}])
+        self.assertEqual(progress["markers"]["native_lifecycle_receipt"], {"fresh": 1, "existing": 0})
+        self.assertEqual(progress["markers"]["native_storage_history"], {"fresh": 0, "existing": 0})
+        self.assertEqual(progress["readiness_observations"], 1)
+        self.assertNotIn("never retain me", json.dumps(progress))
+        self.assertNotIn("unknown_secret_case", json.dumps(progress))
 
     def test_every_primary_lifecycle_case_is_required(self):
         cases = {

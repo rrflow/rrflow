@@ -524,6 +524,22 @@ native pause 30 seconds. The job allows 45 minutes including builds; the warm
 test step allows 20 minutes and two test threads. Existing ordinary lane
 limits are unchanged. `ci-gate` requires all three diagnostic jobs.
 
+The same required native job now invokes
+`python3 scripts/ci/run_native_capacity.py` for fresh/existing estates at WAL,
+segment, manifest and CURRENT-write boundaries. It creates a capped ext4 loop
+image in a private mount namespace, fixed APFS image, or NTFS VHD. The harness
+requires a separately enumerated small volume, an exact owner marker, a private
+one-use pause/resume, and an actual native capacity error at the selected
+phase. It preserves every acknowledged value/receipt, resolves the uncertain
+call, explicitly publishes a repaired candidate when a final WAL frame is
+incomplete, admits distinct new work, and reopens again. These are actual
+filesystem-failure checks; they do not establish OS power-cut safety or a
+24-hour operating envelope. Missing facilities report not-run with nonzero
+exit; any failed cleanup fails qualification. The normal binary must contain
+neither diagnostic marker. The job's 75-minute bound includes the existing
+corpus and a 30-minute native capacity step. Local execution remains explicit:
+this runner must never be pointed at an existing disk or mount.
+
 The nondefault four-crate `crash-test` composition is owned by this dedicated
 job; other optional features retain their existing matrix. It must never be
 used to assemble the normal distribution. These tests do not close installed

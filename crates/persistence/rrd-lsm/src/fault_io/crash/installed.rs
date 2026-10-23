@@ -1,6 +1,6 @@
 //! Private diagnostic-process control, absent from ordinary distributions.
 use super::*;
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
@@ -14,6 +14,8 @@ struct Control {
     id: u16,
     point: Point,
     operation_sha256: Option<String>,
+    #[serde(default)]
+    resume: bool,
 }
 
 struct Pending {
@@ -24,16 +26,26 @@ struct Pending {
 
 static CONFIGURED: AtomicBool = AtomicBool::new(false);
 static PENDING: Mutex<Option<Pending>> = Mutex::new(None);
+static RESUMABLE: AtomicBool = AtomicBool::new(false);
+
+struct Observation {
+    schedule: Schedule,
+    emitted: bool,
+}
+thread_local! { static OBSERVATION: RefCell<Option<Observation>> = const { RefCell::new(None) }; }
 
 /// Called exactly once by diagnostic `serve`, before opening its installed
 /// estate. The caller supplies the locator-bound root, never the controller.
-/// EOF delimits a <=4096-byte private pipe message. Null explicitly disarms.
+/// Newline or EOF delimits a <=4096-byte private pipe message. Null disarms.
 pub fn configure_from_stdin(root: &Path) -> io::Result<()> {
     if CONFIGURED.swap(true, Ordering::AcqRel) {
         return Err(io::Error::other("diagnostic control already configured"));
     }
     let mut bytes = Vec::new();
-    io::stdin().take(4097).read_to_end(&mut bytes)?;
+    io::stdin()
+        .lock()
+        .take(4097)
+        .read_until(b'\n', &mut bytes)?;
     if bytes.len() > 4096 {
         return Err(io::Error::other("diagnostic control exceeds bound"));
     }
@@ -58,6 +70,10 @@ pub fn configure_from_stdin(root: &Path) -> io::Result<()> {
                 | Point::Visible
                 | Point::ReceiptPersisted
                 | Point::RecoveryRead
+                | Point::SegmentBeforeCreate
+                | Point::ManifestBeforeCreate
+                | Point::CurrentBeforeCreate
+                | Point::CurrentBeforeRename
         )
         || (control.point == Point::RecoveryRead) != control.operation_sha256.is_none()
         || control
@@ -67,6 +83,12 @@ pub fn configure_from_stdin(root: &Path) -> io::Result<()> {
     {
         return Err(io::Error::other("inadmissible diagnostic schedule"));
     }
+    if control.resume && control.point == Point::RecoveryRead {
+        return Err(io::Error::other(
+            "capacity resume requires a domain effect boundary",
+        ));
+    }
+    RESUMABLE.store(control.resume, Ordering::Release);
     let schedule = Schedule {
         root: std::fs::canonicalize(root)?,
         nonce: control.nonce,
@@ -104,6 +126,14 @@ fn enter_selected(matches: impl FnOnce(&Pending) -> bool) -> ScopeGuard {
         "diagnostic admission expired"
     );
     drop(pending);
+    if RESUMABLE.load(Ordering::Acquire) {
+        OBSERVATION.with_borrow_mut(|slot| {
+            *slot = Some(Observation {
+                schedule: selected.schedule.clone(),
+                emitted: false,
+            })
+        });
+    }
     arm(selected.schedule);
     ScopeGuard(true)
 }
@@ -115,6 +145,9 @@ impl Drop for ScopeGuard {
             ARMED.with_borrow_mut(|slot| {
                 slot.take();
             });
+            OBSERVATION.with_borrow_mut(|slot| {
+                slot.take();
+            });
         }
     }
 }
@@ -123,4 +156,101 @@ impl Drop for ScopeGuard {
 /// armed. Root containment also rejects another database in that thread.
 pub fn boundary(point: Point, path: &Path) {
     pause_if(|active| active.schedule.point == point && path.starts_with(&active.schedule.root));
+}
+
+/// Continue only through the already-private controller pipe with the exact
+/// one-use identity. No filesystem flag, network listener or default hook.
+pub(super) fn resume_private(hit: &Hit, deadline: Instant) -> bool {
+    if !RESUMABLE.swap(false, Ordering::AcqRel) {
+        return false;
+    }
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Resume {
+        version: u8,
+        nonce: String,
+        id: u16,
+    }
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let result = (|| -> io::Result<Resume> {
+            let mut bytes = Vec::new();
+            io::stdin().lock().take(513).read_until(b'\n', &mut bytes)?;
+            if bytes.len() > 512 {
+                return Err(io::Error::other("capacity resume exceeds bound"));
+            }
+            serde_json::from_slice(&bytes).map_err(|_| io::Error::other("invalid capacity resume"))
+        })();
+        let _ = send.send(result);
+    });
+    let resume = receive
+        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
+        .expect("bounded private capacity resume")
+        .expect("valid private capacity resume");
+    assert!(
+        resume.version == 1 && resume.nonce == hit.nonce && resume.id == hit.id,
+        "capacity resume identity mismatch"
+    );
+    true
+}
+
+pub fn before_io(operation: &'static str, path: &Path) {
+    let parent = path
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|name| name.to_str());
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    let point = match operation {
+        "create" if parent == Some("segments") => Some(Point::SegmentBeforeCreate),
+        "create" if parent == Some("manifests") => Some(Point::ManifestBeforeCreate),
+        "create" if name.starts_with(".CURRENT.") => Some(Point::CurrentBeforeCreate),
+        "rename" if name.starts_with(".CURRENT.") => Some(Point::CurrentBeforeRename),
+        _ => None,
+    };
+    if let Some(point) = point {
+        boundary(point, path);
+    }
+}
+
+/// Observe an actual native call result. This never injects or substitutes I/O.
+pub fn observe_native_error<T>(operation: &'static str, path: &Path, result: &io::Result<T>) {
+    let Err(error) = result else {
+        return;
+    };
+    let Some(code) = error.raw_os_error() else {
+        return;
+    };
+    OBSERVATION.with_borrow_mut(|slot| {
+        let Some(active) = slot.as_mut() else {
+            return;
+        };
+        if active.emitted || !path.starts_with(&active.schedule.root) {
+            return;
+        }
+        active.emitted = true;
+        let parent = path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str());
+        let role = match parent {
+            Some("wal") => "wal",
+            Some("segments") => "segment",
+            Some("manifests") => "manifest",
+            _ => "publication",
+        };
+        let receipt = serde_json::json!({"version":1,"nonce":active.schedule.nonce,
+            "id":active.schedule.id,"pid":std::process::id(),"point":active.schedule.point,
+            "operation":operation,"role":role,"native_code":code});
+        let line = format!("C07F_NATIVE_IO_V1={receipt}\n");
+        assert!(line.len() < 1024);
+        std::io::stdout()
+            .write_all(line.as_bytes())
+            .expect("native capacity receipt");
+        std::io::stdout()
+            .flush()
+            .expect("native capacity receipt flush");
+    });
 }

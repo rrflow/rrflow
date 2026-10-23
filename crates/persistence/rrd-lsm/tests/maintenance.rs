@@ -21,6 +21,72 @@ fn options(max_versions: usize) -> DatabaseOptions {
 }
 
 #[test]
+fn reserve_denies_wal_flush_and_compaction_without_losing_prior_acknowledgements() {
+    // Policy denial against observed native free space, not actual ENOSPC proof.
+    for phase in ["wal", "flush", "compaction"] {
+        let temporary = tempdir().unwrap();
+        let root = temporary.path().join("native");
+        let mut database = Database::create(&root).unwrap();
+        for ordinal in 0..3 {
+            database
+                .write_owned(
+                    WriteBatch::new(vec![put(&format!("key-{ordinal}"), "ack")]).unwrap(),
+                    Durability::Authoritative,
+                )
+                .unwrap();
+            if phase == "compaction" {
+                database.flush_memtable(ordinal + 1).unwrap();
+            }
+        }
+        let before = database.snapshot();
+        let manifest = database.manifest().digest.clone();
+        drop(database);
+        let policy = DatabaseOptions {
+            recovery_reserve_bytes: 1 << 60,
+            ..DatabaseOptions::default()
+        };
+        let mut database = Database::open_with_options(&root, policy).unwrap();
+        let denied = match phase {
+            "wal" => database
+                .write_owned(
+                    WriteBatch::new(vec![put("denied", "none")]).unwrap(),
+                    Durability::Authoritative,
+                )
+                .map(|_| ()),
+            "flush" => database.flush_memtable(10).map(|_| ()),
+            _ => database.compact(&[], 10).map(|_| ()),
+        };
+        assert!(
+            matches!(denied, Err(Error::DiskAdmission { .. })),
+            "{phase}: {denied:?}"
+        );
+        assert_eq!(database.snapshot().sequence, before.sequence);
+        assert_eq!(database.manifest().digest, manifest);
+        assert!(database
+            .get(b"denied", database.snapshot())
+            .unwrap()
+            .is_none());
+        drop(database);
+        let mut database = Database::open(&root).unwrap();
+        for ordinal in 0..3 {
+            assert_eq!(
+                database
+                    .get(format!("key-{ordinal}").as_bytes(), database.snapshot())
+                    .unwrap(),
+                Some(b"ack".to_vec())
+            );
+        }
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("later", "accepted")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(20).unwrap();
+    }
+}
+
+#[test]
 fn the_next_writer_synchronously_flushes_before_crossing_the_mutable_bound() {
     let root = tempdir().unwrap().keep().join("native");
     let mut database = Database::create_with_options(&root, options(2)).unwrap();

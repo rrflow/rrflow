@@ -599,6 +599,28 @@ Acknowledged complete-frame corruption, an unauthenticated manifest choice,
 irreconcilable semantic divergence, or unknown authorization truth can never
 be "fixed" by guessed values.
 
+### Implemented incomplete-tail candidate repair
+
+The current `repair plan --project <root>` command emits JSON to stdout;
+`repair apply --project <root> --plan <file> --expect <sha256>` accepts that
+exact artifact. Only an incomplete final WAL frame qualifies. Planning and
+ordinary verification preserve bytes; complete checksum corruption, missing
+authoritative files, a stale physical inventory or an insufficient recovery
+budget deny repair.
+
+The bounded copy includes every regular file in the active root, including
+object payloads and the private token. Its plan declares source inventory,
+copy bytes, no fallback, same-filesystem publication and quarantine. Only the
+candidate WAL is truncated. The original root is retained under a
+content-addressed quarantine; a private intent resumes interrupted copy and
+publication, and the existing control journal records completion. The candidate
+carries before/after inventory identities. This implementation retains the
+existing installed root name and locator binding, matching the current restore
+publication profile. General locator replacement, other repair classes and
+full semantic/index verification remain D-11 work. The
+[C-07f journal](../../evidence/change-journals/gate-c/c-07f-native-capacity.md)
+separates implementation and compilation from native qualification results.
+
 ## Backup and restore
 
 Backup creation is an authenticated engine operation at one snapshot boundary.

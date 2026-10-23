@@ -130,6 +130,11 @@ impl StorageManifest {
         )?;
         self.budgets.validate()?;
         require(
+            self.budgets.recovery_reserve_bytes.get()
+                == self.installed_configuration.storage.recovery_reserve_bytes,
+            "declared recovery reserve differs from installed native admission",
+        )?;
+        require(
             self.budgets
                 .run_ms
                 .get()

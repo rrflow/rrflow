@@ -25,6 +25,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut bytes = serde_json::to_vec_pretty(&fixture)?;
     bytes.push(b'\n');
     std::fs::write(path, bytes)?;
+    let public_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/public-contract-v1.json");
+    let mut public: Value = serde_json::from_slice(&std::fs::read(&public_path)?)?;
+    public["service"]["configuration"] = serde_json::to_value(EstateConfiguration::default())?;
+    let mut bytes = serde_json::to_vec_pretty(&public)?;
+    bytes.push(b'\n');
+    std::fs::write(public_path, bytes)?;
     println!("refreshed default installation contract projection; no engine workload executed");
     Ok(())
 }

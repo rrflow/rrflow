@@ -15,12 +15,14 @@ use std::sync::Arc;
 #[path = "filesystem/io.rs"]
 pub(crate) mod file_io;
 mod native;
+pub(crate) mod space;
 
 #[cfg(test)]
 use crate::fault_io::{Kind, Ticket};
 
 #[derive(Debug)]
 struct Root {
+    recovery_reserve_bytes: u64,
     file: File,
     mount: native::MountIdentity,
     // Windows write-through publication uses native names. Retaining every
@@ -84,12 +86,35 @@ impl AnchoredPath {
             root: Arc::new(Root {
                 file,
                 mount,
+                recovery_reserve_bytes: 0,
                 _ancestors: ancestors,
                 _parent: None,
             }),
             relative: PathBuf::new(),
             diagnostic: absolute,
         })
+    }
+
+    pub(crate) fn with_recovery_reserve(&self, bytes: u64) -> io::Result<Self> {
+        Ok(Self {
+            root: Arc::new(Root {
+                recovery_reserve_bytes: bytes,
+                file: self.root.file.try_clone()?,
+                mount: self.root.mount.clone(),
+                _ancestors: Vec::new(),
+                _parent: Some(self.root.clone()),
+            }),
+            relative: self.relative.clone(),
+            diagnostic: self.diagnostic.clone(),
+        })
+    }
+
+    pub(crate) fn recovery_reserve(&self) -> u64 {
+        self.root.recovery_reserve_bytes
+    }
+
+    pub(crate) fn admit_disk(&self, bytes: u64, new_file: bool) -> crate::Result<()> {
+        space::admit(&self.root.file, self.recovery_reserve(), bytes, new_file)
     }
 
     pub fn join(&self, relative: impl AsRef<Path>) -> Self {
@@ -153,6 +178,7 @@ impl AnchoredPath {
                 file,
                 mount: self.root.mount.clone(),
                 _ancestors: ancestors,
+                recovery_reserve_bytes: self.root.recovery_reserve_bytes,
                 _parent: Some(self.root.clone()),
             }),
             relative: PathBuf::new(),
@@ -184,6 +210,7 @@ impl AnchoredPath {
                 file,
                 mount: self.root.mount.clone(),
                 _ancestors: ancestors,
+                recovery_reserve_bytes: self.root.recovery_reserve_bytes,
                 _parent: Some(self.root.clone()),
             }),
             relative: PathBuf::new(),
@@ -368,7 +395,10 @@ impl AnchoredPath {
     fn sync_directory_handle(&self, file: &File) -> io::Result<()> {
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::DirectorySync, self.diagnostic_path())?;
-        native::sync_directory(file)?;
+        let result = native::sync_directory(file);
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::observe_native_error("directory_sync", self.diagnostic_path(), &result);
+        result?;
         #[cfg(test)]
         ticket.directory_synced()?;
         Ok(())
@@ -414,12 +444,17 @@ impl AnchoredPath {
         let (target_parent, target_name, _target_ancestors) = target.parent_handle()?;
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::Rename, self.diagnostic_path())?;
-        native::rename(
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::before_io("rename", self.diagnostic_path());
+        let result = native::rename(
             &source_parent,
             Path::new(&source_name),
             &target_parent,
             Path::new(&target_name),
-        )?;
+        );
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::observe_native_error("rename", self.diagnostic_path(), &result);
+        result?;
         #[cfg(test)]
         ticket.renamed(target.diagnostic_path())?;
         self.parent()
@@ -486,7 +521,14 @@ impl OpenOptions {
         native::file_options(&mut options);
         #[cfg(test)]
         let ticket = Ticket::begin(Kind::Open, path.diagnostic_path())?;
-        let file = cap::open(&parent, Path::new(&name), &options)?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        if self.create || self.create_new {
+            crate::crash_test::before_io("create", path.diagnostic_path());
+        }
+        let result = cap::open(&parent, Path::new(&name), &options);
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::observe_native_error("open", path.diagnostic_path(), &result);
+        let file = result?;
         path.admit_mount(&file)?;
         native::validate_file(&file)?;
         if self.truncate {

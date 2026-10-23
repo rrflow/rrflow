@@ -4720,6 +4720,7 @@ version = "1.0.0"
 dependencies = [
  "bytes",
  "clap",
+ "libc",
  "parquet",
  "rrd-client",
  "rrd-contract",

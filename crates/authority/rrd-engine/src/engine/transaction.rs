@@ -359,6 +359,7 @@ impl RrdEngine {
                                     | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::MutableLimit { .. }
                                     | rrd_store::Error::MaintenanceLimit { .. }
+                                    | rrd_store::Error::DiskAdmission { .. }
                                     | rrd_store::Error::ReclamationPending
                                     | rrd_store::Error::ReclamationLimit { .. }
                                     | rrd_store::Error::RuntimeConflict { .. }

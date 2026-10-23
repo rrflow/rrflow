@@ -550,7 +550,7 @@ jobs:
   installed-crash:
     name: installed domain crash (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -583,14 +583,14 @@ jobs:
           import hashlib, json, os
           from pathlib import Path
           path = Path('target/debug/rrflow' + ('.exe' if os.name == 'nt' else ''))
-          marker = b'C07C_NATIVE_PAUSE_V1='
+          markers = [b'C07C_NATIVE_PAUSE_V1=', b'C07F_NATIVE_IO_V1=']
           digest, tail = hashlib.sha256(), b''
           with path.open('rb') as source:
               while block := source.read(1024 * 1024):
-                  if marker in tail + block:
+                  if any(marker in tail + block for marker in markers):
                       raise SystemExit('diagnostic protocol leaked into ordinary artifact')
                   digest.update(block)
-                  tail = block[-len(marker):]
+                  tail = block[-max(map(len, markers)):]
           print('crash_distribution_receipt=' + json.dumps({'sha256': digest.hexdigest(), 'bytes': path.stat().st_size, 'protocol_absent': True}))
           PY
       - name: Build explicit diagnostic primary and installed oracle
@@ -600,6 +600,9 @@ jobs:
       - name: Test exact installed domain boundaries and compound recovery
         timeout-minutes: 20
         run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2
+      - name: Qualify installed native capacity failure and recovery
+        timeout-minutes: 30
+        run: python3 scripts/ci/run_native_capacity.py
       - name: Deny diagnostic-primary and oracle warnings
         run: cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
 

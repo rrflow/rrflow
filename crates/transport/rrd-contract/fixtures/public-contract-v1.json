@@ -75,7 +75,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0",
+      "configuration_sha256": "6f3c2121f9961286d11367c5b2ff1c6831d331bdd8cec6c81fec6f7282b68080",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -119,6 +119,7 @@
         "recovery_files": 262144,
         "recovery_metadata_bytes": 67108864,
         "recovery_read_bytes": 1099511627776,
+        "recovery_reserve_bytes": 16777216,
         "recovery_wal_bytes": 268435456,
         "recovery_wal_frames": 1048576,
         "retained_mutable_bytes": 536870912,

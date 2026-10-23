@@ -475,7 +475,9 @@ fn primary_help_exposes_only_the_installed_product_lifecycle() {
     let output = invoke(&["--help"]);
     assert_success(&output, "primary help");
     let help = String::from_utf8(output.stdout).unwrap();
-    for command in ["version", "install", "serve", "ready", "verify", "restore"] {
+    for command in [
+        "version", "install", "serve", "ready", "verify", "restore", "repair",
+    ] {
         assert!(
             help.contains(command),
             "missing {command} from help:\n{help}"
@@ -615,6 +617,7 @@ recovery_read_bytes = 1099511627776
 recovery_wal_bytes = 268435456
 recovery_wal_frames = 1048576
 recovery_elapsed_ms = 120000
+recovery_reserve_bytes = 16777216
 
 [clock]
 maximum_rollback_ms = 0

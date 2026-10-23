@@ -45,14 +45,55 @@ const PUBLICATION_LEASE_FILE: &str = ".publication.lock";
 /// The exclusive offline publication lease of one instance: an advisory lock
 /// on a file beside the restore staging roots, held for the whole apply so two
 /// publications cannot interleave their renames.
-struct PublicationLease {
+pub(super) struct PublicationLease {
     _file: fs::File,
+}
+
+impl Drop for PublicationLease {
+    fn drop(&mut self) {
+        // File close alone leaves the lock held by duplicated/inherited file
+        // descriptions (including a concurrent fork before exec). Ownership
+        // ends here, after publication unwinds, not when the last duplicate closes.
+        let _ = self._file.unlock();
+    }
+}
+
+#[cfg(test)]
+mod publication_lease_tests {
+    use super::*;
+
+    #[test]
+    fn publication_owner_drop_releases_even_with_a_duplicated_handle() {
+        let root = tempfile::tempdir().unwrap();
+        let anchor = AnchoredPath::open_root(root.path()).unwrap();
+        let owner = PublicationLease::acquire_at(&anchor).unwrap();
+        let duplicate = owner._file.try_clone().unwrap();
+        assert!(matches!(
+            PublicationLease::acquire_at(&anchor),
+            Err(ServiceError::StorageConflict(_))
+        ));
+        drop(owner);
+        let replacement = PublicationLease::acquire_at(&anchor).unwrap();
+        drop(duplicate);
+        // Disposing the former descriptor must not release the new owner's lock.
+        assert!(matches!(
+            PublicationLease::acquire_at(&anchor),
+            Err(ServiceError::StorageConflict(_))
+        ));
+        drop(replacement);
+        let _next = PublicationLease::acquire_at(&anchor).unwrap();
+    }
 }
 
 impl PublicationLease {
     fn acquire(paths: &PublicationPaths) -> Result<Self> {
         let path = paths.restores.join(PUBLICATION_LEASE_FILE);
         reject_existing_symlink_path(&paths.project, &path)?;
+        Self::acquire_at(&paths.restores)
+    }
+
+    pub(super) fn acquire_at(restores: &AnchoredPath) -> Result<Self> {
+        let path = restores.join(PUBLICATION_LEASE_FILE);
         let file = OpenOptions::new()
             .read(true)
             .write(true)
