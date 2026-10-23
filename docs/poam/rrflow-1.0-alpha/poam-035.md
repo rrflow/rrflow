@@ -315,6 +315,10 @@ The [Linux20 candidate comparison](../../evidence/change-journals/gate-c/c-07g-p
 also stopped at ordinal 608 with an internal API rejection before backup, while
 remaining below the resident cap. The read-work repair is locally proved but
 does not resolve this rejection; precise error attribution remains required.
+The [safe read-pressure attribution](../../evidence/change-journals/gate-c/c-07g-read-pressure-attribution.md)
+extends the installed driver's closed diagnostic labels without changing
+Internal classification, durable-outcome proof or disclosure boundaries.
+Actual native attribution remains pending; no causal repair is inferred.
 
 Native run 39979675928 failed the macOS existing/WAL capacity case after a
 real filler ENOSPC: the client returned resource denial without a selected

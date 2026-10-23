@@ -78,6 +78,51 @@ fn error(value: impl std::fmt::Display) -> String {
 // never used to infer effects or retryability. Return constants, not message
 // slices: even an arbitrary server body can disclose only an allowlisted label.
 fn engine_error_label(message: &str) -> Option<&'static str> {
+    // Read pressure can occur after publication, so the engine intentionally
+    // keeps Storage's Internal classification. This label is diagnostic only;
+    // the existing abort/readback evidence still determines durable outcome.
+    if let Some(detail) = message.strip_prefix("Storage(\"") {
+        for (prefix, label) in [
+            ("projected-read active_views limit ", "read-active-views"),
+            ("projected-read ranges limit ", "read-ranges"),
+            ("projected-read runs limit ", "read-runs"),
+            ("projected-read pinned_bytes limit ", "read-pinned-bytes"),
+            ("projected-read versions_examined limit ", "read-versions"),
+            ("projected-read page_requests limit ", "read-page-requests"),
+            (
+                "projected-read page_logical_bytes limit ",
+                "read-page-logical-bytes",
+            ),
+            ("projected-read output_rows limit ", "read-output-rows"),
+            (
+                "projected-read output_buffer_bytes limit ",
+                "read-output-buffer-bytes",
+            ),
+            ("projected-read batch_rows limit ", "read-batch-rows"),
+            (
+                "projected-read batch_allocated_bytes limit ",
+                "read-batch-allocated-bytes",
+            ),
+            (
+                "projected-read retained_output_bytes limit ",
+                "read-retained-output-bytes",
+            ),
+            ("source page allocation limit ", "read-source-pages"),
+            ("transaction active owners limit ", "transaction-active"),
+            (
+                "transaction owned buffer bytes limit ",
+                "transaction-buffered-bytes",
+            ),
+            ("substrate: ", "storage-substrate"),
+            ("claim codec: ", "storage-codec"),
+            ("kernel: ", "storage-kernel"),
+            ("corrupt sequence watermark: ", "storage-watermark"),
+        ] {
+            if detail.starts_with(prefix) {
+                return Some(label);
+            }
+        }
+    }
     if let Some(detail) = message.strip_prefix("StorageAdmission(\"") {
         for (prefix, label) in [
             ("maintenance input_bytes limit ", "maintenance-input-bytes"),
@@ -116,6 +161,7 @@ fn engine_error_label(message: &str) -> Option<&'static str> {
     }
     let variant = message.split_once('(').map_or(message, |(name, _)| name);
     match variant {
+        "Storage" => Some("storage"),
         "TransactionQuota" => Some("transaction-quota"),
         "RenewalQuota" => Some("renewal-quota"),
         "StorageAdmission" => Some("storage-admission"),
@@ -153,6 +199,86 @@ fn client_error(value: rrd_client::Error) -> String {
     };
     let detail = digest("c07g.client-error", &value.to_string()).expect("error digest");
     format!("{code}:{}", detail.as_str())
+}
+
+#[test]
+fn diagnostic_labels_attribute_read_pressure_without_changing_internal_semantics() {
+    use rrd_store::ProjectedReadResource as Resource;
+    for (resource, label) in [
+        (Resource::ActiveViews, "read-active-views"),
+        (Resource::Ranges, "read-ranges"),
+        (Resource::Runs, "read-runs"),
+        (Resource::PinnedBytes, "read-pinned-bytes"),
+        (Resource::VersionsExamined, "read-versions"),
+        (Resource::PageRequests, "read-page-requests"),
+        (Resource::PageLogicalBytes, "read-page-logical-bytes"),
+        (Resource::OutputRows, "read-output-rows"),
+        (Resource::OutputBufferBytes, "read-output-buffer-bytes"),
+        (Resource::BatchRows, "read-batch-rows"),
+        (Resource::BatchAllocatedBytes, "read-batch-allocated-bytes"),
+        (Resource::RetainedOutputBytes, "read-retained-output-bytes"),
+    ] {
+        let error = rrd_engine::ServiceError::from(rrd_store::Error::ProjectedReadLimit {
+            resource,
+            limit: 5,
+            observed: 6,
+        });
+        assert_eq!(error.kind(), rrd_engine::ServiceErrorKind::Internal);
+        assert_eq!(engine_error_label(&error.to_string()), Some(label));
+        assert_eq!(
+            engine_error_label(&format!(
+                "Storage(\"projected-read {} limit private secret\")",
+                resource.as_str()
+            )),
+            Some(label)
+        );
+        assert_eq!(
+            engine_error_label(&format!(
+                "Storage(\"projected-read {}_private limit secret\")",
+                resource.as_str()
+            )),
+            Some("storage")
+        );
+        assert!(format!("rejected-api-internal-{label}:{}", "a".repeat(64)).len() <= 128);
+    }
+    for (error, label) in [
+        (
+            rrd_store::Error::SourcePageLimit {
+                limit: 5,
+                observed: 6,
+            },
+            "read-source-pages",
+        ),
+        (
+            rrd_store::Error::TransactionLimit {
+                resource: rrd_store::TransactionResource::Active,
+                limit: 5,
+                observed: 6,
+            },
+            "transaction-active",
+        ),
+        (
+            rrd_store::Error::TransactionLimit {
+                resource: rrd_store::TransactionResource::BufferedBytes,
+                limit: 5,
+                observed: 6,
+            },
+            "transaction-buffered-bytes",
+        ),
+    ] {
+        let error = rrd_engine::ServiceError::from(error);
+        assert_eq!(error.kind(), rrd_engine::ServiceErrorKind::Internal);
+        assert_eq!(engine_error_label(&error.to_string()), Some(label));
+    }
+    assert_eq!(engine_error_label("StorageSecret(\"private\")"), None);
+    assert_eq!(
+        engine_error_label("Storage(\"substrate: private secret\")"),
+        Some("storage-substrate")
+    );
+    assert_eq!(
+        engine_error_label("Storage(\"private secret\")"),
+        Some("storage")
+    );
 }
 
 #[test]
