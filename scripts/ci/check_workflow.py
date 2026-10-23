@@ -577,8 +577,9 @@ def main() -> None:
         require(f"- {platform}" in reopen, f"ordinary reopen corpus must qualify {platform}")
     for command in [
         "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
-        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
         "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
         "RRFLOW_REOPEN_RECEIPT_DIR:",
         "'attempts': 5150",
         "actions/upload-artifact@",

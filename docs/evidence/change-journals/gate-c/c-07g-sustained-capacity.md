@@ -347,3 +347,56 @@ soak executed. Required candidate CI must execute the definitions. Cold/pin
 interference, fleet allocation, fixed-working-set update/delete histories,
 physical disk reserve and complete native profile/24-hour acceptance remain
 open; OBJ-02, C-07 and POAM-035 are unchanged.
+
+
+## Bounded live working set and mixed-family histories
+
+Continued from `b188e877463c008c32bcb348654dfceb9a9a15f7`. The offered mixed-write
+path now reuses finite slots bounded by the frozen segment-attempt quota,
+independent of immutable seeded point/range records. A slot appears at most
+once per segment. Successful independently read-back generations advance
+through insert, update, atomic record/relation/vector retirement, recreation
+and repeated update/retirement cycles. Rejected work leaves the generation
+unchanged; uncertain or mismatched work fails the segment/campaign. Unique
+transaction identities and retained earlier receipts are not rewritten.
+
+Typed slot/generation coordinates appear in retained intents and outcomes.
+The evaluation owner checks slot bounds, forbids duplicate slot writers in a
+segment and derives acknowledged transition counters. Full qualification now
+also requires observations of every transition type. Retired state is checked
+as exact absent vector identities and empty record/relation queries at the
+same captured cursor; it is a present logical retirement effect, not an
+unacknowledged absent transaction. Slot-generation memory is included in
+prepared-request admission. Canonical version history may still grow; bounded
+live key count does not promise bounded storage.
+
+After the complete offered schedule the driver kills/reopens its owned engine
+and independently regenerates/read-checks the entire seed corpus and each
+latest acknowledged working-slot state before any retry. A bounded raw final
+readback event binds identities and rolling digest. Both the initial lifecycle
+lane and final readback use the frozen lifecycle deadline; the outer launcher
+reserves both. The short installed candidate case uses the same generator for
+three slots ending retired, recreated and updated, verifies every transition,
+then reads and exactly replays the final receipts after actual restart.
+
+Read: public transaction retirement/data/vector/query contracts, runtime
+retirement target validation, existing vector version/retirement visibility,
+workload generator and independent readback, sustained scheduler, aggregate
+validator, progress protocol, launcher and workflow policy. The PR brief was
+updated before implementation. No upstream algorithm or schema of thought was
+introduced. New contract regression definitions check transition cycles and
+deny write coordinates on read attempts; existing qualifications now require
+all transition categories. The user-facing evaluation instructions describe
+actual commands, bounded artifacts and still-unavailable qualification lanes.
+
+Remote verify job 120229929066 exposed that check_workflow.py still required
+the old unfiltered ignored-test command. Its policy now requires the explicit
+100-cycle selector AND the added workload smoke command; both original native
+100-cycle cases remain required. `python scripts/ci/check_workflow.py` passed.
+`python -m py_compile scripts/ci/run_sustained_capacity.py` passed. Strict
+Clippy for rrflow-eval/rrflow-cli all targets passed (16.29 seconds initially,
+2.24 seconds after final readback/smoke changes). Storage schema generation
+passed (21.20 seconds). No local runtime tests or campaigns were executed.
+Required candidate CI is still pending. Physical cold/pin lanes, multi-estate
+allocation, recovery disk reserve and actual full profile/24-hour acceptance
+remain open. No owner completion status changed.

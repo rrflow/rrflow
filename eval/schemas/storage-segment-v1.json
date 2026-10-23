@@ -1463,6 +1463,16 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "write": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WriteTransition"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -2368,6 +2378,27 @@
         "format_version",
         "manifest_sha256",
         "cases"
+      ],
+      "type": "object"
+    },
+    "WriteTransition": {
+      "additionalProperties": false,
+      "description": "Bounded load-slot identity, separate from immutable seeded read coordinates.\nGeneration advances only after acknowledged independent readback.",
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "slot": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "slot",
+        "generation"
       ],
       "type": "object"
     }

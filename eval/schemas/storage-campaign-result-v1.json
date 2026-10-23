@@ -142,6 +142,16 @@
     "OperatingPointResult": {
       "additionalProperties": false,
       "properties": {
+        "acknowledged_transitions": {
+          "items": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
         "attempts": {
           "format": "uint64",
           "minimum": 0,
@@ -252,6 +262,7 @@
         "started_ns",
         "finished_ns",
         "attempts",
+        "acknowledged_transitions",
         "first_sequence",
         "next_sequence",
         "failures",

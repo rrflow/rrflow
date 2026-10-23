@@ -67,11 +67,9 @@ that implementation. Native RSS and disk measurements remain C-07g work.
 
 Limits are positive JSON-exact integers. Inputs/outputs are limited to 8 MiB,
 required cases/bindings to 256, and attempts to 10,000 across a run. This is
-the early bounded fault/history contract. J-04's arrival schedules, full
-operation mix, histogram/resource-series collector and sustained workload
-driver remain future work. No large-run result may be silently truncated to
-fit this format; its later bounded artifact/shard contract needs explicit
-versioned implementation and acceptance.
+the per-segment fault/history contract. Sustained campaigns compose bounded
+segments under an explicit total artifact quota; no large run is truncated
+to fit a single document. J-04's full product workload remains a separate gate.
 
 ## Commands and fixture maintenance
 
@@ -112,7 +110,47 @@ schema, fixture and protocol-version consequences before committing changes.
 
 After an intentional installed-configuration or evaluation-contract change,
 `cargo run --locked -p rrflow-eval --example refresh_storage_contract` regenerates
-the three storage schemas and existing synthetic manifest/result/report fixtures
+the storage and sustained campaign schemas and existing synthetic manifest/result/report fixtures
 with canonical Rust serializers and digests. It preserves the independent
 ledger inputs, refuses a non-synthetic manifest, and does not execute a native
 workload. Review the diff; refreshed synthetic data is never acceptance evidence.
+
+
+## Installed sustained campaigns
+
+The `storage campaign` contract freezes candidate identity, sealed engine
+configuration, allocation, corpus, load schedule, operating points, thresholds
+and finite evidence limits. The installed driver seeds and independently reads
+all requested records, relationships and vectors before offered load. Immutable
+seed data serves point/range reads. Mixed writes reuse at most
+`evidence.segment_attempts` mutable slots and cycle through insert, update,
+atomic retirement and recreation. Transaction identities remain unique;
+canonical version history can still grow even though live key count is bounded.
+After load the driver kills/reopens the engine and independently reads seed
+and final slot state before any retry.
+
+```text
+cargo run --locked -p rrflow-eval -- storage schema campaign
+cargo run --locked -p rrflow-eval -- storage schema progress-event
+cargo run --locked -p rrflow-eval -- storage campaign validate path/to/campaign.json
+python scripts/ci/run_sustained_capacity.py --campaign path/to/campaign.json --configuration path/to/configuration.toml --evidence path/to/new-evidence
+cargo run --locked -p rrflow-eval -- storage campaign verify path/to/new-evidence
+```
+
+Launching is an explicit resource-consuming operation on a clean frozen
+candidate. Linux additionally requires `--cgroup-parent` naming an already
+delegated cgroup; Windows uses an owned Job Object. The driver verifies live
+native limits and process membership rather than trusting environment labels.
+No privileged host setup is implicit. The current runner rejects full
+qualification, cold-cache/reader-pin lanes and multi-estate allocation until
+those facilities exist. macOS constrained-capacity launch is unavailable.
+Characterization results cannot close the profile or 24-hour requirement.
+
+`progress.jsonl` retains typed intents, outcomes, samples and readback with
+bounded record encoding and periodic durable checkpoints. Final reports bind
+its exact bytes, count and digest. A crash may leave observations after the last
+checkpoint uncertain; absent final reports and partial records are incomplete
+evidence. Offline verification streams artifacts and rejects altered, missing
+or truncated files. Reserve enough evidence disk for both successful and
+failed runs. An evidence quota failure is a failed operating point, not a
+reason to omit samples or increase the frozen limit mid-run.

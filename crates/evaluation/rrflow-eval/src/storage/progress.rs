@@ -54,6 +54,7 @@ pub enum ProgressEvent {
         seed: u64,
         phase: LoadPhase,
         expected: ExpectedOperation,
+        write: Option<WriteTransition>,
     },
     LoadOutcome {
         segment: u64,
@@ -78,6 +79,17 @@ pub enum ProgressEvent {
     },
     Failure {
         reason: Id,
+    },
+    FinalReadback {
+        point: Id,
+        seed: u64,
+        killed_pid: u32,
+        reopened_pid: u32,
+        seed_records: u64,
+        working_slots: u64,
+        states_sha256: Digest,
+        started_ns: u64,
+        finished_ns: u64,
     },
 }
 

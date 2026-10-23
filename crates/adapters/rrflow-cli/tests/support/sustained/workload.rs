@@ -2,7 +2,7 @@
 //! independently from request coordinates, never copied out of engine answers.
 use rrd_client::{RequestOptions, RrdClient, Session};
 use rrd_contract::*;
-use rrflow_eval::storage::{digest, Digest, StorageLoadKind};
+use rrflow_eval::storage::{digest, Digest, StorageLoadKind, WriteTransition};
 use std::collections::BTreeMap;
 
 type Result<T> = std::result::Result<T, String>;
@@ -29,6 +29,8 @@ pub(super) struct Prepared {
     pub effect_sha256: Digest,
     pub mutation: Option<CommitTransaction>,
     pub revision: u64,
+    pub key: String,
+    pub write: Option<WriteTransition>,
 }
 
 pub(super) struct Completed {
@@ -276,7 +278,9 @@ impl Workload {
             ),
         )?;
         Ok(Prepared {
-            id: key,
+            id: key.clone(),
+            key,
+            write: None,
             kind,
             request_sha256,
             effect_sha256,
@@ -284,6 +288,97 @@ impl Workload {
             revision,
         })
     }
+    pub fn prepare_load(&self, operation: String, write: WriteTransition) -> Result<Prepared> {
+        let key = format!("working-slot-{:020}", write.slot);
+        let mut request =
+            self.prepare(key.clone(), StorageLoadKind::MixedWrite, write.generation)?;
+        if write.retired() {
+            let mut targets = vec![(
+                DataLogicalModel::Document,
+                reference("capacity_document", &key),
+            )];
+            targets.extend((0..self.edges_per_record).map(|n| {
+                (
+                    DataLogicalModel::GraphRelation,
+                    reference("capacity_link", &format!("edge-{n}-{key}")),
+                )
+            }));
+            targets.extend((0..self.vectors_per_record).map(|n| {
+                (
+                    DataLogicalModel::Vector,
+                    reference("capacity_vector", &format!("vector-{n}-{key}")),
+                )
+            }));
+            let mutations = targets
+                .into_iter()
+                .map(|(model, reference)| TransactionMutation::RetireData {
+                    model,
+                    target: DataTarget::Reference { reference },
+                    effective_at: self.valid_at,
+                })
+                .collect::<Vec<_>>();
+            request.mutation = Some(CommitTransaction {
+                operation_sha256: transaction_operation_sha256(&mutations),
+                mutations,
+            });
+        }
+        request.id = operation;
+        request.write = Some(write);
+        request.request_sha256 = digest(
+            "c07g.working-request",
+            &(&request.id, write, &request.mutation),
+        )?;
+        request.effect_sha256 = digest("c07g.working-effect", &(request.effect_sha256, write))?;
+        Ok(request)
+    }
+
+    async fn verify_retired(&self, key: &str) -> Result<()> {
+        let references = (0..self.vectors_per_record)
+            .map(|n| reference("capacity_vector", &format!("vector-{n}-{key}")))
+            .collect::<Vec<_>>();
+        let vectors = self
+            .client
+            .retrieve_vector_points(
+                &self.session,
+                RetrieveVectorPoints {
+                    scope: self.scope(),
+                    collection_id: id("capacity_documents"),
+                    vector_name: id("body"),
+                    valid_at: self.valid_at,
+                    references: references.clone(),
+                    max_storage_keys: self
+                        .query_budget
+                        .max_storage_keys
+                        .min(MAX_VECTOR_STORAGE_KEYS),
+                },
+                RequestOptions::read("capacity-retired", "capacity-retired").unwrap(),
+            )
+            .await
+            .map_err(error)?;
+        check(
+            vectors.points.is_empty()
+                && vectors.missing.len() == references.len()
+                && references
+                    .iter()
+                    .all(|r| vectors.missing.iter().filter(|m| *m == r).count() == 1),
+            "retired vector set differs",
+        )?;
+        let escaped = serde_json::to_string(key).map_err(error)?;
+        for (source, filter) in [
+            ("record:capacity_document", format!("id = {escaped}")),
+            ("relation:capacity_link", format!("from_id = {escaped}")),
+        ] {
+            let result = self
+                .query(source, &filter, "id", Some(vectors.known_at_cursor))
+                .await?;
+            check(
+                result.rows.is_empty(),
+                "atomic retirement left visible record or relation",
+            )?;
+        }
+        Ok(())
+    }
+
     pub async fn execute(&self, request: &Prepared) -> Result<Completed> {
         let mut idempotent_replay = false;
         let receipt_sha256 = match request.kind {
@@ -393,7 +488,11 @@ impl Workload {
     }
     pub async fn verify(&self, request: &Prepared) -> Result<()> {
         if request.kind == StorageLoadKind::MixedWrite {
-            self.verify_key(&request.id, request.revision).await
+            if request.write.is_some_and(WriteTransition::retired) {
+                self.verify_retired(&request.key).await
+            } else {
+                self.verify_key(&request.key, request.revision).await
+            }
         } else {
             let ordinal = self.read_ordinal(request.revision);
             self.verify_key(&format!("seed-{ordinal:020}"), ordinal)

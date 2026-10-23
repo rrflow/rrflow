@@ -240,6 +240,7 @@ struct PointRun<'a> {
     pid: u32,
     clock: Instant,
     allocation: Option<NativeAllocationReceipt>,
+    generations: Vec<u64>,
 }
 
 impl PointRun<'_> {
@@ -342,7 +343,7 @@ impl PointRun<'_> {
         })
     }
     async fn segment(
-        &self,
+        &mut self,
         writer: &CampaignWriter,
         phase: LoadPhase,
         origin: u64,
@@ -370,11 +371,19 @@ impl PointRun<'_> {
         // This complete expected ledger is frozen before any segment operation.
         for offset in 0..count {
             let sequence = first + offset;
-            let operation = self.workload.prepare(
-                format!("load-{}-{sequence}", writer.next_index()),
-                storage_load_kind(sequence),
-                sequence,
-            )?;
+            let name = format!("load-{}-{sequence}", writer.next_index());
+            let kind = storage_load_kind(sequence);
+            let operation = if kind == StorageLoadKind::MixedWrite {
+                self.workload.prepare_load(
+                    name,
+                    WriteTransition {
+                        slot: offset,
+                        generation: self.generations[offset as usize],
+                    },
+                )?
+            } else {
+                self.workload.prepare(name, kind, sequence)?
+            };
             ledger.expected.push(ExpectedOperation {
                 logical_id: evidence_id(&operation.id),
                 request_sha256: operation.request_sha256.clone(),
@@ -383,13 +392,14 @@ impl PointRun<'_> {
             });
             prepared.push(operation);
         }
-        for expected in &ledger.expected {
+        for (expected, operation) in ledger.expected.iter().zip(&prepared) {
             writer.record_event(&ProgressEvent::LoadIntent {
                 segment: writer.next_index(),
                 point: self.point.id.clone(),
                 seed: self.workload.seed,
                 phase,
                 expected: expected.clone(),
+                write: operation.write,
             })?;
         }
         writer.checkpoint_progress()?;
@@ -506,6 +516,13 @@ impl PointRun<'_> {
                 match attempt.outcome {
                     LoadOutcome::Acknowledged => {
                         if self.workload.verify(operation).await.is_ok() {
+                            if let Some(write) = operation.write {
+                                self.generations[write.slot as usize] = write
+                                    .generation
+                                    .checked_add(1)
+                                    .filter(|n| *n <= MAX_EXACT_INTEGER)
+                                    .ok_or("working slot generation overflow")?;
+                            }
                             ledger.readback.push(Readback::Present {
                                 logical_id: attempt.logical_id.clone(),
                                 request_sha256: operation.request_sha256.clone(),
@@ -655,6 +672,7 @@ fn collect(
     attempts.push(LoadAttempt {
         sequence,
         kind: operation.kind,
+        write: operation.write,
         scheduled_ns,
         started_ns,
         finished_ns,
@@ -789,6 +807,17 @@ fn installed_capacity_workload_smoke() {
             work.execute(&operation).await.unwrap();
             work.verify(&operation).await.unwrap();
         }
+        let mut final_states = Vec::new();
+        for slot in 0..3 {
+            for generation in 0..=slot+2 {
+                let operation = work.prepare_load(format!("smoke-slot-{slot}-{generation}"),
+                    WriteTransition { slot, generation }).unwrap();
+                let receipt = work.execute(&operation).await.unwrap();
+                assert!(!receipt.idempotent_replay);
+                work.verify(&operation).await.unwrap();
+                if generation == slot+2 { final_states.push((operation, receipt.receipt_sha256)); }
+            }
+        }
         let write = work
             .prepare(
                 "smoke-concurrent-write".into(),
@@ -815,6 +844,12 @@ fn installed_capacity_workload_smoke() {
             assert!(replay.idempotent_replay);
             assert_eq!(replay.receipt_sha256, receipts[ordinal as usize]);
         }
+        for (operation, original) in &final_states {
+            work.verify(operation).await.unwrap();
+            let replay = work.execute(operation).await.unwrap();
+            assert!(replay.idempotent_replay);
+            assert_eq!(&replay.receipt_sha256, original);
+        }
         work.verify(&write).await.unwrap();
         let replay = work.execute(&write).await.unwrap();
         assert!(replay.idempotent_replay);
@@ -823,7 +858,7 @@ fn installed_capacity_workload_smoke() {
             "installed_capacity_workload_smoke={}",
             serde_json::json!({
             "build":estate.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
-            "replayed_transactions":9,"backup_sha256":backup.receipt.backup.backup_sha256,
+            "replayed_transactions":12,"write_transitions":{"insert":3,"update":4,"retire":3,"recreate":2},"backup_sha256":backup.receipt.backup.backup_sha256,
             "termination":killed,"reopened":identity,"capacity_qualification":false})
         );
         super::kill(reopened, clock);
@@ -953,6 +988,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     .id(),
                 clock,
                 allocation: allocation.clone(),
+                generations: vec![0; campaign.evidence.segment_attempts.get() as usize],
             };
             for phase in [
                 LoadPhase::Warmup,
@@ -1033,6 +1069,9 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                                 .retained_bytes
                                 .get()
                                 .min(campaign.allocation.engine_bytes.get() / 4)
+                                .saturating_sub(
+                                    (driver.generations.len() as u64).saturating_mul(8),
+                                )
                                 / driver.workload.retained_request_bound().saturating_mul(2),
                         );
                     if take == 0 {
@@ -1060,6 +1099,91 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     next += take;
                 }
             }
+            // Reopen after offered load and verify the final generated state
+            // before any retry can rewrite it. Progress retains incomplete runs.
+            tokio::time::timeout(
+                Duration::from_millis(campaign.schedule.lifecycle_ms.get()),
+                async {
+                    let started_ns = ns(clock);
+                    let killed = super::kill(child.take().ok_or("missing final server")?, clock);
+                    let (reopened, client, _) =
+                        estate.start_for(clock, Duration::from_millis(lifetime_ms));
+                    let reopened_pid = reopened.id();
+                    child = Some(reopened);
+                    driver.workload.client = client;
+                    session_opened = Instant::now() - Duration::from_secs(120);
+                    rotate_session(
+                        &estate,
+                        &mut driver.workload,
+                        campaign,
+                        point.clients.get(),
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
+                    let mut states = digest("c07g.final-state", &(*seed, point.id.clone()))?;
+                    for record in 0..driver.workload.records {
+                        rotate_session(
+                            &estate,
+                            &mut driver.workload,
+                            campaign,
+                            point.clients.get(),
+                            &mut session_ordinal,
+                            &mut session_opened,
+                        )
+                        .await?;
+                        let operation = driver.workload.seed_record(record)?;
+                        driver.workload.verify(&operation).await?;
+                        states = digest("c07g.final-state", &(states, operation.effect_sha256))?;
+                    }
+                    let mut working_slots = 0;
+                    for (slot, generation) in driver
+                        .generations
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, n)| **n > 0)
+                    {
+                        rotate_session(
+                            &estate,
+                            &mut driver.workload,
+                            campaign,
+                            point.clients.get(),
+                            &mut session_ordinal,
+                            &mut session_opened,
+                        )
+                        .await?;
+                        let operation = driver.workload.prepare_load(
+                            "final-readback".into(),
+                            WriteTransition {
+                                slot: slot as u64,
+                                generation: generation - 1,
+                            },
+                        )?;
+                        driver.workload.verify(&operation).await?;
+                        states = digest("c07g.final-state", &(states, operation.effect_sha256))?;
+                        working_slots += 1;
+                    }
+                    writer.record_event(&ProgressEvent::FinalReadback {
+                        point: point.id.clone(),
+                        seed: *seed,
+                        killed_pid: killed["pid"]
+                            .as_u64()
+                            .ok_or("final killed PID missing")?
+                            .try_into()
+                            .map_err(|_| "final PID overflow")?,
+                        reopened_pid,
+                        seed_records: driver.workload.records,
+                        working_slots,
+                        states_sha256: states,
+                        started_ns,
+                        finished_ns: ns(clock),
+                    })?;
+                    writer.checkpoint_progress()?;
+                    Ok::<(), String>(())
+                },
+            )
+            .await
+            .map_err(|_| "final readback exceeded lifecycle deadline")??;
             drop(driver);
             drop(child);
         }

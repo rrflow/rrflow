@@ -399,6 +399,34 @@ pub struct LoadAttempt {
     pub logical_id: Id,
     pub request_sha256: Digest,
     pub result_sha256: Digest,
+    pub write: Option<WriteTransition>,
+}
+
+/// Bounded load-slot identity, separate from immutable seeded read coordinates.
+/// Generation advances only after acknowledged independent readback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WriteTransition {
+    pub slot: u64,
+    pub generation: u64,
+}
+
+impl WriteTransition {
+    /// Insert, update, retire, recreate. These are evidence counters only.
+    pub fn counter_index(self) -> usize {
+        if self.generation == 0 {
+            0
+        } else {
+            match self.generation % 3 {
+                1 => 1,
+                2 => 2,
+                _ => 3,
+            }
+        }
+    }
+    pub fn retired(self) -> bool {
+        self.counter_index() == 2
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -568,6 +596,7 @@ pub struct OperatingPointResult {
     pub started_ns: u64,
     pub finished_ns: u64,
     pub attempts: u64,
+    pub acknowledged_transitions: [u64; 4],
     pub first_sequence: u64,
     pub next_sequence: u64,
     pub schedule_origin_ns: Option<u64>,
@@ -883,6 +912,7 @@ pub fn validate_segment(
         started_ns: segment.started_ns,
         finished_ns: segment.finished_ns,
         attempts: segment.attempts.len() as u64,
+        acknowledged_transitions: [0; 4],
         first_sequence: segment.attempts.first().map_or(0, |a| a.sequence),
         next_sequence: 0,
         schedule_origin_ns: None,
@@ -967,6 +997,7 @@ pub fn validate_segment(
         }
     }
     let mut last = None;
+    let mut written_slots = BTreeSet::new();
     let rate = point.requests_per_second.get()
         * if segment.phase == LoadPhase::Burst {
             2
@@ -998,6 +1029,24 @@ pub fn validate_segment(
                 && attempt.finished_ns <= segment.finished_ns,
             "attempt mix, sequence or monotonic interval differs",
         )?;
+        match attempt.write {
+            Some(write) => {
+                require(
+                    attempt.kind == StorageLoadKind::MixedWrite
+                        && write.slot < campaign.evidence.segment_attempts.get()
+                        && written_slots.insert(write.slot)
+                        && write.generation <= MAX_EXACT_INTEGER,
+                    "write transition exceeds frozen slot admission or repeats within segment",
+                )?;
+                if attempt.outcome == LoadOutcome::Acknowledged {
+                    summary.acknowledged_transitions[write.counter_index()] += 1;
+                }
+            }
+            None => require(
+                attempt.kind != StorageLoadKind::MixedWrite,
+                "mixed write omitted its slot transition",
+            )?,
+        }
         let recorded = segment
             .result
             .cases
@@ -1195,6 +1244,16 @@ fn merge_summary(
                 .filter(|n| *n <= MAX_EXACT_INTEGER)
                 .ok_or("campaign aggregate overflow")?;
         }
+        for (total, count) in total
+            .acknowledged_transitions
+            .iter_mut()
+            .zip(value.acknowledged_transitions)
+        {
+            *total = total
+                .checked_add(count)
+                .filter(|n| *n <= MAX_EXACT_INTEGER)
+                .ok_or("transition count overflow")?;
+        }
         total.maximum_scheduled_latency_ns = total
             .maximum_scheduled_latency_ns
             .max(value.maximum_scheduled_latency_ns);
@@ -1251,6 +1310,7 @@ fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool
         for seed in &campaign.seeds {
             let mut lanes = BTreeSet::new();
             let mut reopens = 0u64;
+            let mut transitions = [false; 4];
             for phase in phases() {
                 let Some(row) = result
                     .operating_points
@@ -1276,6 +1336,9 @@ fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool
                 {
                     return Ok(false);
                 }
+                for (seen, count) in transitions.iter_mut().zip(row.acknowledged_transitions) {
+                    *seen |= count > 0;
+                }
                 lanes.extend(row.lanes.iter().copied());
                 reopens = reopens
                     .checked_add(row.forced_reopens)
@@ -1286,6 +1349,7 @@ fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool
                 .iter()
                 .all(|lane| lanes.contains(lane))
                 || reopens < campaign.schedule.forced_reopens.get()
+                || transitions.iter().any(|seen| !seen)
             {
                 return Ok(false);
             }
@@ -1568,6 +1632,7 @@ mod tests {
             manifest,
             result,
             attempts: vec![LoadAttempt {
+                write: None,
                 sequence: 0,
                 kind: StorageLoadKind::PointRead,
                 scheduled_ns: 0,
@@ -1697,6 +1762,7 @@ mod tests {
                         readback_sha256: digest("fixture", &3).unwrap(),
                     });
                 }
+                row.acknowledged_transitions = [1; 4];
                 row.attempts = if phase == LoadPhase::Drain {
                     0
                 } else {
@@ -1729,6 +1795,38 @@ mod tests {
         campaign.evidence.total_bytes = limit(MAX_DOCUMENT_BYTES);
         assert!(CampaignWriter::create(&directory, campaign).is_err());
         assert!(!directory.exists());
+    }
+
+    #[test]
+    fn working_set_transitions_preserve_identity_and_repeat_retirement_cycles() {
+        assert_eq!(
+            (0..8)
+                .map(|generation| WriteTransition {
+                    slot: 7,
+                    generation
+                }
+                .counter_index())
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 3, 1, 2, 3, 1]
+        );
+        assert!(WriteTransition {
+            slot: 7,
+            generation: 5
+        }
+        .retired());
+        assert!(!WriteTransition {
+            slot: 7,
+            generation: 6
+        }
+        .retired());
+        let (campaign, mut segment) = fixture();
+        segment.attempts[0].write = Some(WriteTransition {
+            slot: 0,
+            generation: 0,
+        });
+        assert!(validate_segment(&campaign, &segment)
+            .unwrap_err()
+            .contains("write transition"));
     }
 
     #[test]
