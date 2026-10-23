@@ -47,6 +47,37 @@ const MAX_ARCHIVE_MANIFEST_BYTES: u64 = 256 * 1024 * 1024;
 pub const MAX_BACKUP_PRUNE_RECEIPTS: usize = 4_096;
 static BACKUP_TEMP_ID: AtomicU64 = AtomicU64::new(1);
 
+/// Page size is an acquisition hint, not permission to exceed native byte
+/// admission. Learn a smaller size for this reader without changing its cut.
+/// Each failed read is discarded before retry; no durable effect is retried.
+struct ControlJournalPages {
+    limit: usize,
+}
+
+impl ControlJournalPages {
+    fn new() -> Self {
+        Self { limit: PAGE_SIZE }
+    }
+
+    fn read(
+        &mut self,
+        engine: &impl StorageEngine,
+        after: u64,
+    ) -> Result<Vec<crate::ControlJournalEntry>> {
+        loop {
+            match engine.control().journal_since(after, self.limit) {
+                Err(Error::ProjectedReadLimit {
+                    resource:
+                        crate::ProjectedReadResource::OutputBufferBytes
+                        | crate::ProjectedReadResource::BatchAllocatedBytes,
+                    ..
+                }) if self.limit > 1 => self.limit /= 2,
+                result => return result,
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BackupCoverage {
@@ -327,8 +358,9 @@ pub fn create_logical_backup<E: StorageEngine>(
 /// families such as sessions, subscriptions, and operation receipts stay out
 /// of the scope. Logical replay, object bytes, catalogues, and control entries
 /// remain separate physical artifacts, but one digest-verified catalogue entry
-/// binds their content identities. A concurrent source mutation rejects the
-/// backup before it is catalogued.
+/// binds their content identities. All repositories read one admitted physical
+/// snapshot, retained through publication; concurrent writes belong to a later
+/// cut and cannot mix into this archive.
 pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     engine: &E,
     objects: &O,
@@ -337,6 +369,8 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     created_at: u64,
     control_families: &[String],
 ) -> Result<BackupEntry> {
+    let snapshot = crate::snapshot::SnapshotStore::capture(engine)?;
+    let engine = &snapshot;
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     validate_label(label)?;
     validate_control_families(control_families)?;
@@ -883,16 +917,14 @@ fn verify_restored_control_journal(
         ));
     }
     let mut page = Vec::new().into_iter();
+    let mut pages = ControlJournalPages::new();
     let mut cursor = first - 1;
     let mut ordinal = 0u64;
     read_control_archive(archive, |entry| {
         let restored = match page.next() {
             Some(restored) => restored,
             None => {
-                page = engine
-                    .control()
-                    .journal_since(cursor, PAGE_SIZE)?
-                    .into_iter();
+                page = pages.read(&engine, cursor)?.into_iter();
                 page.next().ok_or_else(|| {
                     Error::Archive("restored control journal ends before the archive".into())
                 })?
@@ -936,8 +968,9 @@ fn retain_control_journal(
     let mut writer = ControlArchiveWriter::create(&staging, source_control_sequence, families)?;
     let result = (|| {
         let mut after = 0u64;
+        let mut pages = ControlJournalPages::new();
         while after < source_control_sequence {
-            let page = engine.control().journal_since(after, PAGE_SIZE)?;
+            let page = pages.read(engine, after)?;
             if page.is_empty() {
                 return Err(Error::Archive(
                     "control journal ended before the captured backup watermark".into(),
@@ -1110,8 +1143,9 @@ fn retain_catalogues(
     let mut after = 0u64;
     let mut records = std::collections::BTreeMap::<String, CatalogueRecordSnapshot>::new();
     let mut scopes = std::collections::BTreeSet::<ScopeId>::new();
+    let mut pages = ControlJournalPages::new();
     while after < source_control_sequence {
-        let page = engine.control().journal_since(after, PAGE_SIZE)?;
+        let page = pages.read(engine, after)?;
         if page.is_empty() {
             return Err(Error::Archive(
                 "control journal ended before the captured backup watermark".into(),

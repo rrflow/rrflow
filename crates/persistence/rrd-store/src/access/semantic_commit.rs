@@ -23,6 +23,12 @@ use rrd_core::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+mod constraints;
+
+#[cfg(test)]
+#[path = "semantic_commit/constraint_tests.rs"]
+mod constraint_tests;
+
 /// A validated semantic commit plan that has not been published.
 ///
 /// Encoded writes are private to ordinary repository callers, which can only
@@ -361,22 +367,8 @@ fn validate_schema_and_objects(
         (Some(previous), None) => previous,
         (None, None) => return Err(Error::RuntimeSchemaMissing(commit.scope.to_string())),
     };
-    let existing_records = if effective_schema
-        .records
-        .values()
-        .any(|schema| !schema.unique_properties.is_empty())
-    {
-        values_for_scope::<RuntimeRecord>(reader, keyspaces::RUNTIME_RECORDS, &commit.scope)?
-    } else {
-        Vec::new()
-    };
-    let existing_relations = if effective_schema.relations.values().any(|schema| {
-        schema.unique_pair || schema.max_outgoing.is_some() || schema.max_incoming.is_some()
-    }) {
-        values_for_scope::<RuntimeRelation>(reader, keyspaces::RUNTIME_RELATIONS, &commit.scope)?
-    } else {
-        Vec::new()
-    };
+    let (existing_records, existing_relations) =
+        constraints::load(reader, commit, effective_schema, proposed_schema.is_some())?;
     effective_schema.validate_objects(&commit.mutations, &existing_records, &existing_relations)?;
     Ok(Some(effective_schema.clone()))
 }
