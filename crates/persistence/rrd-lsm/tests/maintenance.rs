@@ -316,6 +316,110 @@ fn failed_idle_partition_is_reclaimed_before_another_quantum() {
 }
 
 #[test]
+fn idle_pruning_is_explicit_and_preserves_snapshots_transactions_and_checkpoints() {
+    for prune in [false, true] {
+        let directory = tempdir().unwrap();
+        let root = directory.path().join("protected-idle");
+        let mut database = Database::create(&root).unwrap();
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("hot", "0")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(1).unwrap();
+        database.checkpoint("original", 1).unwrap();
+        let original = root
+            .join("segments")
+            .join(format!("{}.seg", database.manifest().segments[0].id));
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("hot", "1")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(2).unwrap();
+        let protected = database.snapshot();
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("hot", "2")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        database.flush_memtable(3).unwrap();
+        let registered = database.begin_transaction().unwrap();
+        for ordinal in 3..12 {
+            database
+                .write_owned(
+                    WriteBatch::new(vec![put("hot", &ordinal.to_string())]).unwrap(),
+                    Durability::Authoritative,
+                )
+                .unwrap();
+            database.flush_memtable(ordinal + 1).unwrap();
+        }
+        let durable = database.manifest().durable_sequence;
+        database
+            .write_owned(
+                WriteBatch::new(vec![put("hot", "tail")]).unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        let head = database.snapshot();
+        for _ in 0..64 {
+            let worked = if prune {
+                database
+                    .maintenance_step_with_protected_snapshots(&[protected])
+                    .unwrap()
+            } else {
+                database.maintenance_step().unwrap()
+            };
+            assert_eq!(
+                database.get(b"hot", protected).unwrap(),
+                Some(b"1".to_vec())
+            );
+            assert_eq!(
+                registered.get(&database, b"hot").unwrap(),
+                Some(b"2".to_vec())
+            );
+            if !worked {
+                break;
+            }
+        }
+        assert_eq!(database.compaction_debt_segments(), 0);
+        assert_eq!(
+            database
+                .manifest()
+                .segments
+                .iter()
+                .map(|segment| segment.entries)
+                .sum::<u64>(),
+            if prune { 3 } else { 12 }
+        );
+        assert_eq!(database.manifest().durable_sequence, durable);
+        assert_eq!(database.snapshot(), head);
+        assert_eq!(
+            rrd_lsm::Segment::open(&original)
+                .unwrap()
+                .get(b"hot", 1)
+                .unwrap(),
+            Some(b"0".to_vec())
+        );
+        drop(registered);
+        drop(database);
+        let database = Database::open(&root).unwrap();
+        assert_eq!(
+            database.get(b"hot", protected).unwrap(),
+            Some(b"1".to_vec())
+        );
+        assert_eq!(database.get(b"hot", head).unwrap(), Some(b"tail".to_vec()));
+        assert!(original.exists());
+        database.release_checkpoint("original").unwrap();
+        database.garbage_collect().unwrap();
+        assert!(!original.exists());
+    }
+}
+
+#[test]
 fn reserve_denies_wal_flush_and_compaction_without_losing_prior_acknowledgements() {
     // Policy denial against observed native free space, not actual ENOSPC proof.
     for phase in ["wal", "flush", "compaction"] {

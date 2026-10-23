@@ -508,3 +508,13 @@ Linux11 failed during corpus setup with a maintenance denial after 807 retained
 acknowledgements; its prior label did not identify the precise resource. New
 closed resource labels improve that evidence, but native comparison and debt
 convergence remain required before claiming recovery of that operating point.
+
+The [owned-history maintenance repair](../../evidence/change-journals/gate-c/c-07d-tracked-history-maintenance.md)
+removes obsolete physical versions through the existing protected-snapshot
+compactor when the store owns all reader lifetimes. Component evidence retains
+logical claim history, transactions, read cursors, named checkpoints and the
+unflushed acknowledged tail. Untracked standalone snapshots keep conservative
+retention. Linux12 completed all 1000 corpus acknowledgements/readbacks and two
+reopens but failed the unchanged backup-interference deadline; its initial
+maintenance debt remained 39. Installed comparison, debt/latency convergence
+and full qualification remain open.

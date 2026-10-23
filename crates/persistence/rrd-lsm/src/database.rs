@@ -1705,6 +1705,26 @@ impl Database {
     /// Reclamation and compaction use the same publication owner and configured
     /// limits as foreground maintenance. A caller decides when to offer work.
     pub fn maintenance_step(&mut self) -> Result<bool> {
+        self.maintenance_step_inner(&[], true)
+    }
+
+    /// One idle quantum with the same pruning contract as [`Self::compact`].
+    /// The owner must supply every untracked snapshot it needs to retain.
+    /// Registered transactions are protected automatically; projected views
+    /// and named checkpoints retain their original physical generations.
+    /// Unlike explicit compaction, this never flushes the mutable tail.
+    pub fn maintenance_step_with_protected_snapshots(
+        &mut self,
+        protected: &[Snapshot],
+    ) -> Result<bool> {
+        self.maintenance_step_inner(protected, false)
+    }
+
+    fn maintenance_step_inner(
+        &mut self,
+        protected: &[Snapshot],
+        retain_all_versions: bool,
+    ) -> Result<bool> {
         self.ensure_writer_ready()?;
         if self.reclamation_pending {
             let report = self.garbage_collect()?;
@@ -1714,7 +1734,13 @@ impl Database {
         if self.compaction_debt_segments() == 0 {
             return Ok(false);
         }
-        let result = self.compact_segments_inner(&[], self.manifest.created_at, None, false, true);
+        let result = self.compact_segments_inner(
+            protected,
+            self.manifest.created_at,
+            None,
+            false,
+            retain_all_versions,
+        );
         self.record_automatic_compaction(result)
     }
 

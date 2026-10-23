@@ -409,13 +409,18 @@ While serving, the existing one-second host sweep offers one engine-owned
 physical maintenance quantum to a single joined worker. Busy ticks are skipped.
 Each admitted quantum either reclaims a bounded pending inventory or performs
 one bounded compaction to reduce L0 debt. It uses the same writer lock and
-configured limits, preserves all MVCC history, and does not flush the active
-mutable tail or advance logical cursors. Shutdown and cancellation stop new
-offers and join any admitted quantum; the cooperative deadline still cannot
+configured limits and does not flush the active mutable tail or advance logical
+cursors. The store explicitly permits pruning superseded physical versions:
+registered transactions remain protected, read views and named checkpoints
+retain their generations, and logical versioned keys remain data. Standalone
+automatic maintenance retains all versions for untracked copyable snapshots;
+an owner may select the explicit protected-snapshot entry point. Shutdown and
+cancellation stop new offers and join any admitted quantum; the cooperative deadline still cannot
 interrupt a blocked filesystem call. Embedded hosts can offer the same work
 through `RrdEngine::maintain_storage`. The
 [idle-maintenance evidence](../../evidence/change-journals/gate-c/c-07d-idle-maintenance.md)
-does not replace installed latency, drain or soak qualification.
+and [owned-history evidence](../../evidence/change-journals/gate-c/c-07d-tracked-history-maintenance.md)
+do not replace installed latency, drain or soak qualification.
 
 Retained mutable generations share an ownership-based pool per opened database:
 `retained_mutable_bytes` (512 MiB), `retained_mutable_versions` (4,194,304) and

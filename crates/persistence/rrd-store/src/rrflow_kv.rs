@@ -488,7 +488,13 @@ impl RrflowKvStore {
     /// or writer. Busy is a skipped offer, not a second worker or a retry loop.
     pub fn try_maintenance_step(&self) -> Result<bool> {
         match self.database.try_lock() {
-            Ok(mut database) => database.maintenance_step().map_err(Error::from),
+            // The private database never exposes an untracked Snapshot.
+            // Transactions own registered leases; inspection streams and
+            // runtime checkpoints retain physical generations independently.
+            // Logical versioned keys are data, not superseded MVCC versions.
+            Ok(mut database) => database
+                .maintenance_step_with_protected_snapshots(&[])
+                .map_err(Error::from),
             Err(std::sync::TryLockError::WouldBlock) => Ok(false),
             Err(std::sync::TryLockError::Poisoned(_)) => {
                 Err(Error::Substrate("rrflowKV database lock poisoned".into()))
