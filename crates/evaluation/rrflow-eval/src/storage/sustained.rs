@@ -1368,6 +1368,16 @@ pub fn validate_segment(
         }
         if let Some(storage) = &sample.storage {
             storage.validate().map_err(|e| e.to_string())?;
+            if let Some(admission) = &storage.admission {
+                let limits = &campaign.storage.installed_configuration.storage;
+                require(
+                    admission.active_read_views <= limits.active_read_views
+                        && admission.pinned_read_bytes <= limits.pinned_read_bytes,
+                    "physical read owners exceed installed retention admission",
+                )?;
+            } else {
+                missing.insert("physical-read-ownership".to_owned().try_into()?);
+            }
         } else {
             missing.insert("engine-storage-snapshot".to_owned().try_into()?);
         }
@@ -1904,6 +1914,8 @@ mod tests {
         use super::super::{DrainOwnership, DrainSample};
         let (campaign, segment) = fixture();
         let owner = DrainOwnership {
+            active_read_views: 0,
+            pinned_read_bytes: 0,
             mutable_bytes: 10,
             projected_bytes: 20,
             debt_segments: 0,
@@ -1941,7 +1953,7 @@ mod tests {
             super::super::drain::check(&campaign, &[&warmup, row], &row.point, row.seed)
         };
         check(&drain).unwrap();
-        for field in 0..8 {
+        for field in 0..10 {
             let mut bad = drain.clone();
             let value = bad.drain_tail[0].ownership.as_mut().unwrap();
             match field {
@@ -1952,7 +1964,9 @@ mod tests {
                 4 => value.outstanding_bytes = 1,
                 5 => value.queued_requests = 1,
                 6 => value.active = true,
-                _ => value.fenced = true,
+                7 => value.fenced = true,
+                8 => value.active_read_views = 1,
+                _ => value.pinned_read_bytes = 1,
             }
             assert!(
                 check(&bad).is_err(),

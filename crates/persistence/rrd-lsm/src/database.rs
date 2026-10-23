@@ -98,6 +98,9 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Per-open aggregate ownership ceilings, independent of caller budgets.
+    pub active_read_views: usize,
+    pub pinned_read_bytes: u64,
     /// Available native bytes retained beyond each proposed WAL/immutable
     /// allocation. This is admission, not reserved disk space or a total quota.
     pub recovery_reserve_bytes: u64,
@@ -120,6 +123,8 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
+            pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
             recovery_reserve_bytes: 16 * 1024 * 1024,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
@@ -140,9 +145,13 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     pub(crate) fn validate(self) -> Result<Self> {
-        if self.projected_output_bytes == 0 || self.recovery_reserve_bytes == 0 {
+        if self.projected_output_bytes == 0
+            || self.recovery_reserve_bytes == 0
+            || self.active_read_views == 0
+            || self.pinned_read_bytes == 0
+        {
             return Err(Error::InvalidConfiguration(
-                "projected output capacity and recovery reserve must be positive".into(),
+                "projected output, read retention and recovery reserve must be positive".into(),
             ));
         }
         self.page_cache_policy
@@ -355,6 +364,8 @@ pub struct Database {
     writer_requires_reopen: Option<&'static str>,
     transaction_snapshots: Arc<crate::transaction::TransactionSnapshots>,
     active_read_views: Arc<std::sync::Mutex<ActiveReadViews>>,
+    active_read_view_limit: usize,
+    pinned_read_byte_limit: u64,
     projected_output: crate::ProjectedOutputMemory,
     write_path_diagnostics: Option<WritePathCollector>,
 }
@@ -466,6 +477,8 @@ impl Database {
             writer_requires_reopen: None,
             transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            active_read_view_limit: options.active_read_views,
+            pinned_read_byte_limit: options.pinned_read_bytes,
             projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
@@ -615,6 +628,8 @@ impl Database {
             writer_requires_reopen: None,
             transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            active_read_view_limit: options.active_read_views,
+            pinned_read_byte_limit: options.pinned_read_bytes,
             projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
@@ -642,6 +657,11 @@ impl Database {
         self.mutable_memory.clone()
     }
 
+    /// Aggregate live stream ownership; returned batches own separate output reservations.
+    pub fn read_view_ownership(&self) -> Result<(u64, u64)> {
+        ActiveReadViews::ownership(&self.active_read_views)
+    }
+
     pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {
         self.projected_output.clone()
     }
@@ -651,10 +671,18 @@ impl Database {
     /// caller can consume the stream without retaining a borrow of `Database`.
     pub fn begin_projected_read(
         &self,
-        request: ProjectedReadRequest,
+        mut request: ProjectedReadRequest,
     ) -> Result<ProjectedReadStream> {
         let current_sequence = self.snapshot().sequence;
         request.validate(current_sequence)?;
+        request.budget.max_active_views = request
+            .budget
+            .max_active_views
+            .min(self.active_read_view_limit);
+        request.budget.max_pinned_bytes = request
+            .budget
+            .max_pinned_bytes
+            .min(self.pinned_read_byte_limit);
         let segments = self
             .segments
             .iter()

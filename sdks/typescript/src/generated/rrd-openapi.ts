@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: f675d37054cd59fbc001b8eb73c183dade10444b3168b81aac23f6d9c6339b3e
+// OpenAPI SHA-256: 12334d8bad21d6326f49262111dcbbae9c6ec89f41f5a1615cc0049a7e50a1dc
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3344,6 +3344,11 @@ export interface operations {
                                      *     and reopening storage; they are never hot-applied by a client.
                                      */
                                     storage: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Aggregate live physical read owners and charged pinned bytes; restart required.
+                                         */
+                                        active_read_views: number;
                                         /** Format: uint64 */
                                         compaction_elapsed_ms: number;
                                         /** Format: uint64 */
@@ -3364,6 +3369,8 @@ export interface operations {
                                         mutable_versions: number;
                                         /** Format: uint64 */
                                         page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         projected_output_bytes: number;
                                         /** Format: uint64 */
@@ -3617,6 +3624,11 @@ export interface operations {
                                      *     and reopening storage; they are never hot-applied by a client.
                                      */
                                     storage: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Aggregate live physical read owners and charged pinned bytes; restart required.
+                                         */
+                                        active_read_views: number;
                                         /** Format: uint64 */
                                         compaction_elapsed_ms: number;
                                         /** Format: uint64 */
@@ -3637,6 +3649,8 @@ export interface operations {
                                         mutable_versions: number;
                                         /** Format: uint64 */
                                         page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         projected_output_bytes: number;
                                         /** Format: uint64 */
@@ -11115,6 +11129,11 @@ export interface operations {
                                      */
                                     admission?: {
                                         active: boolean;
+                                        /**
+                                         * Format: uint64
+                                         * @description Actual live physical read views and conservative aggregate pin charge.
+                                         */
+                                        active_read_views: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
                                         outstanding_logical_bytes: number;
@@ -11123,6 +11142,8 @@ export interface operations {
                                          * @description Includes the active request plus admitted waiters, matching admission.
                                          */
                                         outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         queued_requests: number;
                                         /**
@@ -13683,6 +13704,11 @@ export interface operations {
                                      */
                                     admission?: {
                                         active: boolean;
+                                        /**
+                                         * Format: uint64
+                                         * @description Actual live physical read views and conservative aggregate pin charge.
+                                         */
+                                        active_read_views: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
                                         outstanding_logical_bytes: number;
@@ -13691,6 +13717,8 @@ export interface operations {
                                          * @description Includes the active request plus admitted waiters, matching admission.
                                          */
                                         outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         queued_requests: number;
                                         /**
@@ -14064,6 +14092,11 @@ export interface operations {
                                  */
                                 admission?: {
                                     active: boolean;
+                                    /**
+                                     * Format: uint64
+                                     * @description Actual live physical read views and conservative aggregate pin charge.
+                                     */
+                                    active_read_views: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
                                     outstanding_logical_bytes: number;
@@ -14072,6 +14105,8 @@ export interface operations {
                                      * @description Includes the active request plus admitted waiters, matching admission.
                                      */
                                     outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    pinned_read_bytes: number;
                                     /** Format: uint64 */
                                     queued_requests: number;
                                     /**
@@ -14283,6 +14318,11 @@ export interface operations {
                                  */
                                 admission?: {
                                     active: boolean;
+                                    /**
+                                     * Format: uint64
+                                     * @description Actual live physical read views and conservative aggregate pin charge.
+                                     */
+                                    active_read_views: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
                                     outstanding_logical_bytes: number;
@@ -14291,6 +14331,8 @@ export interface operations {
                                      * @description Includes the active request plus admitted waiters, matching admission.
                                      */
                                     outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    pinned_read_bytes: number;
                                     /** Format: uint64 */
                                     queued_requests: number;
                                     /**

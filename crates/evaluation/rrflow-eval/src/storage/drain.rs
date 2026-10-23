@@ -34,6 +34,8 @@ impl DrainPolicy {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DrainOwnership {
+    pub active_read_views: u64,
+    pub pinned_read_bytes: u64,
     pub mutable_bytes: u64,
     pub projected_bytes: u64,
     pub debt_segments: u64,
@@ -58,6 +60,8 @@ impl From<&ResourceSample> for DrainSample {
             let admission = storage.admission.as_ref()?;
             let native = storage.rrflow_kv.as_ref()?;
             Some(DrainOwnership {
+                active_read_views: admission.active_read_views,
+                pinned_read_bytes: admission.pinned_read_bytes,
                 mutable_bytes: admission.retained_mutable_bytes,
                 projected_bytes: admission.retained_projected_bytes,
                 debt_segments: native.segment_set.compaction_debt_segments,
@@ -132,7 +136,9 @@ pub(super) fn check(
             .as_ref()
             .ok_or("drain ownership observation unavailable")?;
         require(
-            owner.mutable_bytes <= mutable
+            owner.active_read_views <= baseline.active_read_views
+                && owner.pinned_read_bytes <= baseline.pinned_read_bytes
+                && owner.mutable_bytes <= mutable
                 && owner.projected_bytes <= projected
                 && owner.debt_segments <= campaign.drain.maximum_debt_segments
                 && owner.outstanding_requests == 0

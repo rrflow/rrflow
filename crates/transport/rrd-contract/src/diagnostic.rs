@@ -451,6 +451,9 @@ pub struct DiagnosticRrflowKvSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiagnosticStorageAdmission {
+    /// Actual live physical read views and conservative aggregate pin charge.
+    pub active_read_views: u64,
+    pub pinned_read_bytes: u64,
     /// Logical owner charges; these are not allocator or process RSS bytes.
     pub retained_mutable_bytes: u64,
     pub retained_projected_bytes: u64,

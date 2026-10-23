@@ -112,6 +112,11 @@
         "active": {
           "type": "boolean"
         },
+        "active_read_views": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "debt_segments": {
           "format": "uint64",
           "minimum": 0,
@@ -135,6 +140,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "pinned_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "projected_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -147,6 +157,8 @@
         }
       },
       "required": [
+        "active_read_views",
+        "pinned_read_bytes",
         "mutable_bytes",
         "projected_bytes",
         "debt_segments",

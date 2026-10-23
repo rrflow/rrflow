@@ -191,3 +191,8 @@ from the owning workload table; CI rejects drift. A qualifying operating point
 is not proof of the entire load sweep. Reduced characterization remains
 explicitly unqualified. Fleet qualification is refused until quiet/equal/abusive
 per-estate interference can be represented and observed.
+
+Installed read retention has per-open active-view and pinned-byte ceilings.
+Requests can lower these limits but cannot raise them. Storage observations
+report actual physical views separately from retained output-buffer bytes;
+campaign drain checks require both view and pin counts to return to baseline.

@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: f675d37054cd59fbc001b8eb73c183dade10444b3168b81aac23f6d9c6339b3e
+// OpenAPI SHA-256: 12334d8bad21d6326f49262111dcbbae9c6ec89f41f5a1615cc0049a7e50a1dc
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -47,7 +47,7 @@ public enum OperationId {
     VECTOR_POINT_SCROLL("vector-point-scroll", "POST", "/v1/vector/points/scroll", Authentication.SESSION_BEARER, false),
     VECTOR_SEARCH("vector-search", "POST", "/v1/vector/search", Authentication.SESSION_BEARER, false);
 
-    static final String OPENAPI_DOCUMENT_SHA256 = "f675d37054cd59fbc001b8eb73c183dade10444b3168b81aac23f6d9c6339b3e";
+    static final String OPENAPI_DOCUMENT_SHA256 = "12334d8bad21d6326f49262111dcbbae9c6ec89f41f5a1615cc0049a7e50a1dc";
 
     public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }
 

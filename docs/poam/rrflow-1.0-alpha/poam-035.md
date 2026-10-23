@@ -228,6 +228,12 @@ adds a scope-bound authenticated physical-counter read using the same storage
 projection. Candidate acceptance and large-corpus measurement remain pending;
 full diagnostic consistency remains POAM-029's separate responsibility.
 
+Native projected reads also accepted caller-controlled aggregate view/pin
+ceilings. The [C-07g retention correction](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md#per-open-read-retention-ceilings-and-ownership-observations)
+binds per-open ceilings to sealed installation policy and exposes actual
+owner observations for drain validation. Candidate runtime acceptance is
+pending; this does not establish the installed retained-reader workload.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

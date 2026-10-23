@@ -278,7 +278,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "6f3c2121f9961286d11367c5b2ff1c6831d331bdd8cec6c81fec6f7282b68080",
+      "configuration_sha256": "f27778fd148ae1395b93b30c264db5853a4bc66f1a10c5c6f32c0505418eac73",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -302,6 +302,7 @@
       },
       "revision": 1,
       "storage": {
+        "active_read_views": 1024,
         "compaction_elapsed_ms": 30000,
         "compaction_input_bytes": 1073741824,
         "compaction_input_logical_bytes": 268435456,
@@ -312,6 +313,7 @@
         "mutable_accounted_bytes": 134217728,
         "mutable_versions": 1048576,
         "page_cache_bytes": 4194304,
+        "pinned_read_bytes": 4294967296,
         "projected_output_bytes": 134217728,
         "reclamation_delete_bytes": 1073741824,
         "reclamation_delete_files": 1024,
@@ -441,7 +443,7 @@
         "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "46809686f4914c7df2b3c97ceb0422615a1cc03d21b72b04312f2f78d506bfd3",
+    "plan_sha256": "746946ca4da2f326230d139ce31f6902cead6ee0529a1f3d44d9cdf5008c0535",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -507,8 +509,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "46809686f4914c7df2b3c97ceb0422615a1cc03d21b72b04312f2f78d506bfd3",
-    "result_sha256": "58df9660c9b977f90506f53546ae35c788c7dbe849a74a46850448bc542005eb",
+    "plan_sha256": "746946ca4da2f326230d139ce31f6902cead6ee0529a1f3d44d9cdf5008c0535",
+    "result_sha256": "c999a7a241a7cc2dd96e25ffdd226f6549d133642df55c60346814c6842ef34e",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },

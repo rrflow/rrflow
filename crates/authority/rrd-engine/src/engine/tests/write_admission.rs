@@ -5,10 +5,14 @@ use rrd_store::RrflowKvStore;
 fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     let policy = rrd_contract::StorageLimits {
         recovery_reserve_bytes: 32 * 1024 * 1024,
+        active_read_views: 7,
+        pinned_read_bytes: 8192,
         ..Default::default()
     };
     let native = crate::engine::core::installed_storage_options(&policy).unwrap();
     assert_eq!(native.recovery_reserve_bytes, policy.recovery_reserve_bytes);
+    assert_eq!(native.active_read_views, 7);
+    assert_eq!(native.pinned_read_bytes, 8192);
     let error = rrd_store::Error::DiskAdmission {
         available: 100,
         required: 200,

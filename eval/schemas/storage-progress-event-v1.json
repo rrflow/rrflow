@@ -645,6 +645,12 @@
         "active": {
           "type": "boolean"
         },
+        "active_read_views": {
+          "description": "Actual live physical view/batch owners and conservative aggregate pin charge.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "fenced": {
           "type": "boolean"
         },
@@ -655,6 +661,11 @@
         },
         "outstanding_requests": {
           "description": "Includes the active request plus admitted waiters, matching admission.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_read_bytes": {
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -677,6 +688,8 @@
         }
       },
       "required": [
+        "active_read_views",
+        "pinned_read_bytes",
         "retained_mutable_bytes",
         "retained_projected_bytes",
         "outstanding_requests",

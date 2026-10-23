@@ -845,12 +845,15 @@ impl StorageEngine for RrflowKvStore {
         let compaction = database.compaction_policy();
         let maintenance_stats = database.maintenance_stats();
         let memtable = database.memtable().profile();
+        let (active_read_views, pinned_read_bytes) = database.read_view_ownership()?;
         Ok(PhysicalStoreEvidence {
             backend: "rrflow_kv".into(),
             evidence_level: RRFLOW_KV_COUNTER_EVIDENCE.into(),
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),
+            active_read_views: Some(active_read_views),
+            pinned_read_bytes: Some(pinned_read_bytes),
             retained_mutable_bytes: Some(database.mutable_memory().stats().accounted_bytes as u64),
             retained_projected_bytes: Some(
                 database.projected_output_memory().stats().reserved_bytes as u64,
