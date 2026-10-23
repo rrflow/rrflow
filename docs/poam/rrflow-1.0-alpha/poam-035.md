@@ -276,6 +276,13 @@ coverage gap. The [bounded-worker readback correction](../../evidence/change-jou
 moves the same independent oracle into existing admitted workers while keeping
 real API latency and final restart readback. Actual timing acceptance is pending.
 
+The lower-rate campaign reached drain and exposed an invalid probe ledger:
+it claimed a present read without a recorded attempt. The
+[drain receipt correction](../../evidence/change-journals/gate-c/c-07g-drain-probe-receipt.md)
+records an executed public request, real receipt and independent verification
+without counting idle-drain probes as offered throughput. Native flow acceptance
+remains pending; the earlier failed resource policies remain retained.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

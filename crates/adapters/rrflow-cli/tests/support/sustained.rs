@@ -291,15 +291,45 @@ impl PointRun<'_> {
             )
             .await;
         }
-        self.workload.verify(&baseline).await?;
+        writer.record_event(&ProgressEvent::LoadIntent {
+            segment: writer.next_index(),
+            point: self.point.id.clone(),
+            seed: self.workload.seed,
+            phase: LoadPhase::Drain,
+            expected: expected.clone(),
+            write: None,
+        })?;
+        writer.checkpoint_progress()?;
+        let probe_started = ns(self.clock);
+        let (receipt, probe_finished) = tokio::time::timeout(
+            Duration::from_millis(self.campaign.schedule.operation_deadline_ms.get()),
+            async {
+                let receipt = self.workload.execute(&baseline).await?;
+                let finished = ns(self.clock);
+                self.workload.verify(&baseline).await?;
+                Ok::<_, String>((receipt, finished))
+            },
+        )
+        .await
+        .map_err(|_| "drain probe deadline")??;
         let ledger = AcknowledgementLedger {
             expected: vec![expected],
-            attempts: vec![],
+            // This is the actual drain probe, not offered load or throughput.
+            attempts: vec![Attempt {
+                attempt_id: evidence_id(format!("drain-probe-{}", writer.next_index())),
+                logical_id: evidence_id(&baseline.id),
+                request_sha256: baseline.request_sha256.clone(),
+                started_ns: probe_started - started,
+                finished_ns: probe_finished - started,
+                outcome: AttemptOutcome::Acknowledged {
+                    receipt_sha256: receipt.receipt_sha256.clone(),
+                },
+            }],
             readback: vec![Readback::Present {
                 logical_id: evidence_id(baseline.id),
                 request_sha256: baseline.request_sha256,
                 effect_sha256: baseline.effect_sha256.clone(),
-                receipt_sha256: digest("c07g.drain-readback", &baseline.effect_sha256)?,
+                receipt_sha256: receipt.receipt_sha256,
                 applications: 1u64.try_into().unwrap(),
             }],
         };
