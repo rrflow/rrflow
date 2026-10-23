@@ -134,6 +134,7 @@ struct Filler {
     native_code: i32,
     metadata_paths: Vec<PathBuf>,
     metadata_native_code: Option<i32>,
+    free_inodes: Option<u64>,
 }
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
@@ -162,11 +163,35 @@ impl Filler {
             native_code: 0,
             metadata_paths: Vec::new(),
             metadata_native_code: None,
+            free_inodes: None,
         };
         // Nonzero data prevents sparse/zero-block optimizations. Allocation and
         // sync failures are actual OS results, never injected StorageFull.
         let buffer = [0xa5u8; 64 * 1024];
         let started = Instant::now();
+        // Ext4 directory blocks may have filename-dependent spare slots. Exhaust
+        // inodes while data space remains, then fill data through the already
+        // open filler. A free-inode observation of zero proves create denial
+        // independent of the selected publication filename.
+        #[cfg(target_os = "linux")]
+        if let Some(directory) = &directory {
+            filler.fill_metadata(volume, directory, started);
+            use std::os::fd::AsRawFd;
+            let handle = File::open(directory).unwrap();
+            let mut state = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+            // SAFETY: valid owned directory fd and writable statvfs storage.
+            assert_eq!(
+                unsafe { libc::fstatvfs(handle.as_raw_fd(), state.as_mut_ptr()) },
+                0
+            );
+            // SAFETY: successful fstatvfs initialized the value.
+            let state = unsafe { state.assume_init() };
+            assert_eq!(
+                state.f_ffree, 0,
+                "metadata error did not exhaust ext4 inodes"
+            );
+            filler.free_inodes = Some(state.f_ffree);
+        }
         let error = loop {
             assert!(
                 started.elapsed() < Duration::from_secs(25),
@@ -195,40 +220,43 @@ impl Filler {
             "filler failed for another reason: {error}"
         );
         filler.file = Some(file);
-        // NTFS can still create resident files after data clusters are full.
-        // Exhaust actual directory/MFT allocation at the selected create
-        // boundary; never call a later WAL error a segment/publication proof.
-        if let Some(directory) = directory {
-            for index in 0..8192u32 {
-                assert!(
-                    started.elapsed() < Duration::from_secs(25),
-                    "bounded metadata fill"
-                );
-                let path = directory.join(format!("c{}-{index:04x}", &volume.nonce[..8]));
-                match OpenOptions::new().write(true).create_new(true).open(&path) {
-                    Ok(file) => {
-                        filler.metadata_paths.push(path);
-                        // Creation is the resource being exhausted. Dropping
-                        // the handle retains its directory record until cleanup.
-                        drop(file);
-                    }
-                    Err(error) => {
-                        let code = error.raw_os_error().expect("native metadata capacity code");
-                        assert!(
-                            capacity_code(code),
-                            "metadata fill failed for another reason: {error}"
-                        );
-                        filler.metadata_native_code = Some(code);
-                        break;
-                    }
-                }
+        // Resident metadata on APFS/NTFS is exhausted after data allocation.
+        if !cfg!(target_os = "linux") {
+            if let Some(directory) = &directory {
+                filler.fill_metadata(volume, directory, started);
             }
-            assert!(
-                filler.metadata_native_code.is_some(),
-                "metadata file count bound exhausted"
-            );
         }
         filler
+    }
+    fn fill_metadata(&mut self, volume: &Volume, directory: &std::path::Path, started: Instant) {
+        for index in 0..8192u32 {
+            assert!(
+                started.elapsed() < Duration::from_secs(25),
+                "bounded metadata fill"
+            );
+            let path = directory.join(format!("c{}-{index:04x}", &volume.nonce[..8]));
+            match OpenOptions::new().write(true).create_new(true).open(&path) {
+                Ok(file) => {
+                    self.metadata_paths.push(path);
+                    // Creation is the resource being exhausted. Dropping
+                    // the handle retains its directory record until cleanup.
+                    drop(file);
+                }
+                Err(error) => {
+                    let code = error.raw_os_error().expect("native metadata capacity code");
+                    assert!(
+                        capacity_code(code),
+                        "metadata fill failed for another reason: {error}"
+                    );
+                    self.metadata_native_code = Some(code);
+                    break;
+                }
+            }
+        }
+        assert!(
+            self.metadata_native_code.is_some(),
+            "metadata file count bound exhausted"
+        );
     }
 }
 impl Drop for Filler {
@@ -493,7 +521,7 @@ fn capacity_case(point: &str, mode: &str) {
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();
         let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code,
-            "metadata_files":filler.metadata_paths.len(),"metadata_native_code":filler.metadata_native_code});
+            "metadata_files":filler.metadata_paths.len(),"metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes});
         drop(filler);
         ledger.attempts.push(Attempt {attempt_id:"capacity-uncertain".to_owned().try_into().unwrap(),
             logical_id:"uncertain".to_owned().try_into().unwrap(),request_sha256:digest("c07f.request",&target).unwrap(),
