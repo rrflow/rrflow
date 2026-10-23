@@ -235,3 +235,33 @@ pipeline followed by process exit. Empty responses still fail qualification.
 No new host operation ran locally.
 
 The exact-extent correction passed `cargo clippy -p rrd-lsm --all-targets --locked -- -D warnings` in 6.19 seconds. PowerShell parsing and Python syntax compilation passed. Native runtime acceptance remains candidate-CI work, not a local run.
+
+
+## Publication owner release after interrupted repair
+
+Candidate `117c388385db3c2f6bc879c1b8bc4dc54192e471`, run 39893191950,
+engine-authority job 120217937801, failed the installed tail-repair interruption
+history at installation.rs:498: immediate resume reported another publication
+owner after the preceding apply returned. Inspection found PublicationLease
+relied solely on file close. A duplicated/inherited open-file description can
+retain that lock past owner drop. This is a supported explanation for the
+observed failure; the CI log alone does not identify an inheriting process.
+
+The existing publication owner now explicitly unlocks on Drop, matching the
+native manifest/inspection owner lifetime. It keeps the persistent inode and
+nonblocking exclusive acquisition; there is no retry/sleep workaround. A
+regression definition retains a duplicated descriptor, verifies denial during
+ownership, drops the owner, reacquires immediately, and verifies disposal of
+the old duplicate cannot release the new owner's lease. The existing installed
+interruption history remains the integration oracle.
+
+Before editing, PR 71's brief was extended with this exact owner and oracle.
+Reads: restore_publication, tail_repair/publication, installation/lease,
+installation interruption tests, native manifest/inspection Drop, anchored
+filesystem flags and [Rust File locking semantics](https://doc.rust-lang.org/std/fs/struct.File.html#method.unlock).
+`cargo clippy -p rrd-engine --all-targets --locked -- -D warnings` passed in
+38.50 seconds. No local runtime test ran. The dependency PR 65 passed all
+candidate checks at `beb55307a9c54df3eedec45a113084e360a4bdc1` and merged as
+`6de0c5be56a6b7c888586186babb3b1648eb55ae`; this worktree merged that
+unchanged-source main ancestry. Native capacity/repair acceptance still needs
+the corrected candidate pipeline. C-07 remains open.
