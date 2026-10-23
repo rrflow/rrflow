@@ -92,6 +92,9 @@ impl RrdEngine {
                 ServiceError::DeadlineExceeded
             } else {
                 match error {
+                    rrd_query::Error::StorageAdmission(message) => {
+                        ServiceError::StorageAdmission(message)
+                    }
                     rrd_query::Error::Budget(message) => ServiceError::ConfigurationLimit(message),
                     other => ServiceError::Query(other.to_string()),
                 }

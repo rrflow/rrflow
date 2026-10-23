@@ -2,7 +2,7 @@ use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SharedIoContext};
 use crate::mutable::MutableCharge;
 use crate::segment::{
-    new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
+    new_page_cache_with_limits, next_projected_cache_access, page_cache_stats, ActiveReadViews,
     ReadView, SharedPageCache,
 };
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
@@ -98,11 +98,19 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Maximum named checkpoint-directory entries, including interrupted temporary files.
+    pub checkpoint_entries: usize,
+    pub transaction_limits: crate::TransactionLimits,
+    /// Per-open aggregate ownership ceilings, independent of caller budgets.
+    pub active_read_views: usize,
+    pub pinned_read_bytes: u64,
     /// Available native bytes retained beyond each proposed WAL/immutable
     /// allocation. This is admission, not reserved disk space or a total quota.
     pub recovery_reserve_bytes: u64,
     /// Output allocation cap shared by projected streams of this open instance.
     pub projected_output_bytes: usize,
+    /// Live owned source allocations across cached and uncached readers.
+    pub source_page_bytes: usize,
     pub page_cache_bytes: usize,
     pub page_cache_policy: PageCachePolicy,
     pub segment_io: SegmentIoPolicy,
@@ -120,7 +128,12 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            checkpoint_entries: crate::manifest::DEFAULT_CHECKPOINT_ENTRIES,
+            transaction_limits: crate::TransactionLimits::default(),
+            active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
+            pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
+            source_page_bytes: crate::DEFAULT_SOURCE_PAGE_BYTES,
             recovery_reserve_bytes: 16 * 1024 * 1024,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
             page_cache_policy: PageCachePolicy::default(),
@@ -140,9 +153,19 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     pub(crate) fn validate(self) -> Result<Self> {
-        if self.projected_output_bytes == 0 || self.recovery_reserve_bytes == 0 {
+        if self.checkpoint_entries == 0 || self.checkpoint_entries > 65_536 {
             return Err(Error::InvalidConfiguration(
-                "projected output capacity and recovery reserve must be positive".into(),
+                "checkpoint entries must be in 1..=65536".into(),
+            ));
+        }
+        if self.source_page_bytes == 0
+            || self.projected_output_bytes == 0
+            || self.recovery_reserve_bytes == 0
+            || self.active_read_views == 0
+            || self.pinned_read_bytes == 0
+        {
+            return Err(Error::InvalidConfiguration(
+                "source pages, projected output, read retention and recovery reserve must be positive".into(),
             ));
         }
         self.page_cache_policy
@@ -150,6 +173,7 @@ impl DatabaseOptions {
         self.segment_io.validate()?;
         self.segment_row_group_budget.validate()?;
         self.segment_compression.validate()?;
+        self.transaction_limits.validate()?;
         self.maintenance.validate()?;
         self.mutable_limits.validate()?;
         if self.mutable_retention.accounted_bytes < self.mutable_limits.accounted_bytes
@@ -355,6 +379,8 @@ pub struct Database {
     writer_requires_reopen: Option<&'static str>,
     transaction_snapshots: Arc<crate::transaction::TransactionSnapshots>,
     active_read_views: Arc<std::sync::Mutex<ActiveReadViews>>,
+    active_read_view_limit: usize,
+    pinned_read_byte_limit: u64,
     projected_output: crate::ProjectedOutputMemory,
     write_path_diagnostics: Option<WritePathCollector>,
 }
@@ -432,7 +458,8 @@ impl Database {
         }
         let root = root.pin_directory()?;
         let root = root.with_recovery_reserve(options.recovery_reserve_bytes)?;
-        let manifests = ManifestStore::create_anchored(&root)?;
+        let manifests = ManifestStore::create_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         root.join(WAL_DIRECTORY).create_dir()?;
         root.join(SEGMENT_DIRECTORY).create_dir()?;
         let manifest = new_manifest(1, None, 0, 0, 1, Vec::new(), application_format)?;
@@ -447,9 +474,10 @@ impl Database {
             memtable: mutable_memory.empty(0),
             mutable_memory,
             segments: Vec::new(),
-            page_cache: new_page_cache_with_policy(
+            page_cache: new_page_cache_with_limits(
                 options.page_cache_bytes,
                 options.page_cache_policy,
+                options.source_page_bytes,
             )?,
             segment_io,
             segment_open_evidence: SegmentOpenEvidence::default(),
@@ -464,8 +492,12 @@ impl Database {
             maintenance_stats: MaintenanceStats::default(),
             wal_payload_bytes: 0,
             writer_requires_reopen: None,
-            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
+            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::new(
+                options.transaction_limits,
+            )),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            active_read_view_limit: options.active_read_views,
+            pinned_read_byte_limit: options.pinned_read_bytes,
             projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
@@ -498,13 +530,22 @@ impl Database {
         let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
-        let manifests = ManifestStore::open_existing_anchored(&root)?;
+        let manifests = ManifestStore::open_existing_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         let (_, manifest) = manifests
             .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::boundary(
+            crate::crash_test::Point::RecoveryManifest,
+            root.diagnostic_path(),
+        );
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
-        let page_cache =
-            new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
+        let page_cache = new_page_cache_with_limits(
+            options.page_cache_bytes,
+            options.page_cache_policy,
+            options.source_page_bytes,
+        )?;
         let mut segment_bytes = 0u64;
         for segment in &manifest.segments {
             recovery_budget.file(segment.bytes)?;
@@ -613,8 +654,12 @@ impl Database {
             maintenance_stats,
             wal_payload_bytes,
             writer_requires_reopen: None,
-            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::default()),
+            transaction_snapshots: Arc::new(crate::transaction::TransactionSnapshots::new(
+                options.transaction_limits,
+            )),
             active_read_views: Arc::new(std::sync::Mutex::new(ActiveReadViews::default())),
+            active_read_view_limit: options.active_read_views,
+            pinned_read_byte_limit: options.pinned_read_bytes,
             projected_output: crate::ProjectedOutputMemory::new(options.projected_output_bytes),
             write_path_diagnostics: None,
         })
@@ -642,6 +687,20 @@ impl Database {
         self.mutable_memory.clone()
     }
 
+    /// Coherent aggregate native transaction owner/buffer charge observation.
+    pub fn transaction_ownership(&self) -> Result<(u64, u64)> {
+        self.transaction_snapshots.ownership()
+    }
+
+    /// Aggregate live stream ownership; returned batches own separate output reservations.
+    pub fn read_view_ownership(&self) -> Result<(u64, u64)> {
+        ActiveReadViews::ownership(&self.active_read_views)
+    }
+
+    pub fn source_page_memory(&self) -> crate::SourcePageMemory {
+        crate::segment::source_page_memory(&self.page_cache)
+    }
+
     pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {
         self.projected_output.clone()
     }
@@ -651,10 +710,18 @@ impl Database {
     /// caller can consume the stream without retaining a borrow of `Database`.
     pub fn begin_projected_read(
         &self,
-        request: ProjectedReadRequest,
+        mut request: ProjectedReadRequest,
     ) -> Result<ProjectedReadStream> {
         let current_sequence = self.snapshot().sequence;
         request.validate(current_sequence)?;
+        request.budget.max_active_views = request
+            .budget
+            .max_active_views
+            .min(self.active_read_view_limit);
+        request.budget.max_pinned_bytes = request
+            .budget
+            .max_pinned_bytes
+            .min(self.pinned_read_byte_limit);
         let segments = self
             .segments
             .iter()
@@ -1333,6 +1400,10 @@ impl Database {
         self.manifests.checkpoint(name, &self.manifest.digest, at)
     }
 
+    pub fn checkpoint_ownership(&self) -> Result<(u64, u64)> {
+        self.manifests.checkpoint_ownership()
+    }
+
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {
         self.manifests.checkpoints()
     }
@@ -1647,31 +1718,10 @@ impl Database {
     ) -> Result<Option<CompactionOutcome>> {
         self.flush_memtable_inner(at, None)?;
         let started = Instant::now();
-        let Some(candidate) = self.select_compaction_candidate(force) else {
+        let Some(candidate) = self.select_compaction_candidate(force, started)? else {
             return Ok(None);
         };
-        let mut logical_bytes = 0u64;
-        let mut versions = 0u64;
-        let mut physical_bytes = 0u64;
-        for index in &candidate.indices {
-            let segment = &self.segments[*index];
-            physical_bytes = physical_bytes
-                .checked_add(segment.descriptor.bytes)
-                .ok_or_else(|| Error::InvalidSegment("compaction physical byte overflow".into()))?;
-            logical_bytes = logical_bytes
-                .checked_add(segment.compaction_logical_bytes()?)
-                .ok_or_else(|| Error::InvalidSegment("compaction logical byte overflow".into()))?;
-            versions = versions
-                .checked_add(segment.descriptor.entries)
-                .ok_or_else(|| Error::InvalidSegment("compaction version count overflow".into()))?;
-            self.compaction_limits
-                .check(crate::MaintenanceResource::InputBytes, physical_bytes)?;
-            self.compaction_limits
-                .check(crate::MaintenanceResource::InputLogicalBytes, logical_bytes)?;
-            self.compaction_limits
-                .check(crate::MaintenanceResource::InputVersions, versions)?;
-            self.compaction_limits.check_elapsed(started)?;
-        }
+        let input_bytes = self.admit_compaction_input(&candidate, started)?;
         let durable = self.manifest.durable_sequence;
         let mut protected_sequences = protected
             .iter()
@@ -1682,7 +1732,6 @@ impl Database {
         protected_sequences.insert(durable);
         let previous_manifest = self.manifest.digest.clone();
         let input_segments = candidate.indices.len();
-        let input_bytes = physical_bytes;
         let merge = self.merge_compaction_candidate(
             &candidate,
             durable,
@@ -1755,134 +1804,153 @@ impl Database {
         }))
     }
 
-    fn select_compaction_candidate(&self, force: bool) -> Option<CompactionCandidate> {
-        let mut l0 = self
-            .segments
-            .iter()
-            .enumerate()
-            .filter(|(_, segment)| segment.descriptor.level == 0)
-            .map(|(index, segment)| (index, &segment.descriptor))
-            .collect::<Vec<_>>();
-        l0.sort_by(|left, right| {
-            left.1
-                .maximum_sequence
-                .cmp(&right.1.maximum_sequence)
-                .then_with(|| left.1.first_key.cmp(&right.1.first_key))
-                .then_with(|| left.1.id.cmp(&right.1.id))
-        });
-        if !l0.is_empty() && (force || l0.len() >= self.compaction.l0_compaction_trigger) {
-            let target_level = 1.min(self.compaction.max_level);
-            let mut selected_l0 = vec![l0[0].0];
-            let mut first_key = l0[0].1.first_key.clone();
-            let mut last_key = l0[0].1.last_key.clone();
-            for (index, descriptor) in l0.into_iter().skip(1) {
-                let candidate_first = first_key.as_slice().min(descriptor.first_key.as_slice());
-                let candidate_last = last_key.as_slice().max(descriptor.last_key.as_slice());
-                let overlap_count = self
-                    .segments
-                    .iter()
-                    .enumerate()
-                    .filter(|(other, segment)| {
-                        !selected_l0.contains(other)
-                            && *other != index
-                            && segment.descriptor.level == target_level
-                            && ranges_overlap(
-                                candidate_first,
-                                candidate_last,
-                                &segment.descriptor.first_key,
-                                &segment.descriptor.last_key,
-                            )
-                    })
-                    .count();
-                if selected_l0.len() + 1 + overlap_count > self.compaction.max_input_segments {
-                    break;
-                }
-                selected_l0.push(index);
-                first_key = candidate_first.to_vec();
-                last_key = candidate_last.to_vec();
-            }
-            let mut indices = selected_l0;
-            let overlaps = self
-                .segments
-                .iter()
-                .enumerate()
-                .filter(|(index, segment)| {
-                    !indices.contains(index)
-                        && segment.descriptor.level == target_level
-                        && ranges_overlap(
-                            &first_key,
-                            &last_key,
-                            &segment.descriptor.first_key,
-                            &segment.descriptor.last_key,
-                        )
-                })
-                .map(|(index, _)| index)
-                .collect::<Vec<_>>();
-            indices.extend(overlaps);
-            if (force || indices.len() >= 2) && indices.len() <= self.compaction.max_input_segments
-            {
-                indices.sort_unstable();
-                return Some(CompactionCandidate {
-                    indices,
-                    source_level: 0,
-                    target_level,
-                });
-            }
-            return None;
-        }
-
-        for source_level in 1..self.compaction.max_level {
-            let mut at_level = self
+    /// Select a complete overlap closure that fits one maintenance quantum.
+    /// A blocked upper level must not hide feasible work that clears its target.
+    fn select_compaction_candidate(
+        &self,
+        force: bool,
+        started: Instant,
+    ) -> Result<Option<CompactionCandidate>> {
+        let mut denied = None;
+        for source_level in 0..self.compaction.max_level {
+            self.compaction_limits.check_elapsed(started)?;
+            let mut sources = self
                 .segments
                 .iter()
                 .enumerate()
                 .filter(|(_, segment)| segment.descriptor.level == source_level)
-                .map(|(index, segment)| (index, &segment.descriptor))
+                .map(|(index, _)| index)
                 .collect::<Vec<_>>();
-            if at_level.is_empty() || (!force && at_level.len() < 2) {
+            let blocked = denied.is_some();
+            let threshold = if source_level == 0 {
+                self.compaction.l0_compaction_trigger
+            } else {
+                2
+            };
+            if sources.is_empty() || (!force && !blocked && sources.len() < threshold) {
                 continue;
             }
-            at_level.sort_by(|left, right| {
-                left.1
-                    .first_key
-                    .cmp(&right.1.first_key)
-                    .then_with(|| left.1.id.cmp(&right.1.id))
-            });
-            let target_level = source_level.saturating_add(1);
-            for take in (1..=at_level.len().min(self.compaction.max_input_segments)).rev() {
-                let first_key = &at_level[0].1.first_key;
-                let last_key = &at_level[take - 1].1.last_key;
-                let mut indices = at_level
-                    .iter()
-                    .take(take)
-                    .map(|(index, _)| *index)
-                    .collect::<Vec<_>>();
-                for (index, segment) in self.segments.iter().enumerate() {
-                    if segment.descriptor.level == target_level
-                        && ranges_overlap(
-                            first_key,
-                            last_key,
-                            &segment.descriptor.first_key,
-                            &segment.descriptor.last_key,
-                        )
-                    {
-                        indices.push(index);
-                    }
+            sources.sort_by(|left, right| {
+                let left = &self.segments[*left].descriptor;
+                let right = &self.segments[*right].descriptor;
+                if source_level == 0 {
+                    left.maximum_sequence
+                        .cmp(&right.maximum_sequence)
+                        .then_with(|| left.first_key.cmp(&right.first_key))
+                        .then_with(|| left.id.cmp(&right.id))
+                } else {
+                    left.first_key
+                        .cmp(&right.first_key)
+                        .then_with(|| left.id.cmp(&right.id))
                 }
-                indices.sort_unstable();
-                indices.dedup();
-                if indices.len() <= self.compaction.max_input_segments
-                    && (force || indices.len() >= 2)
-                {
-                    return Some(CompactionCandidate {
-                        indices,
-                        source_level,
-                        target_level,
-                    });
+            });
+            for take in (1..=sources.len().min(self.compaction.max_input_segments)).rev() {
+                let Some(candidate) =
+                    self.compaction_overlap_candidate(&sources[..take], source_level, started)?
+                else {
+                    continue;
+                };
+                // Do not disguise a rejected merge of multiple source segments
+                // as a successful move of just one. A sole blocking target may
+                // move down to free its parent; this is finite in max_level.
+                if candidate.indices.len() < 2 && !(sources.len() == 1 && (force || blocked)) {
+                    continue;
+                }
+                match self.admit_compaction_input(&candidate, started) {
+                    Ok(_) => return Ok(Some(candidate)),
+                    Err(
+                        error @ Error::MaintenanceLimit {
+                            resource:
+                                crate::MaintenanceResource::InputBytes
+                                | crate::MaintenanceResource::InputLogicalBytes
+                                | crate::MaintenanceResource::InputVersions,
+                            ..
+                        },
+                    ) => {
+                        if denied.is_none() {
+                            denied = Some(error);
+                        }
+                    }
+                    Err(error) => return Err(error),
                 }
             }
         }
-        None
+        match denied {
+            Some(error) => Err(error),
+            None => Ok(None),
+        }
+    }
+
+    fn compaction_overlap_candidate(
+        &self,
+        sources: &[usize],
+        source_level: u8,
+        started: Instant,
+    ) -> Result<Option<CompactionCandidate>> {
+        let first_key = sources
+            .iter()
+            .map(|index| self.segments[*index].descriptor.first_key.as_slice())
+            .min()
+            .expect("nonempty source selection");
+        let last_key = sources
+            .iter()
+            .map(|index| self.segments[*index].descriptor.last_key.as_slice())
+            .max()
+            .expect("nonempty source selection");
+        let target_level = source_level + 1;
+        let mut indices = sources.to_vec();
+        for (index, segment) in self.segments.iter().enumerate() {
+            self.compaction_limits.check_elapsed(started)?;
+            if segment.descriptor.level == target_level
+                && ranges_overlap(
+                    first_key,
+                    last_key,
+                    &segment.descriptor.first_key,
+                    &segment.descriptor.last_key,
+                )
+            {
+                indices.push(index);
+                if indices.len() > self.compaction.max_input_segments {
+                    return Ok(None);
+                }
+            }
+        }
+        indices.sort_unstable();
+        Ok(Some(CompactionCandidate {
+            indices,
+            source_level,
+            target_level,
+        }))
+    }
+
+    fn admit_compaction_input(
+        &self,
+        candidate: &CompactionCandidate,
+        started: Instant,
+    ) -> Result<u64> {
+        let mut logical_bytes = 0u64;
+        let mut versions = 0u64;
+        let mut physical_bytes = 0u64;
+        for index in &candidate.indices {
+            let segment = &self.segments[*index];
+            physical_bytes = physical_bytes
+                .checked_add(segment.descriptor.bytes)
+                .ok_or_else(|| Error::InvalidSegment("compaction physical byte overflow".into()))?;
+            logical_bytes = logical_bytes
+                .checked_add(segment.compaction_logical_bytes()?)
+                .ok_or_else(|| Error::InvalidSegment("compaction logical byte overflow".into()))?;
+            versions = versions
+                .checked_add(segment.descriptor.entries)
+                .ok_or_else(|| Error::InvalidSegment("compaction version count overflow".into()))?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputBytes, physical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputLogicalBytes, logical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputVersions, versions)?;
+            self.compaction_limits.check_elapsed(started)?;
+        }
+        Ok(physical_bytes)
     }
 
     fn merge_compaction_candidate(

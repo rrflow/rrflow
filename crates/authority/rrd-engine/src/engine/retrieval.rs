@@ -59,7 +59,7 @@ impl RrdEngine {
             RuntimeValue::String(request.text_query.clone()),
         )]);
         let pipeline = rrd_query::StampedQueryPipeline::new(&self.storage, read.clone())
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
         let candidate_limit = usize::try_from(request.candidate_k)
             .map_err(|_| ServiceError::Query("hybrid candidate_k exceeds usize".into()))?;
         let max_input_rows = usize::try_from(request.max_storage_keys)
@@ -74,13 +74,11 @@ impl RrdEngine {
         };
         let bound = pipeline
             .bind(&query, &parameters, &text_budget)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
-        let text_plan = pipeline
-            .plan(&bound)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
+        let text_plan = pipeline.plan(&bound).map_err(ServiceError::from)?;
         let text_execution = pipeline
             .execute(&text_plan, &text_budget)
-            .map_err(|error| ServiceError::Query(error.to_string()))?;
+            .map_err(ServiceError::from)?;
         if text_execution.truncated {
             return Err(ServiceError::Query(
                 "hybrid BM25 candidates were truncated by the execution budget".into(),

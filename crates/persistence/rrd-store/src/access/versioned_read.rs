@@ -7,12 +7,12 @@
 //! change log is not a range source here; replay, changefeed, archive, and
 //! recovery keep their explicit paged-log APIs.
 
-use super::runtime_state::{read_accumulator_node, scan_space, validate_read_stamp, AccessRead};
-use crate::key_codec::KeyCodec;
+use super::runtime_state::{read_accumulator_node, validate_read_stamp, AccessRead};
+use crate::key_codec::{prefix_end, KeyCodec};
 use crate::keyspaces::{self, Space};
 use crate::{Error, Result};
 use rrd_core::{
-    Predicate, ReadStamp, RuntimeChange, RuntimeLogAccumulator, RuntimeLogicalModel,
+    Predicate, ReadStamp, RuntimeChange, RuntimeId, RuntimeLogAccumulator, RuntimeLogicalModel,
     RuntimeMutation, RuntimeReadValidation, RuntimeRef, RuntimeType,
 };
 use serde::{Deserialize, Serialize};
@@ -111,6 +111,15 @@ pub enum RuntimeVersionedSource {
         model: RuntimeLogicalModel,
         reference: RuntimeRef,
     },
+    /// Complete histories for a lexical interval of IDs in one typed family.
+    /// Bounds select identities, never individual temporal versions. At least
+    /// one bound is required; use the family source for an unbounded scan.
+    IdentityRange {
+        model: RuntimeLogicalModel,
+        kind: RuntimeType,
+        lower: Bound<RuntimeId>,
+        upper: Bound<RuntimeId>,
+    },
     /// Temporal adjacency history for one node and relation type: every
     /// relation version that placed `node` at the `direction` endpoint, plus
     /// every retirement of a relation while it did. The range selects the
@@ -159,7 +168,9 @@ impl RuntimeVersionedSource {
             Self::Series { .. } => Ok(RuntimeReadAccessPath::SeriesVersions),
             Self::Geo { .. } => Ok(RuntimeReadAccessPath::GeoVersions),
             Self::Objects { .. } => Ok(RuntimeReadAccessPath::ObjectVersions),
-            Self::Identity { model, .. } => access_path_for_model(*model),
+            Self::Identity { model, .. } | Self::IdentityRange { model, .. } => {
+                access_path_for_model(*model)
+            }
             Self::Adjacency { .. } => Ok(RuntimeReadAccessPath::AdjacencyVersions),
         }
     }
@@ -393,13 +404,11 @@ pub(crate) fn schema_at_read(
     Ok(schema)
 }
 
-/// Every typed range admitted into one read, keyed by its encoded prefix.
-/// Encoded prefixes carry their family and subspace, so bytewise order is
-/// enough to find an overlap: with no prior overlap, a range overlapping any
-/// admitted range overlaps its sorted neighbour.
+/// Every nonempty half-open physical interval admitted into one read. With
+/// no prior overlap, only its sorted neighbours can overlap a new interval.
 #[derive(Default)]
 struct SourceRanges {
-    admitted: BTreeMap<Vec<u8>, RuntimeVersionedSource>,
+    admitted: BTreeMap<Vec<u8>, (Vec<u8>, RuntimeVersionedSource)>,
 }
 
 impl SourceRanges {
@@ -410,8 +419,11 @@ impl SourceRanges {
     ) -> Result<Vec<RuntimeVersionedSource>> {
         let mut step = Vec::new();
         for source in sources {
-            let (_, prefix) = source_range(source, scope)?;
-            if let Some(admitted) = self.admitted.get(&prefix) {
+            let (_, start, end) = source_interval(source, scope)?;
+            if start == end {
+                continue;
+            }
+            if let Some((_, admitted)) = self.admitted.get(&start) {
                 if admitted == source {
                     continue;
                 }
@@ -419,18 +431,18 @@ impl SourceRanges {
             }
             let previous = self
                 .admitted
-                .range::<[u8], _>((Bound::Unbounded, Bound::Excluded(prefix.as_slice())))
+                .range::<[u8], _>((Bound::Unbounded, Bound::Excluded(start.as_slice())))
                 .next_back()
-                .is_some_and(|(admitted, _)| prefix.starts_with(admitted));
+                .is_some_and(|(_, (admitted_end, _))| admitted_end > &start);
             let next = self
                 .admitted
-                .range::<[u8], _>((Bound::Excluded(prefix.as_slice()), Bound::Unbounded))
+                .range::<[u8], _>((Bound::Excluded(start.as_slice()), Bound::Unbounded))
                 .next()
-                .is_some_and(|(admitted, _)| admitted.starts_with(&prefix));
+                .is_some_and(|(admitted_start, _)| admitted_start < &end);
             if previous || next {
                 return Err(overlapping_ranges(source));
             }
-            self.admitted.insert(prefix, source.clone());
+            self.admitted.insert(start, (end, source.clone()));
             step.push(source.clone());
         }
         Ok(step)
@@ -451,8 +463,60 @@ fn scan_source(
     read: &ReadStamp,
     source: &RuntimeVersionedSource,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let (space, prefix) = source_range(source, &read.scope)?;
-    scan_space(reader, space, &prefix)
+    let (_, start, end) = source_interval(source, &read.scope)?;
+    reader.scan_range(&start, &end, usize::MAX)
+}
+
+fn source_interval(
+    source: &RuntimeVersionedSource,
+    scope: &rrd_core::ScopeId,
+) -> Result<(Space, Vec<u8>, Vec<u8>)> {
+    let end_of = |prefix: &[u8]| {
+        prefix_end(prefix)
+            .ok_or_else(|| Error::Substrate("version range has no upper bound".into()))
+    };
+    if let RuntimeVersionedSource::IdentityRange {
+        model,
+        kind,
+        lower,
+        upper,
+    } = source
+    {
+        if matches!((lower, upper), (Bound::Unbounded, Bound::Unbounded))
+            || matches!((lower, upper),
+                (Bound::Included(a) | Bound::Excluded(a), Bound::Included(b) | Bound::Excluded(b)) if a > b)
+        {
+            return Err(Error::Substrate("invalid runtime identity interval".into()));
+        }
+        let space = version_space_for_model(*model)?;
+        let family = keyspaces::runtime_kind_prefix(space, scope, kind);
+        let identity = |id: &RuntimeId| {
+            keyspaces::runtime_reference_prefix(
+                space,
+                scope,
+                &RuntimeRef {
+                    kind: kind.clone(),
+                    id: id.clone(),
+                },
+            )
+        };
+        let start = match lower {
+            Bound::Unbounded => family.clone(),
+            Bound::Included(id) => identity(id),
+            Bound::Excluded(id) => end_of(&identity(id))?,
+        };
+        let end = match upper {
+            Bound::Unbounded => end_of(&family)?,
+            Bound::Excluded(id) => identity(id),
+            Bound::Included(id) => end_of(&identity(id))?,
+        };
+        // Equal semantic endpoints with either strict side select no identity.
+        let start = start.min(end.clone());
+        return Ok((space, start, end));
+    }
+    let (space, prefix) = source_range(source, scope)?;
+    let end = end_of(&prefix)?;
+    Ok((space, prefix, end))
 }
 
 fn source_range(
@@ -498,6 +562,11 @@ fn source_range(
                 space,
                 keyspaces::runtime_reference_prefix(space, scope, reference),
             )
+        }
+        RuntimeVersionedSource::IdentityRange { .. } => {
+            return Err(Error::Substrate(
+                "identity interval is not a prefix source".into(),
+            ));
         }
         RuntimeVersionedSource::Adjacency {
             relation,
@@ -753,6 +822,28 @@ fn source_accepts_address(
         RuntimeVersionedSource::Identity { model, reference } => {
             return Ok(version_space_for_model(*model)? == address.space
                 && reference == &address.reference);
+        }
+        RuntimeVersionedSource::IdentityRange {
+            model,
+            kind,
+            lower,
+            upper,
+        } => {
+            let id = &address.reference.id;
+            let above = match lower {
+                Bound::Unbounded => true,
+                Bound::Included(lower) => id >= lower,
+                Bound::Excluded(lower) => id > lower,
+            };
+            let below = match upper {
+                Bound::Unbounded => true,
+                Bound::Included(upper) => id <= upper,
+                Bound::Excluded(upper) => id < upper,
+            };
+            return Ok(version_space_for_model(*model)? == address.space
+                && kind == &address.reference.kind
+                && above
+                && below);
         }
         RuntimeVersionedSource::Schema
         | RuntimeVersionedSource::Claims { .. }
@@ -1012,6 +1103,10 @@ impl<R: AccessRead + ?Sized> AccessRead for MeteredRead<'_, R> {
 fn checked_add(left: u64, right: u64) -> Result<u64> {
     left.checked_add(right).ok_or(Error::SequenceOverflow)
 }
+
+#[cfg(test)]
+#[path = "versioned_identity_ranges.rs"]
+mod identity_range_tests;
 
 #[cfg(test)]
 mod tests {

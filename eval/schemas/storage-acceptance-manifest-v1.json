@@ -1,0 +1,135 @@
+{
+  "$defs": {
+    "AcceptanceCampaign": {
+      "additionalProperties": false,
+      "properties": {
+        "absence_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Missing results must be declared, never silently omitted from coverage."
+        },
+        "campaign_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "directory": {
+          "$ref": "#/$defs/Id",
+          "description": "One non-symlink directory directly below the evidence root."
+        },
+        "launch_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "result_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/CampaignStatus"
+        }
+      },
+      "required": [
+        "directory",
+        "campaign_sha256",
+        "status"
+      ],
+      "type": "object"
+    },
+    "AcceptanceSource": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "public_catalogue_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "tree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "commit",
+        "tree",
+        "public_catalogue_sha256"
+      ],
+      "type": "object"
+    },
+    "CampaignStatus": {
+      "enum": [
+        "completed",
+        "failed",
+        "interrupted",
+        "not_run"
+      ],
+      "type": "string"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "campaigns": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceCampaign"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "type": "array"
+    },
+    "ci_directory": {
+      "$ref": "#/$defs/Id"
+    },
+    "ci_receipt_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "owner_projection_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "source": {
+      "$ref": "#/$defs/AcceptanceSource"
+    }
+  },
+  "required": [
+    "format_version",
+    "source",
+    "owner_projection_sha256",
+    "ci_directory",
+    "ci_receipt_sha256",
+    "campaigns"
+  ],
+  "title": "StorageAcceptanceManifest",
+  "type": "object"
+}
