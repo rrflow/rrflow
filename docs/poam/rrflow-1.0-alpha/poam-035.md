@@ -368,3 +368,10 @@ cap. Bounded chunks now preserve the full-page checksum and exact historical
 reads without raising any limit. Native component tests pass; attribution of
 the retained installed Internal failure and updated installed capacity/soak
 acceptance remain open.
+
+The first actual shared-allocation fleet campaign found an idle-neighbour
+segment that spent its whole time budget before the required verification
+probe. The [idle deadline reservation repair](../../evidence/change-journals/gate-c/c-07g-idle-segment-deadlines.md)
+derives bounded idle spans and enforces an outer deadline without changing
+ledger acceptance. Forty evaluation tests and CLI lint pass; the repaired
+quiet/equal/abusive installed campaign remains required.
