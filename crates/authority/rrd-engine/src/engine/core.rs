@@ -19,12 +19,18 @@ pub(super) fn installed_storage_options(
         })
     };
     let mut options = rrd_store::DatabaseOptions {
+        checkpoint_entries: native("checkpoint_entries", policy.checkpoint_entries)?,
         recovery_reserve_bytes: policy.recovery_reserve_bytes,
         ..rrd_store::DatabaseOptions::default()
     };
     options.mutable_limits.accounted_bytes =
         native("mutable_accounted_bytes", policy.mutable_accounted_bytes)?;
     options.mutable_limits.versions = native("mutable_versions", policy.mutable_versions)?;
+    options.transaction_limits.active = native("native_transactions", policy.native_transactions)?;
+    options.transaction_limits.buffered_bytes =
+        native("native_transaction_bytes", policy.native_transaction_bytes)?;
+    options.active_read_views = native("active_read_views", policy.active_read_views)?;
+    options.pinned_read_bytes = policy.pinned_read_bytes;
     options.projected_output_bytes =
         native("projected_output_bytes", policy.projected_output_bytes)?;
     options.page_cache_bytes = native("page_cache_bytes", policy.page_cache_bytes)?;
@@ -99,6 +105,7 @@ pub struct RrdEngine {
     /// resource descriptors are public; credentials and runtime sessions are
     /// never serialized into durable RRD state.
     pub(crate) embedding_backends: Mutex<rrd_inference::EmbeddingBackendRegistry>,
+    pub(in crate::engine) storage_cursors: Mutex<super::storage_cursor::CursorRegistry>,
 }
 impl RrdEngine {
     pub fn create_new(root: &Path, instance: CanonicalId, token_key: [u8; 32]) -> Result<Self> {
@@ -255,6 +262,7 @@ impl RrdEngine {
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
+            storage_cursors: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -296,6 +304,7 @@ impl RrdEngine {
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
+            storage_cursors: Mutex::new(BTreeMap::new()),
         })
     }
 

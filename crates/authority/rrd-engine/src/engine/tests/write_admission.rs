@@ -4,11 +4,26 @@ use rrd_store::RrflowKvStore;
 #[test]
 fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     let policy = rrd_contract::StorageLimits {
+        checkpoint_entries: 7,
         recovery_reserve_bytes: 32 * 1024 * 1024,
+        native_transactions: 5,
+        native_transaction_bytes: 16384,
+        active_read_views: 7,
+        pinned_read_bytes: 8192,
         ..Default::default()
     };
     let native = crate::engine::core::installed_storage_options(&policy).unwrap();
     assert_eq!(native.recovery_reserve_bytes, policy.recovery_reserve_bytes);
+    assert_eq!(native.transaction_limits.active, 5);
+    assert_eq!(native.transaction_limits.buffered_bytes, 16384);
+    assert_eq!(native.active_read_views, 7);
+    assert_eq!(native.pinned_read_bytes, 8192);
+    assert_eq!(native.checkpoint_entries, 7);
+    let checkpoint = ServiceError::from(rrd_store::Error::CheckpointLimit {
+        limit: 7,
+        observed: 8,
+    });
+    assert!(matches!(checkpoint, ServiceError::StorageAdmission(_)));
     let error = rrd_store::Error::DiskAdmission {
         available: 100,
         required: 200,
@@ -49,7 +64,7 @@ fn domain_evidence(engine: &RrdEngine, prior_commit: &str, rejected_commit: &str
 
 #[test]
 fn oversized_semantic_commit_is_rejected_abortable_and_reopens_without_effects() {
-    rejection_history(None, 4096, 4096, "write batch encoded_bytes");
+    rejection_history(None, None, 4096, 4096, "write batch encoded_bytes");
 }
 
 #[test]
@@ -59,6 +74,7 @@ fn mutable_byte_rejection_preserves_domain_and_clears_only_absent_intent() {
             accounted_bytes: 128 * 1024,
             versions: 8192,
         }),
+        None,
         256,
         1024,
         "mutable accounted bytes",
@@ -72,22 +88,91 @@ fn mutable_version_rejection_preserves_domain_and_clears_only_absent_intent() {
             accounted_bytes: 8 * 1024 * 1024,
             versions: 256,
         }),
+        None,
         256,
         16,
         "mutable versions",
     );
 }
 
+#[test]
+fn native_buffer_rejection_preserves_domain_and_resolves_absent_intent() {
+    rejection_history(
+        None,
+        Some(rrd_store::TransactionLimits {
+            active: 64,
+            buffered_bytes: 128 * 1024,
+        }),
+        256,
+        1024,
+        "transaction owned buffer bytes",
+    );
+}
+
+#[test]
+fn exhausted_native_owners_do_not_reclassify_an_accepted_commit_as_rejected() {
+    let root = tempfile::tempdir().unwrap();
+    let engine = configured_engine(&root.path().join("engine"), None, None, true);
+    let lease = engine
+        .create_session(
+            &session_request(5_000, 1),
+            &id("owner-session"),
+            1_000,
+            "owner-session",
+            "owner-session",
+        )
+        .unwrap();
+    let transaction = engine
+        .begin_transaction(
+            &lease.session_id,
+            &lease.token,
+            &begin_request(),
+            &mutation_context(&id("owner-begin"), "owner-begin", "owner-begin"),
+            1_100,
+        )
+        .unwrap();
+    let request = commit_request("accepted-before-pressure");
+    let commit = |at| {
+        engine.commit_transaction(
+            &lease.session_id,
+            &lease.token,
+            &transaction.transaction_id,
+            &id("owner-commit"),
+            &request,
+            at,
+            "owner-commit",
+            "owner-commit",
+        )
+    };
+    let accepted = commit(1_200).unwrap();
+    let held = (0..64)
+        .map(|_| engine.storage.begin_transaction().unwrap())
+        .collect::<Vec<_>>();
+    let error = commit(1_300).unwrap_err();
+    assert!(
+        matches!(error, ServiceError::Storage(_)),
+        "unresolved replay reported rejection: {error}"
+    );
+    drop(held);
+    let mut replay = commit(1_400).unwrap();
+    assert!(replay.idempotent_replay);
+    replay.idempotent_replay = false;
+    assert_eq!(replay, accepted);
+    assert_eq!(engine.storage.claims().sequence().unwrap(), 1);
+}
+
 fn configured_engine(
     root: &std::path::Path,
     limits: Option<rrd_store::MutableLimits>,
+    native: Option<rrd_store::TransactionLimits>,
     create: bool,
 ) -> RrdEngine {
-    let Some(mutable_limits) = limits else {
+    if limits.is_none() && native.is_none() {
         return RrdEngine::open(root, instance(), TOKEN_KEY).unwrap();
-    };
+    }
     let options = rrd_store::DatabaseOptions {
-        mutable_limits,
+        mutable_limits: limits.unwrap_or_default(),
+        transaction_limits: native.unwrap_or_default(),
         ..Default::default()
     };
     let storage = if create {
@@ -109,13 +194,14 @@ fn configured_engine(
 
 fn rejection_history(
     limits: Option<rrd_store::MutableLimits>,
+    native: Option<rrd_store::TransactionLimits>,
     count: usize,
     object_bytes: usize,
     expected_error: &str,
 ) {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("engine");
-    let engine = configured_engine(&path, limits, true);
+    let engine = configured_engine(&path, limits, native, true);
     let lease = engine
         .create_session(
             &session_request(5_000, 1),
@@ -223,7 +309,7 @@ fn rejection_history(
         .commit_intent
         .is_none());
     drop(engine);
-    let reopened = configured_engine(&path, limits, false);
+    let reopened = configured_engine(&path, limits, native, false);
     assert_eq!(reopened.storage.runtime().cursor().unwrap(), before);
     assert_eq!(
         domain_evidence(&reopened, &prior_commit, &rejected_commit),
@@ -283,7 +369,7 @@ fn rejection_history(
     assert!(!receipt.idempotent_replay);
     assert_eq!(reopened.storage.runtime().cursor().unwrap(), before + 1);
     drop(reopened);
-    let reopened = configured_engine(&path, limits, false);
+    let reopened = configured_engine(&path, limits, native, false);
     let claims = reopened.storage.claims().claims_in_range(0, 8192).unwrap();
     assert_eq!(claims.len(), 2);
     assert_eq!(claims[0].object, "prior-acknowledged");

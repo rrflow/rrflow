@@ -75,7 +75,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "6f3c2121f9961286d11367c5b2ff1c6831d331bdd8cec6c81fec6f7282b68080",
+      "configuration_sha256": "013df7cdb73ab4840bc88cada4fa071e89e1dc6be400bee355163a25443e1cfb",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -99,6 +99,8 @@
       },
       "revision": 1,
       "storage": {
+        "active_read_views": 1024,
+        "checkpoint_entries": 1024,
         "compaction_elapsed_ms": 30000,
         "compaction_input_bytes": 1073741824,
         "compaction_input_logical_bytes": 268435456,
@@ -108,7 +110,10 @@
         "memtable_flush_target_versions": 524288,
         "mutable_accounted_bytes": 134217728,
         "mutable_versions": 1048576,
+        "native_transaction_bytes": 67108864,
+        "native_transactions": 64,
         "page_cache_bytes": 4194304,
+        "pinned_read_bytes": 4294967296,
         "projected_output_bytes": 134217728,
         "reclamation_delete_bytes": 1073741824,
         "reclamation_delete_files": 1024,

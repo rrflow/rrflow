@@ -58,6 +58,10 @@ def test_public_negotiation_retries_transport_loss_and_validates_envelope() -> N
                         "mutable_accounted_bytes": 134217728,
                         "mutable_versions": 1048576,
                         "projected_output_bytes": 134217728,
+                        "native_transactions": 64,
+                        "native_transaction_bytes": 67108864,
+                        "active_read_views": 1024,
+                        "pinned_read_bytes": 4294967296,
                         "page_cache_bytes": 4194304,
                         "wal_flush_target_bytes": 67108864,
                         "memtable_flush_target_versions": 524288,
@@ -272,7 +276,7 @@ def test_remote_cleartext_expired_deadlines_and_typed_api_errors_are_rejected() 
 
 
 def test_generated_catalogue_covers_the_frozen_contract() -> None:
-    assert len(ENDPOINTS) == 42
+    assert len(ENDPOINTS) == 43
     assert ENDPOINTS["capabilities-read"] == {
         "method": "GET",
         "path": "/v1/capabilities",
