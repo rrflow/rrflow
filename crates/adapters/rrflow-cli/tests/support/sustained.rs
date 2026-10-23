@@ -785,6 +785,13 @@ fn collect(
                 reason: evidence_id("driver-concurrency-limit"),
             },
         ),
+        Err(error) if error.starts_with("rejected-") => (
+            LoadOutcome::Rejected,
+            digest("c07g.rejected-request", &(sequence, &error))?,
+            AttemptOutcome::Rejected {
+                reason: failure_code(error.strip_prefix("rejected-").expect("matched prefix")),
+            },
+        ),
         Err(error) => (
             LoadOutcome::Uncertain,
             digest("c07g.request-failure", &(sequence, &error))?,
