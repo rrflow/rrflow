@@ -24,6 +24,8 @@ pub enum Point {
     ReclaimBeforeRemove,
     ReclaimRemoved,
     RecoveryRead,
+    #[cfg(not(test))]
+    RecoveryManifest,
     Acknowledged,
     #[cfg(not(test))]
     ReceiptPersisted,
@@ -180,6 +182,6 @@ mod tests;
 mod installed;
 #[cfg(not(test))]
 pub use installed::{
-    before_io, boundary, configure_from_stdin, enter_domain, enter_recovery, observe_native_error,
-    ScopeGuard,
+    after_io, before_io, boundary, configure_from_stdin, enter_domain, enter_recovery,
+    observe_native_error, ScopeGuard,
 };

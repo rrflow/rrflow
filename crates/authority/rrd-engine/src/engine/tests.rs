@@ -98,6 +98,7 @@ mod native_inference;
 mod query_transaction;
 mod recovery;
 mod security;
+mod storage_cursor;
 mod subscription;
 mod task;
 mod transaction_stamp;
