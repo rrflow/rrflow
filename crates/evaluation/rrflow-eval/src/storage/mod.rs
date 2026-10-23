@@ -1,6 +1,7 @@
 //! C-07's early storage subset of the J-04 measurement contract.
 //! Validation admits evidence structure; it cannot authenticate a measurement
 //! or prove an engine enforces the manifest's proposed resource envelope.
+mod capacity;
 pub mod cli;
 mod drain;
 mod ledger;
@@ -10,6 +11,7 @@ mod progress;
 mod sustained;
 mod validation;
 
+pub use capacity::{capacity_profiles, CapacityProfile, CapacityProfiles};
 pub use drain::{DrainOwnership, DrainPolicy, DrainSample};
 pub use ledger::*;
 pub use model::*;

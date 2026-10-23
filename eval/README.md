@@ -148,6 +148,7 @@ After load the driver kills/reopens the engine and independently reads seed
 and final slot state before any retry.
 
 ```text
+cargo run --locked -p rrflow-eval -- storage campaign profiles
 cargo run --locked -p rrflow-eval -- storage schema campaign
 cargo run --locked -p rrflow-eval -- storage schema progress-event
 cargo run --locked -p rrflow-eval -- storage campaign validate path/to/campaign.json
@@ -181,3 +182,12 @@ evidence. Offline verification streams artifacts and rejects altered, missing
 or truncated files. Reserve enough evidence disk for both successful and
 failed runs. An evidence quota failure is a failed operating point, not a
 reason to omit samples or increase the frozen limit mid-run.
+
+Capacity qualification binds the exact current J-04 projection digest, fixed
+CPU/memory/estate allocation, minimum corpus, vector dimensions and declared
+load coordinates. `campaign profiles` exposes the bundled projection without
+running a workload. `scripts/knowledge/render_capacity_profiles.py` derives it
+from the owning workload table; CI rejects drift. A qualifying operating point
+is not proof of the entire load sweep. Reduced characterization remains
+explicitly unqualified. Fleet qualification is refused until quiet/equal/abusive
+per-estate interference can be represented and observed.

@@ -523,6 +523,11 @@ def main() -> None:
         reusable.count("python3 scripts/ci/build_execution_inventory.py --check") == 1,
         "the exhaustive execution inventory must be checked exactly once",
     )
+    require(
+        reusable.count("python3 scripts/knowledge/render_capacity_profiles.py --check") == 1
+        and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1,
+        "the owning J-04 capacity projection must be checked exactly once",
+    )
 
     expected_jobs = {
         "installed-reopen",

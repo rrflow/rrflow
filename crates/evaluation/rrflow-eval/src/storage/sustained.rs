@@ -307,6 +307,7 @@ impl StorageCampaign {
             "sampling interval exceeds exact nanosecond bound",
         )?;
         if self.purpose == CampaignPurpose::Qualification {
+            super::capacity::validate_capacity_profile(self)?;
             require(
                 self.schedule.warmup_ms.get() >= 300_000
                     && self.schedule.measured_ms.get() >= 1_800_000
@@ -2297,6 +2298,65 @@ mod tests {
             .is_err());
         }
     }
+    fn bind_desktop(campaign: &mut StorageCampaign) {
+        let projection = capacity_profiles().unwrap();
+        let profile = &projection.profiles[0];
+        assert_eq!(profile.id, "desktop");
+        campaign.storage.profile = profile.id.clone().try_into().unwrap();
+        campaign.allocation = CapacityAllocation {
+            owner_projection_sha256: projection.owner_projection_sha256,
+            vcpus: limit(profile.vcpus),
+            host_bytes: limit(profile.host_bytes),
+            engine_bytes: limit(profile.engine_bytes),
+            estates: limit(profile.estates),
+            records: limit(profile.records_min),
+            edges: limit(profile.edges_min),
+            vectors: limit(profile.vectors_min),
+            vector_dimensions: limit(profile.vector_dimensions),
+            logical_source_bytes: limit(profile.logical_source_bytes_min),
+        };
+        campaign.storage.budgets.host_bytes = campaign.allocation.host_bytes;
+        campaign.storage.budgets.process_bytes = campaign.allocation.engine_bytes;
+        campaign.storage.budgets.estates = campaign.allocation.estates;
+        campaign.points[0].requests_per_second = limit(profile.rates[0]);
+    }
+
+    #[test]
+    fn qualification_binds_owning_allocation_corpus_and_load_coordinates() {
+        let (mut campaign, _) = fixture();
+        bind_desktop(&mut campaign);
+        super::super::capacity::validate_capacity_profile(&campaign).unwrap();
+        for mutation in 0..12 {
+            let mut invalid = campaign.clone();
+            match mutation {
+                0 => invalid.allocation.owner_projection_sha256 = digest("wrong", &0).unwrap(),
+                1 => invalid.storage.profile = "unknown".to_owned().try_into().unwrap(),
+                2 => invalid.allocation.vcpus = limit(1),
+                3 => invalid.allocation.host_bytes = limit(1),
+                4 => invalid.allocation.engine_bytes = limit(1),
+                5 => invalid.allocation.estates = limit(2),
+                6 => invalid.allocation.records = limit(1),
+                7 => invalid.allocation.edges = limit(1),
+                8 => invalid.allocation.vectors = limit(1),
+                9 => invalid.allocation.vector_dimensions = limit(1),
+                10 => invalid.allocation.logical_source_bytes = limit(1),
+                _ => invalid.points[0].requests_per_second = limit(1),
+            }
+            assert!(
+                super::super::capacity::validate_capacity_profile(&invalid).is_err(),
+                "accepted changed owning coordinate {mutation}"
+            );
+        }
+        campaign.points[0].clients = limit(2);
+        assert!(super::super::capacity::validate_capacity_profile(&campaign).is_err());
+        campaign.storage.profile = "fleet-isolation".to_owned().try_into().unwrap();
+        assert!(super::super::capacity::validate_capacity_profile(&campaign)
+            .unwrap_err()
+            .contains("estate evidence"));
+        // Smaller arbitrary characterization remains representable, without qualification.
+        fixture().0.validate().unwrap();
+    }
+
     #[test]
     fn observed_only_shortened_or_omitted_work_cannot_qualify() {
         let (mut campaign, segment) = fixture();
@@ -2308,6 +2368,7 @@ mod tests {
         campaign.schedule.forced_reopens = limit(100);
         campaign.seeds = vec![1, 2, 3];
         campaign.required_lanes = all_lanes().into_iter().collect();
+        bind_desktop(&mut campaign);
         campaign.validate().unwrap();
         let mut result = CampaignResult {
             format_version: 1,
@@ -2337,14 +2398,14 @@ mod tests {
                 row.forced_reopens = 100;
                 if phase == LoadPhase::Warmup {
                     row.corpus = Some(CorpusEvidence {
-                        records: 1,
+                        records: campaign.allocation.records.get(),
                         anchor_records: 1,
-                        edges: 1,
-                        vectors: 1,
-                        vector_dimensions: 1,
-                        logical_source_bytes: 1024,
+                        edges: campaign.allocation.edges.get(),
+                        vectors: campaign.allocation.vectors.get(),
+                        vector_dimensions: campaign.allocation.vector_dimensions.get(),
+                        logical_source_bytes: campaign.allocation.logical_source_bytes.get(),
                         encoded_mutation_bytes: 2048,
-                        verified_records: 1,
+                        verified_records: campaign.allocation.records.get(),
                         started_ns: 0,
                         finished_ns: 0,
                         input_sha256: digest("fixture", &1).unwrap(),
@@ -2357,6 +2418,7 @@ mod tests {
                     0
                 } else {
                     campaign.schedule.duration_ms(phase) / 1000
+                        * campaign.points[0].requests_per_second.get()
                         * if phase == LoadPhase::Burst { 2 } else { 1 }
                 };
                 result.operating_points.push(row);
@@ -2365,8 +2427,8 @@ mod tests {
         assert!(qualifies(&campaign, &result).unwrap());
         result.operating_points[0].attempts = 1;
         assert!(!qualifies(&campaign, &result).unwrap());
-        result.operating_points[0].attempts = 300;
-        result.operating_points[0].latency_over_budget = 4;
+        result.operating_points[0].attempts = 1500;
+        result.operating_points[0].latency_over_budget = 16;
         assert!(!qualifies(&campaign, &result).unwrap());
         result.operating_points[0].latency_over_budget = 0;
         result.operating_points[0].missing_metrics.push(

@@ -50,6 +50,10 @@ pub fn run(args: &[String]) -> Result<()> {
                 .write_all(&pretty(&generated)?)
                 .map_err(|e| e.to_string())
         }
+        ["campaign", "profiles"] => {
+            std::io::stdout().lock().write_all(&pretty(&capacity_profiles()?)?)
+                .map_err(|e| e.to_string())
+        }
         ["campaign", "validate", path] => {
             let campaign: StorageCampaign = decode(&read(Path::new(path))?)?;
             println!("valid storage campaign: {} purpose={:?}; no workload executed",
@@ -97,6 +101,6 @@ pub fn run(args: &[String]) -> Result<()> {
             );
             Ok(())
         }
-        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event> | validate <manifest> | verify <manifest> <result> <new-report> | campaign validate <campaign> | campaign verify <directory>".into()),
+        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event> | validate <manifest> | verify <manifest> <result> <new-report> | campaign profiles | campaign validate <campaign> | campaign verify <directory>".into()),
     }
 }
