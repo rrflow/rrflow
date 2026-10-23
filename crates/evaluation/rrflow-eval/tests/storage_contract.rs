@@ -468,6 +468,18 @@ fn generated_schemas_and_synthetic_receipts_match_goldens() {
         &schema_root.join("storage-fleet-trial-v1.json"),
         &schema::<FleetTrialResult>(),
     );
+    golden(
+        &schema_root.join("storage-acceptance-manifest-v1.json"),
+        &schema::<StorageAcceptanceManifest>(),
+    );
+    golden(
+        &schema_root.join("storage-acceptance-report-v1.json"),
+        &schema::<StorageAcceptanceReport>(),
+    );
+    golden(
+        &schema_root.join("storage-candidate-ci-v1.json"),
+        &schema::<CandidateCiReceipt>(),
+    );
     let (manifest, result) = fixtures();
     let fixture_root = root.join("tests/fixtures/storage");
     golden(

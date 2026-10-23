@@ -144,6 +144,11 @@ def verify_workflow_security(workflows: dict[Path, str]) -> None:
         )
 
         for line_number, body in checkout_steps(workflow):
+            if path == REUSABLE:
+                require(
+                    not any(re.match(r"(?:ref|repository|path)\s*:", entry) for entry in body),
+                    f"candidate checkout must use its triggering source revision: {relative}:{line_number}",
+                )
             require(
                 "persist-credentials: false" in body,
                 f"checkout credentials must not persist: {relative}:{line_number}",
@@ -525,7 +530,8 @@ def main() -> None:
     )
     require(
         reusable.count("python3 scripts/knowledge/render_capacity_profiles.py --check") == 1
-        and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1,
+        and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1
+        and reusable.count("python3 scripts/ci/test_collect_storage_acceptance.py") == 1,
         "the owning J-04 capacity projection must be checked exactly once",
     )
 

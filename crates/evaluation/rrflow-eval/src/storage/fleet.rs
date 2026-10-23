@@ -371,7 +371,7 @@ pub fn assess_fleet_trial(
             .iter()
             .find(|b| b.estate == estate && b.stage.as_str() == "warmup")
             .ok_or("warmup boundary missing")?;
-        let mut histogram = latency::Histogram::new();
+        let mut histogram = super::latency::Histogram::new();
         for index in 0..result.segments {
             let segment: SustainedSegment = decode(&read_bounded(
                 &directory.join(format!("segment-{index:020}.json")),
@@ -404,7 +404,13 @@ pub fn assess_fleet_trial(
                 )?;
             }
         }
-        measured_latency.push(histogram.finish(estate)?);
+        let band = histogram.percentile(99)?;
+        measured_latency.push(FleetLatencyBand {
+            estate,
+            samples: band.samples,
+            p99_lower_ns: band.lower_ns,
+            p99_upper_ns: band.upper_ns,
+        });
         if trial.trial == FleetTrial::Quiet {
             let row = result
                 .operating_points

@@ -11,6 +11,7 @@ pub struct CapacityProfiles {
     pub owner_projection_sha256: Digest,
     pub record_payload_bytes: u64,
     pub profiles: Vec<CapacityProfile>,
+    pub thresholds: CapacityThresholds,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -30,6 +31,28 @@ pub struct CapacityProfile {
     pub clients: Vec<u64>,
     pub rates: Vec<u64>,
     pub requires_estate_interference: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapacityThresholds {
+    pub nominal_rates: Vec<NominalRate>,
+    pub point_read: LatencyThreshold,
+    pub mixed_write: LatencyThreshold,
+    pub range_read: LatencyThreshold,
+    pub maximum_error_basis_points: u16,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NominalRate {
+    pub profile: String,
+    pub requests_per_second: u64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LatencyThreshold {
+    pub p95_ns: u64,
+    pub p99_ns: u64,
 }
 
 pub fn capacity_profiles() -> Result<CapacityProfiles> {

@@ -234,3 +234,51 @@ reservation. These restart-only installed ceilings are visible in configuration;
 actual counts/bytes are observed in storage diagnostics and must drain to
 baseline. The reservation charges vector capacities and explicit record/handoff
 representations; allocator metadata and caller input are not process-RSS proof.
+
+## C-07 acceptance reconciliation
+
+The offline acceptance boundary binds one clean tested source revision/tree,
+the current public catalogue and J-04 profile/threshold projection, retained
+candidate CI records, and explicitly enumerated capacity campaigns. It reuses
+the campaign/fleet reducers, including their raw histories, native allocation,
+readback, lifetime, failure and soak checks. It does not launch an engine or
+change the roadmap. Generated contracts are `storage-acceptance-manifest-v1`,
+`storage-acceptance-report-v1` and `storage-candidate-ci-v1` under `eval/schemas`.
+
+```text
+python scripts/ci/collect_storage_acceptance.py --run RUN_ID --output evidence/ci
+cargo run --locked -p rrflow-eval -- storage schema acceptance-manifest
+cargo run --locked -p rrflow-eval -- storage acceptance verify evidence acceptance.json new-report.json
+```
+
+The collector reads the development repository through authenticated GitHub
+API calls, retains bounded run/job/commit records, and asks the Rust owner to
+validate mandatory successful native jobs and steps. It preserves the PR head
+separately from the actual tested reusable-workflow revision. Candidate checkout
+policy prohibits alternate ref/repository/path inputs so that default checkout
+continues to test that triggering source. The reusable workflow and PR merge
+revision may differ from the branch head; campaigns must bind the tested
+revision, never silently substitute the head. Reruns/attempt changes during
+collection fail. Offline raw-record digests establish integrity and internal
+provenance, not a cryptographic GitHub attestation; collect from the API again
+when establishing current candidate status. No official promotion is implied.
+
+The manifest names direct, non-symlink evidence directories and semantic hashes.
+A missing result requires explicit `not_run` or `interrupted` status and a reason;
+it cannot count as attempted coverage. Failed results remain visible alongside
+missing coordinates and the largest actually qualified rate for each client
+count. The report requires every declared point to qualify before indicating
+readiness for owner review; a lower successful point cannot erase a failed
+higher point. This conservative flag does not automatically accept a reduced
+operating envelope or close any gate.
+
+Nominal desktop/service observations are separately recomputed from raw measured
+scheduled-to-finished timings for each seed/client count. The bounded integer
+histogram is shared with fleet isolation; p95/p99 upper bounds must meet J-04's
+owning limits and unexpected terminal errors must meet its exact basis-point
+limit. Author-supplied campaign thresholds cannot substitute for those limits.
+Three distinct seeds are required at every nominal client count. Physical range
+timing is explicitly a C-07 proxy; graph/context/model quality remains under its
+own later gates. Unknown owner grammar fails projection generation. Full
+capacity and 24-hour native evidence remain required and are not supplied by
+these commands or synthetic regression fixtures.

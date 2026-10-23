@@ -261,3 +261,12 @@ The [installed physical cursor candidate](../../evidence/change-journals/gate-c/
 adds session-owned native reader/output retention and raw sustained-interference
 reconciliation. Runtime acceptance, complete capacity profiles and soak remain
 open; a schema or compiled capability does not establish this proof.
+
+
+The acceptance review found that author-supplied campaign SLOs could be looser
+than J-04's owning nominal latency/error thresholds. The
+[C-07h acceptance implementation](../../evidence/change-journals/gate-c/c-07h-acceptance-reconciliation.md)
+projects those thresholds from their owner and checks raw measured observations
+in addition to campaign qualification. It also binds native CI to the actual
+tested revision and reports absent/failed operating points explicitly. Candidate
+acceptance and the full profile/24-hour matrix remain pending; POAM-035 is open.

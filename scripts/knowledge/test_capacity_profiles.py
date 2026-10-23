@@ -24,6 +24,16 @@ class CapacityProfiles(unittest.TestCase):
         self.assertNotEqual(before["owner_projection_sha256"], after["owner_projection_sha256"])
         self.assertEqual(after["profiles"][0]["vcpus"], 6)
 
+    def test_nominal_thresholds_are_projected_and_digest_bound(self):
+        before = projection.render(self.source)
+        after = projection.render(self.source.replace("p95 <= 50 ms", "p95 <= 60 ms"))
+        self.assertEqual(before["thresholds"]["point_read"]["p95_ns"], 50_000_000)
+        self.assertEqual(before["thresholds"]["maximum_error_basis_points"], 10)
+        self.assertEqual(after["thresholds"]["point_read"]["p95_ns"], 60_000_000)
+        self.assertNotEqual(before["owner_projection_sha256"], after["owner_projection_sha256"])
+        with self.assertRaises(ValueError):
+            projection.render(self.source.replace("unexpected terminal errors must be <= 0.1%", "errors are fine"))
+
     def test_unknown_or_inconsistent_grammar_is_not_silently_dropped(self):
         for source in (
             self.source.replace("| Desktop |", "| Other |"),
