@@ -205,6 +205,7 @@ pub struct StorageCampaign {
     pub allocation: CapacityAllocation,
     pub schedule: SustainedSchedule,
     pub read_distribution: ReadKeyDistribution,
+    pub drain: super::DrainPolicy,
     #[schemars(length(min = 1, max = 32))]
     pub seeds: Vec<u64>,
     #[schemars(length(min = 1, max = 32))]
@@ -217,6 +218,7 @@ pub struct StorageCampaign {
 impl StorageCampaign {
     pub fn validate(&self) -> Result<()> {
         self.storage.validate()?;
+        self.drain.validate(self)?;
         self.read_distribution
             .validate(self.allocation.records.get())?;
         require(self.format_version == 1, "unsupported campaign format")?;
@@ -695,6 +697,9 @@ pub struct OperatingPointResult {
     pub lanes: Vec<CapacityLane>,
     pub forced_reopens: u64,
     pub corpus: Option<CorpusEvidence>,
+    pub ownership_baseline: Option<super::DrainSample>,
+    #[schemars(length(max = 64))]
+    pub drain_tail: Vec<super::DrainSample>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -882,8 +887,20 @@ impl CampaignWriter {
         self.count += 1;
         self.previous = Some(hash.clone());
         self.last_finished_ns = segment.finished_ns;
-        merge_summary(&mut self.totals, summary)?;
+        merge_summary(
+            &mut self.totals,
+            summary,
+            self.campaign.drain.stable_samples.get() as usize,
+        )?;
         Ok(hash)
+    }
+    pub fn verify_drain(&self, point: &Id, seed: u64) -> Result<()> {
+        super::drain::check(
+            &self.campaign,
+            &self.totals.values().collect::<Vec<_>>(),
+            point,
+            seed,
+        )
     }
     pub fn finish(self, status: CampaignStatus, limitations: Vec<Id>) -> Result<CampaignResult> {
         require(
@@ -922,6 +939,9 @@ impl CampaignWriter {
             limitations,
             qualification_passed: false,
         };
+        if status == CampaignStatus::Completed {
+            super::drain::check_completed(&self.campaign, &result.operating_points)?;
+        }
         result.qualification_passed = qualifies(&self.campaign, &result)?;
         let bytes = encode_bounded(&result, MAX_DOCUMENT_BYTES)?;
         require(
@@ -1016,7 +1036,29 @@ pub fn validate_segment(
         lanes: Vec::new(),
         forced_reopens: 0,
         corpus: segment.corpus.clone(),
+        ownership_baseline: None,
+        drain_tail: Vec::new(),
     };
+    if segment.phase == LoadPhase::Warmup && summary.first_sequence == 0 {
+        let first = &segment.resources[0];
+        require(
+            segment
+                .attempts
+                .iter()
+                .all(|attempt| first.elapsed_ns <= attempt.started_ns),
+            "ownership baseline follows a warmup effect",
+        )?;
+        summary.ownership_baseline = Some(first.into());
+    }
+    if segment.phase == LoadPhase::Drain {
+        let keep = campaign.drain.stable_samples.get() as usize;
+        summary.drain_tail = segment
+            .resources
+            .iter()
+            .skip(segment.resources.len().saturating_sub(keep))
+            .map(super::DrainSample::from)
+            .collect();
+    }
     if let Some(corpus) = &segment.corpus {
         require(
             segment.phase == LoadPhase::Warmup && summary.first_sequence == 0,
@@ -1351,9 +1393,23 @@ pub fn validate_segment(
 fn merge_summary(
     totals: &mut BTreeMap<(Id, u64, LoadPhase), OperatingPointResult>,
     value: OperatingPointResult,
+    drain_samples: usize,
 ) -> Result<()> {
     let key = (value.point.clone(), value.seed, value.phase);
     if let Some(total) = totals.get_mut(&key) {
+        require(
+            value.ownership_baseline.is_none(),
+            "ownership baseline repeated",
+        )?;
+        // Keep only the frozen finite tail, including missing observations.
+        // Every segment uses the same policy; short segments accumulate until
+        // the maximum 64-sample window is available.
+        total.drain_tail.extend(value.drain_tail.iter().cloned());
+        if total.drain_tail.len() > drain_samples {
+            total
+                .drain_tail
+                .drain(..total.drain_tail.len() - drain_samples);
+        }
         require(
             value.corpus.is_none(),
             "corpus receipt repeated within operating point",
@@ -1431,7 +1487,11 @@ fn validate_next(
     let summary = validate_segment(campaign, segment)?;
     // Fixed-count aggregates, bounded to 32 points * 32 seeds * five phases.
     // Validate on a copy before publishing evidence or mutating totals.
-    merge_summary(&mut totals.clone(), summary.clone())?;
+    merge_summary(
+        &mut totals.clone(),
+        summary.clone(),
+        campaign.drain.stable_samples.get() as usize,
+    )?;
     Ok(summary)
 }
 
@@ -1599,7 +1659,11 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
             last_finished,
             &totals,
         )?;
-        merge_summary(&mut totals, summary)?;
+        merge_summary(
+            &mut totals,
+            summary,
+            campaign.drain.stable_samples.get() as usize,
+        )?;
         previous = Some(digest("rrflow-storage-segment-v1", &segment)?);
         last_finished = segment.finished_ns;
     }
@@ -1663,6 +1727,9 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
                 == digest("point-results", &result.operating_points)?,
         "result aggregates or segment digest differ",
     )?;
+    if result.status == CampaignStatus::Completed {
+        super::drain::check_completed(&campaign, &result.operating_points)?;
+    }
     require(
         result.qualification_passed == qualifies(&campaign, &result)?,
         "campaign qualification claim differs from evidence",
@@ -1714,6 +1781,12 @@ mod tests {
             },
             seeds: vec![7],
             read_distribution: ReadKeyDistribution::Uniform,
+            drain: super::super::DrainPolicy {
+                maximum_mutable_growth_bytes: 0,
+                maximum_projected_growth_bytes: 0,
+                maximum_debt_segments: 0,
+                stable_samples: limit(2),
+            },
             points: vec![OperatingPoint {
                 id: "one".to_owned().try_into().unwrap(),
                 clients: limit(1),
@@ -1826,6 +1899,113 @@ mod tests {
     }
 
     #[test]
+    fn drain_requires_consecutive_ownership_recovery_and_exact_baseline() {
+        use super::super::{DrainOwnership, DrainSample};
+        let (campaign, segment) = fixture();
+        let owner = DrainOwnership {
+            mutable_bytes: 10,
+            projected_bytes: 20,
+            debt_segments: 0,
+            outstanding_requests: 0,
+            outstanding_bytes: 0,
+            queued_requests: 0,
+            active: false,
+            fenced: false,
+        };
+        let mut warmup = validate_segment(&campaign, &segment).unwrap();
+        warmup.phase = LoadPhase::Warmup;
+        warmup.ownership_baseline = Some(DrainSample {
+            elapsed_ns: 0,
+            ownership: Some(owner.clone()),
+        });
+        let mut drain = warmup.clone();
+        drain.phase = LoadPhase::Drain;
+        drain.ownership_baseline = None;
+        drain.started_ns = warmup.finished_ns;
+        drain.finished_ns = drain.started_ns + 10;
+        drain.first_sequence = 0;
+        drain.next_sequence = 0;
+        drain.schedule_origin_ns = None;
+        drain.drain_tail = vec![
+            DrainSample {
+                elapsed_ns: 1,
+                ownership: Some(owner.clone()),
+            },
+            DrainSample {
+                elapsed_ns: 2,
+                ownership: Some(owner),
+            },
+        ];
+        let check = |row: &OperatingPointResult| {
+            super::super::drain::check(&campaign, &[&warmup, row], &row.point, row.seed)
+        };
+        check(&drain).unwrap();
+        for field in 0..8 {
+            let mut bad = drain.clone();
+            let value = bad.drain_tail[0].ownership.as_mut().unwrap();
+            match field {
+                0 => value.mutable_bytes += 1,
+                1 => value.projected_bytes += 1,
+                2 => value.debt_segments = 1,
+                3 => value.outstanding_requests = 1,
+                4 => value.outstanding_bytes = 1,
+                5 => value.queued_requests = 1,
+                6 => value.active = true,
+                _ => value.fenced = true,
+            }
+            assert!(
+                check(&bad).is_err(),
+                "failed first sample cannot be hidden by settled last sample"
+            );
+        }
+        let mut missing = drain.clone();
+        missing.drain_tail[0].ownership = None;
+        assert!(check(&missing).is_err());
+        missing.drain_tail.remove(0);
+        assert!(check(&missing).is_err());
+        missing = drain.clone();
+        missing.drain_tail[1].elapsed_ns = missing.drain_tail[0].elapsed_ns;
+        assert!(check(&missing).is_err());
+        assert!(
+            super::super::drain::check(&campaign, &[&drain], &drain.point, drain.seed).is_err()
+        );
+        let mut totals = BTreeMap::new();
+        merge_summary(&mut totals, drain.clone(), 2).unwrap();
+        drain.started_ns = drain.finished_ns;
+        drain.finished_ns += 1;
+        drain.drain_tail[0].elapsed_ns = 3;
+        drain.drain_tail[1].elapsed_ns = 4;
+        merge_summary(&mut totals, drain, 2).unwrap();
+        let tail = &totals.values().next().unwrap().drain_tail;
+        assert_eq!(tail.len(), 2);
+        assert_eq!(tail[0].elapsed_ns, 3);
+    }
+
+    #[test]
+    fn drain_configuration_and_preload_observation_are_frozen() {
+        let (mut campaign, mut segment) = fixture();
+        let original = campaign.sha256().unwrap();
+        campaign.drain.maximum_mutable_growth_bytes = 1;
+        assert_ne!(original, campaign.sha256().unwrap());
+        campaign.drain.stable_samples = limit(65);
+        assert!(campaign.validate().is_err());
+        campaign.drain.stable_samples = limit(1);
+        assert!(campaign.validate().is_err());
+        campaign.drain.stable_samples = limit(3);
+        assert!(
+            campaign.validate().is_err(),
+            "window exceeds frozen drain time"
+        );
+        campaign.drain.stable_samples = limit(2);
+        segment.campaign_sha256 = campaign.sha256().unwrap();
+        segment.phase = LoadPhase::Warmup;
+        segment.resources[0].elapsed_ns = segment.attempts[0].started_ns + 1;
+        assert!(validate_segment(&campaign, &segment)
+            .unwrap_err()
+            .contains("baseline"));
+    }
+
+    #[test]
     fn read_distribution_is_frozen_bounded_and_selects_the_requested_region() {
         let uniform = ReadKeyDistribution::Uniform;
         let hot = ReadKeyDistribution::HotKey { ordinal: 99 };
@@ -1883,13 +2063,18 @@ mod tests {
     fn missing_sequence_and_changed_offered_schedule_are_rejected() {
         let (campaign, segment) = fixture();
         let mut totals = BTreeMap::new();
-        merge_summary(&mut totals, validate_segment(&campaign, &segment).unwrap()).unwrap();
+        merge_summary(
+            &mut totals,
+            validate_segment(&campaign, &segment).unwrap(),
+            2,
+        )
+        .unwrap();
         let mut repeated = validate_segment(&campaign, &segment).unwrap();
-        assert!(merge_summary(&mut totals, repeated.clone()).is_err());
+        assert!(merge_summary(&mut totals, repeated.clone(), 2).is_err());
         repeated.first_sequence = 1;
         repeated.next_sequence = 2;
         repeated.schedule_origin_ns = Some(1);
-        assert!(merge_summary(&mut totals, repeated).is_err());
+        assert!(merge_summary(&mut totals, repeated, 2).is_err());
         let mut changed = segment.clone();
         changed.attempts[0].finished_ns = 1001;
         changed.result.cases[0].ledger.attempts[0].finished_ns = 1001;

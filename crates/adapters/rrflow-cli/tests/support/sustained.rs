@@ -1045,6 +1045,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                         writer.append(&driver.drain(writer, duration).await?)?;
                         remaining -= duration;
                     }
+                    writer.verify_drain(&point.id, *seed)?;
                     continue;
                 }
                 let rate =

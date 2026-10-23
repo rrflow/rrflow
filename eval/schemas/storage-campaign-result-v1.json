@@ -106,6 +106,83 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "DrainOwnership": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "debt_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fenced": {
+          "type": "boolean"
+        },
+        "mutable_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projected_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "queued_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mutable_bytes",
+        "projected_bytes",
+        "debt_segments",
+        "outstanding_requests",
+        "outstanding_bytes",
+        "queued_requests",
+        "active",
+        "fenced"
+      ],
+      "type": "object"
+    },
+    "DrainSample": {
+      "additionalProperties": false,
+      "properties": {
+        "elapsed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ownership": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DrainOwnership"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Missing native admission/counters are retained, never converted to zero."
+        }
+      },
+      "required": [
+        "elapsed_ns"
+      ],
+      "type": "object"
+    },
     "FailedSegment": {
       "additionalProperties": false,
       "description": "The first rejected operating point remains independently inspectable. This\nreference is not an accepted segment and cannot contribute passing totals.",
@@ -167,6 +244,13 @@
             }
           ]
         },
+        "drain_tail": {
+          "items": {
+            "$ref": "#/$defs/DrainSample"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
         "elapsed_ns": {
           "format": "uint64",
           "minimum": 0,
@@ -224,6 +308,16 @@
           "minimum": 0,
           "type": "integer"
         },
+        "ownership_baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DrainSample"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "phase": {
           "$ref": "#/$defs/LoadPhase"
         },
@@ -272,7 +366,8 @@
         "maximum_resident_bytes",
         "missing_metrics",
         "lanes",
-        "forced_reopens"
+        "forced_reopens",
+        "drain_tail"
       ],
       "type": "object"
     },

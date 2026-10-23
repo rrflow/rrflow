@@ -623,3 +623,51 @@ or soak executed. Candidate CI is pending; full retained-reader/fleet/native
 profile and 24-hour evidence remain open. Full changed diff reviewed; no
 objective, roadmap or POA&M completion status changed.
 Navigation and execution inventory regeneration, documentation policy and CI workflow policy passed; staged diff whitespace check passed.
+
+## Frozen post-burst ownership and debt recovery
+
+Continued from `dccbefeb`; the PR brief named this refinement before edits.
+Added required DrainPolicy at the existing storage campaign owner: declared
+mutable/projected growth tolerances, debt threshold and 2..64 consecutive
+settled samples. The first warmup storage observation must precede every
+attempted warmup effect and becomes the measured baseline. Drain summaries
+retain only the final declared ownership window, including missing gauges.
+Outstanding/queued requests and logical admission bytes must return to zero;
+active or fenced admission, excessive retained growth or debt fail. Warmup
+must precede drain. Mutable canonical history is allowed only within its
+explicit tolerance, not mislabeled as automatically reclaimable memory.
+
+The installed driver validates drain before entering soak, and writer
+completion/offline verification repeat the same derived-summary check.
+Failure remains visible in retained samples and the driver's failed result.
+No new sampler, runtime authority, automatic flush or policy relaxation was
+added; synchronous maintenance can legitimately expose an unsustainable
+operating point. Existing resource sampling/caps and raw segment hash chain
+remain authoritative. Schema projections and eval instructions were updated.
+
+Read/reviewed: full new storage/drain.rs; sustained campaign validation,
+resource series, bounded summary merge, writer/offline completion, fixtures;
+installed initial sampling/scheduling and drain loop; DiagnosticStorageAdmission
+and store retained-mutable accounting; evaluation instructions. Regression
+definitions cover every retained/debt/admission/fence failure, missing and
+insufficient observations, repeated time, missing baseline, finite tail merge,
+invalid sample windows, changed policy identity and late baseline observation.
+No upstream adaptation or new dependency; no source deletion or relocation.
+
+Candidate `8f66c55a` engine-authority job 120238838388 exposed stale exported
+OPENAPI_DOCUMENT_SHA256 in rrd-contract/src/lib.rs. The regression correctly
+compared the generated `f6557460...65241` against old `58273fc2...bb163`.
+After locating the actual owner and refining the PR brief, updated that public
+constant to the reviewed diagnostics-storage-read projection. The exact
+regression assertion remains unchanged. Initial patch aimed at a test-local
+literal and made no change because that literal does not exist there.
+
+Strict Clippy for rrd-contract/public_contract passed (13.17s); rrflow-eval
+and rrflow-cli all targets passed after final drain ordering (1.53s).
+Synthetic storage schema refresh passed (9.57s); generated surface parity
+passed for 43 HTTP operations and all seven signal projections; whitespace
+check passed. No local runtime suite, native capacity effects or soak ran.
+Candidate CI must execute these regression definitions. Gate C, C-07f/g,
+OBJ-02 and POAM-035 remain open; reader-pin/fleet execution, disk reserve and
+full profile/24-hour qualification remain unfinished. Full changed diff
+reviewed before commit.

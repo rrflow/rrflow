@@ -2,6 +2,7 @@
 //! Validation admits evidence structure; it cannot authenticate a measurement
 //! or prove an engine enforces the manifest's proposed resource envelope.
 pub mod cli;
+mod drain;
 mod ledger;
 mod model;
 mod policy;
@@ -9,6 +10,7 @@ mod progress;
 mod sustained;
 mod validation;
 
+pub use drain::{DrainOwnership, DrainPolicy, DrainSample};
 pub use ledger::*;
 pub use model::*;
 pub use policy::*;

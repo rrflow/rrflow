@@ -118,6 +118,16 @@ workload. Review the diff; refreshed synthetic data is never acceptance evidence
 
 ## Installed sustained campaigns
 
+Each campaign also freezes `drain`: `maximum_mutable_growth_bytes`,
+`maximum_projected_growth_bytes`, `maximum_debt_segments`, and `stable_samples`
+(2 through 64). Growth is compared with the first pre-load warmup observation;
+the final consecutive drain samples must meet those thresholds with zero
+outstanding requests, queued requests and admitted bytes, and no active or
+fenced writer. Missing ownership gauges fail this check. The driver checks
+drain before soak; completion and offline verification repeat it. Current
+maintenance is synchronous: a failed debt threshold is retained as a failed
+operating point, without silently forcing extra maintenance or relaxing policy.
+
 The `storage campaign` contract freezes candidate identity, sealed engine
 configuration, allocation, corpus, load schedule, operating points, thresholds
 and finite evidence limits. The installed driver seeds and independently reads

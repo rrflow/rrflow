@@ -790,6 +790,36 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "DrainPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_debt_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximum_mutable_growth_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximum_projected_growth_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stable_samples": {
+          "$ref": "#/$defs/Limit"
+        }
+      },
+      "required": [
+        "maximum_mutable_growth_bytes",
+        "maximum_projected_growth_bytes",
+        "maximum_debt_segments",
+        "stable_samples"
+      ],
+      "type": "object"
+    },
     "DurabilityClass": {
       "enum": [
         "authoritative",
@@ -1526,6 +1556,9 @@
     "allocation": {
       "$ref": "#/$defs/CapacityAllocation"
     },
+    "drain": {
+      "$ref": "#/$defs/DrainPolicy"
+    },
     "evidence": {
       "$ref": "#/$defs/EvidenceLimits"
     },
@@ -1582,6 +1615,7 @@
     "allocation",
     "schedule",
     "read_distribution",
+    "drain",
     "seeds",
     "points",
     "required_lanes",
