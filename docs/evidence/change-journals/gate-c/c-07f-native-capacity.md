@@ -291,3 +291,35 @@ uses size/fs image creation; the actual native command error is the direct
 current evidence. No claim is made that the corrected APFS case has executed.
 PowerShell and Python syntax checks are authoring checks only. No local disk
 image, runtime suite or exhaustion run was launched.
+
+
+## Non-browsable APFS fixture admission
+
+Candidate `151626c0ef950c47e0b2f4bdec9750d5bb321e80`, run 39895107779,
+macOS job 120225089113 created/attached the capped APFS image successfully,
+then failed before filling: Volume::admitted found zero sysinfo matches.
+Locked sysinfo 0.39.6's Apple implementation skips volumes for which
+kCFURLVolumeIsBrowsableKey is false; the fixture intentionally uses -nobrowse.
+This is an admission mismatch, not native exhaustion evidence.
+
+The macOS harness now queries statfs on the canonical fixture root, requires
+that the returned mount root match exactly, verifies APFS and actual bounded
+capacity, and independently checks the root's device differs from its parent's.
+Image/device/nonce ownership and capped image creation are unchanged. Linux
+and Windows retain their existing native disk enumeration. Added only a
+macOS-specific test dependency on the already locked libc 0.2.189. No default
+runtime dependency, mount visibility change or relaxed volume admission.
+
+Read: Volume::admitted, native image controller and identity checks, locked
+sysinfo Apple getfsstat/browsability filter and libc statfs declaration.
+Primary references: [Apple statfs](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/statfs.2.html)
+and [locked sysinfo source](https://docs.rs/sysinfo/0.39.6/src/sysinfo/unix/apple/disk.rs.html).
+The owner brief was updated before implementation. Native macOS execution
+remains the acceptance oracle, not Windows compilation of cfg-gated source.
+
+The initial Windows compile found a stale shared-target rrd-contract artifact
+from C-07g (a missing diagnostic admission initializer in unchanged F source).
+After cleaning that package, `cargo clippy -p rrflow-cli --test installed_crash
+--features crash-test --locked -- -D warnings` passed (20.13 seconds).
+No local runtime test, mount or fill ran. Candidate CI and actual APFS/NTFS/ext4
+capacity matrix remain required; C-07 status is unchanged.

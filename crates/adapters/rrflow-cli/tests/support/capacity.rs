@@ -41,24 +41,7 @@ impl Volume {
             volume.root,
             std::fs::canonicalize(std::env::temp_dir()).unwrap()
         );
-        let disks = sysinfo::Disks::new_with_refreshed_list();
-        let matching: Vec<_> = disks
-            .iter()
-            .filter(|disk| {
-                std::fs::canonicalize(disk.mount_point()).ok().as_ref() == Some(&volume.root)
-            })
-            .collect();
-        assert_eq!(
-            matching.len(),
-            1,
-            "fixture must be a separately enumerated native volume"
-        );
-        let disk = matching[0];
-        assert_eq!(
-            disk.file_system().to_str().unwrap().to_ascii_lowercase(),
-            volume.filesystem
-        );
-        assert!(disk.total_space() > 32 * 1024 * 1024 && disk.total_space() <= volume.max_bytes);
+        volume.verify_native_mount();
         assert!(matches!(
             volume.filesystem.as_str(),
             "ext4" | "apfs" | "ntfs"
@@ -73,6 +56,74 @@ impl Volume {
             .unwrap();
         assert_eq!(owner, volume.nonce.as_bytes());
         volume
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn verify_native_mount(&self) {
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let matching: Vec<_> = disks
+            .iter()
+            .filter(|disk| {
+                std::fs::canonicalize(disk.mount_point()).ok().as_ref() == Some(&self.root)
+            })
+            .collect();
+        assert_eq!(
+            matching.len(),
+            1,
+            "fixture must be a separately enumerated native volume"
+        );
+        let disk = matching[0];
+        assert_eq!(
+            disk.file_system().to_str().unwrap().to_ascii_lowercase(),
+            self.filesystem
+        );
+        assert!(disk.total_space() > 32 * 1024 * 1024 && disk.total_space() <= self.max_bytes);
+    }
+
+    #[cfg(target_os = "macos")]
+    fn verify_native_mount(&self) {
+        use std::os::unix::{ffi::OsStrExt, fs::MetadataExt};
+        // sysinfo intentionally hides non-browsable APFS volumes. Query the
+        // kernel mount itself; visibility in Finder is not volume admission.
+        let path = std::ffi::CString::new(self.root.as_os_str().as_bytes()).unwrap();
+        let mut native = std::mem::MaybeUninit::<libc::statfs>::uninit();
+        // SAFETY: NUL-terminated path and writable, correctly sized output.
+        let result = unsafe { libc::statfs(path.as_ptr(), native.as_mut_ptr()) };
+        assert_eq!(
+            result,
+            0,
+            "statfs failed: {}",
+            std::io::Error::last_os_error()
+        );
+        // SAFETY: successful statfs initialized every output field.
+        let native = unsafe { native.assume_init() };
+        let text = |field: &[libc::c_char]| {
+            let end = field
+                .iter()
+                .position(|c| *c == 0)
+                .expect("terminated statfs field");
+            field[..end].iter().map(|c| *c as u8).collect::<Vec<_>>()
+        };
+        let mount = text(&native.f_mntonname);
+        assert_eq!(
+            std::fs::canonicalize(std::ffi::OsStr::from_bytes(&mount)).unwrap(),
+            self.root,
+            "fixture must be an exact native mount root"
+        );
+        assert_eq!(text(&native.f_fstypename), self.filesystem.as_bytes());
+        assert_eq!(self.filesystem, "apfs");
+        assert_ne!(
+            std::fs::metadata(&self.root).unwrap().dev(),
+            std::fs::metadata(self.root.parent().unwrap())
+                .unwrap()
+                .dev(),
+            "fixture must be a separate filesystem"
+        );
+        let total = native
+            .f_blocks
+            .checked_mul(u64::from(native.f_bsize))
+            .expect("capacity overflow");
+        assert!(total > 32 * 1024 * 1024 && total <= self.max_bytes);
     }
 }
 
