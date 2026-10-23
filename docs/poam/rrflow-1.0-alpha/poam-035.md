@@ -375,3 +375,11 @@ probe. The [idle deadline reservation repair](../../evidence/change-journals/gat
 derives bounded idle spans and enforces an outer deadline without changing
 ledger acceptance. Forty evaluation tests and CLI lint pass; the repaired
 quiet/equal/abusive installed campaign remains required.
+
+The [combined native characterization record](../../evidence/change-journals/gate-c/c-07h-native-flow-characterization.md)
+retains completed repaired Windows compaction flow, all three two-estate
+interference trials, and a Linux WSL ext4 cold flow with zero resident pages
+before restart. Fleet and Linux small runs have exact histories and no rejected
+or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
+All remain characterization. Required corpus profiles, complete 24-hour evidence,
+current-candidate CI and final acceptance reconciliation remain open.
