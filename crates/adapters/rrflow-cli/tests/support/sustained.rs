@@ -2,7 +2,7 @@
 //! campaign out of ordinary correctness CI; failure artifacts are never green.
 use super::Estate;
 use rrd_client::RequestOptions;
-use rrd_contract::{CloseSession, CreateSession, ReadDiagnosticSnapshot, SessionLimits};
+use rrd_contract::{CloseSession, CreateSession, ReadStorageDiagnostics, SessionLimits};
 use rrflow_eval::storage::*;
 use std::{
     io::Read,
@@ -160,18 +160,10 @@ async fn sample(
     let io = process.disk_usage();
     let snapshot = workload
         .client
-        .read_diagnostic_snapshot(
+        .read_storage_diagnostics(
             &workload.session,
-            ReadDiagnosticSnapshot {
+            ReadStorageDiagnostics {
                 scope: format!("instance:{}", workload.client.instance_id()),
-                graph_valid_at_unix_ms: workload.valid_at,
-                graph_known_at_cursor: None,
-                graph_compare_cursor: 0,
-                runtime_max_scanned_changes: 1_000_000,
-                changes_after_cursor: 0,
-                change_limit: 1,
-                audit_after_sequence: 0,
-                audit_limit: 1,
             },
             RequestOptions::read("capacity-resource", "capacity-resource").unwrap(),
         )
@@ -201,7 +193,7 @@ async fn sample(
         cpu_time_ns: NativeMetric::Observed {
             value: process.accumulated_cpu_time() * 1_000_000,
         },
-        retained_bytes: match &snapshot.storage.admission {
+        retained_bytes: match &snapshot.admission {
             Some(value) => NativeMetric::Observed {
                 value: value
                     .retained_mutable_bytes
@@ -210,13 +202,13 @@ async fn sample(
             },
             None => missing("public-retained-gauge-unavailable"),
         },
-        queue_requests: match &snapshot.storage.admission {
+        queue_requests: match &snapshot.admission {
             Some(value) => NativeMetric::Observed {
                 value: value.outstanding_requests,
             },
             None => missing("public-queue-gauge-unavailable"),
         },
-        maintenance_debt_segments: match &snapshot.storage.rrflow_kv {
+        maintenance_debt_segments: match &snapshot.rrflow_kv {
             Some(value) => NativeMetric::Observed {
                 value: value.segment_set.compaction_debt_segments,
             },
@@ -224,7 +216,7 @@ async fn sample(
         },
         allocation_enforcement: native::enforcement(pid, allocation.as_ref())?,
         allocation_receipt: allocation.clone(),
-        storage: Some(snapshot.storage),
+        storage: Some(snapshot),
     })
 }
 
@@ -807,6 +799,10 @@ fn installed_capacity_workload_smoke() {
             work.execute(&operation).await.unwrap();
             work.verify(&operation).await.unwrap();
         }
+        let physical = work.client.read_storage_diagnostics(&work.session,
+            ReadStorageDiagnostics {scope: format!("instance:{}",work.client.instance_id())},
+            RequestOptions::read("smoke-storage", "smoke-storage").unwrap()).await.unwrap();
+        assert!(physical.rrflow_kv.is_some() && physical.admission.is_some());
         let mut final_states = Vec::new();
         for slot in 0..3 {
             for generation in 0..=slot+2 {

@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 58273fc2418b1e8d2085f8f91fe05be06fdc42eafbeb7d6a8a24082affdbb163
+// OpenAPI SHA-256: f6557460e7fb5c20d48bef62366d4c4a84ff47ba71973a039076bfb59ce65241
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -164,6 +164,23 @@ export interface paths {
         put?: never;
         /** RRD diagnostics-read */
         post: operations["diagnostics-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/diagnostics/storage/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD diagnostics-storage-read */
+        post: operations["diagnostics-storage-read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13942,6 +13959,496 @@ export interface operations {
                                     revision: number;
                                     scope: string;
                                 };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "diagnostics-storage-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /**
+                     * @description Physical process-local counters only; no graph/history assembly or claim
+                     *     that independently sampled counters form an authoritative read stamp.
+                     */
+                    payload: {
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                admission?: {
+                                    active: boolean;
+                                    fenced: boolean;
+                                    /** Format: uint64 */
+                                    outstanding_logical_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Includes the active request plus admitted waiters, matching admission.
+                                     */
+                                    outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    queued_requests: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                     */
+                                    retained_mutable_bytes: number;
+                                    /** Format: uint64 */
+                                    retained_projected_bytes: number;
+                                } | null;
+                                /** @description How much physical evidence the instance's storage profile reports. */
+                                evidence_level: "logical_only" | "rrflow_kv_counters";
+                                /** Format: uint64 */
+                                observed_at_unix_ms: number;
+                                /** @enum {string} */
+                                profile: "rrflow_mx" | "rrflow_kv";
+                                /** @description rrflowKV physical state and counters. */
+                                rrflow_kv?: {
+                                    /** Format: uint64 */
+                                    durable_sequence: number;
+                                    /** @description Cumulative flush and compaction work since the process opened the store. */
+                                    maintenance: {
+                                        /** Format: uint64 */
+                                        automatic_compactions: number;
+                                        /** Format: uint64 */
+                                        automatic_flushes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_output_bytes: number;
+                                        /** Format: uint64 */
+                                        failed_compactions: number;
+                                        /** Format: uint64 */
+                                        failed_flushes: number;
+                                        /** Format: uint64 */
+                                        oversized_batches: number;
+                                        /** Format: uint64 */
+                                        peak_compaction_buffer_bytes: number;
+                                        /** Format: uint64 */
+                                        write_stalls: number;
+                                    };
+                                    /** Format: uint64 */
+                                    manifest_generation: number;
+                                    /** @description The rrflowKV mutable write buffer. */
+                                    memtable: {
+                                        /** Format: uint64 */
+                                        approximate_bytes: number;
+                                        /** Format: uint64 */
+                                        key_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        keys: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Version count that triggers an automatic flush.
+                                         */
+                                        max_versions: number;
+                                        /** Format: uint64 */
+                                        owned_bytes_lower_bound: number;
+                                        /** Format: uint64 */
+                                        spilled_chains: number;
+                                        /** Format: uint64 */
+                                        spilled_version_capacity: number;
+                                        /** Format: uint64 */
+                                        tombstones: number;
+                                        /** Format: uint64 */
+                                        value_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        version_record_bytes: number;
+                                        /** Format: uint64 */
+                                        versions: number;
+                                    };
+                                    /**
+                                     * @description The bounded decoded-page cache and the page reads it served or missed.
+                                     *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                     *     the process opened the store.
+                                     */
+                                    page_cache: {
+                                        /** Format: uint64 */
+                                        bytes_allocated: number;
+                                        /** Format: uint64 */
+                                        bytes_borrowed: number;
+                                        /** Format: uint64 */
+                                        bytes_copied: number;
+                                        /** Format: uint64 */
+                                        bytes_decoded: number;
+                                        /** Format: uint64 */
+                                        bytes_decompressed: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        capacity_bytes: number;
+                                        /** Format: uint64 */
+                                        entries: number;
+                                        /** Format: uint64 */
+                                        evictions: number;
+                                        /** Format: uint64 */
+                                        filter_checks: number;
+                                        /** Format: uint64 */
+                                        filter_negatives: number;
+                                        /** Format: uint64 */
+                                        hits: number;
+                                        /** Format: uint64 */
+                                        misses: number;
+                                        /** Format: uint64 */
+                                        page_loads: number;
+                                        /** Format: uint64 */
+                                        resident_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    physical_sequence: number;
+                                    /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                    segment_io: {
+                                        /** Format: uint64 */
+                                        bounded_reads: number;
+                                        /** Format: uint64 */
+                                        bounded_segments: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        fallbacks: number;
+                                        /** Format: uint64 */
+                                        io_uring_reads: number;
+                                        /** Format: uint64 */
+                                        io_uring_segments: number;
+                                        last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_request_bytes: number;
+                                        /** Format: uint64 */
+                                        mmap_reads: number;
+                                        /** Format: uint64 */
+                                        mmap_segments: number;
+                                        /** Format: uint64 */
+                                        peak_request_bytes: number;
+                                        /** Format: uint64 */
+                                        read_operations: number;
+                                        /**
+                                         * @description The segment read path rrflowKV requested.
+                                         * @enum {string}
+                                         */
+                                        requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                    };
+                                    /** @description The persisted segment set named by the current manifest. */
+                                    segment_set: {
+                                        /** Format: uint64 */
+                                        compaction_debt_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_target_segment_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description L0 segment count that triggers compaction.
+                                         */
+                                        l0_compaction_trigger: number;
+                                        /** Format: uint64 */
+                                        l0_segments: number;
+                                        /** Format: uint64 */
+                                        segment_bytes: number;
+                                        /** Format: uint64 */
+                                        segments: number;
+                                    };
+                                    /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                    write_ahead_log: {
+                                        /** Format: uint64 */
+                                        payload_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Payload size that triggers an automatic flush.
+                                         */
+                                        payload_max_bytes: number;
+                                    };
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                admission?: {
+                                    active: boolean;
+                                    fenced: boolean;
+                                    /** Format: uint64 */
+                                    outstanding_logical_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Includes the active request plus admitted waiters, matching admission.
+                                     */
+                                    outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    queued_requests: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                     */
+                                    retained_mutable_bytes: number;
+                                    /** Format: uint64 */
+                                    retained_projected_bytes: number;
+                                } | null;
+                                /** @description How much physical evidence the instance's storage profile reports. */
+                                evidence_level: "logical_only" | "rrflow_kv_counters";
+                                /** Format: uint64 */
+                                observed_at_unix_ms: number;
+                                /** @enum {string} */
+                                profile: "rrflow_mx" | "rrflow_kv";
+                                /** @description rrflowKV physical state and counters. */
+                                rrflow_kv?: {
+                                    /** Format: uint64 */
+                                    durable_sequence: number;
+                                    /** @description Cumulative flush and compaction work since the process opened the store. */
+                                    maintenance: {
+                                        /** Format: uint64 */
+                                        automatic_compactions: number;
+                                        /** Format: uint64 */
+                                        automatic_flushes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_output_bytes: number;
+                                        /** Format: uint64 */
+                                        failed_compactions: number;
+                                        /** Format: uint64 */
+                                        failed_flushes: number;
+                                        /** Format: uint64 */
+                                        oversized_batches: number;
+                                        /** Format: uint64 */
+                                        peak_compaction_buffer_bytes: number;
+                                        /** Format: uint64 */
+                                        write_stalls: number;
+                                    };
+                                    /** Format: uint64 */
+                                    manifest_generation: number;
+                                    /** @description The rrflowKV mutable write buffer. */
+                                    memtable: {
+                                        /** Format: uint64 */
+                                        approximate_bytes: number;
+                                        /** Format: uint64 */
+                                        key_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        keys: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Version count that triggers an automatic flush.
+                                         */
+                                        max_versions: number;
+                                        /** Format: uint64 */
+                                        owned_bytes_lower_bound: number;
+                                        /** Format: uint64 */
+                                        spilled_chains: number;
+                                        /** Format: uint64 */
+                                        spilled_version_capacity: number;
+                                        /** Format: uint64 */
+                                        tombstones: number;
+                                        /** Format: uint64 */
+                                        value_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        version_record_bytes: number;
+                                        /** Format: uint64 */
+                                        versions: number;
+                                    };
+                                    /**
+                                     * @description The bounded decoded-page cache and the page reads it served or missed.
+                                     *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                     *     the process opened the store.
+                                     */
+                                    page_cache: {
+                                        /** Format: uint64 */
+                                        bytes_allocated: number;
+                                        /** Format: uint64 */
+                                        bytes_borrowed: number;
+                                        /** Format: uint64 */
+                                        bytes_copied: number;
+                                        /** Format: uint64 */
+                                        bytes_decoded: number;
+                                        /** Format: uint64 */
+                                        bytes_decompressed: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        capacity_bytes: number;
+                                        /** Format: uint64 */
+                                        entries: number;
+                                        /** Format: uint64 */
+                                        evictions: number;
+                                        /** Format: uint64 */
+                                        filter_checks: number;
+                                        /** Format: uint64 */
+                                        filter_negatives: number;
+                                        /** Format: uint64 */
+                                        hits: number;
+                                        /** Format: uint64 */
+                                        misses: number;
+                                        /** Format: uint64 */
+                                        page_loads: number;
+                                        /** Format: uint64 */
+                                        resident_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    physical_sequence: number;
+                                    /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                    segment_io: {
+                                        /** Format: uint64 */
+                                        bounded_reads: number;
+                                        /** Format: uint64 */
+                                        bounded_segments: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        fallbacks: number;
+                                        /** Format: uint64 */
+                                        io_uring_reads: number;
+                                        /** Format: uint64 */
+                                        io_uring_segments: number;
+                                        last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_request_bytes: number;
+                                        /** Format: uint64 */
+                                        mmap_reads: number;
+                                        /** Format: uint64 */
+                                        mmap_segments: number;
+                                        /** Format: uint64 */
+                                        peak_request_bytes: number;
+                                        /** Format: uint64 */
+                                        read_operations: number;
+                                        /**
+                                         * @description The segment read path rrflowKV requested.
+                                         * @enum {string}
+                                         */
+                                        requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                    };
+                                    /** @description The persisted segment set named by the current manifest. */
+                                    segment_set: {
+                                        /** Format: uint64 */
+                                        compaction_debt_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_target_segment_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description L0 segment count that triggers compaction.
+                                         */
+                                        l0_compaction_trigger: number;
+                                        /** Format: uint64 */
+                                        l0_segments: number;
+                                        /** Format: uint64 */
+                                        segment_bytes: number;
+                                        /** Format: uint64 */
+                                        segments: number;
+                                    };
+                                    /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                    write_ahead_log: {
+                                        /** Format: uint64 */
+                                        payload_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Payload size that triggers an automatic flush.
+                                         */
+                                        payload_max_bytes: number;
+                                    };
+                                } | null;
                             };
                             /** @constant */
                             status: "ok";

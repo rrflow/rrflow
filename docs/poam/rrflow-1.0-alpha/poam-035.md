@@ -220,6 +220,14 @@ adds explicit owner-bound unlock and duplicated-handle characterization;
 corrected candidate acceptance is pending. This does not authorize bypassing
 an active owner or changing the persistent lock inode.
 
+The sustained sampler was found to invoke complete graph/history diagnostics
+for physical counters, with a million-change ceiling and cross-model retries.
+This can distort load or prevent sampling at the required corpus sizes.
+The [C-07g storage observation change](../../evidence/change-journals/gate-c/c-07g-sustained-capacity.md)
+adds a scope-bound authenticated physical-counter read using the same storage
+projection. Candidate acceptance and large-corpus measurement remain pending;
+full diagnostic consistency remains POAM-029's separate responsibility.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

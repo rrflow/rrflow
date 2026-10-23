@@ -70,8 +70,9 @@ pub use diagnostic::{
     DiagnosticSnapshotLease, DiagnosticStorageAdmission, DiagnosticStorageEvidenceLevel,
     DiagnosticStorageSnapshot, DiagnosticVectorArtifactCatalogueSnapshot,
     DiagnosticVectorArtifactKind, DiagnosticVectorArtifactSnapshot,
-    DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot, DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION,
-    MAX_DIAGNOSTIC_AUDIT_RECORDS, MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
+    DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot, ReadStorageDiagnostics,
+    DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
+    MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
 };
 pub use endpoint_binding::{
     endpoint_profile_sha256, BindingKind, BindingLimits, CredentialReference, DeclaredFootprint,
@@ -3537,6 +3538,16 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "ContextPacket",
         ),
         endpoint(
+            "diagnostics-storage-read",
+            HttpMethod::Post,
+            "/v1/diagnostics/storage/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "ReadStorageDiagnostics",
+            "DiagnosticStorageSnapshot",
+        ),
+        endpoint(
             "diagnostics-read",
             HttpMethod::Post,
             "/v1/diagnostics/read",
@@ -4205,6 +4216,7 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "ReadStorageDiagnostics" => schema_json::<RequestEnvelope<ReadStorageDiagnostics>>(),
         "ReadDataSchema" => schema_json::<RequestEnvelope<ReadDataSchema>>(),
         "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
         "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
@@ -4238,6 +4250,7 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "DiagnosticStorageSnapshot" => schema_json::<ResponseEnvelope<DiagnosticStorageSnapshot>>(),
         "DataSchemaSnapshot" => schema_json::<ResponseEnvelope<DataSchemaSnapshot>>(),
         "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
         "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),

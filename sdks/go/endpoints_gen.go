@@ -2,9 +2,9 @@
 
 package rrd
 
-// OpenAPI SHA-256: 58273fc2418b1e8d2085f8f91fe05be06fdc42eafbeb7d6a8a24082affdbb163
+// OpenAPI SHA-256: f6557460e7fb5c20d48bef62366d4c4a84ff47ba71973a039076bfb59ce65241
 
-const EndpointOpenAPIDocumentSHA256 = "58273fc2418b1e8d2085f8f91fe05be06fdc42eafbeb7d6a8a24082affdbb163"
+const EndpointOpenAPIDocumentSHA256 = "f6557460e7fb5c20d48bef62366d4c4a84ff47ba71973a039076bfb59ce65241"
 
 type OperationID string
 
@@ -19,6 +19,7 @@ const (
 	OperationContextAssemble        OperationID = "context-assemble"
 	OperationDataSchemaRead         OperationID = "data-schema-read"
 	OperationDiagnosticsRead        OperationID = "diagnostics-read"
+	OperationDiagnosticsStorageRead OperationID = "diagnostics-storage-read"
 	OperationEndpointCatalogue      OperationID = "endpoint-catalogue"
 	OperationEstateRead             OperationID = "estate-read"
 	OperationFlightLaunch           OperationID = "flight-launch"
@@ -64,6 +65,7 @@ var endpoints = map[OperationID]Endpoint{
 	OperationContextAssemble:        {Method: "POST", Path: "/v1/context/assemble", Authentication: "session_bearer", Mutation: false},
 	OperationDataSchemaRead:         {Method: "POST", Path: "/v1/data/schema", Authentication: "session_bearer", Mutation: false},
 	OperationDiagnosticsRead:        {Method: "POST", Path: "/v1/diagnostics/read", Authentication: "session_bearer", Mutation: false},
+	OperationDiagnosticsStorageRead: {Method: "POST", Path: "/v1/diagnostics/storage/read", Authentication: "session_bearer", Mutation: false},
 	OperationEndpointCatalogue:      {Method: "GET", Path: "/v1/schema/endpoints", Authentication: "public", Mutation: false},
 	OperationEstateRead:             {Method: "POST", Path: "/v1/estates/{estate}/read", Authentication: "session_bearer", Mutation: false},
 	OperationFlightLaunch:           {Method: "POST", Path: "/v1/flights", Authentication: "session_bearer", Mutation: true},

@@ -12,6 +12,26 @@ pub const DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION: u16 = 1;
 pub const MAX_DIAGNOSTIC_AUDIT_RECORDS: u16 = 1_024;
 pub const MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES: u64 = 1_000_000;
 
+/// Physical process-local counters only; no graph/history assembly or claim
+/// that independently sampled counters form an authoritative read stamp.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadStorageDiagnostics {
+    pub scope: String,
+}
+
+impl ReadStorageDiagnostics {
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.scope.is_empty()
+            || self.scope.len() > crate::MAX_ID_BYTES
+            || self.scope.as_bytes().contains(&0)
+        {
+            return invalid("storage diagnostic scope is invalid");
+        }
+        Ok(())
+    }
+}
+
 /// Coordinates a bounded diagnostic read. Cursors are explicit so a client can
 /// resume without asking RRD to infer history from UI state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

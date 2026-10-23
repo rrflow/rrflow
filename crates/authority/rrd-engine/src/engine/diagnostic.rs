@@ -18,6 +18,37 @@ struct EngineDiagnosticStamp {
 }
 
 impl RrdEngine {
+    /// Observe physical counters without traversing runtime/graph history.
+    /// Authorization and instance scope are identical to full diagnostics;
+    /// these counters are observations, not a cross-model consistency claim.
+    pub fn read_storage_diagnostics(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &rrd_contract::ReadStorageDiagnostics,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<DiagnosticStorageSnapshot> {
+        request
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        self.authorize(
+            session_id,
+            token,
+            SecurityAction::DiagnosticsRead,
+            now,
+            request_id,
+            operation_id,
+        )?;
+        self.query_scope(&request.scope)?;
+        let snapshot = diagnostic_storage(self, now)?;
+        snapshot
+            .validate()
+            .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        Ok(snapshot)
+    }
+
     /// Assembles a bounded cross-model diagnostic view under one verified RRD
     /// read stamp. Concurrent mutations cause a retry; a response is never
     /// returned with coordinates from two different runtime states.

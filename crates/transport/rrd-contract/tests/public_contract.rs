@@ -323,7 +323,7 @@ fn supported_sdks_share_one_strict_semantic_corpus() {
     .unwrap();
     corpus.validate().unwrap();
     assert_eq!(corpus.required_domains.len(), 13);
-    assert_eq!(corpus.expected.endpoint_count, 42);
+    assert_eq!(corpus.expected.endpoint_count, 43);
     assert_eq!(
         rrd_contract::transaction_operation_sha256(&corpus.transaction.commit.mutations),
         corpus.transaction.commit.operation_sha256
@@ -1348,7 +1348,7 @@ fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();
     catalogue.validate().unwrap();
-    assert_eq!(catalogue.endpoints.len(), 42);
+    assert_eq!(catalogue.endpoints.len(), 43);
     assert_eq!(catalogue.endpoints[0].operation.as_str(), "audit-export");
     let create = catalogue
         .endpoints
@@ -2511,4 +2511,37 @@ fn task_contract_is_bounded_strict_and_separately_authorized() {
         assert_eq!(descriptor.mutation, mutation);
         assert_eq!(descriptor.action.fixed_action(), Some(action));
     }
+}
+
+#[test]
+fn storage_observation_has_bounded_scope_and_a_read_only_authenticated_route() {
+    use rrd_contract::ReadStorageDiagnostics;
+    for scope in [
+        String::new(),
+        "x".repeat(rrd_contract::MAX_ID_BYTES + 1),
+        "instance:a\0".into(),
+    ] {
+        assert!(ReadStorageDiagnostics { scope }.validate().is_err());
+    }
+    assert!(
+        serde_json::from_value::<ReadStorageDiagnostics>(serde_json::json!({
+            "scope":"instance:alpha", "physical_store":"/outside"
+        }))
+        .is_err()
+    );
+    let endpoint = rrd_contract::endpoint_catalogue()
+        .endpoints
+        .into_iter()
+        .find(|e| e.operation.as_str() == "diagnostics-storage-read")
+        .unwrap();
+    assert_eq!(endpoint.path, "/v1/diagnostics/storage/read");
+    assert_eq!(
+        endpoint.authentication,
+        rrd_contract::EndpointAuthentication::SessionBearer
+    );
+    assert_eq!(
+        endpoint.action.fixed_action(),
+        Some(rrd_contract::SecurityAction::DiagnosticsRead)
+    );
+    assert!(!endpoint.mutation);
 }

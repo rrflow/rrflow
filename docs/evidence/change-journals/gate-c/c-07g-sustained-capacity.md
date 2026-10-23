@@ -400,3 +400,59 @@ passed (21.20 seconds). No local runtime tests or campaigns were executed.
 Required candidate CI is still pending. Physical cold/pin lanes, multi-estate
 allocation, recovery disk reserve and actual full profile/24-hour acceptance
 remain open. No owner completion status changed.
+
+
+## Storage observation without graph-history reconstruction
+
+Continued from `f53ddab45e955b894b318f62bde0c3ae7406c3c7`. Source inspection
+confirmed that the sustained sampler called the full diagnostic assembly,
+including graph/history traversal up to a million changes and cross-model
+consistency retries. This would distort measurements or fail at the requested
+large-corpus sizes. Recorded the deficiency and correction in POAM-035;
+POAM-029's full diagnostic consistency issue remains independent.
+
+Added `diagnostics-storage-read` at `/v1/diagnostics/storage/read` in the existing
+executable endpoint catalogue. Its `ReadStorageDiagnostics` request contains
+only bounded instance scope; its response reuses DiagnosticStorageSnapshot.
+RrdEngine applies the existing diagnostics permission and exact scope check,
+then calls the same physical projection directly. No graph, changefeed, audit
+or catalogue history is assembled. The result explicitly remains process-local
+observation, not a consistent authoritative snapshot. Existing full diagnostic
+behavior is preserved. HTTP dispatch, Rust client, sampler, native smoke and
+all five generated language projections use this operation.
+
+Regression definitions cover request bounds/unknown fields, read-only bearer
+route policy, denied permission and wrong scope, successful physical reads
+inside the existing diagnostic-conflict window, and actual client/server
+physical counters/permission denial. The native installed workload case also
+reads this operation. Shared conformance's expected endpoint count is 43;
+Rust's typed HTTP-method count is 38. Full SDK/product qualification is not
+inferred from generated operations.
+
+Reads: contract diagnostic and endpoint/schema owners, server dispatch and
+existing authenticated diagnostic handler, Rust operation bindings, engine
+physical projection/authorization and diagnostic assembly, security and real
+client/server fixtures, generated-surface scripts and SDK generators, reference
+records and sustained sampler. PR brief was updated before implementation.
+Research decision: reuse current storage projection/authorization, with no
+new external dependency or copied algorithm. No implementation was removed
+or moved; the sampler's call site now selects the bounded observation path.
+
+Strict Clippy for rrflow-eval, rrflow-cli, rrd-contract, rrd-engine, rrd-client
+and rrd-server all targets passed (19.76 seconds; 1.77 seconds after regression
+definitions). All five SDK generators completed. The first Python invocation
+lacked Ruff on PATH; the pinned `uv run --no-project --with ruff==0.17.1 python
+sdks/python/scripts/generate.py` succeeded. Go generation initially used the
+repository root, then succeeded from sdks/go. The TypeScript generator warned
+that local Node 24.21.0/pnpm 10.30.3 differ from declared Node >=24.22.0 and
+pnpm 12.14.0; this is authoring output, not toolchain qualification. A Windows
+legacy-codepage read introduced documentation mojibake; restored the affected
+UTF-8 bytes before commit and retained only intended edits.
+
+Generated-surface write/check passed: 43 HTTP operations, unchanged signal
+catalogue `239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07`,
+OpenAPI `f6557460e7fb5c20d48bef62366d4c4a84ff47ba71973a039076bfb59ce65241`.
+Synthetic storage schema/fixture regeneration passed (4.26 seconds). No local
+runtime suite, native campaign or soak executed. Candidate CI, native capacity
+and full profile/24-hour acceptance remain required and unclaimed. Parent
+objective/roadmap/POAM status remains open.

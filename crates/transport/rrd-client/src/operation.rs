@@ -475,6 +475,27 @@ impl RrdClient {
         Ok(snapshot)
     }
 
+    /// Bounded physical observations without materializing graph history.
+    pub async fn read_storage_diagnostics(
+        &self,
+        session: &Session,
+        request: rrd_contract::ReadStorageDiagnostics,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::DiagnosticStorageSnapshot> {
+        let snapshot: rrd_contract::DiagnosticStorageSnapshot = self
+            .session_call(
+                Method::POST,
+                "/v1/diagnostics/storage/read",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        snapshot.validate().map_err(contract)?;
+        Ok(snapshot)
+    }
+
     pub async fn assemble_context(
         &self,
         session: &Session,
