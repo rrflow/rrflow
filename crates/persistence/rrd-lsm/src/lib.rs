@@ -21,6 +21,7 @@ mod error;
 pub mod filesystem;
 mod inspection;
 mod io;
+mod maintenance_limits;
 mod manifest;
 mod memtable;
 mod mutable;
@@ -56,6 +57,7 @@ pub use database::{
 pub use error::{Error, Result};
 pub use inspection::{DatabaseInspection, InspectionFile, ReadOnlyDatabase};
 pub use io::{SegmentIoMode, SegmentIoPolicy, SegmentIoStats, DEFAULT_SEGMENT_IO_REQUEST_BYTES};
+pub use maintenance_limits::{CompactionLimits, MaintenanceResource};
 pub use manifest::{
     Checkpoint, CurrentPointer, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION,
 };

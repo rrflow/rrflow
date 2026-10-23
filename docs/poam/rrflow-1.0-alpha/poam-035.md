@@ -116,6 +116,17 @@ retains actual timings and checks independent outer bounds, exact forwarded
 context and durable effects. It does not qualify contention performance,
 resource enforcement or close this POA&M item.
 
+### C-07d immutable maintenance admission
+
+Inspection at `4dc1b43764c4f48f35f532ca2a575811e8587cb8` found count-only
+compaction admission and complete hot-key history materialization. The
+[bounded compaction implementation](../../evidence/change-journals/gate-c/c-07d-bounded-compaction.md)
+adds installed byte/version/output/deadline/L0 limits, typed pressure and
+ownership-preserving pruning. New history/pressure oracles are compiled but
+unrun locally at the owner's direction. Candidate CI, native memory, installed
+reclamation, real exhaustion and sustained capacity remain required; this is
+implementation inventory, not closure evidence.
+
 ## Impact
 
 ### Encoded staging admission deficiency

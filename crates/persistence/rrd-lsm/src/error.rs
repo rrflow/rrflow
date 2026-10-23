@@ -20,6 +20,12 @@ pub enum Error {
         object: &'static str,
         version: u16,
     },
+    /// Maintenance pressure before the incoming batch is appended.
+    MaintenanceLimit {
+        resource: crate::MaintenanceResource,
+        limit: u64,
+        observed: u64,
+    },
     MutableLimit {
         resource: crate::MutableResource,
         limit: usize,
@@ -98,6 +104,7 @@ impl fmt::Display for Error {
             Self::UnsupportedVersion { object, version } => {
                 write!(formatter, "unsupported {object} format version {version}")
             }
+            Self::MaintenanceLimit { resource, limit, observed } => write!(formatter, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::MutableLimit { resource, limit, observed } => write!(formatter, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::InvalidConfiguration(reason) => {
                 write!(formatter, "invalid RRD LSM configuration: {reason}")

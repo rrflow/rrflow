@@ -395,11 +395,11 @@ fn linked_bootstrap_bytes_are_platform_stable_and_unknown_profiles_have_no_effec
     for (profile, sha256) in [
         (
             "default",
-            "4cd907c211671714e33208bc13540a50c59e6b7488184d9e7378d1d5976d3f53",
+            "8931c327e315c1d8f5676c4675c224ba9a722eeb09da46147e001c32fc91e324",
         ),
         (
             "clyffy",
-            "048de57d1a8f5aec86b58cfb1533996f6bad7f6927040d69876c05fc68eeab5e",
+            "b0e07e56637a51db6d5f4e682c806d60c829acc87013879fd5abe0ecdf122dd7",
         ),
     ] {
         let project = tempfile::tempdir().unwrap();

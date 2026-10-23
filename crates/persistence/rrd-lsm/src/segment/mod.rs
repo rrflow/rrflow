@@ -1080,6 +1080,19 @@ impl Segment {
         self.visible_from(&[], None, read_sequence)
     }
 
+    /// Sum authenticated decoded page lengths without loading page contents.
+    /// This includes key spines, offsets, sequence columns and value payloads.
+    pub(crate) fn compaction_logical_bytes(&self) -> Result<u64> {
+        self.row_groups
+            .iter()
+            .flat_map(|group| &group.pages)
+            .try_fold(0u64, |total, page| {
+                total.checked_add(page.logical_bytes as u64).ok_or_else(|| {
+                    Error::InvalidSegment("compaction decoded input overflow".into())
+                })
+            })
+    }
+
     pub(crate) fn record_cursor(&self) -> SegmentRecordCursor<'_> {
         SegmentRecordCursor {
             segment: self,

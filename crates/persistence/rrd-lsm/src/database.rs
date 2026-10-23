@@ -109,6 +109,7 @@ pub struct DatabaseOptions {
     pub maintenance: MaintenancePolicy,
     pub mutable_limits: crate::MutableLimits,
     pub compaction: CompactionPolicy,
+    pub compaction_limits: crate::CompactionLimits,
 }
 
 impl Default for DatabaseOptions {
@@ -123,6 +124,7 @@ impl Default for DatabaseOptions {
             maintenance: MaintenancePolicy::default(),
             mutable_limits: crate::MutableLimits::default(),
             compaction: CompactionPolicy::default(),
+            compaction_limits: crate::CompactionLimits::default(),
         }
     }
 }
@@ -142,6 +144,12 @@ impl DatabaseOptions {
         self.maintenance.validate()?;
         self.mutable_limits.validate()?;
         self.compaction.validate()?;
+        self.compaction_limits.validate()?;
+        if self.compaction_limits.l0_segments < self.compaction.l0_compaction_trigger as u64 {
+            return Err(Error::InvalidConfiguration(
+                "L0 hard capacity is below its compaction trigger".into(),
+            ));
+        }
         Ok(self)
     }
 }
@@ -315,6 +323,7 @@ pub struct Database {
     maintenance: MaintenancePolicy,
     mutable_limits: crate::MutableLimits,
     compaction: CompactionPolicy,
+    compaction_limits: crate::CompactionLimits,
     maintenance_stats: MaintenanceStats,
     wal_payload_bytes: usize,
     writer_requires_reopen: Option<&'static str>,
@@ -420,6 +429,7 @@ impl Database {
             maintenance: options.maintenance,
             mutable_limits: options.mutable_limits,
             compaction: options.compaction,
+            compaction_limits: options.compaction_limits,
             maintenance_stats: MaintenanceStats::default(),
             wal_payload_bytes: 0,
             writer_requires_reopen: None,
@@ -554,6 +564,7 @@ impl Database {
             maintenance: options.maintenance,
             mutable_limits: options.mutable_limits,
             compaction: options.compaction,
+            compaction_limits: options.compaction_limits,
             maintenance_stats,
             wal_payload_bytes,
             writer_requires_reopen: None,
@@ -1113,6 +1124,23 @@ impl Database {
                 }
             }
         }
+        let l0_segments = self
+            .segments
+            .iter()
+            .filter(|segment| segment.descriptor.level == 0)
+            .count() as u64;
+        if l0_segments >= self.compaction_limits.l0_segments {
+            self.compact_if_needed(self.manifest.created_at)?;
+            let remaining = self
+                .segments
+                .iter()
+                .filter(|segment| segment.descriptor.level == 0)
+                .count() as u64;
+            self.compaction_limits.check(
+                crate::MaintenanceResource::L0Segments,
+                remaining.saturating_add(1),
+            )?;
+        }
         self.mutable_limits
             .check(self.memtable.charge().checked_add(charge)?)?;
         if payload_bytes > self.maintenance.wal_payload_max_bytes
@@ -1173,6 +1201,15 @@ impl Database {
             self.wal.sync()?;
             return Ok(None);
         }
+        let l0_segments = self
+            .segments
+            .iter()
+            .filter(|segment| segment.descriptor.level == 0)
+            .count() as u64;
+        self.compaction_limits.check(
+            crate::MaintenanceResource::L0Segments,
+            l0_segments.saturating_add(1),
+        )?;
         let sequence = self.wal.sync()?;
         inject_failure(failure, FlushBoundary::WalSynced)?;
         let (segment, _) = Segment::write_from_memtable_with_cache(
@@ -1492,8 +1529,8 @@ impl Database {
     /// exactly the versions observable at `protected` snapshots and at the
     /// current durable head. Input selection is bounded and records are merged
     /// through forward-only segment cursors. Output is partitioned at key
-    /// boundaries, so the working set is bounded by the configured target plus
-    /// one key's complete MVCC history.
+    /// boundaries. Hard input byte/version limits include every version of a
+    /// hot key before decoding; the output target alone is not a hard bound.
     ///
     /// Named checkpoints keep their original manifests and segments and are
     /// handled independently by garbage collection.
@@ -1521,7 +1558,6 @@ impl Database {
     /// cannot act as a lifetime-tracked reclamation lease. Explicit compaction
     /// supplies the precise protected snapshot set and may prune history.
     pub fn compact_if_needed(&mut self, at: u64) -> Result<Option<CompactionOutcome>> {
-        self.flush_memtable_inner(at, None)?;
         self.compact_inner(&[], at, None, false, true)
     }
 
@@ -1534,9 +1570,32 @@ impl Database {
         retain_all_versions: bool,
     ) -> Result<Option<CompactionOutcome>> {
         self.flush_memtable_inner(at, None)?;
+        let started = Instant::now();
         let Some(candidate) = self.select_compaction_candidate(force) else {
             return Ok(None);
         };
+        let mut logical_bytes = 0u64;
+        let mut versions = 0u64;
+        let mut physical_bytes = 0u64;
+        for index in &candidate.indices {
+            let segment = &self.segments[*index];
+            physical_bytes = physical_bytes
+                .checked_add(segment.descriptor.bytes)
+                .ok_or_else(|| Error::InvalidSegment("compaction physical byte overflow".into()))?;
+            logical_bytes = logical_bytes
+                .checked_add(segment.compaction_logical_bytes()?)
+                .ok_or_else(|| Error::InvalidSegment("compaction logical byte overflow".into()))?;
+            versions = versions
+                .checked_add(segment.descriptor.entries)
+                .ok_or_else(|| Error::InvalidSegment("compaction version count overflow".into()))?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputBytes, physical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputLogicalBytes, logical_bytes)?;
+            self.compaction_limits
+                .check(crate::MaintenanceResource::InputVersions, versions)?;
+            self.compaction_limits.check_elapsed(started)?;
+        }
         let durable = self.manifest.durable_sequence;
         let mut protected_sequences = protected
             .iter()
@@ -1547,16 +1606,13 @@ impl Database {
         protected_sequences.insert(durable);
         let previous_manifest = self.manifest.digest.clone();
         let input_segments = candidate.indices.len();
-        let input_bytes = candidate.indices.iter().try_fold(0u64, |total, index| {
-            total
-                .checked_add(self.segments[*index].descriptor.bytes)
-                .ok_or_else(|| Error::InvalidSegment("compaction input bytes overflow".into()))
-        })?;
+        let input_bytes = physical_bytes;
         let merge = self.merge_compaction_candidate(
             &candidate,
             durable,
             &protected_sequences,
             retain_all_versions,
+            started,
         )?;
         let CompactionMerge {
             segments: compacted_segments,
@@ -1566,6 +1622,7 @@ impl Database {
             output_bytes,
             peak_buffer_bytes,
         } = merge;
+        self.compaction_limits.check_elapsed(started)?;
         inject_compaction_failure(failure, CompactionBoundary::SegmentSynced)?;
         let selected = candidate.indices.iter().copied().collect::<BTreeSet<_>>();
         let mut descriptors = self
@@ -1592,6 +1649,7 @@ impl Database {
             descriptors,
             self.manifest.application_format,
         )?;
+        self.compaction_limits.check_elapsed(started)?;
         self.manifests
             .publish(&next, Some(previous_manifest.as_str()))?;
         let mut retained_segments = std::mem::take(&mut self.segments)
@@ -1756,6 +1814,7 @@ impl Database {
         durable: u64,
         protected_sequences: &BTreeSet<u64>,
         retain_all_versions: bool,
+        started: Instant,
     ) -> Result<CompactionMerge> {
         let selected = candidate.indices.iter().copied().collect::<BTreeSet<_>>();
         let mut cursors = candidate
@@ -1781,9 +1840,11 @@ impl Database {
             .min()
             .map(<[u8]>::to_vec)
         {
+            self.compaction_limits.check_elapsed(started)?;
             let mut versions = BTreeMap::<u64, Option<Box<[u8]>>>::new();
             for (cursor, record) in cursors.iter_mut().zip(current.iter_mut()) {
                 while record.as_ref().is_some_and(|record| record.key == key) {
+                    self.compaction_limits.check_elapsed(started)?;
                     let observed = record.take().expect("record was checked");
                     match versions.get(&observed.version.sequence) {
                         Some(existing) if existing != &observed.version.value => {
@@ -1807,24 +1868,19 @@ impl Database {
                     .map(|(sequence, value)| VersionedValue { sequence, value })
                     .collect::<Vec<_>>()
             } else {
-                protected_sequences
+                let retained_sequences = protected_sequences
                     .iter()
                     .filter_map(|sequence| {
                         versions
                             .range(..=*sequence)
                             .next_back()
-                            .map(|(sequence, value)| {
-                                (
-                                    *sequence,
-                                    VersionedValue {
-                                        sequence: *sequence,
-                                        value: value.clone(),
-                                    },
-                                )
-                            })
+                            .map(|(sequence, _)| *sequence)
                     })
-                    .collect::<BTreeMap<_, _>>()
-                    .into_values()
+                    .collect::<BTreeSet<_>>();
+                versions
+                    .into_iter()
+                    .filter(|(sequence, _)| retained_sequences.contains(sequence))
+                    .map(|(sequence, value)| VersionedValue { sequence, value })
                     .collect::<Vec<_>>()
             };
             let tombstone_only = retained.iter().all(|version| version.value.is_none());
@@ -1842,6 +1898,11 @@ impl Database {
             if !buffered.is_empty()
                 && buffered_bytes.saturating_add(group_bytes) > self.compaction.target_segment_bytes
             {
+                self.compaction_limits.check_elapsed(started)?;
+                self.compaction_limits.check(
+                    crate::MaintenanceResource::OutputSegments,
+                    compacted_segments.len() as u64 + 1,
+                )?;
                 let segment = self.write_compaction_partition(
                     std::mem::take(&mut buffered),
                     durable,
@@ -1857,6 +1918,11 @@ impl Database {
             buffered.insert(key, retained);
         }
         if !buffered.is_empty() {
+            self.compaction_limits.check_elapsed(started)?;
+            self.compaction_limits.check(
+                crate::MaintenanceResource::OutputSegments,
+                compacted_segments.len() as u64 + 1,
+            )?;
             let segment =
                 self.write_compaction_partition(buffered, durable, candidate.target_level)?;
             output_bytes = output_bytes.saturating_add(segment.descriptor.bytes);

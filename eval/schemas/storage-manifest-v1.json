@@ -762,12 +762,16 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageLimits"
         }
       },
       "required": [
         "format_version",
         "revision",
         "clock",
+        "storage",
         "reasoning",
         "recall",
         "query",
@@ -959,6 +963,87 @@
         "operation",
         "seed",
         "expected_ledger_sha256"
+      ],
+      "type": "object"
+    },
+    "StorageLimits": {
+      "additionalProperties": false,
+      "description": "Installed native storage limits. These bound separately accounted owners,\nnot total process RSS. Changing them requires a new governed configuration\nand reopening storage; they are never hot-applied by a client.",
+      "properties": {
+        "compaction_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_logical_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_l0_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_output_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memtable_flush_target_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mutable_accounted_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mutable_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_cache_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projected_output_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wal_flush_target_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mutable_accounted_bytes",
+        "mutable_versions",
+        "projected_output_bytes",
+        "page_cache_bytes",
+        "wal_flush_target_bytes",
+        "memtable_flush_target_versions",
+        "compaction_input_bytes",
+        "compaction_input_logical_bytes",
+        "compaction_input_versions",
+        "compaction_output_segments",
+        "compaction_elapsed_ms",
+        "compaction_l0_segments"
       ],
       "type": "object"
     },

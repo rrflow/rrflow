@@ -592,6 +592,12 @@ projected_output_bytes = 134217728
 page_cache_bytes = 4194304
 wal_flush_target_bytes = 67108864
 memtable_flush_target_versions = 524288
+compaction_input_bytes = 1073741824
+compaction_input_logical_bytes = 268435456
+compaction_input_versions = 4194304
+compaction_output_segments = 256
+compaction_elapsed_ms = 30000
+compaction_l0_segments = 64
 
 [clock]
 maximum_rollback_ms = 0

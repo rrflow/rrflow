@@ -325,7 +325,8 @@ startup slice without claiming the complete target above:
   raw product CLI, development supervisor, standalone security initializer,
   and server initializer are removed with no successful compatibility reader.
 
-The required `[storage]` configuration has six separately scoped controls:
+The required `[storage]` configuration separates active-state, output, cache,
+and maintenance controls:
 `mutable_accounted_bytes` (128 MiB default), `mutable_versions` (1,048,576),
 `projected_output_bytes` (128 MiB), `page_cache_bytes` (4 MiB, zero disables
 caching), `wal_flush_target_bytes` (64 MiB) and
@@ -333,9 +334,25 @@ caching), `wal_flush_target_bytes` (64 MiB) and
 hard caps; the next two bound retained projected allocations and cache bytes;
 the last two are soft synchronous maintenance targets. A single atomic batch
 may exceed a soft target only within hard admission. These are not aggregate
-RSS or maintenance-debt bounds. Protocol ceilings and checked native conversion
+RSS bounds. Protocol ceilings and checked native conversion
 reject invalid configuration. Current limits require reopening; no live
 configure operation or qualified capacity profile is implied.
+
+Immutable maintenance adds `compaction_input_bytes` (1 GiB),
+`compaction_input_logical_bytes` (256 MiB), `compaction_input_versions`
+(4,194,304), `compaction_output_segments` (256), `compaction_elapsed_ms`
+(30,000) and `compaction_l0_segments` (64). Verified segment metadata admits
+compressed and decoded input, including complete hot-key histories, before
+cursor decoding. Logical bytes count page payloads, not heap overhead or RSS.
+The deadline is cooperative between records/partitions and before publication;
+it cannot interrupt a filesystem operation. Output partitions are bounded
+before creation. L0 saturation denies further write admission if synchronous
+maintenance cannot make room, including repeated attempts after a prior flush.
+Explicit flushes also cannot exceed the L0 cap. Pressure never authorizes
+pruning protected history. Unpublished partition files from interrupted work
+remain subject to the existing validated garbage collector. Total on-disk
+history, higher-level debt, retained snapshots and process memory are separate
+qualification obligations; these controls do not claim those are bounded.
 
 Apply, interrupted installation, reopen, inspection, backup restore and restore
 publication lower the same sealed policy into native storage options. A low

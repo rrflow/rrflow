@@ -31,6 +31,12 @@ pub(super) fn installed_storage_options(
         "memtable_flush_target_versions",
         policy.memtable_flush_target_versions,
     )?;
+    options.compaction_limits.input_bytes = policy.compaction_input_bytes;
+    options.compaction_limits.input_logical_bytes = policy.compaction_input_logical_bytes;
+    options.compaction_limits.input_versions = policy.compaction_input_versions;
+    options.compaction_limits.output_segments = policy.compaction_output_segments;
+    options.compaction_limits.elapsed_ms = policy.compaction_elapsed_ms;
+    options.compaction_limits.l0_segments = policy.compaction_l0_segments;
     Ok(options)
 }
 

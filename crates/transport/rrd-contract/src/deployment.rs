@@ -236,6 +236,12 @@ pub struct StorageLimits {
     pub page_cache_bytes: u64,
     pub wal_flush_target_bytes: u64,
     pub memtable_flush_target_versions: u64,
+    pub compaction_input_bytes: u64,
+    pub compaction_input_logical_bytes: u64,
+    pub compaction_input_versions: u64,
+    pub compaction_output_segments: u64,
+    pub compaction_elapsed_ms: u64,
+    pub compaction_l0_segments: u64,
 }
 
 impl Default for StorageLimits {
@@ -247,6 +253,12 @@ impl Default for StorageLimits {
             page_cache_bytes: 4 * 1024 * 1024,
             wal_flush_target_bytes: 64 * 1024 * 1024,
             memtable_flush_target_versions: 524_288,
+            compaction_input_bytes: 1024 * 1024 * 1024,
+            compaction_input_logical_bytes: 256 * 1024 * 1024,
+            compaction_input_versions: 4_194_304,
+            compaction_output_segments: 256,
+            compaction_elapsed_ms: 30_000,
+            compaction_l0_segments: 64,
         }
     }
 }
@@ -283,6 +295,42 @@ impl StorageLimits {
             self.memtable_flush_target_versions,
             self.mutable_versions,
         )?;
+
+        validate_nonzero_max(
+            "storage compaction_input_bytes",
+            self.compaction_input_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_input_logical_bytes",
+            self.compaction_input_logical_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_input_versions",
+            self.compaction_input_versions,
+            MAX_VERSIONS,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_output_segments",
+            self.compaction_output_segments,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_elapsed_ms",
+            self.compaction_elapsed_ms,
+            3_600_000,
+        )?;
+        validate_nonzero_max(
+            "storage compaction_l0_segments",
+            self.compaction_l0_segments,
+            65_536,
+        )?;
+        if self.compaction_l0_segments < 8 {
+            return invalid(
+                "storage compaction_l0_segments must accommodate the native L0 trigger of eight",
+            );
+        }
         if self.page_cache_bytes > MAX_BYTES {
             return invalid("storage page_cache_bytes exceeds the protocol ceiling");
         }

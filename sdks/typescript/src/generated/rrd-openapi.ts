@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: f6222edb5c2c247566cbb244a4b33098aa0567a4b883957dad0c0bfbca83d30f
+// OpenAPI SHA-256: 7ef6b88399359d1075138e328d910ca301e8de360cbd19cc6c5f993c3314c8f0
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3328,6 +3328,18 @@ export interface operations {
                                      */
                                     storage: {
                                         /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
                                         memtable_flush_target_versions: number;
                                         /** Format: uint64 */
                                         mutable_accounted_bytes: number;
@@ -3548,6 +3560,18 @@ export interface operations {
                                      *     and reopening storage; they are never hot-applied by a client.
                                      */
                                     storage: {
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
                                         /** Format: uint64 */
                                         memtable_flush_target_versions: number;
                                         /** Format: uint64 */

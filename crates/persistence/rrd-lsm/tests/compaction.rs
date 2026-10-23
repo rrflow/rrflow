@@ -22,6 +22,129 @@ fn delete(key: &str) -> Mutation {
 }
 
 #[test]
+fn hard_compaction_input_limits_preserve_every_protected_version() {
+    use rrd_lsm::{CompactionLimits, Error, MaintenanceResource};
+    for resource in [
+        MaintenanceResource::InputBytes,
+        MaintenanceResource::InputLogicalBytes,
+        MaintenanceResource::InputVersions,
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("database");
+        let mut limits = CompactionLimits::default();
+        match resource {
+            MaintenanceResource::InputBytes => limits.input_bytes = 1,
+            MaintenanceResource::InputLogicalBytes => limits.input_logical_bytes = 1,
+            MaintenanceResource::InputVersions => limits.input_versions = 1,
+            _ => unreachable!(),
+        }
+        let mut database = Database::create_with_options(
+            &root,
+            DatabaseOptions {
+                compaction_limits: limits,
+                ..DatabaseOptions::default()
+            },
+        )
+        .unwrap();
+        database
+            .write(&batch(vec![put("hot", "first")]), Durability::Authoritative)
+            .unwrap();
+        let first = database.snapshot();
+        database.flush_memtable(1).unwrap();
+        database
+            .write(
+                &batch(vec![put("hot", "second")]),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        let second = database.snapshot();
+        database.flush_memtable(2).unwrap();
+        let before = database.manifest().digest.clone();
+        assert!(
+            matches!(database.compact(&[first], 3), Err(Error::MaintenanceLimit { resource: actual, .. }) if actual == resource)
+        );
+        assert_eq!(database.manifest().digest, before);
+        assert_eq!(
+            database.get(b"hot", first).unwrap(),
+            Some(b"first".to_vec())
+        );
+        assert_eq!(
+            database.get(b"hot", second).unwrap(),
+            Some(b"second".to_vec())
+        );
+        drop(database);
+        let mut reopened = Database::open(&root).unwrap();
+        reopened.compact(&[first], 4).unwrap().unwrap();
+        assert_eq!(
+            reopened.get(b"hot", first).unwrap(),
+            Some(b"first".to_vec())
+        );
+        assert_eq!(
+            reopened.get(b"hot", second).unwrap(),
+            Some(b"second".to_vec())
+        );
+    }
+}
+
+#[test]
+fn blocked_l0_maintenance_cannot_be_bypassed_by_repeating_a_write() {
+    use rrd_lsm::{CompactionLimits, Error};
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("database");
+    let mut database = Database::create_with_options(
+        &root,
+        DatabaseOptions {
+            compaction: CompactionPolicy {
+                l0_compaction_trigger: 2,
+                ..CompactionPolicy::default()
+            },
+            compaction_limits: CompactionLimits {
+                input_bytes: 1,
+                l0_segments: 2,
+                ..CompactionLimits::default()
+            },
+            ..DatabaseOptions::default()
+        },
+    )
+    .unwrap();
+    for (index, value) in ["first", "second"].into_iter().enumerate() {
+        database
+            .write(&batch(vec![put("hot", value)]), Durability::Authoritative)
+            .unwrap();
+        database.flush_memtable(index as u64).unwrap();
+    }
+    let sequence = database.snapshot().sequence;
+    for _ in 0..3 {
+        assert!(matches!(
+            database.write(
+                &batch(vec![put("new", "must-not-appear")]),
+                Durability::Authoritative
+            ),
+            Err(Error::MaintenanceLimit { .. })
+        ));
+        assert_eq!(database.snapshot().sequence, sequence);
+        assert_eq!(database.get(b"new", database.snapshot()).unwrap(), None);
+    }
+    drop(database);
+    let mut reopened = Database::open(&root).unwrap();
+    reopened.compact(&[], 3).unwrap().unwrap();
+    reopened
+        .write(
+            &batch(vec![put("new", "admitted")]),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    assert_eq!(
+        reopened.get(b"hot", reopened.snapshot()).unwrap(),
+        Some(b"second".to_vec())
+    );
+    assert_eq!(
+        reopened.get(b"new", reopened.snapshot()).unwrap(),
+        Some(b"admitted".to_vec())
+    );
+}
+
+#[test]
 fn pinned_transaction_reads_survive_compaction_garbage_collect_cycles() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("database");

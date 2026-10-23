@@ -45,13 +45,19 @@ final class RrdClientTest {
                             "format_version", 3,
                             "revision", 1,
                             "clock", Map.of("maximum_rollback_ms", 0),
-                            "storage", Map.of(
-                                    "mutable_accounted_bytes", 134217728,
-                                    "mutable_versions", 1048576,
-                                    "projected_output_bytes", 134217728,
-                                    "page_cache_bytes", 4194304,
-                                    "wal_flush_target_bytes", 67108864,
-                                    "memtable_flush_target_versions", 524288),
+                            "storage", Map.ofEntries(
+                                    Map.entry("mutable_accounted_bytes", 134217728),
+                                    Map.entry("mutable_versions", 1048576),
+                                    Map.entry("projected_output_bytes", 134217728),
+                                    Map.entry("page_cache_bytes", 4194304),
+                                    Map.entry("wal_flush_target_bytes", 67108864),
+                                    Map.entry("memtable_flush_target_versions", 524288),
+                                    Map.entry("compaction_input_bytes", 1073741824L),
+                                    Map.entry("compaction_input_logical_bytes", 268435456L),
+                                    Map.entry("compaction_input_versions", 4194304L),
+                                    Map.entry("compaction_output_segments", 256L),
+                                    Map.entry("compaction_elapsed_ms", 30000L),
+                                    Map.entry("compaction_l0_segments", 64L)),
                             "reasoning", Map.of(
                                     "max_run_elapsed_ms", 900000,
                                     "max_steps", 256,
@@ -70,7 +76,7 @@ final class RrdClientTest {
                                     "max_spill_bytes", 268435456,
                                     "max_elapsed_ms", 30000),
                             "configuration_sha256",
-                            "aeba8b3b57844cfafae288189ee1b02ff987632e51a9431b917d6e43ebc8c098"),
+                            "a8c50eaf57e5a749eb7a6f65bc0a61ffff21b771044f7225789bf0d6ca63324c"),
                     "instance", Map.of("kind", "instance", "id", "sdk-test"),
                     "capabilities", List.of())));
         });

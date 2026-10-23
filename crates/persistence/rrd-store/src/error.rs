@@ -14,6 +14,12 @@ pub enum Error {
         limit: u64,
         observed: u64,
     },
+    /// Maintenance pressure before the incoming batch is appended.
+    MaintenanceLimit {
+        resource: rrd_lsm::MaintenanceResource,
+        limit: u64,
+        observed: u64,
+    },
     /// Active mutable-state admission or read-only WAL materialization exceeded
     /// a process-local native limit. This does not classify unknown I/O errors.
     MutableLimit {
@@ -94,6 +100,7 @@ impl fmt::Display for Error {
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
             ),
+            Error::MaintenanceLimit { resource, limit, observed } => write!(f, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::MutableLimit { resource, limit, observed } => write!(
                 f, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()
             ),
@@ -181,6 +188,15 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::MaintenanceLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::MaintenanceLimit {
+                resource,
+                limit,
+                observed,
+            },
             rrd_lsm::Error::MutableLimit {
                 resource,
                 limit,
