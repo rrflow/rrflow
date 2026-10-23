@@ -2,7 +2,8 @@
 //! This does not run a workload or produce native storage qualification.
 use rrflow_eval::storage::{
     catalogue_digest, manifest_digest, schema, validate_result, CampaignResult, EvidenceClass,
-    StorageCampaign, StorageManifest, StorageResult, SustainedSegment, ValidationReport,
+    ProgressEvent, StorageCampaign, StorageManifest, StorageResult, SustainedSegment,
+    ValidationReport,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -60,6 +61,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write(
         &schemas.join("storage-campaign-result-v1.json"),
         &schema::<CampaignResult>(),
+    )?;
+    write(
+        &schemas.join("storage-progress-event-v1.json"),
+        &schema::<ProgressEvent>(),
     )?;
     println!("refreshed synthetic storage contract projections; no native workload executed");
     Ok(())

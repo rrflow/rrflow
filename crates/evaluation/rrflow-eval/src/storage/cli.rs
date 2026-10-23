@@ -42,6 +42,7 @@ pub fn run(args: &[String]) -> Result<()> {
                 "campaign" => schema::<StorageCampaign>(),
                 "segment" => schema::<SustainedSegment>(),
                 "campaign-result" => schema::<CampaignResult>(),
+                "progress-event" => schema::<ProgressEvent>(),
                 _ => return Err("unknown storage schema projection".into()),
             };
             std::io::stdout()
@@ -96,6 +97,6 @@ pub fn run(args: &[String]) -> Result<()> {
             );
             Ok(())
         }
-        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result> | validate <manifest> | verify <manifest> <result> <new-report> | campaign validate <campaign> | campaign verify <directory>".into()),
+        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event> | validate <manifest> | verify <manifest> <result> <new-report> | campaign validate <campaign> | campaign verify <directory>".into()),
     }
 }

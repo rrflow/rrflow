@@ -6,14 +6,14 @@ pub(super) async fn seed(
     estate: &Estate,
     work: &mut Workload,
     campaign: &StorageCampaign,
-    point: &OperatingPoint,
+    progress: &ProgressContext<'_>,
     clock: Instant,
     ordinal: &mut u64,
     opened: &mut Instant,
 ) -> DriverResult<CorpusEvidence> {
     tokio::time::timeout(
         Duration::from_millis(campaign.schedule.setup_ms.get()),
-        seed_inner(estate, work, campaign, point, clock, ordinal, opened),
+        seed_inner(estate, work, campaign, progress, clock, ordinal, opened),
     )
     .await
     .map_err(|_| "corpus setup exceeded its frozen deadline".to_owned())?
@@ -23,7 +23,7 @@ async fn seed_inner(
     estate: &Estate,
     work: &mut Workload,
     campaign: &StorageCampaign,
-    point: &OperatingPoint,
+    progress: &ProgressContext<'_>,
     clock: Instant,
     ordinal: &mut u64,
     opened: &mut Instant,
@@ -45,43 +45,97 @@ async fn seed_inner(
     let mut encoded = 0u64;
     let operation_deadline = Duration::from_millis(campaign.schedule.operation_deadline_ms.get());
     work.initialize().await?;
-    for record in 0..work.records {
-        rotate_session(estate, work, campaign, point.clients.get(), ordinal, opened).await?;
-        let request = work.seed_record(record)?;
-        let bytes = serde_json::to_vec(request.mutation.as_ref().ok_or("missing corpus mutation")?)
-            .map_err(|e| e.to_string())?
-            .len() as u64;
-        if bytes > campaign.storage.budgets.atomic_batch_bytes.get() {
-            return Err("corpus record exceeds frozen atomic batch bytes".into());
+    // Persist each bounded batch of intents before its first database effect.
+    // ACK checkpoints bound the evidence-loss window without retaining the corpus.
+    for first in (0..work.records).step_by(64) {
+        let end = first.saturating_add(64).min(work.records);
+        for record in first..end {
+            let request = work.seed_record(record)?;
+            let bytes =
+                serde_json::to_vec(request.mutation.as_ref().ok_or("missing corpus mutation")?)
+                    .map_err(|e| e.to_string())?
+                    .len() as u64;
+            if bytes > campaign.storage.budgets.atomic_batch_bytes.get() {
+                return Err("corpus record exceeds frozen atomic batch bytes".into());
+            }
+            encoded = encoded
+                .checked_add(bytes)
+                .ok_or("encoded corpus overflow")?;
+            input = digest(
+                "c07g.corpus.input",
+                &(input, record, &request.request_sha256),
+            )?;
+            progress.writer.record_event(&ProgressEvent::CorpusIntent {
+                point: progress.point.id.clone(),
+                seed: work.seed,
+                ordinal: record,
+                request_sha256: request.request_sha256,
+                effect_sha256: request.effect_sha256,
+            })?;
         }
-        encoded = encoded
-            .checked_add(bytes)
-            .ok_or("encoded corpus overflow")?;
-        input = digest(
-            "c07g.corpus.input",
-            &(input, record, &request.request_sha256),
-        )?;
-        let receipt = tokio::time::timeout(operation_deadline, work.execute(&request))
-            .await
-            .map_err(|_| "corpus write deadline")??;
-        acknowledgements = digest(
-            "c07g.corpus.acknowledgements",
-            &(acknowledgements, record, receipt.receipt_sha256),
-        )?;
+        progress.writer.checkpoint_progress()?;
+        for record in first..end {
+            rotate_session(
+                estate,
+                work,
+                campaign,
+                progress.point.clients.get(),
+                ordinal,
+                opened,
+            )
+            .await?;
+            let request = work.seed_record(record)?;
+            let receipt = tokio::time::timeout(operation_deadline, work.execute(&request))
+                .await
+                .map_err(|_| "corpus write deadline")??;
+            progress
+                .writer
+                .record_event(&ProgressEvent::CorpusAcknowledged {
+                    point: progress.point.id.clone(),
+                    seed: work.seed,
+                    ordinal: record,
+                    receipt_sha256: receipt.receipt_sha256.clone(),
+                })?;
+            acknowledgements = digest(
+                "c07g.corpus.acknowledgements",
+                &(acknowledgements, record, receipt.receipt_sha256),
+            )?;
+        }
+        progress.writer.checkpoint_progress()?;
     }
     // Only a complete independent readback can attest the seeded allocation.
     // Expected values are regenerated, never learned from the database answer.
     for record in 0..work.records {
-        rotate_session(estate, work, campaign, point.clients.get(), ordinal, opened).await?;
+        rotate_session(
+            estate,
+            work,
+            campaign,
+            progress.point.clients.get(),
+            ordinal,
+            opened,
+        )
+        .await?;
         let request = work.seed_record(record)?;
         tokio::time::timeout(operation_deadline, work.verify(&request))
             .await
             .map_err(|_| "corpus readback deadline")??;
+        progress
+            .writer
+            .record_event(&ProgressEvent::CorpusVerified {
+                point: progress.point.id.clone(),
+                seed: work.seed,
+                ordinal: record,
+                effect_sha256: request.effect_sha256.clone(),
+            })?;
+        if record % 64 == 63 {
+            progress.writer.checkpoint_progress()?;
+        }
         readback = digest(
             "c07g.corpus.readback",
             &(readback, record, &request.effect_sha256),
         )?;
     }
+    progress.writer.checkpoint_progress()?;
     Ok(CorpusEvidence {
         records: work.records,
         anchor_records: 1,

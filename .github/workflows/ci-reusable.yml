@@ -494,6 +494,9 @@ jobs:
           cache-on-failure: false
       - name: Build ordinary primary and fixed reopen corpus
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
+      - name: Exercise installed capacity workload and backup readback
+        timeout-minutes: 10
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
       - name: Require fresh and existing 100-cycle histories
         timeout-minutes: 65
         env:

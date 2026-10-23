@@ -228,6 +228,11 @@ async fn sample(
     })
 }
 
+struct ProgressContext<'a> {
+    writer: &'a CampaignWriter,
+    point: &'a OperatingPoint,
+}
+
 struct PointRun<'a> {
     campaign: &'a StorageCampaign,
     point: &'a OperatingPoint,
@@ -238,6 +243,14 @@ struct PointRun<'a> {
 }
 
 impl PointRun<'_> {
+    async fn sample(&self, writer: &CampaignWriter) -> DriverResult<ResourceSample> {
+        let value = sample(&self.workload, self.pid, self.clock, &self.allocation).await?;
+        writer.record_event(&ProgressEvent::Resource {
+            segment: writer.next_index(),
+            sample: Box::new(value.clone()),
+        })?;
+        Ok(value)
+    }
     async fn drain(
         &self,
         writer: &CampaignWriter,
@@ -265,7 +278,7 @@ impl PointRun<'_> {
         let deadline =
             self.clock + Duration::from_nanos(started) + Duration::from_millis(duration_ms);
         loop {
-            resources.push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
+            resources.push(self.sample(writer).await?);
             if Instant::now() >= deadline {
                 break;
             }
@@ -291,6 +304,11 @@ impl PointRun<'_> {
                 applications: 1u64.try_into().unwrap(),
             }],
         };
+        writer.record_event(&ProgressEvent::Readback {
+            segment: writer.next_index(),
+            observation: ledger.readback[0].clone(),
+        })?;
+        writer.checkpoint_progress()?;
         let result = StorageResult {
             format_version: 1,
             manifest_sha256: manifest_digest(&manifest)?,
@@ -365,6 +383,16 @@ impl PointRun<'_> {
             });
             prepared.push(operation);
         }
+        for expected in &ledger.expected {
+            writer.record_event(&ProgressEvent::LoadIntent {
+                segment: writer.next_index(),
+                point: self.point.id.clone(),
+                seed: self.workload.seed,
+                phase,
+                expected: expected.clone(),
+            })?;
+        }
+        writer.checkpoint_progress()?;
         let mut manifest = campaign.storage.clone();
         manifest.required_cases = vec![RequiredCase {
             id: evidence_id(&key),
@@ -372,8 +400,7 @@ impl PointRun<'_> {
             seed: self.workload.seed,
             expected_ledger_sha256: expected_digest(&ledger.expected)?,
         }];
-        let mut resources =
-            vec![sample(&self.workload, self.pid, self.clock, &self.allocation).await?];
+        let mut resources = vec![self.sample(writer).await?];
         let mut attempts = Vec::new();
         let mut joins = JoinSet::new();
         let mut backup = JoinSet::new();
@@ -387,11 +414,11 @@ impl PointRun<'_> {
                 tokio::select! {
                     biased;
                     result=joins.join_next(), if !joins.is_empty() => {
-                        collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger)?;
+                        collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,writer)?;
                     }
                     _=tokio::time::sleep_until(next_sample) => {
                         if resources.len() as u64>=campaign.evidence.samples_per_segment.get() {return Err("resource sample cap exhausted".into());}
-                        resources.push(sample(&self.workload,self.pid,self.clock,&self.allocation).await?);
+                        resources.push(self.sample(writer).await?);
                         next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                     }
                     _=tokio::time::sleep_until(due.into()) => break,
@@ -416,6 +443,7 @@ impl PointRun<'_> {
                     started,
                     &mut attempts,
                     &mut ledger,
+                    writer,
                 )?;
             } else {
                 let at = scheduled(sequence);
@@ -431,10 +459,10 @@ impl PointRun<'_> {
         }
         while !joins.is_empty() {
             tokio::select! {
-                result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger)?,
+                result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,writer)?,
                 _=tokio::time::sleep_until(next_sample) => {
                     if resources.len() as u64>=campaign.evidence.samples_per_segment.get(){return Err("resource sample cap exhausted".into());}
-                    resources.push(sample(&self.workload,self.pid,self.clock,&self.allocation).await?);
+                    resources.push(self.sample(writer).await?);
                     next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                 }
             }
@@ -449,22 +477,28 @@ impl PointRun<'_> {
                     if resources.len() as u64+1>=campaign.evidence.samples_per_segment.get() {
                         return Err("backup resource sample cap exhausted".into());
                     }
-                    resources.push(sample(&self.workload,self.pid,self.clock,&self.allocation).await?);
+                    resources.push(self.sample(writer).await?);
                     next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                 }
             }
         }
         let mut verified = true;
+        if let Some(observation) = &backup_receipt {
+            writer.record_event(&ProgressEvent::Backup {
+                segment: writer.next_index(),
+                observation: observation.clone(),
+            })?;
+        }
         for operation in &prepared {
             if tokio::time::Instant::now() >= next_sample {
                 if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
                     return Err("readback resource sample cap exhausted".into());
                 }
-                resources
-                    .push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
+                resources.push(self.sample(writer).await?);
                 next_sample = tokio::time::Instant::now()
                     + Duration::from_millis(campaign.schedule.sample_ms.get());
             }
+            let before = ledger.readback.len();
             if let Some(attempt) = attempts
                 .iter()
                 .find(|a| a.logical_id.as_str() == operation.id)
@@ -489,6 +523,12 @@ impl PointRun<'_> {
                     _ => verified = false,
                 }
             }
+            if ledger.readback.len() > before {
+                writer.record_event(&ProgressEvent::Readback {
+                    segment: writer.next_index(),
+                    observation: ledger.readback[before].clone(),
+                })?;
+            }
         }
         let offered_end = self.clock + Duration::from_nanos(scheduled(first + count));
         while Instant::now() < offered_end {
@@ -501,10 +541,11 @@ impl PointRun<'_> {
             if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
                 return Err("offered interval resource sample cap exhausted".into());
             }
-            resources.push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
+            resources.push(self.sample(writer).await?);
         }
-        resources.push(sample(&self.workload, self.pid, self.clock, &self.allocation).await?);
+        resources.push(self.sample(writer).await?);
         attempts.sort_by_key(|a| a.sequence);
+        writer.checkpoint_progress()?;
         let mut lanes = match &backup_receipt {
             Some(raw) => vec![LaneEvidence {
                 lane: CapacityLane::BackupUnderWrite,
@@ -578,6 +619,7 @@ fn collect(
     segment_start: u64,
     attempts: &mut Vec<LoadAttempt>,
     ledger: &mut AcknowledgementLedger,
+    writer: &CampaignWriter,
 ) -> DriverResult<()> {
     let (outcome, result_sha256, recorded) = match result {
         Some(result) => (
@@ -621,6 +663,10 @@ fn collect(
         request_sha256: operation.request_sha256,
         result_sha256,
     });
+    writer.record_event(&ProgressEvent::LoadOutcome {
+        segment: writer.next_index(),
+        attempt: attempts.last().ok_or("missing completed attempt")?.clone(),
+    })?;
     Ok(())
 }
 
@@ -635,14 +681,24 @@ fn installed_sustained_capacity() {
     let campaign: StorageCampaign = bounded_json(&campaign_path).unwrap();
     campaign.validate().unwrap();
     let mut writer = CampaignWriter::create(&evidence, campaign.clone()).unwrap();
-    let result = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(run(&campaign, &mut writer));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(run(&campaign, &mut writer))
+    }))
+    .unwrap_or_else(|_| {
+        Err("installed driver panicked; retained progress is incomplete evidence".into())
+    });
     let (status, limitations) = if result.is_ok() {
         (CampaignStatus::Completed, vec![])
     } else {
+        if let Err(error) = writer.record_event(&ProgressEvent::Failure {
+            reason: evidence_id("installed-driver-failed"),
+        }) {
+            eprintln!("failure event could not be appended: {error}; sealing failed result");
+        }
         (
             CampaignStatus::Failed,
             vec![evidence_id("installed-driver-failed")],
@@ -657,6 +713,121 @@ fn installed_sustained_capacity() {
         result.is_ok(),
         "installed sustained driver failed: {result:?}"
     );
+}
+
+/// Short executable integration of the campaign's actual workload adapter.
+/// It deliberately emits no NativeCapacity/soak qualification claim.
+#[test]
+#[ignore = "explicit native capacity-driver smoke; candidate portability job"]
+fn installed_capacity_workload_smoke() {
+    let estate = Estate::install("fresh");
+    let clock = Instant::now();
+    let (child, client, _) = estate.start_for(clock, Duration::from_secs(300));
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let lease = client
+            .create_session(
+                credential.principal_id.clone(),
+                credential.credential(),
+                CreateSession {
+                    limits: SessionLimits {
+                        idle_timeout_ms: 300_000,
+                        absolute_timeout_ms: 600_000,
+                        max_open_transactions: 4,
+                    },
+                },
+                RequestOptions::mutation(
+                    "capacity-smoke-session",
+                    "capacity-smoke-session",
+                    "capacity-smoke-session",
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let mut work = Workload {
+            client,
+            session: lease,
+            valid_at: estate.at,
+            dimensions: 16,
+            seed: 73,
+            records: 8,
+            edges_per_record: 3,
+            vectors_per_record: 2,
+            payload_bytes: 1024,
+            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+                .unwrap(),
+        };
+        work.initialize().await.unwrap();
+        let mut receipts = Vec::new();
+        for ordinal in 0..work.records {
+            let operation = work.seed_record(ordinal).unwrap();
+            let receipt = work.execute(&operation).await.unwrap();
+            assert!(!receipt.idempotent_replay);
+            receipts.push(receipt.receipt_sha256);
+        }
+        for ordinal in 0..work.records {
+            work.verify(&work.seed_record(ordinal).unwrap())
+                .await
+                .unwrap();
+        }
+        for (index, kind) in [
+            StorageLoadKind::PointRead,
+            StorageLoadKind::RangeRead,
+            StorageLoadKind::Maintenance,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let operation = work
+                .prepare(format!("smoke-read-{index}"), kind, index as u64)
+                .unwrap();
+            work.execute(&operation).await.unwrap();
+            work.verify(&operation).await.unwrap();
+        }
+        let write = work
+            .prepare(
+                "smoke-concurrent-write".into(),
+                StorageLoadKind::MixedWrite,
+                99,
+            )
+            .unwrap();
+        let (written, backup) = tokio::join!(
+            work.execute(&write),
+            lifecycle::backup(work.clone(), "smoke-backup".into(), clock)
+        );
+        let written = written.unwrap();
+        let backup = backup.unwrap();
+        work.verify(&write).await.unwrap();
+        let killed = super::kill(child, clock);
+        let (reopened, client, identity) = estate.start_for(clock, Duration::from_secs(300));
+        work.client = client;
+        // Every old value is read before replay; exact old request identities
+        // must return the stored receipt after this real process boundary.
+        for ordinal in 0..work.records {
+            let operation = work.seed_record(ordinal).unwrap();
+            work.verify(&operation).await.unwrap();
+            let replay = work.execute(&operation).await.unwrap();
+            assert!(replay.idempotent_replay);
+            assert_eq!(replay.receipt_sha256, receipts[ordinal as usize]);
+        }
+        work.verify(&write).await.unwrap();
+        let replay = work.execute(&write).await.unwrap();
+        assert!(replay.idempotent_replay);
+        assert_eq!(replay.receipt_sha256, written.receipt_sha256);
+        println!(
+            "installed_capacity_workload_smoke={}",
+            serde_json::json!({
+            "build":estate.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
+            "replayed_transactions":9,"backup_sha256":backup.receipt.backup.backup_sha256,
+            "termination":killed,"reopened":identity,"capacity_qualification":false})
+        );
+        super::kill(reopened, clock);
+    });
 }
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
@@ -741,7 +912,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     &estate,
                     &mut work,
                     campaign,
-                    point,
+                    &ProgressContext { writer, point },
                     clock,
                     &mut session_ordinal,
                     &mut session_opened,
@@ -768,6 +939,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     campaign,
                     clock,
                     Duration::from_millis(lifetime_ms),
+                    &ProgressContext { writer, point },
                 )
                 .await?,
             );

@@ -455,6 +455,10 @@ fn generated_schemas_and_synthetic_receipts_match_goldens() {
         &schema_root.join("storage-campaign-result-v1.json"),
         &schema::<CampaignResult>(),
     );
+    golden(
+        &schema_root.join("storage-progress-event-v1.json"),
+        &schema::<ProgressEvent>(),
+    );
     let (manifest, result) = fixtures();
     let fixture_root = root.join("tests/fixtures/storage");
     golden(

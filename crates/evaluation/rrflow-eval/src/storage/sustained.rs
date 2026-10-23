@@ -1,5 +1,6 @@
 //! Bounded sustained evidence built on the existing storage manifest/ledger.
 //! These records describe qualification; they never configure the engine.
+use super::progress::ProgressJournal;
 use super::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 const NANOSECONDS_PER_MS: u64 = 1_000_000;
 const MAX_SAMPLES: usize = 4096;
@@ -600,6 +602,7 @@ pub struct CampaignResult {
     /// Campaign and segment bytes, excluding this self-describing result file.
     /// The total evidence quota still includes the result's encoded bytes.
     pub artifact_bytes: u64,
+    pub progress: ProgressReceipt,
     pub failed_segment: Option<FailedSegment>,
     pub operating_points: Vec<OperatingPointResult>,
     pub limitations: Vec<Id>,
@@ -627,6 +630,7 @@ pub struct CampaignWriter {
     last_finished_ns: u64,
     totals: BTreeMap<(Id, u64, LoadPhase), OperatingPointResult>,
     failed: Option<FailedSegment>,
+    progress: Mutex<ProgressJournal>,
 }
 
 impl CampaignWriter {
@@ -636,12 +640,14 @@ impl CampaignWriter {
         require(
             (bytes.len() as u64)
                 .checked_add(MAX_DOCUMENT_BYTES)
+                .and_then(|n| n.checked_add(4096))
                 .is_some_and(|n| n <= campaign.evidence.total_bytes.get()),
             "campaign identity exceeds artifact budget",
         )?;
         std::fs::create_dir(directory)
             .map_err(|e| format!("campaign requires absent evidence directory: {e}"))?;
         write_new(&directory.join("campaign.json"), &bytes)?;
+        let progress = Mutex::new(ProgressJournal::create(directory, &identity)?);
         Ok(Self {
             directory: directory.to_owned(),
             campaign,
@@ -652,6 +658,7 @@ impl CampaignWriter {
             last_finished_ns: 0,
             totals: BTreeMap::new(),
             failed: None,
+            progress,
         })
     }
     pub fn next_index(&self) -> u64 {
@@ -663,6 +670,34 @@ impl CampaignWriter {
     pub fn identity(&self) -> &Digest {
         &self.identity
     }
+    pub fn record_event(&self, event: &ProgressEvent) -> Result<()> {
+        let maximum = self
+            .campaign
+            .evidence
+            .total_bytes
+            .get()
+            .checked_sub(self.bytes)
+            .and_then(|n| n.checked_sub(MAX_DOCUMENT_BYTES))
+            .and_then(|n| n.checked_sub(self.campaign.evidence.segment_bytes.get()))
+            .ok_or("progress has no reserved evidence capacity")?;
+        self.progress
+            .lock()
+            .map_err(|_| "progress writer poisoned")?
+            .append(event, maximum)
+    }
+    pub fn checkpoint_progress(&self) -> Result<()> {
+        self.progress
+            .lock()
+            .map_err(|_| "progress writer poisoned")?
+            .checkpoint()
+    }
+    fn progress_bytes(&self) -> Result<u64> {
+        Ok(self
+            .progress
+            .lock()
+            .map_err(|_| "progress writer poisoned")?
+            .bytes())
+    }
     /// Reserve enough evidence capacity before invoking the next operating
     /// point. Actual append still checks its encoded size and native writes.
     pub fn admit_next(&self) -> Result<()> {
@@ -673,6 +708,7 @@ impl CampaignWriter {
         require(
             self.bytes
                 .checked_add(self.campaign.evidence.segment_bytes.get())
+                .and_then(|n| n.checked_add(self.progress_bytes().ok()?))
                 .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES))
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "next operating point has no reserved evidence capacity",
@@ -695,7 +731,8 @@ impl CampaignWriter {
         // Reserve one bounded final result so a quota failure cannot consume its
         // reporting space. Failed OS writes remain failed, never counted complete.
         require(
-            next.checked_add(MAX_DOCUMENT_BYTES)
+            next.checked_add(self.progress_bytes()?)
+                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES))
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "campaign artifact quota exhausted",
         )?;
@@ -743,13 +780,23 @@ impl CampaignWriter {
                 || matches!(status, CampaignStatus::Failed | CampaignStatus::Interrupted),
             "failed operating point cannot be reported complete",
         )?;
+        let progress = self
+            .progress
+            .into_inner()
+            .map_err(|_| "progress writer poisoned")?
+            .finish()?;
+        let artifact_bytes = self
+            .bytes
+            .checked_add(progress.bytes)
+            .ok_or("progress artifact overflow")?;
         let mut result = CampaignResult {
             format_version: 1,
             campaign_sha256: self.identity,
             status,
             segments: self.count,
             last_segment_sha256: self.previous,
-            artifact_bytes: self.bytes,
+            artifact_bytes,
+            progress,
             failed_segment: self.failed,
             operating_points: self.totals.into_values().collect(),
             limitations,
@@ -758,7 +805,7 @@ impl CampaignWriter {
         result.qualification_passed = qualifies(&self.campaign, &result)?;
         let bytes = encode_bounded(&result, MAX_DOCUMENT_BYTES)?;
         require(
-            self.bytes
+            artifact_bytes
                 .checked_add(bytes.len() as u64)
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "final result exceeds artifact quota",
@@ -1247,7 +1294,7 @@ fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool
     Ok(true)
 }
 
-fn encode_bounded(value: &impl Serialize, limit: u64) -> Result<Vec<u8>> {
+pub(super) fn encode_bounded(value: &impl Serialize, limit: u64) -> Result<Vec<u8>> {
     struct Capped {
         bytes: Vec<u8>,
         limit: u64,
@@ -1310,6 +1357,12 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
     let identity = campaign.sha256()?;
     let result_bytes = read_bounded(&directory.join("result.json"), MAX_DOCUMENT_BYTES)?;
     let result: CampaignResult = decode(&result_bytes)?;
+    super::progress::verify(
+        directory,
+        &result.progress,
+        &identity,
+        campaign.evidence.total_bytes.get(),
+    )?;
     require(
         result.format_version == 1
             && result.campaign_sha256 == identity
@@ -1323,7 +1376,9 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
     let mut totals = BTreeMap::new();
     let mut bytes = std::fs::metadata(directory.join("campaign.json"))
         .map_err(|e| e.to_string())?
-        .len();
+        .len()
+        .checked_add(result.progress.bytes)
+        .ok_or("progress artifact byte overflow")?;
     for index in 0..result.segments {
         let raw = read_bounded(
             &directory.join(format!("segment-{index:020}.json")),
@@ -1606,6 +1661,11 @@ mod tests {
             segments: 15,
             last_segment_sha256: None,
             artifact_bytes: 0,
+            progress: ProgressReceipt {
+                bytes: 0,
+                records: 1,
+                sha256: digest("fixture", &1).unwrap(),
+            },
             failed_segment: None,
             operating_points: vec![],
             limitations: vec![],

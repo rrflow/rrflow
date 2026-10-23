@@ -5,12 +5,14 @@ pub mod cli;
 mod ledger;
 mod model;
 mod policy;
+mod progress;
 mod sustained;
 mod validation;
 
 pub use ledger::*;
 pub use model::*;
 pub use policy::*;
+pub use progress::{ProgressEvent, ProgressReceipt};
 pub use sustained::*;
 pub use validation::*;
 

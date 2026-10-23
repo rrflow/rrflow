@@ -264,6 +264,30 @@
         "forced_reopens"
       ],
       "type": "object"
+    },
+    "ProgressReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "bytes",
+        "records",
+        "sha256"
+      ],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -316,6 +340,9 @@
       },
       "type": "array"
     },
+    "progress": {
+      "$ref": "#/$defs/ProgressReceipt"
+    },
     "qualification_passed": {
       "type": "boolean"
     },
@@ -334,6 +361,7 @@
     "status",
     "segments",
     "artifact_bytes",
+    "progress",
     "operating_points",
     "limitations",
     "qualification_passed"

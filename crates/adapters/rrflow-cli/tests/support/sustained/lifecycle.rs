@@ -59,10 +59,11 @@ pub(super) async fn reopens(
     campaign: &StorageCampaign,
     clock: Instant,
     lifetime: Duration,
+    progress: &ProgressContext<'_>,
 ) -> DriverResult<ReopenEvidence> {
     tokio::time::timeout(
         Duration::from_millis(campaign.schedule.lifecycle_ms.get()),
-        reopen_inner(estate, child, work, campaign, clock, lifetime),
+        reopen_inner(estate, child, work, campaign, clock, lifetime, progress),
     )
     .await
     .map_err(|_| "installed reopen lane exceeded lifecycle deadline".to_owned())?
@@ -75,6 +76,7 @@ async fn reopen_inner(
     campaign: &StorageCampaign,
     clock: Instant,
     lifetime: Duration,
+    progress: &ProgressContext<'_>,
 ) -> DriverResult<ReopenEvidence> {
     let started_ns = ns(clock);
     let mut cycles = Vec::new();
@@ -85,10 +87,29 @@ async fn reopen_inner(
             StorageLoadKind::MixedWrite,
             cycle,
         )?;
+        progress
+            .writer
+            .record_event(&ProgressEvent::LifecycleIntent {
+                point: progress.point.id.clone(),
+                seed: work.seed,
+                cycle,
+                request_sha256: request.request_sha256.clone(),
+                effect_sha256: request.effect_sha256.clone(),
+            })?;
+        progress.writer.checkpoint_progress()?;
         let acknowledged = work.execute(&request).await?;
         if acknowledged.idempotent_replay {
             return Err("fresh reopen operation unexpectedly replayed".into());
         }
+        progress
+            .writer
+            .record_event(&ProgressEvent::LifecycleAcknowledged {
+                point: progress.point.id.clone(),
+                seed: work.seed,
+                cycle,
+                receipt_sha256: acknowledged.receipt_sha256.clone(),
+            })?;
+        progress.writer.checkpoint_progress()?;
         receipts.push(acknowledged.receipt_sha256);
         let killed = super::super::kill(child.take().ok_or("missing owned server")?, clock);
         let (reopened, client, identity) = estate.start_for(clock, lifetime);
@@ -150,6 +171,12 @@ async fn reopen_inner(
             replay_receipts_sha256: replayed,
             readback_sha256: readback,
         });
+        progress.writer.record_event(&ProgressEvent::Reopen {
+            point: progress.point.id.clone(),
+            seed: work.seed,
+            observation: cycles.last().ok_or("missing reopen observation")?.clone(),
+        })?;
+        progress.writer.checkpoint_progress()?;
     }
     // Verify the entire pre-existing seeded corpus after the last kill. These
     // immutable seed keys were never rewritten by retry or the lifecycle lane.

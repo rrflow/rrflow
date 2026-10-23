@@ -292,3 +292,58 @@ native claims lacking receipts, substituted limits and mismatched native kinds.
 No native control or runtime campaign executed locally. Full C-07 acceptance,
 preparation-failure artifact retention, cold/pin/fleet lanes, update/delete
 histories and actual profile/24-hour results remain open.
+
+
+## Interrupted preparation and workload evidence
+
+Continued from `c9a17d2e67d3310e19e024b4c701c4c30e9c6cd7`. Added a
+bounded append-only `progress.jsonl` under the existing campaign evidence
+owner. Its generated typed events record corpus request/effect identities,
+observed acknowledgements, independently verified readback, lifecycle writes
+and reopen observations, offered-load intents/outcomes, resources and backup
+receipts. The campaign result binds its exact byte count, record count and
+SHA-256; offline verification streams one bounded record at a time and rejects
+missing, substituted, truncated or changed evidence. This is evidence, not
+engine state or replay authorization. Missing outcomes remain uncertain.
+
+Corpus intents are flushed and synchronized in batches of at most 64 before
+that batch's first effect. ACK/readback checkpoints bound evidence retention
+without collecting the corpus in memory. Lifecycle intent and ACK checkpoints
+precede each kill. Segment intents are checkpointed before offered load;
+completed outcomes and resource samples are retained as they arrive. Each
+completed segment and final report synchronizes progress. A process/host death
+can still lose observations since the last checkpoint; those absent records
+cannot become successes. Quota admission includes progress bytes and reserves
+space for the segment and final result before append. Native I/O errors remain
+failures; a failed disk write cannot promise a complete final receipt.
+
+The installed driver catches setup/runtime panics and attempts to seal a failed
+campaign with retained progress. A quota-exhausted failure marker does not
+prevent sealing the failed result. Added regression definitions for quota
+rejection without file changes and missing/truncated/modified progress. A short
+ignored installed workload case now exercises actual seeded records, edges,
+vectors, point/range/cancel operations, concurrent backup/write and restart
+readback before exact replay. The native candidate workflow invokes that case
+separately from its existing 100-cycle cases. It explicitly makes no capacity
+or soak qualification claim.
+
+Read: storage sustained writer/validator/CLI and schema generator, storage
+contract golden assertions, installed sustained scheduling/collection,
+corpus/lifecycle/workload/native adapters, installed reopen harness and
+candidate workflow. Changed those owning paths plus `storage/progress.rs` and
+the generated progress/result schemas. Research decision: existing Rust file
+sync and bounded evidence contracts suffice; no new runtime algorithm or
+third-party implementation was imported. Failure oracle is preservation and
+rejection of incomplete evidence, not green compilation.
+
+Commands: `cargo clippy -p rrflow-cli --test installed_reopen --locked -- -D
+warnings` passed (2.60 seconds). Expanded strict Clippy first surfaced a test
+module before a production item; moved the test module to the end, then
+`cargo clippy -p rrflow-eval -p rrflow-cli --all-targets --locked -- -D warnings`
+passed (1.92 seconds). `cargo run -p rrflow-eval --example
+refresh_storage_contract --locked` regenerated schemas (3.75 seconds), with
+no native workload. No local runtime regression, native smoke, volume fill or
+soak executed. Required candidate CI must execute the definitions. Cold/pin
+interference, fleet allocation, fixed-working-set update/delete histories,
+physical disk reserve and complete native profile/24-hour acceptance remain
+open; OBJ-02, C-07 and POAM-035 are unchanged.
