@@ -218,6 +218,29 @@ pub struct StorageCampaign {
 }
 
 impl StorageCampaign {
+    /// Idle samples and the executed verification probe share one segment's
+    /// existing deadline. Reserve probe time before choosing an idle span.
+    pub fn idle_segment_ms(&self, requested_ms: u64) -> Result<u64> {
+        let available = self
+            .storage
+            .budgets
+            .run_ms
+            .get()
+            .checked_sub(self.schedule.operation_deadline_ms.get())
+            .filter(|value| *value > 0)
+            .ok_or("idle segment must reserve an operation deadline")?;
+        let sampled = self
+            .schedule
+            .sample_ms
+            .get()
+            .checked_mul(self.evidence.samples_per_segment.get().saturating_sub(2))
+            .filter(|value| *value > 0)
+            .ok_or("idle segment needs bounded resource samples")?;
+        let duration = requested_ms.min(available).min(sampled).min(120_000);
+        require(duration > 0, "idle segment requires a positive duration")?;
+        Ok(duration)
+    }
+
     pub fn validate(&self) -> Result<()> {
         self.storage.validate()?;
         self.drain.validate(self)?;
@@ -1799,6 +1822,26 @@ pub(super) mod tests {
     fn limit(value: u64) -> Limit {
         value.try_into().unwrap()
     }
+    #[test]
+    fn idle_segments_reserve_probe_time_and_respect_sample_capacity() {
+        let (mut campaign, _) = fixture();
+        campaign.storage.budgets.run_ms = limit(120_000);
+        campaign.schedule.operation_deadline_ms = limit(30_000);
+        campaign.schedule.sample_ms = limit(1000);
+        campaign.evidence.samples_per_segment = limit(256);
+        assert_eq!(campaign.idle_segment_ms(120_000).unwrap(), 90_000);
+        assert_eq!(campaign.idle_segment_ms(20_000).unwrap(), 20_000);
+        campaign.evidence.samples_per_segment = limit(4);
+        assert_eq!(campaign.idle_segment_ms(120_000).unwrap(), 2000);
+        campaign.evidence.samples_per_segment = limit(2);
+        assert!(campaign.idle_segment_ms(120_000).is_err());
+        campaign.evidence.samples_per_segment = limit(256);
+        campaign.schedule.operation_deadline_ms = limit(120_000);
+        assert!(campaign.idle_segment_ms(120_000).is_err());
+        campaign.schedule.operation_deadline_ms = limit(30_000);
+        assert!(campaign.idle_segment_ms(0).is_err());
+    }
+
     pub(crate) fn fixture() -> (StorageCampaign, SustainedSegment) {
         // Contract fixtures deliberately do not represent native observations.
         let mut manifest: StorageManifest =

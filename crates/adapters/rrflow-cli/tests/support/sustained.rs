@@ -259,6 +259,22 @@ impl PointRun<'_> {
         writer: &CampaignWriter,
         duration_ms: u64,
     ) -> DriverResult<SustainedSegment> {
+        if self.campaign.idle_segment_ms(duration_ms)? != duration_ms {
+            return Err("idle duration exceeds its frozen segment admission".into());
+        }
+        tokio::time::timeout(
+            Duration::from_millis(self.campaign.storage.budgets.run_ms.get().min(180_000)),
+            self.drain_inner(writer, duration_ms),
+        )
+        .await
+        .map_err(|_| "idle segment exceeded its frozen deadline")?
+    }
+
+    async fn drain_inner(
+        &self,
+        writer: &CampaignWriter,
+        duration_ms: u64,
+    ) -> DriverResult<SustainedSegment> {
         let started = ns(self.clock);
         let baseline =
             self.workload
@@ -1287,19 +1303,6 @@ async fn run_estate(
                         }))
                 {
                     let mut remaining = campaign.schedule.duration_ms(phase);
-                    let cap = campaign
-                        .schedule
-                        .sample_ms
-                        .get()
-                        .checked_mul(
-                            campaign
-                                .evidence
-                                .samples_per_segment
-                                .get()
-                                .saturating_sub(2),
-                        )
-                        .filter(|v| *v > 0)
-                        .ok_or("drain sample capacity must exceed two")?;
                     while remaining > 0 {
                         writer.admit_next()?;
                         rotate_session(
@@ -1311,7 +1314,7 @@ async fn run_estate(
                             &mut session_opened,
                         )
                         .await?;
-                        let duration = remaining.min(cap).min(120_000);
+                        let duration = campaign.idle_segment_ms(remaining)?;
                         writer.append(&driver.drain(writer, duration).await?)?;
                         remaining -= duration;
                     }
