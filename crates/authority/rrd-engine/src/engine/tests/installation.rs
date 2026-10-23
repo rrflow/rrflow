@@ -717,6 +717,9 @@ reclamation_metadata_bytes = 67108864
 reclamation_delete_files = 1024
 reclamation_delete_bytes = 1073741824
 reclamation_elapsed_ms = 30000
+transaction_admission_requests = 64
+transaction_admission_bytes = 67108864
+transaction_admission_wait_ms = 30000
 
 [clock]
 maximum_rollback_ms = 250

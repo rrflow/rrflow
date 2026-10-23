@@ -9,6 +9,7 @@ pub enum ServiceError {
     Storage(String),
     StorageConflict(String),
     StorageAdmission(String),
+    AdmissionCancelled,
     SessionNotFound,
     Unauthenticated,
     SessionExpired,
@@ -111,6 +112,7 @@ impl ServiceError {
             | Self::SeatNotRepresented
             | Self::ClockUnavailable(_)
             | Self::ClockRollback { .. }
+            | Self::AdmissionCancelled
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
             | Self::StorageAdmission(_)
@@ -162,6 +164,7 @@ impl From<rrd_store::Error> for ServiceError {
             rrd_store::Error::WriteBatchLimit { .. }
             | rrd_store::Error::MutableLimit { .. }
             | rrd_store::Error::MaintenanceLimit { .. }
+            | rrd_store::Error::ReclamationPending
             | rrd_store::Error::ReclamationLimit { .. } => Self::StorageAdmission(message),
             rrd_store::Error::RuntimeReadBudgetExceeded { .. } => Self::ConfigurationLimit(message),
             rrd_store::Error::IndexConstraint(_) => Self::Query(message),

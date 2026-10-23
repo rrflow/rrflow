@@ -370,9 +370,26 @@ publication and on reopen, before appending the incoming batch. Controls are
 manifests protect their files. Complete admitted inventories and protected
 references are checked before deletion; damaged references fail closed.
 Partial deletion cycles synchronize completed removals and retain pending work.
+A partial cycle returns reclamation pressure before the incoming WAL append;
+retries drain that finite work before admitting additional growth.
 A single file larger than the deletion budget reports explicit pressure.
 Elapsed limits are cooperative and cannot interrupt native filesystem calls.
 These controls do not qualify actual disk exhaustion or sustained capacity.
+
+Engine transaction serialization uses a FIFO admission gate with
+`transaction_admission_requests` (64 active plus queued requests),
+`transaction_admission_bytes` (64 MiB aggregate serialized logical request
+charge), and `transaction_admission_wait_ms` (30,000). A bounded counting sink
+measures each request without allocating a second serialized buffer. The
+active owner remains charged until its actual guard drops. Timeout and pending
+cancellation release queued reservations; a panic in effect code fences future
+admission. These controls cover the existing transaction/unique-index/function/
+flight/task/operator gate, not transport parsing or total process allocation.
+`AuthorizedInvocation::cancel_pending` controls an authenticated embedded
+invocation waiting for that gate; it is not an HTTP disconnect hook or rollback
+of effects already admitted. Request-context deadlines are checked before
+admission. Native `transaction_admission_snapshot` exposes content-free current
+and peak charge; no new wire operation or independent lifecycle is introduced.
 
 Apply, interrupted installation, reopen, inspection, backup restore and restore
 publication lower the same sealed policy into native storage options. A low

@@ -15,6 +15,7 @@ pub enum Error {
         observed: u64,
     },
     /// Maintenance pressure before the incoming batch is appended.
+    ReclamationPending,
     ReclamationLimit {
         resource: rrd_lsm::ReclamationResource,
         limit: u64,
@@ -105,6 +106,7 @@ impl fmt::Display for Error {
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
             ),
+            Error::ReclamationPending => write!(f, "bounded reclamation has remaining work; retry before admitting another write"),
             Error::ReclamationLimit { resource, limit, observed } => write!(f, "reclamation {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::MaintenanceLimit { resource, limit, observed } => write!(f, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::MutableLimit { resource, limit, observed } => write!(
@@ -194,6 +196,7 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::ReclamationPending => Self::ReclamationPending,
             rrd_lsm::Error::ReclamationLimit {
                 resource,
                 limit,

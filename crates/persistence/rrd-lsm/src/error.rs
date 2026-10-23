@@ -21,6 +21,7 @@ pub enum Error {
         version: u16,
     },
     /// Maintenance pressure before the incoming batch is appended.
+    ReclamationPending,
     ReclamationLimit {
         resource: crate::ReclamationResource,
         limit: u64,
@@ -109,6 +110,7 @@ impl fmt::Display for Error {
             Self::UnsupportedVersion { object, version } => {
                 write!(formatter, "unsupported {object} format version {version}")
             }
+            Self::ReclamationPending => write!(formatter, "bounded reclamation has remaining work; retry before admitting another write"),
             Self::ReclamationLimit { resource, limit, observed } => write!(formatter, "reclamation {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::MaintenanceLimit { resource, limit, observed } => write!(formatter, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::MutableLimit { resource, limit, observed } => write!(formatter, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()),

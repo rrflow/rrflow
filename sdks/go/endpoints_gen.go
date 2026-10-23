@@ -2,9 +2,9 @@
 
 package rrd
 
-// OpenAPI SHA-256: 68a17b8757c21aa38a881d75b8c3340dafafed0b8d6d2875be1a1e86dcab653c
+// OpenAPI SHA-256: d41937932617054902fc4519cc755c5f37ba8cab154667f4b46e006bd12580e0
 
-const EndpointOpenAPIDocumentSHA256 = "68a17b8757c21aa38a881d75b8c3340dafafed0b8d6d2875be1a1e86dcab653c"
+const EndpointOpenAPIDocumentSHA256 = "d41937932617054902fc4519cc755c5f37ba8cab154667f4b46e006bd12580e0"
 
 type OperationID string
 

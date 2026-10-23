@@ -1065,6 +1065,21 @@
           "minimum": 0,
           "type": "integer"
         },
+        "transaction_admission_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transaction_admission_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transaction_admission_wait_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "wal_flush_target_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1091,7 +1106,10 @@
         "reclamation_metadata_bytes",
         "reclamation_delete_files",
         "reclamation_delete_bytes",
-        "reclamation_elapsed_ms"
+        "reclamation_elapsed_ms",
+        "transaction_admission_requests",
+        "transaction_admission_bytes",
+        "transaction_admission_wait_ms"
       ],
       "type": "object"
     },

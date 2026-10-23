@@ -189,6 +189,12 @@ writes. Compilation is recorded separately from pending candidate CI. This
 remediates implementation gaps without closing queue admission, recovery space,
 real exhaustion, capacity profiles, soak or aggregate host-memory qualification.
 
+The [finite transaction-admission change](../../evidence/change-journals/gate-c/c-07d-transaction-admission.md)
+adds configured count/byte/wait admission to the existing serialization owner
+and denies growth while bounded reclamation still has work. Its native runtime
+acceptance remains pending; transport cancellation, recovery headroom and the
+capacity/soak obligations are not closed by compilation.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,

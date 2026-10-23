@@ -75,7 +75,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "234b19e7ce250615faa119c297c6a4a13ca590cd88639975cb297037f12ecac2",
+      "configuration_sha256": "510e1074e7c8f99129cd2ddfadc67ba62e05f1e0d9451c45edf77a900e34bb56",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -118,6 +118,9 @@
         "retained_mutable_bytes": 536870912,
         "retained_mutable_generations": 64,
         "retained_mutable_versions": 4194304,
+        "transaction_admission_bytes": 67108864,
+        "transaction_admission_requests": 64,
+        "transaction_admission_wait_ms": 30000,
         "wal_flush_target_bytes": 67108864
       }
     },

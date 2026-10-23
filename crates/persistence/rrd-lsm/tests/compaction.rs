@@ -459,7 +459,14 @@ fn garbage_collection_preserves_current_and_checkpoint_reachability() {
         .join("segments")
         .join(format!("{current_segment}.seg"))
         .exists());
-    assert!(!first.removed_wals.is_empty());
+    // Normal pre-write maintenance may already have removed the first WAL.
+    // Prove physical reachability rather than which collector call did it.
+    assert!(!root.join("wal").join("00000000000000000001.wal").exists());
+    let physical_wals = std::fs::read_dir(root.join("wal"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(physical_wals, first.retained_wals.iter().cloned().collect());
 
     assert!(database.release_checkpoint("keep-first").unwrap());
     let second = database.garbage_collect().unwrap();

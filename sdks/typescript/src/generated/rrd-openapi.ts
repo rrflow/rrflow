@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 68a17b8757c21aa38a881d75b8c3340dafafed0b8d6d2875be1a1e86dcab653c
+// OpenAPI SHA-256: d41937932617054902fc4519cc755c5f37ba8cab154667f4b46e006bd12580e0
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3366,6 +3366,12 @@ export interface operations {
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
                                         /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
                                         wal_flush_target_bytes: number;
                                     };
                                 };
@@ -3614,6 +3620,12 @@ export interface operations {
                                         retained_mutable_generations: number;
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
                                         /** Format: uint64 */
                                         wal_flush_target_bytes: number;
                                     };

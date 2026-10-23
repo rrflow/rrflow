@@ -73,7 +73,7 @@ pub struct RrdEngine {
     /// Serializes the local definition/validation/commit boundary. rrflowKV
     /// already owns the cross-process writer lock; this closes the
     /// in-process race between publishing a unique index and committing data.
-    pub(crate) transaction_gate: Mutex<()>,
+    pub(crate) transaction_gate: super::transaction_admission::TransactionGate,
     /// Tracks invocation reservations currently executing through a supported
     /// adapter. Session-backed methods use this to distinguish a correctly
     /// wrapped call from a direct embedded call and make the latter leave a
@@ -241,7 +241,7 @@ impl RrdEngine {
             component_operation_parent: operation_parent,
             instance,
             token_key,
-            transaction_gate: Mutex::new(()),
+            transaction_gate: super::transaction_admission::TransactionGate::default(),
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
@@ -282,7 +282,7 @@ impl RrdEngine {
             component_operation_parent: None,
             instance,
             token_key,
-            transaction_gate: Mutex::new(()),
+            transaction_gate: super::transaction_admission::TransactionGate::default(),
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),

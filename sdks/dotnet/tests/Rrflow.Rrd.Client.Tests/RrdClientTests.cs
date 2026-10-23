@@ -72,6 +72,9 @@ public sealed class RrdClientTests
                             ["reclamation_delete_files"] = 1024,
                             ["reclamation_delete_bytes"] = 1073741824,
                             ["reclamation_elapsed_ms"] = 30000,
+                            ["transaction_admission_requests"] = 64,
+                            ["transaction_admission_bytes"] = 67108864,
+                            ["transaction_admission_wait_ms"] = 30000,
                         },
                         ["reasoning"] = new Dictionary<string, object?>
                         {
@@ -97,7 +100,7 @@ public sealed class RrdClientTests
                             ["max_elapsed_ms"] = 30_000,
                         },
                         ["configuration_sha256"] =
-                            "234b19e7ce250615faa119c297c6a4a13ca590cd88639975cb297037f12ecac2",
+                            "510e1074e7c8f99129cd2ddfadc67ba62e05f1e0d9451c45edf77a900e34bb56",
                     },
                     ["instance"] = new Dictionary<string, object?>
                     {

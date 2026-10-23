@@ -176,20 +176,24 @@ fn installed_write_maintenance_reclaims_only_an_admitted_prefix() {
     let mut policy = options(1);
     policy.reclamation.delete_files = 1;
     let mut database = Database::create_with_options(&root, policy).unwrap();
-    database
-        .write_owned(
-            WriteBatch::new(vec![put("key", "one")]).unwrap(),
-            Durability::Authoritative,
-        )
-        .unwrap();
+    let write = |database: &mut Database, value: &str| {
+        for _ in 0..100 {
+            let before = database.snapshot().sequence;
+            match database.write_owned(
+                WriteBatch::new(vec![put("key", value)]).unwrap(),
+                Durability::Authoritative,
+            ) {
+                Ok(_) => return,
+                Err(Error::ReclamationPending) => assert_eq!(database.snapshot().sequence, before),
+                Err(error) => panic!("unexpected maintenance error: {error}"),
+            }
+        }
+        panic!("bounded cleanup failed to drain");
+    };
+    write(&mut database, "one");
     database.flush_memtable(1).unwrap();
     let pinned = database.checkpoint("retain", 2).unwrap();
-    database
-        .write_owned(
-            WriteBatch::new(vec![put("key", "two")]).unwrap(),
-            Durability::Authoritative,
-        )
-        .unwrap();
+    write(&mut database, "two");
     database.flush_memtable(3).unwrap();
     database.compact(&[], 4).unwrap();
     let report = database.garbage_collect().unwrap();
@@ -200,12 +204,7 @@ fn installed_write_maintenance_reclaims_only_an_admitted_prefix() {
     assert!(report.retained_manifests.contains(&pinned.manifest));
     assert!(database.release_checkpoint("retain").unwrap());
     for index in 0..12 {
-        database
-            .write_owned(
-                WriteBatch::new(vec![put("key", &index.to_string())]).unwrap(),
-                Durability::Authoritative,
-            )
-            .unwrap();
+        write(&mut database, &index.to_string());
     }
     assert!(!root
         .join("manifests")

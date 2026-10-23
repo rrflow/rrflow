@@ -127,6 +127,7 @@ mod subscription;
 mod task;
 mod token_key;
 mod transaction;
+mod transaction_admission;
 mod vector;
 
 pub use clock::{
@@ -156,6 +157,7 @@ pub use security::{MAX_AUDIT_PAGE_RECORDS, MAX_JWT_CREDENTIAL_BYTES};
 use session::*;
 use token_key::load_or_create_token_key;
 pub use token_key::TOKEN_KEY_BYTES;
+pub use transaction_admission::TransactionAdmissionSnapshot;
 
 const SESSION_STATE_FORMAT: u16 = 3;
 const MAX_SESSION_RENEWALS: usize = 64;

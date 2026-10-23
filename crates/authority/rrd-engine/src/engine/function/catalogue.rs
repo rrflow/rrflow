@@ -29,10 +29,7 @@ impl RrdEngine {
             request_id,
             operation_id,
         )?;
-        let _transaction_guard = self
-            .transaction_gate
-            .lock()
-            .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         for definition in request.catalogue.functions.values() {
             super::runtime_profile::validate_runtime_identity(&definition.runtime)?;
         }

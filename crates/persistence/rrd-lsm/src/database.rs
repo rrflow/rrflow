@@ -2021,6 +2021,10 @@ impl Database {
         if self.reclamation_pending {
             let report = self.garbage_collect()?;
             self.reclamation_pending = report.has_more;
+            if report.has_more {
+                // Finish finite cleanup across retries before creating more debt.
+                return Err(Error::ReclamationPending);
+            }
         }
         Ok(())
     }

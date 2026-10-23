@@ -250,6 +250,9 @@ pub struct StorageLimits {
     pub reclamation_delete_files: u64,
     pub reclamation_delete_bytes: u64,
     pub reclamation_elapsed_ms: u64,
+    pub transaction_admission_requests: u64,
+    pub transaction_admission_bytes: u64,
+    pub transaction_admission_wait_ms: u64,
 }
 
 impl Default for StorageLimits {
@@ -275,6 +278,9 @@ impl Default for StorageLimits {
             reclamation_delete_files: 1_024,
             reclamation_delete_bytes: 1_073_741_824,
             reclamation_elapsed_ms: 30_000,
+            transaction_admission_requests: 64,
+            transaction_admission_bytes: 67_108_864,
+            transaction_admission_wait_ms: 30_000,
         }
     }
 }
@@ -387,6 +393,21 @@ impl StorageLimits {
         {
             return invalid("retained mutable limits must accommodate one full active generation");
         }
+        validate_nonzero_max(
+            "storage transaction_admission_requests",
+            self.transaction_admission_requests,
+            65_536,
+        )?;
+        validate_nonzero_max(
+            "storage transaction_admission_bytes",
+            self.transaction_admission_bytes,
+            MAX_BYTES,
+        )?;
+        validate_nonzero_max(
+            "storage transaction_admission_wait_ms",
+            self.transaction_admission_wait_ms,
+            3_600_000,
+        )?;
         if self.compaction_l0_segments < 8 {
             return invalid(
                 "storage compaction_l0_segments must accommodate the native L0 trigger of eight",

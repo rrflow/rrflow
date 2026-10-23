@@ -65,7 +65,10 @@ final class RrdClientTest {
                                     Map.entry("reclamation_metadata_bytes", 67108864L),
                                     Map.entry("reclamation_delete_files", 1024L),
                                     Map.entry("reclamation_delete_bytes", 1073741824L),
-                                    Map.entry("reclamation_elapsed_ms", 30000L)),
+                                    Map.entry("reclamation_elapsed_ms", 30000L),
+                                    Map.entry("transaction_admission_requests", 64L),
+                                    Map.entry("transaction_admission_bytes", 67108864L),
+                                    Map.entry("transaction_admission_wait_ms", 30000L)),
                             "reasoning", Map.of(
                                     "max_run_elapsed_ms", 900000,
                                     "max_steps", 256,
@@ -84,7 +87,7 @@ final class RrdClientTest {
                                     "max_spill_bytes", 268435456,
                                     "max_elapsed_ms", 30000),
                             "configuration_sha256",
-                            "234b19e7ce250615faa119c297c6a4a13ca590cd88639975cb297037f12ecac2"),
+                            "510e1074e7c8f99129cd2ddfadc67ba62e05f1e0d9451c45edf77a900e34bb56"),
                     "instance", Map.of("kind", "instance", "id", "sdk-test"),
                     "capabilities", List.of())));
         });
