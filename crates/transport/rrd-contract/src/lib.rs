@@ -22,6 +22,8 @@ mod model_manifest;
 mod platform;
 mod query_export;
 mod read;
+mod reasoning_budget;
+pub use reasoning_budget::*;
 mod reasoning_tree;
 mod restore_publication;
 mod router;
@@ -218,7 +220,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377";
+    "13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3747,6 +3749,66 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "OpenSubscriptionResult",
         ),
         endpoint(
+            "embedding-builtin-activate",
+            HttpMethod::Post,
+            "/v1/embedding/builtin/activate",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "ActivateBuiltinEmbedding",
+            "EmbeddingModelCatalogue",
+        ),
+        endpoint(
+            "task-budget-configure",
+            HttpMethod::Post,
+            "/v1/tasks/budget/configure",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "ConfigureTaskBudget",
+            "TaskBudgetView",
+        ),
+        endpoint(
+            "task-budget-read",
+            HttpMethod::Post,
+            "/v1/tasks/budget/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::ReasoningRead,
+            "ReadTaskBudget",
+            "TaskBudgetView",
+        ),
+        endpoint(
+            "task-budget-stop",
+            HttpMethod::Post,
+            "/v1/tasks/budget/stop",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "StopTaskBudget",
+            "TaskBudgetView",
+        ),
+        endpoint(
+            "task-embedding-execute",
+            HttpMethod::Post,
+            "/v1/tasks/embedding/execute",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "ExecuteTaskEmbedding",
+            "GenerateEmbeddingsResult",
+        ),
+        endpoint(
+            "task-attempt-read",
+            HttpMethod::Post,
+            "/v1/tasks/attempt/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::ReasoningRead,
+            "ReadTaskAttempt",
+            "TaskAttemptView",
+        ),
+        endpoint(
             "task-close",
             HttpMethod::Post,
             "/v1/tasks/close",
@@ -4183,6 +4245,12 @@ fn schema_json<T: JsonSchema>() -> serde_json::Value {
 
 fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
     let schema = match name {
+        "ActivateBuiltinEmbedding" => schema_json::<RequestEnvelope<ActivateBuiltinEmbedding>>(),
+        "ConfigureTaskBudget" => schema_json::<RequestEnvelope<ConfigureTaskBudget>>(),
+        "ExecuteTaskEmbedding" => schema_json::<RequestEnvelope<ExecuteTaskEmbedding>>(),
+        "ReadTaskAttempt" => schema_json::<RequestEnvelope<ReadTaskAttempt>>(),
+        "ReadTaskBudget" => schema_json::<RequestEnvelope<ReadTaskBudget>>(),
+        "StopTaskBudget" => schema_json::<RequestEnvelope<StopTaskBudget>>(),
         "AbortTransaction" => schema_json::<RequestEnvelope<AbortTransaction>>(),
         "AssembleContext" => schema_json::<RequestEnvelope<AssembleContext>>(),
         "BeginTransaction" => schema_json::<RequestEnvelope<BeginTransaction>>(),
@@ -4227,6 +4295,10 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
 
 fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
     let schema = match name {
+        "EmbeddingModelCatalogue" => schema_json::<ResponseEnvelope<EmbeddingModelCatalogue>>(),
+        "GenerateEmbeddingsResult" => schema_json::<ResponseEnvelope<GenerateEmbeddingsResult>>(),
+        "TaskAttemptView" => schema_json::<ResponseEnvelope<TaskAttemptView>>(),
+        "TaskBudgetView" => schema_json::<ResponseEnvelope<TaskBudgetView>>(),
         "AuditExport" => schema_json::<ResponseEnvelope<AuditExport>>(),
         "AuditPage" => schema_json::<ResponseEnvelope<AuditPage>>(),
         "ChangefeedFollowResult" => schema_json::<ResponseEnvelope<ChangefeedFollowResult>>(),

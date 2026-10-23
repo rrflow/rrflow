@@ -174,7 +174,7 @@
   },
   "estate": {},
   "expected": {
-    "endpoint_count": 42,
+    "endpoint_count": 48,
     "query_identity": "record:document:sdk-conformance",
     "vector_reference": "embedding:sdk-conformance-title",
     "estate_revision": 1,

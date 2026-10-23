@@ -35,16 +35,17 @@ Rust application
 ```
 
 The SDK cannot select a storage profile, raw key, physical index, DataFusion
-plan, model backend, or project database. It may express semantic intent and
-budgets exposed by `rrd-contract`. Cross-surface proof must compare the result,
+plan or project database. It may select an engine-advertised embedding backend
+and express semantic intent and budgets exposed by `rrd-contract`.
+Cross-surface proof must compare the result,
 denial, stamp, digest, receipt, and causal identity produced by the engine—not
 merely compare JSON shapes.
 
 ## Audited current surface
 
-The executable `endpoint_catalogue()` contains 42 HTTP operations and one
+The executable `endpoint_catalogue()` contains 48 HTTP operations and one
 generic authenticated `/v1/ws` descriptor. `RrdClient` currently supplies
-typed HTTP methods for 37 of those 42 operations, while `RrdWebSocket`
+typed HTTP methods for 43 of those 48 operations, while `RrdWebSocket`
 implements the bounded B-04 multiplexed protocol. The current boundary is:
 
 | Family | Catalogued HTTP operations | Rust methods now | Missing now |
@@ -65,8 +66,18 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Diagnostics | 1 | 1 | none |
 | Prompt flights | 3 | 3 | none |
 | Tasks | 4 | 4 | none |
+| Task effort and explicit reference inference | 6 | 6 | none |
 | Context | 1 | 1 | none |
-| **Total** | **42** | **37** | **5** |
+| **Total** | **48** | **43** | **5** |
+
+The [task effort flow](../inference/lfg-swag.md#public-task-effort-flow) uses
+`configure_task_budget`, `activate_builtin_embedding`,
+`execute_task_embedding`, `read_task_budget`, `stop_task_budget` and
+`read_task_attempt`. Stop supplies the observed budget digest; a repeated
+attempt is inspected instead of automatically dispatched again. The real
+authenticated socket fixture `rrd-client/tests/task_effort.rs` executes this
+flow and reads the same result and stopped budget after native-store reopen.
+This reference inference path does not supply an LLM or a complete router.
 
 The WebSocket method authenticates one generic connection, validates the
 server's opening identity and negotiated limits, and carries request,

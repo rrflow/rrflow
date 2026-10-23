@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377
+// OpenAPI SHA-256: 13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -164,6 +164,23 @@ export interface paths {
         put?: never;
         /** RRD diagnostics-read */
         post: operations["diagnostics-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/embedding/builtin/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD embedding-builtin-activate */
+        post: operations["embedding-builtin-activate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -510,6 +527,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tasks/attempt/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-attempt-read */
+        post: operations["task-attempt-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/budget/configure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-budget-configure */
+        post: operations["task-budget-configure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/budget/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-budget-read */
+        post: operations["task-budget-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/budget/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-budget-stop */
+        post: operations["task-budget-stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tasks/close": {
         parameters: {
             query?: never;
@@ -521,6 +606,23 @@ export interface paths {
         put?: never;
         /** RRD task-close */
         post: operations["task-close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/embedding/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-embedding-execute */
+        post: operations["task-embedding-execute"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13939,6 +14041,226 @@ export interface operations {
             };
         };
     };
+    "embedding-builtin-activate": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /**
+                     * @description Explicit, process-local activation of the bundled deterministic reference
+                     *     adapter. This is not model training, an LLM, or an external model fetch.
+                     */
+                    payload: {
+                        /** Format: uint32 */
+                        dimensions: number;
+                        scope: string;
+                        /** Format: uint32 */
+                        seed: number;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                backends: {
+                                    deterministic: boolean;
+                                    /** Format: uint32 */
+                                    dimensions: number;
+                                    execution: {
+                                        /** @constant */
+                                        kind: "cpu";
+                                    } | {
+                                        device: string;
+                                        /** @constant */
+                                        kind: "gpu";
+                                        platform: string;
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote";
+                                        provider: string;
+                                    };
+                                    id: string;
+                                    /** @enum {string} */
+                                    modality: "text" | "image";
+                                    model: string;
+                                    model_sha256: string;
+                                    network_required: boolean;
+                                    /** @enum {string} */
+                                    normalization: "none" | "unit_l2";
+                                    provider: string;
+                                    resources: {
+                                        /** Format: uint64 */
+                                        maximum_batch_bytes: number;
+                                        /** Format: uint32 */
+                                        maximum_batch_inputs: number;
+                                        /** Format: uint64 */
+                                        maximum_input_bytes: number;
+                                        /** Format: uint64 */
+                                        maximum_output_values: number;
+                                    };
+                                    revision: string;
+                                    trust: {
+                                        /** @constant */
+                                        kind: "local_offline";
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote_provider";
+                                        provider: string;
+                                    };
+                                }[];
+                                /** Format: uint64 */
+                                registry_revision: number;
+                                scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                backends: {
+                                    deterministic: boolean;
+                                    /** Format: uint32 */
+                                    dimensions: number;
+                                    execution: {
+                                        /** @constant */
+                                        kind: "cpu";
+                                    } | {
+                                        device: string;
+                                        /** @constant */
+                                        kind: "gpu";
+                                        platform: string;
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote";
+                                        provider: string;
+                                    };
+                                    id: string;
+                                    /** @enum {string} */
+                                    modality: "text" | "image";
+                                    model: string;
+                                    model_sha256: string;
+                                    network_required: boolean;
+                                    /** @enum {string} */
+                                    normalization: "none" | "unit_l2";
+                                    provider: string;
+                                    resources: {
+                                        /** Format: uint64 */
+                                        maximum_batch_bytes: number;
+                                        /** Format: uint32 */
+                                        maximum_batch_inputs: number;
+                                        /** Format: uint64 */
+                                        maximum_input_bytes: number;
+                                        /** Format: uint64 */
+                                        maximum_output_values: number;
+                                    };
+                                    revision: string;
+                                    trust: {
+                                        /** @constant */
+                                        kind: "local_offline";
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote_provider";
+                                        provider: string;
+                                    };
+                                }[];
+                                /** Format: uint64 */
+                                registry_revision: number;
+                                scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
     "estate-read": {
         parameters: {
             query?: never;
@@ -20405,6 +20727,1175 @@ export interface operations {
             };
         };
     };
+    "task-attempt-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        attempt_id: string;
+                        scope: string;
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                attempt?: {
+                                    attempt_id: string;
+                                    /** Format: uint64 */
+                                    ordinal: number;
+                                    outcome_sha256?: string | null;
+                                    result?: {
+                                        backend: {
+                                            deterministic: boolean;
+                                            /** Format: uint32 */
+                                            dimensions: number;
+                                            execution: {
+                                                /** @constant */
+                                                kind: "cpu";
+                                            } | {
+                                                device: string;
+                                                /** @constant */
+                                                kind: "gpu";
+                                                platform: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "remote";
+                                                provider: string;
+                                            };
+                                            id: string;
+                                            /** @enum {string} */
+                                            modality: "text" | "image";
+                                            model: string;
+                                            model_sha256: string;
+                                            network_required: boolean;
+                                            /** @enum {string} */
+                                            normalization: "none" | "unit_l2";
+                                            provider: string;
+                                            resources: {
+                                                /** Format: uint64 */
+                                                maximum_batch_bytes: number;
+                                                /** Format: uint32 */
+                                                maximum_batch_inputs: number;
+                                                /** Format: uint64 */
+                                                maximum_input_bytes: number;
+                                                /** Format: uint64 */
+                                                maximum_output_values: number;
+                                            };
+                                            revision: string;
+                                            trust: {
+                                                /** @constant */
+                                                kind: "local_offline";
+                                            } | {
+                                                /** @constant */
+                                                kind: "remote_provider";
+                                                provider: string;
+                                            };
+                                        };
+                                        embeddings: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            input_id: string;
+                                            provenance: {
+                                                /** Format: uint32 */
+                                                dimensions: number;
+                                                /** @default {} */
+                                                generation_parameters: {
+                                                    [key: string]: {
+                                                        /** @constant */
+                                                        type: "null";
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "bool";
+                                                        value: boolean;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "integer";
+                                                        /** Format: int64 */
+                                                        value: number;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "unsigned";
+                                                        /** Format: uint64 */
+                                                        value: number;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "decimal";
+                                                        value: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "string";
+                                                        value: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "digest";
+                                                        value: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "list";
+                                                        value: components["schemas"]["QueryValue"][];
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "map";
+                                                        value: {
+                                                            [key: string]: components["schemas"]["QueryValue"];
+                                                        };
+                                                    };
+                                                };
+                                                model: string;
+                                                model_sha256: string;
+                                                /** @enum {string} */
+                                                normalization: "none" | "unit_l2";
+                                                source_sha256: string;
+                                            };
+                                            value: {
+                                                /** @constant */
+                                                kind: "dense";
+                                                values: number[];
+                                            } | {
+                                                /** Format: uint32 */
+                                                dimensions: number;
+                                                indices: number[];
+                                                /** @constant */
+                                                kind: "sparse";
+                                                values: number[];
+                                            } | {
+                                                /** Format: uint32 */
+                                                dimensions: number;
+                                                /** @constant */
+                                                kind: "multi_dense";
+                                                vectors: number[][];
+                                            };
+                                        }[];
+                                        /** Format: uint64 */
+                                        known_at_cursor: number;
+                                        read_manifest_sha256: string;
+                                        /** Format: uint64 */
+                                        registry_revision: number;
+                                        scope: string;
+                                    } | null;
+                                    /** @enum {string} */
+                                    status: "reserved" | "accepted" | "stopped";
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                attempt?: {
+                                    attempt_id: string;
+                                    /** Format: uint64 */
+                                    ordinal: number;
+                                    outcome_sha256?: string | null;
+                                    result?: {
+                                        backend: {
+                                            deterministic: boolean;
+                                            /** Format: uint32 */
+                                            dimensions: number;
+                                            execution: {
+                                                /** @constant */
+                                                kind: "cpu";
+                                            } | {
+                                                device: string;
+                                                /** @constant */
+                                                kind: "gpu";
+                                                platform: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "remote";
+                                                provider: string;
+                                            };
+                                            id: string;
+                                            /** @enum {string} */
+                                            modality: "text" | "image";
+                                            model: string;
+                                            model_sha256: string;
+                                            network_required: boolean;
+                                            /** @enum {string} */
+                                            normalization: "none" | "unit_l2";
+                                            provider: string;
+                                            resources: {
+                                                /** Format: uint64 */
+                                                maximum_batch_bytes: number;
+                                                /** Format: uint32 */
+                                                maximum_batch_inputs: number;
+                                                /** Format: uint64 */
+                                                maximum_input_bytes: number;
+                                                /** Format: uint64 */
+                                                maximum_output_values: number;
+                                            };
+                                            revision: string;
+                                            trust: {
+                                                /** @constant */
+                                                kind: "local_offline";
+                                            } | {
+                                                /** @constant */
+                                                kind: "remote_provider";
+                                                provider: string;
+                                            };
+                                        };
+                                        embeddings: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            input_id: string;
+                                            provenance: {
+                                                /** Format: uint32 */
+                                                dimensions: number;
+                                                /** @default {} */
+                                                generation_parameters: {
+                                                    [key: string]: {
+                                                        /** @constant */
+                                                        type: "null";
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "bool";
+                                                        value: boolean;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "integer";
+                                                        /** Format: int64 */
+                                                        value: number;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "unsigned";
+                                                        /** Format: uint64 */
+                                                        value: number;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "decimal";
+                                                        value: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "string";
+                                                        value: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "digest";
+                                                        value: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "list";
+                                                        value: components["schemas"]["QueryValue"][];
+                                                    } | {
+                                                        /** @constant */
+                                                        type: "map";
+                                                        value: {
+                                                            [key: string]: components["schemas"]["QueryValue"];
+                                                        };
+                                                    };
+                                                };
+                                                model: string;
+                                                model_sha256: string;
+                                                /** @enum {string} */
+                                                normalization: "none" | "unit_l2";
+                                                source_sha256: string;
+                                            };
+                                            value: {
+                                                /** @constant */
+                                                kind: "dense";
+                                                values: number[];
+                                            } | {
+                                                /** Format: uint32 */
+                                                dimensions: number;
+                                                indices: number[];
+                                                /** @constant */
+                                                kind: "sparse";
+                                                values: number[];
+                                            } | {
+                                                /** Format: uint32 */
+                                                dimensions: number;
+                                                /** @constant */
+                                                kind: "multi_dense";
+                                                vectors: number[][];
+                                            };
+                                        }[];
+                                        /** Format: uint64 */
+                                        known_at_cursor: number;
+                                        read_manifest_sha256: string;
+                                        /** Format: uint64 */
+                                        registry_revision: number;
+                                        scope: string;
+                                    } | null;
+                                    /** @enum {string} */
+                                    status: "reserved" | "accepted" | "stopped";
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-budget-configure": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        limits: {
+                            /**
+                             * Format: uint64
+                             * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                             *     limit on private analysis performed before a durable/effect boundary.
+                             */
+                            max_run_elapsed_ms: number;
+                            /** Format: uint64 */
+                            max_step_elapsed_ms: number;
+                            /** Format: uint64 */
+                            max_steps: number;
+                        };
+                        /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                        repetition_policy?: {
+                            /** Format: uint64 */
+                            max_equivalent_attempts: number;
+                        } | null;
+                        scope: string;
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Public observation of engine-owned control state. Task lifecycle remains
+                                 *     owned by the task record; clients cannot write this budget directly.
+                                 */
+                                budget?: {
+                                    active_attempt?: string | null;
+                                    /** Format: uint64 */
+                                    charged_elapsed_ms: number;
+                                    configuration_sha256: string;
+                                    /** Format: uint64 */
+                                    deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
+                                    /**
+                                     * @description Conservative persisted observation; only explicit future reconciliation
+                                     *     may clear uncertainty about non-cooperative external work.
+                                     */
+                                    execution_may_continue: boolean;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /** Format: uint64 */
+                                    last_observed_at_unix_ms: number;
+                                    limits: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                                         *     limit on private analysis performed before a durable/effect boundary.
+                                         */
+                                        max_run_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_step_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_steps: number;
+                                    };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
+                                    /** Format: uint64 */
+                                    reserved_steps: number;
+                                    scope: string;
+                                    /** Format: uint64 */
+                                    started_at_unix_ms: number;
+                                    stop_expected_sha256?: string | null;
+                                    /** @enum {string|null} */
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                } | null;
+                                budget_sha256?: string | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Public observation of engine-owned control state. Task lifecycle remains
+                                 *     owned by the task record; clients cannot write this budget directly.
+                                 */
+                                budget?: {
+                                    active_attempt?: string | null;
+                                    /** Format: uint64 */
+                                    charged_elapsed_ms: number;
+                                    configuration_sha256: string;
+                                    /** Format: uint64 */
+                                    deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
+                                    /**
+                                     * @description Conservative persisted observation; only explicit future reconciliation
+                                     *     may clear uncertainty about non-cooperative external work.
+                                     */
+                                    execution_may_continue: boolean;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /** Format: uint64 */
+                                    last_observed_at_unix_ms: number;
+                                    limits: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                                         *     limit on private analysis performed before a durable/effect boundary.
+                                         */
+                                        max_run_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_step_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_steps: number;
+                                    };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
+                                    /** Format: uint64 */
+                                    reserved_steps: number;
+                                    scope: string;
+                                    /** Format: uint64 */
+                                    started_at_unix_ms: number;
+                                    stop_expected_sha256?: string | null;
+                                    /** @enum {string|null} */
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                } | null;
+                                budget_sha256?: string | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-budget-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        scope: string;
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Public observation of engine-owned control state. Task lifecycle remains
+                                 *     owned by the task record; clients cannot write this budget directly.
+                                 */
+                                budget?: {
+                                    active_attempt?: string | null;
+                                    /** Format: uint64 */
+                                    charged_elapsed_ms: number;
+                                    configuration_sha256: string;
+                                    /** Format: uint64 */
+                                    deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
+                                    /**
+                                     * @description Conservative persisted observation; only explicit future reconciliation
+                                     *     may clear uncertainty about non-cooperative external work.
+                                     */
+                                    execution_may_continue: boolean;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /** Format: uint64 */
+                                    last_observed_at_unix_ms: number;
+                                    limits: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                                         *     limit on private analysis performed before a durable/effect boundary.
+                                         */
+                                        max_run_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_step_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_steps: number;
+                                    };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
+                                    /** Format: uint64 */
+                                    reserved_steps: number;
+                                    scope: string;
+                                    /** Format: uint64 */
+                                    started_at_unix_ms: number;
+                                    stop_expected_sha256?: string | null;
+                                    /** @enum {string|null} */
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                } | null;
+                                budget_sha256?: string | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Public observation of engine-owned control state. Task lifecycle remains
+                                 *     owned by the task record; clients cannot write this budget directly.
+                                 */
+                                budget?: {
+                                    active_attempt?: string | null;
+                                    /** Format: uint64 */
+                                    charged_elapsed_ms: number;
+                                    configuration_sha256: string;
+                                    /** Format: uint64 */
+                                    deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
+                                    /**
+                                     * @description Conservative persisted observation; only explicit future reconciliation
+                                     *     may clear uncertainty about non-cooperative external work.
+                                     */
+                                    execution_may_continue: boolean;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /** Format: uint64 */
+                                    last_observed_at_unix_ms: number;
+                                    limits: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                                         *     limit on private analysis performed before a durable/effect boundary.
+                                         */
+                                        max_run_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_step_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_steps: number;
+                                    };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
+                                    /** Format: uint64 */
+                                    reserved_steps: number;
+                                    scope: string;
+                                    /** Format: uint64 */
+                                    started_at_unix_ms: number;
+                                    stop_expected_sha256?: string | null;
+                                    /** @enum {string|null} */
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                } | null;
+                                budget_sha256?: string | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-budget-stop": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        expected_budget_sha256: string;
+                        scope: string;
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Public observation of engine-owned control state. Task lifecycle remains
+                                 *     owned by the task record; clients cannot write this budget directly.
+                                 */
+                                budget?: {
+                                    active_attempt?: string | null;
+                                    /** Format: uint64 */
+                                    charged_elapsed_ms: number;
+                                    configuration_sha256: string;
+                                    /** Format: uint64 */
+                                    deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
+                                    /**
+                                     * @description Conservative persisted observation; only explicit future reconciliation
+                                     *     may clear uncertainty about non-cooperative external work.
+                                     */
+                                    execution_may_continue: boolean;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /** Format: uint64 */
+                                    last_observed_at_unix_ms: number;
+                                    limits: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                                         *     limit on private analysis performed before a durable/effect boundary.
+                                         */
+                                        max_run_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_step_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_steps: number;
+                                    };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
+                                    /** Format: uint64 */
+                                    reserved_steps: number;
+                                    scope: string;
+                                    /** Format: uint64 */
+                                    started_at_unix_ms: number;
+                                    stop_expected_sha256?: string | null;
+                                    /** @enum {string|null} */
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                } | null;
+                                budget_sha256?: string | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Public observation of engine-owned control state. Task lifecycle remains
+                                 *     owned by the task record; clients cannot write this budget directly.
+                                 */
+                                budget?: {
+                                    active_attempt?: string | null;
+                                    /** Format: uint64 */
+                                    charged_elapsed_ms: number;
+                                    configuration_sha256: string;
+                                    /** Format: uint64 */
+                                    deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
+                                    /**
+                                     * @description Conservative persisted observation; only explicit future reconciliation
+                                     *     may clear uncertainty about non-cooperative external work.
+                                     */
+                                    execution_may_continue: boolean;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /** Format: uint64 */
+                                    last_observed_at_unix_ms: number;
+                                    limits: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Wall-clock ceiling for a future governed reasoning run. This is not a
+                                         *     limit on private analysis performed before a durable/effect boundary.
+                                         */
+                                        max_run_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_step_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        max_steps: number;
+                                    };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
+                                    /** Format: uint64 */
+                                    reserved_steps: number;
+                                    scope: string;
+                                    /** Format: uint64 */
+                                    started_at_unix_ms: number;
+                                    stop_expected_sha256?: string | null;
+                                    /** @enum {string|null} */
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                } | null;
+                                budget_sha256?: string | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
     "task-close": {
         parameters: {
             query?: never;
@@ -20600,6 +22091,409 @@ export interface operations {
                                     task_id: string;
                                     title: string;
                                 };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-embedding-execute": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        attempt_id: string;
+                        request: {
+                            backend_id: string;
+                            inputs: {
+                                bytes: number[];
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                id: string;
+                                media_type: string;
+                            }[];
+                            /**
+                             * @default deny
+                             * @enum {string}
+                             */
+                            network_policy?: "deny" | "allow";
+                            scope: string;
+                        };
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                backend: {
+                                    deterministic: boolean;
+                                    /** Format: uint32 */
+                                    dimensions: number;
+                                    execution: {
+                                        /** @constant */
+                                        kind: "cpu";
+                                    } | {
+                                        device: string;
+                                        /** @constant */
+                                        kind: "gpu";
+                                        platform: string;
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote";
+                                        provider: string;
+                                    };
+                                    id: string;
+                                    /** @enum {string} */
+                                    modality: "text" | "image";
+                                    model: string;
+                                    model_sha256: string;
+                                    network_required: boolean;
+                                    /** @enum {string} */
+                                    normalization: "none" | "unit_l2";
+                                    provider: string;
+                                    resources: {
+                                        /** Format: uint64 */
+                                        maximum_batch_bytes: number;
+                                        /** Format: uint32 */
+                                        maximum_batch_inputs: number;
+                                        /** Format: uint64 */
+                                        maximum_input_bytes: number;
+                                        /** Format: uint64 */
+                                        maximum_output_values: number;
+                                    };
+                                    revision: string;
+                                    trust: {
+                                        /** @constant */
+                                        kind: "local_offline";
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote_provider";
+                                        provider: string;
+                                    };
+                                };
+                                embeddings: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    input_id: string;
+                                    provenance: {
+                                        /** Format: uint32 */
+                                        dimensions: number;
+                                        /** @default {} */
+                                        generation_parameters: {
+                                            [key: string]: {
+                                                /** @constant */
+                                                type: "null";
+                                            } | {
+                                                /** @constant */
+                                                type: "bool";
+                                                value: boolean;
+                                            } | {
+                                                /** @constant */
+                                                type: "integer";
+                                                /** Format: int64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "unsigned";
+                                                /** Format: uint64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "decimal";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "string";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "digest";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "list";
+                                                value: components["schemas"]["QueryValue"][];
+                                            } | {
+                                                /** @constant */
+                                                type: "map";
+                                                value: {
+                                                    [key: string]: components["schemas"]["QueryValue"];
+                                                };
+                                            };
+                                        };
+                                        model: string;
+                                        model_sha256: string;
+                                        /** @enum {string} */
+                                        normalization: "none" | "unit_l2";
+                                        source_sha256: string;
+                                    };
+                                    value: {
+                                        /** @constant */
+                                        kind: "dense";
+                                        values: number[];
+                                    } | {
+                                        /** Format: uint32 */
+                                        dimensions: number;
+                                        indices: number[];
+                                        /** @constant */
+                                        kind: "sparse";
+                                        values: number[];
+                                    } | {
+                                        /** Format: uint32 */
+                                        dimensions: number;
+                                        /** @constant */
+                                        kind: "multi_dense";
+                                        vectors: number[][];
+                                    };
+                                }[];
+                                /** Format: uint64 */
+                                known_at_cursor: number;
+                                read_manifest_sha256: string;
+                                /** Format: uint64 */
+                                registry_revision: number;
+                                scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                backend: {
+                                    deterministic: boolean;
+                                    /** Format: uint32 */
+                                    dimensions: number;
+                                    execution: {
+                                        /** @constant */
+                                        kind: "cpu";
+                                    } | {
+                                        device: string;
+                                        /** @constant */
+                                        kind: "gpu";
+                                        platform: string;
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote";
+                                        provider: string;
+                                    };
+                                    id: string;
+                                    /** @enum {string} */
+                                    modality: "text" | "image";
+                                    model: string;
+                                    model_sha256: string;
+                                    network_required: boolean;
+                                    /** @enum {string} */
+                                    normalization: "none" | "unit_l2";
+                                    provider: string;
+                                    resources: {
+                                        /** Format: uint64 */
+                                        maximum_batch_bytes: number;
+                                        /** Format: uint32 */
+                                        maximum_batch_inputs: number;
+                                        /** Format: uint64 */
+                                        maximum_input_bytes: number;
+                                        /** Format: uint64 */
+                                        maximum_output_values: number;
+                                    };
+                                    revision: string;
+                                    trust: {
+                                        /** @constant */
+                                        kind: "local_offline";
+                                    } | {
+                                        /** @constant */
+                                        kind: "remote_provider";
+                                        provider: string;
+                                    };
+                                };
+                                embeddings: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    input_id: string;
+                                    provenance: {
+                                        /** Format: uint32 */
+                                        dimensions: number;
+                                        /** @default {} */
+                                        generation_parameters: {
+                                            [key: string]: {
+                                                /** @constant */
+                                                type: "null";
+                                            } | {
+                                                /** @constant */
+                                                type: "bool";
+                                                value: boolean;
+                                            } | {
+                                                /** @constant */
+                                                type: "integer";
+                                                /** Format: int64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "unsigned";
+                                                /** Format: uint64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "decimal";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "string";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "digest";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "list";
+                                                value: components["schemas"]["QueryValue"][];
+                                            } | {
+                                                /** @constant */
+                                                type: "map";
+                                                value: {
+                                                    [key: string]: components["schemas"]["QueryValue"];
+                                                };
+                                            };
+                                        };
+                                        model: string;
+                                        model_sha256: string;
+                                        /** @enum {string} */
+                                        normalization: "none" | "unit_l2";
+                                        source_sha256: string;
+                                    };
+                                    value: {
+                                        /** @constant */
+                                        kind: "dense";
+                                        values: number[];
+                                    } | {
+                                        /** Format: uint32 */
+                                        dimensions: number;
+                                        indices: number[];
+                                        /** @constant */
+                                        kind: "sparse";
+                                        values: number[];
+                                    } | {
+                                        /** Format: uint32 */
+                                        dimensions: number;
+                                        /** @constant */
+                                        kind: "multi_dense";
+                                        vectors: number[][];
+                                    };
+                                }[];
+                                /** Format: uint64 */
+                                known_at_cursor: number;
+                                read_manifest_sha256: string;
+                                /** Format: uint64 */
+                                registry_revision: number;
+                                scope: string;
                             };
                             /** @constant */
                             status: "ok";

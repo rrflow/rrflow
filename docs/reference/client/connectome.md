@@ -69,6 +69,17 @@ integration and proof; this source registration supplies none of those effects.
 
 ### Native local workbench
 
+The current engine exposes the [public task effort flow](../inference/lfg-swag.md#public-task-effort-flow)
+for configuration, explicit reference-adapter activation, bounded embedding
+execution, Stop and retained-result readback. The pinned workbench below does
+not yet consume those operations. H-06 should place these controls inside the
+existing task detail/replay area, after updating its engine/SDK and installation
+adapter together. Display the exact effective limits, original deadline,
+reserved steps and outstanding-work flag; send Stop with the observed budget
+digest and refresh on conflict. A browser timer is display only. Label the
+bundled FeatureHash adapter as a CPU reference baseline, not a local LLM.
+No UI pin or UI qualification is changed by this engine package.
+
 [Connectome PR12](https://github.com/rrflow/connectome-development/pull/12)
 implements visible local startup, a DB/QL/KV guide, and a native model browser
 on the existing authenticated Rust SDK session. The packaged engine/SDK input
@@ -228,6 +239,15 @@ assumes that a ceiling activates a feature. In particular,
 support future plan/apply and UI preparation, not a success badge. Context and
 query controls must default at or below the advertised estate ceilings rather
 than blindly sending the protocol hard maximum.
+
+The [user-selected effort contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+owns reasoning controls. H-06 must show the selected preset or custom limits,
+effective estate caps, remaining time/steps/attempts and known cost, plus Stop
+and an explicitly previewed extension. A stopped run shows partial results and
+unresolved work with the engine's reason. Resume cannot reset consumption.
+Until the runner and configuration-apply capabilities are advertised, these
+controls must be unavailable with an explanation; changing a local UI setting
+cannot claim an enforced timeout. All clients share the engine's authority.
 
 ## One object, many bounded lenses
 

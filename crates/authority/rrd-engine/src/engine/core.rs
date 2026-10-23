@@ -95,6 +95,10 @@ pub struct RrdEngine {
     /// Process-local optional HNSW build adapters. Their bytes are never
     /// authoritative until the CPU differential coordinator admits them.
     pub(crate) hnsw_accelerators: Mutex<rrd_vector::HnswAcceleratorRegistry>,
+    /// Process-local delivery handles for durable task Stop, keyed by task and
+    /// fenced by attempt identity. Control state remains authoritative.
+    pub(in crate::engine) active_task_cancellations:
+        Mutex<BTreeMap<String, (CorrelationId, rrd_inference::EmbeddingCancellation)>>,
     /// Process-local executable inference adapters. Exact model, trust, and
     /// resource descriptors are public; credentials and runtime sessions are
     /// never serialized into durable RRD state.
@@ -254,6 +258,7 @@ impl RrdEngine {
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
+            active_task_cancellations: Mutex::new(BTreeMap::new()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
         })
     }
@@ -295,6 +300,7 @@ impl RrdEngine {
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
+            active_task_cancellations: Mutex::new(BTreeMap::new()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
         })
     }

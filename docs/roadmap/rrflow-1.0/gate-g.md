@@ -63,6 +63,105 @@ commands above do not prove the planned cases already exist or pass. Fix test
 names from the actual checkout before running; keep real-model and installed
 acceptance separate from reference-adapter results.
 
+### Aggregate reasoning-budget acceptance
+
+The [user-selected effort contract](../../reference/inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+is mandatory across G-01a adapter execution, G-02a durable dispatch and G-05
+context escalation. Implement one engine-owned aggregate run budget; retries,
+fallbacks, reads and planning consume its remaining time/attempts. Extend the
+existing installed limits and run/receipt authority, never a provider loop or
+client timer. D-06 owns governed configuration changes; H-06 exposes finite
+presets/custom limits, remaining budget, stop reasons and explicit extensions.
+
+The falsifying corpus includes endless context requests, repeated invalid
+output, fallback cycles, no progress, blocked/late providers, cancellation,
+lost ACK/restart, clock rollback and concurrent budget reservations. No case
+may reset consumption or silently extend the deadline. Accepted effects remain
+durable and uncertain work remains visible. Unit/mock timers alone cannot
+close this requirement; G-06 needs installed evidence with the chosen real
+adapter. Existing configuration fields and examples do not implement it.
+This preparation changes no gate status or dependency order.
+
+### Budget-control delivery sequence
+
+The user has prioritized usable budget controls. The existing embedding
+deadline repair advances the current executable boundary without introducing
+a reasoning loop before its storage/authorization prerequisites. Gate G stays
+open. Each following row is a bounded implementation package within the owners
+above, not an additional engine or independent roadmap.
+
+| Order / owner | Code and required behavior | Falsifying acceptance history |
+|---|---|---|
+| 1 / G-01a | `rrd-inference::EmbeddingExecution` and `rrd-engine::generate_embeddings_at`: consume the sealed step ceiling, preserve worker admission after caller timeout, reject late output; common validation remains shared. | Block a real engine's admitted adapter, configure 250 ms, receive non-retryable deadline before release; deny another dispatch, then release and recover capacity. Expired requests invoke no backend; actual FeatureHash output/provenance equals synchronous execution. This proves a bounded wait, not a stopped provider. |
+| 2 / G-01a, G-01b | Extend the existing adapter descriptor and execution owner with qualified cancellation/termination behavior and router dispatch. No detached replacement workers or implicit retry. | Cancel before dispatch and during work; a late result cannot advance the tree. A non-cooperative adapter cannot satisfy a hard stop profile. Real adapter cancellation evidence is required alongside controlled failure cases. |
+| 3 / D-06, G-02a | Extend `EstateConfiguration`, kernel reasoning-tree/task identities and store semantic transactions with one durable resolved budget, original deadline, attempt reservations, usage and terminal reason. No client/provider-owned ledger. | Two workers contend for the final allowance; exactly one reserves it. Crash before dispatch, after response and after commit; replay never resets consumption or repeats an uncertain effect. Clock rollback denies further dispatch. |
+| 4 / G-03, G-05 | All route/context/fallback attempts consume that same owner. Detect repeated semantic request/source/configuration identity with no accepted progress. Bound tracking state by the configured step/attempt cap. | An endless context requester, malformed-output controller and fallback cycle terminate at the configured limit. Changed correlation IDs cannot evade repetition; new authorized source evidence permits useful work within the remaining budget. |
+| 5 / D-06, H-06 | Resolve editable finite Quick/Balanced/Thorough/Custom profiles through the same configuration and public catalogue; Connectome previews exact limits and displays remaining allowance, Stop, partial output and authorized extension. | A stale override or extension fails CAS; a client cannot raise estate caps. Reloading the UI or resuming work preserves original consumption. Unsupported cost/cancellation guarantees are visibly unavailable. |
+| 6 / G-06 | Installed histories with one qualified real adapter, exact source/configuration/model identity and retained public decisions/receipts. | Repeat blocked/late/invalid/retry/concurrent/restart/no-progress cases through the shipped process. Measure actual last dispatch, output acceptance, usage and uncertain work. Candidate CI and installed evidence must pass before claiming loop prevention. |
+
+The [research rationale](../../reference/inference/lfg-swag.md#research-decisions-for-budget-enforcement)
+explains why timers, attempt limits, cancellation and durable accounting need
+separate proof. No row is complete merely because its contract or unit fixture
+exists. A per-batch deadline cannot close aggregate run accounting.
+
+[PR 101](https://github.com/rrflow/rrflow-development/pull/101) advances row 2
+with process-local cooperative cancellation through the existing embedding
+owner and the actual bundled FeatureHash implementation. It does not qualify
+router dispatch, remote provider cancellation, hard termination, a durable run
+Stop operation or UI controls. The descriptor and wire catalogue are unchanged;
+no adapter is advertised as forcibly stoppable because it implements a trait.
+
+[PR 102](https://github.com/rrflow/rrflow-development/pull/102) advances row 3
+at the existing task/embedding boundary: an immutable task budget and attempt
+reservation use engine control CAS, atomically paired with task-linked runtime
+evidence. The package tests native rrflowKV reopen, contention, lost completion,
+clock/configuration denial and inherited execution limits. It does not supply
+persisted tree routing, installed process-kill qualification, full output replay,
+or the remaining row 3 acceptance. Its
+[journal](../../evidence/change-journals/gate-g/g-02a-task-budget.md) records the
+exact evidence and open boundaries; Gate G and POAM-009 stay open.
+
+### Public effort flow and next implementation boundaries
+
+[PR104](https://github.com/rrflow/rrflow-development/pull/104) extends the public
+task budget with optional immutable repeated-embedding admission. It detects
+equivalent batches across changed labels/order, cycles and reopen, retaining
+at most 128 identities in the same durable owner. The
+[package evidence](../../evidence/change-journals/gate-g/g-03-task-repetition.md)
+records validation. This advances the existing no-progress prerequisite for
+embedding work only. General semantic route/context/fallback progress and
+installed qualification remain open; no gate checkbox changes.
+
+[PR103](https://github.com/rrflow/rrflow-development/pull/103) composes the
+existing task budget through six catalogue-owned operations: explicit bundled
+reference-adapter activation, immutable narrowed configuration, bounded task
+execution, budget inspection, digest-checked durable Stop and retained-result
+readback. The [package journal](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md)
+owns validation. This advances sequence rows 3/5 without closing either row,
+Gate G, C-07 or H-06. The remaining work follows these existing boundaries:
+
+1. G-01/G-02/G-05: qualify the separate router capability and compose route,
+   context and fallback dispatch through the same durable task allowance.
+   Charge each admitted attempt; preserve uncertain effects and validate
+   source/configuration identity before accepting decisions. First oracle:
+   repeated context/fallback requests exhaust one budget across restart.
+2. G-03/D-06: bound semantic no-progress tracking by the attempt cap; resolve
+   configured presets and explicit limits at admission. New correlation IDs
+   cannot bypass repetition. Authorized new evidence can permit useful work
+   within the original remainder. Token/cost limits require measured adapter
+   accounting; unsupported accounting must remain unavailable.
+3. H-06: update the pinned Connectome engine/SDK pair and installation-plan
+   adapter together, then add controls beneath the existing task detail route.
+   Preview effective limits; show attempts, retained outputs and uncertainty;
+   Stop uses the observed digest. No browser-owned budget or duplicate run
+   lifecycle. Prove reload/reconnect and stale Stop through the public API.
+4. G-06 and the existing C-07 owner: run the installed real-adapter flow with
+   process interruption, resource admission, capacity and sustained-load
+   evidence. Reopen/component tests cannot substitute for these campaigns.
+
+These are bounded implementation packages in the existing dependency sequence,
+not permission to skip installed durability or promote a complete alpha.
+
 ## Controller learning packages
 
 The [learning contract](../../reference/inference/learning/controller-training.md)
