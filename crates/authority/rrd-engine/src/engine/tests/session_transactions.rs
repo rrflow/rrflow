@@ -1,5 +1,117 @@
 use super::*;
 
+#[test]
+fn inline_session_retention_persists_a_reader_fence_and_rejects_unknown_formats() {
+    let (root, engine) = isolated_engine();
+    let session = engine
+        .create_session(
+            &session_request(9_000, 1),
+            &id("fence"),
+            1_000,
+            "fence",
+            "fence",
+        )
+        .unwrap();
+    let key = format!(
+        "server/state/{}/session/{}",
+        instance(),
+        session.session_id.as_str()
+    );
+    let before = engine.storage.control().get(&key).unwrap().unwrap();
+    let mut inline: Value = serde_json::from_slice(&before).unwrap();
+    // The pre-retention encoding has all records inline and no terminal marker.
+    inline
+        .as_object_mut()
+        .unwrap()
+        .remove("terminal_transaction_format");
+    engine
+        .storage
+        .control()
+        .commit(&ControlTransition {
+            key: key.clone(),
+            expected: Some(before),
+            replacement: Some(serde_json::to_vec(&inline).unwrap()),
+            at: 1_050,
+            actor: "test".into(),
+            action: "test.inline".into(),
+            request_id: "fence".into(),
+            operation_id: "fence".into(),
+        })
+        .unwrap();
+    let context = mutation_context(&id("fence-begin"), "fence", "fence");
+    let transaction = engine
+        .begin_transaction(
+            &session.session_id,
+            &session.token,
+            &begin_request(),
+            &context,
+            1_100,
+        )
+        .unwrap();
+    let request = commit_request("fenced");
+    let first = engine
+        .commit_transaction(
+            &session.session_id,
+            &session.token,
+            &transaction.transaction_id,
+            &id("fence-commit"),
+            &request,
+            1_200,
+            "fence",
+            "fence",
+        )
+        .unwrap();
+    let retained = engine.storage.control().get(&key).unwrap().unwrap();
+    let mut state: Value = serde_json::from_slice(&retained).unwrap();
+    assert_eq!(state["terminal_transaction_format"], 1);
+    assert!(state["transactions"].as_object().unwrap().is_empty());
+    drop(engine);
+    let engine = RrdEngine::open(root.path(), instance(), TOKEN_KEY).unwrap();
+    let mut replay = engine
+        .commit_transaction(
+            &session.session_id,
+            &session.token,
+            &transaction.transaction_id,
+            &id("fence-commit"),
+            &request,
+            1_300,
+            "fence",
+            "fence",
+        )
+        .unwrap();
+    assert!(replay.idempotent_replay);
+    replay.idempotent_replay = false;
+    assert_eq!(replay, first);
+    state["terminal_transaction_format"] = 99.into();
+    engine
+        .storage
+        .control()
+        .commit(&ControlTransition {
+            key,
+            expected: Some(retained),
+            replacement: Some(serde_json::to_vec(&state).unwrap()),
+            at: 1_400,
+            actor: "test".into(),
+            action: "test.future-format".into(),
+            request_id: "fence".into(),
+            operation_id: "fence".into(),
+        })
+        .unwrap();
+    let sequence = engine.storage.control().sequence().unwrap();
+    assert!(matches!(
+        engine.begin_transaction(
+            &session.session_id,
+            &session.token,
+            &begin_request(),
+            &context,
+            1_500
+        ),
+        Err(ServiceError::Contract(_))
+    ));
+    assert_eq!(engine.storage.control().sequence().unwrap(), sequence);
+    assert_eq!(engine.storage.runtime().cursor().unwrap(), 1);
+}
+
 fn bounded_history(engine: &RrdEngine, count: usize) -> rrd_contract::SessionLease {
     let session = engine
         .create_session(

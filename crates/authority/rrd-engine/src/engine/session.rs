@@ -165,6 +165,7 @@ impl RrdEngine {
         };
         let state = SessionState {
             format_version: SESSION_STATE_FORMAT,
+            terminal_transaction_format: session_transactions::terminal_transaction_format(),
             session_id: session_id.clone(),
             principal_id,
             principal_credential_revision,
@@ -633,6 +634,11 @@ pub(in crate::engine) fn decode_session(bytes: &[u8]) -> Result<SessionState> {
             "unsupported session-state format {}; expected {SESSION_STATE_FORMAT}",
             state.format_version
         )));
+    }
+    if state.terminal_transaction_format != session_transactions::terminal_transaction_format() {
+        return Err(ServiceError::Contract(
+            "unsupported session terminal-transaction format".into(),
+        ));
     }
     Ok(state)
 }

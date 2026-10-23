@@ -11,7 +11,23 @@ reproduced 52280 bytes of hot session state after 32 completed transactions on
 both rrflowMX and rrflowKV. Historical transaction accumulation could exhaust
 the one-MiB control value limit. Bounded atomic terminal-record placement now
 preserves replay without retaining the full history in each session update.
-Installed comparison and complete C-07 qualification remain open.
+Complete C-07 qualification remains open; the bounded comparison follows.
+
+The subsequent [Linux23 installed comparison](../../evidence/change-journals/gate-c/c-07g-session-retention-native.md)
+completed the unchanged 1000-record characterization: 22 segments, complete
+readback, two reopens, reader interference, backup under writes, burst, drain
+and a two-minute soak, with no failed/unresolved operations or latency-budget
+violations. Backup creation and verification took 5.179 seconds within the
+unchanged 30-second deadline. This resolves that short operating point only;
+full profiles, three seeds, native acceptance and 24-hour qualification remain
+open. No alpha or gate completion follows.
+
+The [session reader fence](../../evidence/change-journals/gate-c/c-07g-session-retention-fence.md)
+also persists a terminal-record format marker so an earlier strict session
+reader rejects state whose retained receipts it cannot discover. The current
+decoder accepts existing inline state and rejects unknown marker versions;
+its focused replay/format and owning engine suites pass. Final-candidate
+native evidence remains separately required.
 
 Linux21 again stopped at corpus ordinal 608 after 609 acknowledgements,
 now classified as a storage-substrate error. The

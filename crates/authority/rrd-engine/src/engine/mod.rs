@@ -171,6 +171,11 @@ const MAX_SESSION_RENEWALS: usize = 64;
 #[serde(deny_unknown_fields)]
 struct SessionState {
     format_version: u16,
+    // Earlier strict session readers must reject state whose terminal records
+    // they cannot discover. Absence denotes the existing inline working set;
+    // every new transition serializes the current marker atomically with it.
+    #[serde(default = "session_transactions::terminal_transaction_format")]
+    terminal_transaction_format: u16,
     session_id: CorrelationId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     principal_id: Option<CanonicalId>,

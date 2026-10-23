@@ -5,6 +5,10 @@ use super::*;
 
 const TERMINAL_TRANSACTION_FORMAT: u16 = 1;
 
+pub(super) const fn terminal_transaction_format() -> u16 {
+    TERMINAL_TRANSACTION_FORMAT
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TerminalTransaction {
