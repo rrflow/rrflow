@@ -78,6 +78,9 @@ fn error(value: impl std::fmt::Display) -> String {
 // never used to infer effects or retryability. Return constants, not message
 // slices: even an arbitrary server body can disclose only an allowlisted label.
 fn engine_error_label(message: &str) -> Option<&'static str> {
+    if message == "Storage(\"substrate: control state exceeds one MiB\")" {
+        return Some("control-state-size");
+    }
     // Read pressure can occur after publication, so the engine intentionally
     // keeps Storage's Internal classification. This label is diagnostic only;
     // the existing abort/readback evidence still determines durable outcome.
@@ -278,6 +281,32 @@ fn diagnostic_labels_attribute_read_pressure_without_changing_internal_semantics
     assert_eq!(
         engine_error_label("Storage(\"private secret\")"),
         Some("storage")
+    );
+}
+
+#[test]
+fn diagnostic_labels_identify_control_state_capacity_from_the_real_validator() {
+    let error = rrd_store::ControlTransition {
+        key: "server/state/test/capacity".into(),
+        expected: None,
+        replacement: Some(vec![0; 1024 * 1024 + 1]),
+        at: 1,
+        actor: "test".into(),
+        action: "test".into(),
+        request_id: "test".into(),
+        operation_id: "test".into(),
+    }
+    .validate()
+    .unwrap_err();
+    let error = rrd_engine::ServiceError::from(error);
+    assert_eq!(error.kind(), rrd_engine::ServiceErrorKind::Internal);
+    assert_eq!(
+        engine_error_label(&error.to_string()),
+        Some("control-state-size")
+    );
+    assert_eq!(
+        engine_error_label("Storage(\"substrate: control state exceeds one MiB private\")"),
+        Some("storage-substrate")
     );
 }
 

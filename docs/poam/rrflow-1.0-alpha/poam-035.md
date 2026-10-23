@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+Linux21 again stopped at corpus ordinal 608 after 609 acknowledgements,
+now classified as a storage-substrate error. The
+[control-size attribution record](../../evidence/change-journals/gate-c/c-07g-control-size-attribution.md)
+adds a closed diagnostic for the one-MiB control-state limit. Historical
+transaction growth in the session is a source-grounded hypothesis until the
+native campaign confirms that exact label; no capacity qualification follows.
+
 At `b6052feef8df2aa86e5a866ff0c8da196bc8f2ab`, accepted C-06 supplies the
 physical reader/format/cache and D-01 supplies native installed lifecycle
 evidence. The [C-07 planning baseline](../../evidence/change-journals/gate-c/c-07-planning-baseline.md)
