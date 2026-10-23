@@ -419,3 +419,78 @@ acceptance: its macOS offline lifecycle deadline failed and later source
 changes require new CI. No local disk-exhaustion workload ran, no 24-hour
 campaign ran, and no capacity-profile or roadmap completion status changed.
 The evidence export initially used Windows CRLF; the whitespace check exposed it. Normalized the JSON to LF without changing parsed receipts, then repeated the check.
+
+## Native recovery-reserve admission
+
+Continued from `5cc37849`; PR 71's disk-admission refinement was posted before
+implementation. Added positive, sealed StorageLimits.recovery_reserve_bytes
+(default 16 MiB, protocol ceiling 1 TiB), lowered into native DatabaseOptions
+on create and reopen. AnchoredPath carries this policy through retained root
+handles and directory rebinding. The native space helper queries POSIX
+fstatvfs or Windows FileFsFullSizeInformation on those handles, without
+resolving diagnostic names. Windows observes caller quota availability;
+POSIX reports nonprivileged available blocks, which does not guarantee quota
+admission. Unknown units, incomplete native replies and arithmetic overflow
+fail explicitly.
+
+WAL header/append/initial preallocation, encoded segment publication/import,
+and manifest/CURRENT/checkpoint temporary publication check rounded proposed
+bytes plus a conservative allocation-unit metadata allowance and the reserve.
+Already-written immutable outputs remain charged by actual free-space
+observation. Typed DiskAdmission is a pre-effect refusal, preserved through
+store conversion and engine admission/absent-outcome classification; it does
+not poison the WAL or manifest publication. Actual write/sync/rename errors
+retain existing uncertainty and fencing. Real ENOSPC diagnostic barriers
+remain after admission, so an external capacity change still exercises native
+failure handling. This does not reserve physical blocks, guarantee metadata
+or inode capacity, bound all estate disk usage, or admit external backup
+archive/staging effects. Read-only open/inspection do not require free space
+simply to observe existing acknowledged data.
+
+Read/reviewed: new filesystem/space.rs in full; AnchoredPath root creation,
+rebinding and effect methods; native handle validation; DatabaseOptions,
+create/open, prepare-write, flush/compaction publication; WalWriter creation,
+reopen, append and initial preallocation; segment encoding/import publication;
+manifest publication/fencing; native/store error conversion; engine storage
+lowering, transaction rejection/intent handling and service classification;
+StorageLimits validation/defaults, installation template and TOML fixtures;
+storage manifest validation; existing installation/storage projection examples,
+SDK generators and reference identity checks. No upstream engine source was
+adapted, no dependency or format lane was added, and no implementation moved.
+
+Primary native API references reviewed 2026-10-23:
+[fstatvfs](https://www.man7.org/linux/man-pages/man3/statvfs.3.html),
+[NtQueryVolumeInformationFile](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntqueryvolumeinformationfile),
+and [FILE_FS_FULL_SIZE_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/ns-ntddk-_file_fs_full_size_information).
+They support handle-based observations and platform field semantics; they do
+not establish crash durability or transfer third-party benchmark results.
+
+Regression definitions cover allocation rounding/metadata/reserve overflow,
+real handle observations without disk filling, WAL/flush/compaction refusal
+with prior-ACK readback and later valid work, positive/bounded sealed policy,
+engine lowering/error classification and declared-versus-installed reserve
+mismatch. The existing projection generator now refreshes the public default
+configuration fixture as well as installation fixtures. All five SDK and
+signal/reference projections were regenerated; the final OpenAPI identity is
+`64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377`.
+No runtime suite or local disk effect was executed.
+
+Surfaced authoring failures: an incorrectly quoted Python command did not
+execute and made no source change; replaced it with structured patches and a
+literal here-string. Strict Clippy rejected a field reassignment after Default;
+used the existing initializer pattern. The worktree lacked TypeScript tools;
+global pnpm 10 rejected the pnpm 12 lockfile. The declared pnpm 12.14.0 installed
+44 locked packages from cache, with zero downloads, without changing the
+lockfile; generation succeeded. Local Node is 24.21.0, below the package's
+24.22.0 requirement, so no SDK runtime qualification is claimed. Generated
+surface checks exposed stale authored digest citations; updated only current
+contract/SDK references, preserving historical evidence. Final parity passed
+for 42 operations and seven signal projections on this dependency branch.
+Full candidate CI remains required; C-07f/g, Gate C, OBJ-02 and POAM-035 remain
+open, including installed damage, reader interference, fleet/profile and
+24-hour qualification. Reviewed changed source and projection diffs.
+Final `cargo fmt --all` and strict Clippy across rrd-lsm, rrd-store,
+rrd-engine, rrd-contract, rrflow-eval and rrflow-cli all targets passed (8.41s).
+Default installation/public fixture and synthetic storage projection generation
+passed; no engine workload was invoked by these generators. Whitespace and
+generated-surface checks passed before staging.

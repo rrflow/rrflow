@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: ad757ac1ddfe818f0b0b32bb06ec4f5d7f24171762decad07df7b33abc708bae
+// OpenAPI SHA-256: 64a5c9081928a5708a2f16b4ad08a285fe64c2473473edf13f1ea06fe8889377
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3367,6 +3367,12 @@ export interface operations {
                                         recovery_metadata_bytes: number;
                                         /** Format: uint64 */
                                         recovery_read_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Bytes to keep available beyond each native WAL/immutable allocation.
+                                         *     Requires restart; racy admission cannot replace actual I/O error handling.
+                                         */
+                                        recovery_reserve_bytes: number;
                                         /** Format: uint64 */
                                         recovery_wal_bytes: number;
                                         /** Format: uint64 */
@@ -3634,6 +3640,12 @@ export interface operations {
                                         recovery_metadata_bytes: number;
                                         /** Format: uint64 */
                                         recovery_read_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Bytes to keep available beyond each native WAL/immutable allocation.
+                                         *     Requires restart; racy admission cannot replace actual I/O error handling.
+                                         */
+                                        recovery_reserve_bytes: number;
                                         /** Format: uint64 */
                                         recovery_wal_bytes: number;
                                         /** Format: uint64 */

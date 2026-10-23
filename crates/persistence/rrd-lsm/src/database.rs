@@ -98,6 +98,9 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Available native bytes retained beyond each proposed WAL/immutable
+    /// allocation. This is admission, not reserved disk space or a total quota.
+    pub recovery_reserve_bytes: u64,
     /// Output allocation cap shared by projected streams of this open instance.
     pub projected_output_bytes: usize,
     pub page_cache_bytes: usize,
@@ -118,6 +121,7 @@ impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
+            recovery_reserve_bytes: 16 * 1024 * 1024,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
             page_cache_policy: PageCachePolicy::default(),
             segment_io: SegmentIoPolicy::default(),
@@ -136,9 +140,9 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     pub(crate) fn validate(self) -> Result<Self> {
-        if self.projected_output_bytes == 0 {
+        if self.projected_output_bytes == 0 || self.recovery_reserve_bytes == 0 {
             return Err(Error::InvalidConfiguration(
-                "projected output byte capacity must be greater than zero".into(),
+                "projected output capacity and recovery reserve must be positive".into(),
             ));
         }
         self.page_cache_policy
@@ -427,6 +431,7 @@ impl Database {
             Err(error) => return Err(error.into()),
         }
         let root = root.pin_directory()?;
+        let root = root.with_recovery_reserve(options.recovery_reserve_bytes)?;
         let manifests = ManifestStore::create_anchored(&root)?;
         root.join(WAL_DIRECTORY).create_dir()?;
         root.join(SEGMENT_DIRECTORY).create_dir()?;
@@ -489,6 +494,7 @@ impl Database {
         let total_started = Instant::now();
         validate_existing_database_layout(&root)?;
         let options = options.validate()?;
+        let root = root.with_recovery_reserve(options.recovery_reserve_bytes)?;
         let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();

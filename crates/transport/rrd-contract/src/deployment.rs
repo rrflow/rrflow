@@ -230,6 +230,9 @@ impl RecallLimits {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StorageLimits {
+    /// Bytes to keep available beyond each native WAL/immutable allocation.
+    /// Requires restart; racy admission cannot replace actual I/O error handling.
+    pub recovery_reserve_bytes: u64,
     pub mutable_accounted_bytes: u64,
     pub mutable_versions: u64,
     pub projected_output_bytes: u64,
@@ -265,6 +268,7 @@ impl Default for StorageLimits {
     fn default() -> Self {
         Self {
             mutable_accounted_bytes: 128 * 1024 * 1024,
+            recovery_reserve_bytes: 16 * 1024 * 1024,
             mutable_versions: 1_048_576,
             projected_output_bytes: 128 * 1024 * 1024,
             page_cache_bytes: 4 * 1024 * 1024,
@@ -304,6 +308,10 @@ impl StorageLimits {
         const MAX_BYTES: u64 = 1 << 40;
         const MAX_VERSIONS: u64 = 1 << 32;
         for (name, value) in [
+            (
+                "storage recovery_reserve_bytes",
+                self.recovery_reserve_bytes,
+            ),
             (
                 "storage mutable_accounted_bytes",
                 self.mutable_accounted_bytes,

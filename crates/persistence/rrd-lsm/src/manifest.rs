@@ -572,7 +572,7 @@ impl ManifestStore {
     }
 
     fn publication_result<T>(&self, result: Result<T>) -> Result<T> {
-        if result.is_err() {
+        if result.is_err() && !matches!(&result, Err(Error::DiskAdmission { .. })) {
             // A failed rename or directory barrier may already have selected a
             // different root. No dependent effect may use the old in-memory root.
             self.publication_uncertain.store(true, Ordering::Release);
@@ -867,5 +867,6 @@ fn persist_rename(
     target: &AnchoredPath,
     bytes: &[u8],
 ) -> Result<()> {
+    temporary.admit_disk(bytes.len() as u64, true)?;
     crate::filesystem::persist_rename(temporary, target, bytes).map_err(Error::Io)
 }

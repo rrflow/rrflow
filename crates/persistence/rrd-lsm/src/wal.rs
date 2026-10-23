@@ -90,6 +90,7 @@ pub(crate) struct RecoverySummary {
 }
 
 pub struct WalWriter {
+    recovery_reserve_bytes: u64,
     path: PathBuf,
     file: File,
     offset: u64,
@@ -112,6 +113,7 @@ impl WalWriter {
                 "WAL starting sequence must be non-zero".into(),
             ));
         }
+        path.admit_disk(FILE_HEADER_BYTES as u64, true)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -124,6 +126,7 @@ impl WalWriter {
             .sync_directory()?;
         Ok(Self {
             path: path.diagnostic_path().to_owned(),
+            recovery_reserve_bytes: path.recovery_reserve(),
             file,
             offset: FILE_HEADER_BYTES as u64,
             next_sequence,
@@ -176,6 +179,7 @@ impl WalWriter {
         file.seek(SeekFrom::Start(recovery.valid_bytes))?;
         Ok(Self {
             path: path.diagnostic_path().to_owned(),
+            recovery_reserve_bytes: path.recovery_reserve(),
             file,
             offset: recovery.valid_bytes,
             next_sequence: recovery
@@ -231,6 +235,22 @@ impl WalWriter {
                 .expect("phase recorder checked")
                 .record_prepare = started.finish();
         }
+        let allocation = end_offset - offset;
+        #[cfg(target_os = "linux")]
+        let allocation = if offset == FILE_HEADER_BYTES as u64
+            && batch.first_sequence == 1
+            && batch.payload.len() >= INITIAL_WAL_RESERVATION_MIN_BATCH_BYTES
+        {
+            allocation.max(INITIAL_WAL_RESERVATION_BYTES)
+        } else {
+            allocation
+        };
+        crate::filesystem::space::admit(
+            &self.file,
+            self.recovery_reserve_bytes,
+            allocation,
+            false,
+        )?;
         if offset == FILE_HEADER_BYTES as u64
             && batch.first_sequence == 1
             && batch.payload.len() >= INITIAL_WAL_RESERVATION_MIN_BATCH_BYTES

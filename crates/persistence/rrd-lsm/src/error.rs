@@ -6,6 +6,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    DiskAdmission {
+        available: u64,
+        required: u64,
+        reserve: u64,
+    },
     Io(std::io::Error),
     IoContext {
         operation: &'static str,
@@ -118,6 +123,7 @@ impl fmt::Display for Error {
             Self::RecoveryLimit { resource, limit, observed } => write!(formatter, "recovery {} limit {limit} would be exceeded by {observed}; reopen with explicitly configured capacity", resource.as_str()),
             Self::ReclamationPending => write!(formatter, "bounded reclamation has remaining work; retry before admitting another write"),
             Self::ReclamationLimit { resource, limit, observed } => write!(formatter, "reclamation {} limit {limit} would be exceeded by {observed}", resource.as_str()),
+            Self::DiskAdmission { available, required, reserve } => write!(formatter, "disk admission requires {required} bytes including {reserve} recovery reserve; observed {available}"),
             Self::MaintenanceLimit { resource, limit, observed } => write!(formatter, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::MutableLimit { resource, limit, observed } => write!(formatter, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::InvalidConfiguration(reason) => {

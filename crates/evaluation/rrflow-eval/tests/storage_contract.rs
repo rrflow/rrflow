@@ -222,6 +222,7 @@ fn rejects_budget_overflow_cross_field_conflicts_and_false_effective_policy() {
         ("decoded_bytes", 1),
         ("mutable_versions", 524288),
         ("recovery_ms", 60001),
+        ("recovery_reserve_bytes", 16777217),
         ("run_ms", MAX_EXACT_INTEGER),
         ("attempts", 10001),
     ] {
