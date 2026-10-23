@@ -194,6 +194,49 @@
         }
       ]
     },
+    "BackupCoverageSnapshot": {
+      "enum": [
+        "included",
+        "referenced_only",
+        "rebuild_required",
+        "excluded"
+      ],
+      "type": "string"
+    },
+    "BackupEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt": {
+          "$ref": "#/$defs/CreateInstanceBackupResult"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verification_catalogue_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "verified_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_ns",
+        "finished_ns",
+        "verified_ns",
+        "receipt",
+        "verification_catalogue_sha256"
+      ],
+      "type": "object"
+    },
     "Budgets": {
       "additionalProperties": false,
       "description": "Proposed, frozen laboratory ceilings. They are NOT installed configuration.\nByte reservations are disjoint; recovery replay bytes differ from memory.",
@@ -501,6 +544,32 @@
         "input_sha256",
         "acknowledgement_sha256",
         "readback_sha256"
+      ],
+      "type": "object"
+    },
+    "CreateInstanceBackupResult": {
+      "additionalProperties": false,
+      "properties": {
+        "backup": {
+          "$ref": "#/$defs/InstanceBackupSnapshot"
+        },
+        "catalogue_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "catalogue_sha256": {
+          "type": "string"
+        },
+        "idempotent_replay": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "backup",
+        "catalogue_revision",
+        "catalogue_sha256",
+        "idempotent_replay"
       ],
       "type": "object"
     },
@@ -1264,6 +1333,69 @@
       "pattern": "^[a-z0-9][a-z0-9_.-]*$",
       "type": "string"
     },
+    "InstanceBackupSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "application_complete": {
+          "type": "boolean"
+        },
+        "archive": {
+          "$ref": "#/$defs/LogicalArchiveSnapshot"
+        },
+        "backup_sha256": {
+          "type": "string"
+        },
+        "catalogues": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "claims": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "created_at_unix_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "installed_control": {
+          "$ref": "#/$defs/BackupCoverageSnapshot",
+          "description": "The estate's control state outside the catalogues: installed record\nand checkpoint, active configuration, security policy and audit chain,\nattunement plan and job state, and estate documents. `included` means\nthe backup carries them as a replayable control-journal archive; the\ntoken key and operator credential are never carried."
+        },
+        "invocation_telemetry": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "label": {
+          "type": "string"
+        },
+        "object_payloads": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "projections": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "snapshot_leases": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "typed_runtime": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        }
+      },
+      "required": [
+        "backup_sha256",
+        "label",
+        "created_at_unix_ms",
+        "archive",
+        "claims",
+        "typed_runtime",
+        "catalogues",
+        "installed_control",
+        "object_payloads",
+        "projections",
+        "invocation_telemetry",
+        "snapshot_leases",
+        "application_complete"
+      ],
+      "type": "object"
+    },
     "LaneEvidence": {
       "additionalProperties": false,
       "properties": {
@@ -1365,6 +1497,80 @@
         "soak"
       ],
       "type": "string"
+    },
+    "LogicalArchiveSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "action_count": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "archive_sha256": {
+          "type": "string"
+        },
+        "claim_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "contract_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime_audit_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runtime_commits": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime_cursor": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime_mutations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "standalone_claims": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "format_version",
+        "contract_version",
+        "archive_sha256",
+        "action_count",
+        "standalone_claims",
+        "runtime_commits",
+        "runtime_mutations",
+        "payload_bytes",
+        "claim_sequence",
+        "runtime_cursor"
+      ],
+      "type": "object"
     },
     "NativeMetric": {
       "oneOf": [
@@ -1597,6 +1803,111 @@
         "max_items",
         "max_output_bytes",
         "max_storage_keys"
+      ],
+      "type": "object"
+    },
+    "ReopenEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "corpus_readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "corpus_records_verified": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cycles": {
+          "items": {
+            "$ref": "#/$defs/ReopenObservation"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "type": "array"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_ns",
+        "finished_ns",
+        "corpus_records_verified",
+        "corpus_readback_sha256",
+        "cycles"
+      ],
+      "type": "object"
+    },
+    "ReopenObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_operations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cycle": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "killed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "killed_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "original_receipts_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "ready_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reopened_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "replay_receipts_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "cycle",
+        "killed_pid",
+        "reopened_pid",
+        "killed_ns",
+        "ready_ns",
+        "finished_ns",
+        "checked_operations",
+        "expected_sha256",
+        "original_receipts_sha256",
+        "replay_receipts_sha256",
+        "readback_sha256"
       ],
       "type": "object"
     },
@@ -2010,6 +2321,16 @@
       "maxItems": 10000,
       "type": "array"
     },
+    "backup": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BackupEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "campaign_sha256": {
       "$ref": "#/$defs/Digest"
     },
@@ -2060,6 +2381,16 @@
       "anyOf": [
         {
           "$ref": "#/$defs/Digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reopens": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReopenEvidence"
         },
         {
           "type": "null"

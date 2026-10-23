@@ -116,7 +116,7 @@ def main():
     harness = paths.pop()
     require(f"{CASE}: test" in run(str(harness), "--list").stdout.splitlines(), "installed sustained entry missing")
     schedule = campaign["schedule"]
-    duration = sum(schedule[name] for name in ["setup_ms", "warmup_ms", "measured_ms", "burst_ms", "drain_ms", "soak_ms"])
+    duration = sum(schedule[name] for name in ["setup_ms", "lifecycle_ms", "warmup_ms", "measured_ms", "burst_ms", "drain_ms", "soak_ms"])
     timeout = (duration // 1000 + 600) * len(campaign["points"]) * len(campaign["seeds"])
     require(0 < timeout <= 31 * 86400, "campaign exceeds explicit one-month run bound")
     allocation = campaign["allocation"]

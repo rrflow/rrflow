@@ -95,6 +95,8 @@ pub struct OperatingPoint {
 pub struct SustainedSchedule {
     /// Separate finite admission for corpus ingestion and full independent readback.
     pub setup_ms: Limit,
+    /// Installed kill/reopen and interference preparation, outside offered load.
+    pub lifecycle_ms: Limit,
     pub warmup_ms: Limit,
     pub measured_ms: Limit,
     pub burst_ms: Limit,
@@ -219,6 +221,11 @@ impl StorageCampaign {
         require(
             self.schedule.setup_ms.get() <= 7 * 86_400_000,
             "corpus setup exceeds the seven-day admission ceiling",
+        )?;
+        require(
+            self.schedule.lifecycle_ms.get() <= 1_800_000
+                && self.schedule.forced_reopens.get() <= 1000,
+            "installed lifecycle preparation exceeds bounded admission",
         )?;
         require(
             self.schedule.operation_deadline_ms.get() <= self.storage.budgets.run_ms.get(),
@@ -405,6 +412,74 @@ impl CorpusEvidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct ReopenObservation {
+    pub cycle: u64,
+    pub killed_pid: u32,
+    pub reopened_pid: u32,
+    pub killed_ns: u64,
+    pub ready_ns: u64,
+    pub finished_ns: u64,
+    pub checked_operations: u64,
+    pub expected_sha256: Digest,
+    pub original_receipts_sha256: Digest,
+    pub replay_receipts_sha256: Digest,
+    pub readback_sha256: Digest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReopenEvidence {
+    pub started_ns: u64,
+    pub finished_ns: u64,
+    pub corpus_records_verified: u64,
+    pub corpus_readback_sha256: Digest,
+    #[schemars(length(min = 1, max = 1000))]
+    pub cycles: Vec<ReopenObservation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BackupEvidence {
+    pub started_ns: u64,
+    pub finished_ns: u64,
+    pub verified_ns: u64,
+    pub receipt: rrd_contract::CreateInstanceBackupResult,
+    pub verification_catalogue_sha256: Digest,
+}
+
+impl ReopenEvidence {
+    fn validate(&self, campaign: &StorageCampaign, before_ns: u64) -> Result<()> {
+        require(
+            self.started_ns <= self.finished_ns
+                && self.finished_ns <= before_ns
+                && self.finished_ns - self.started_ns
+                    <= campaign.schedule.lifecycle_ms.get() * NANOSECONDS_PER_MS
+                && self.corpus_records_verified == campaign.allocation.records.get()
+                && self.cycles.len() as u64 == campaign.schedule.forced_reopens.get(),
+            "reopen corpus count or lifecycle deadline differs",
+        )?;
+        let mut prior = self.started_ns;
+        for (index, cycle) in self.cycles.iter().enumerate() {
+            require(
+                cycle.cycle == index as u64
+                    && cycle.checked_operations == index as u64 + 1
+                    && cycle.killed_pid > 0
+                    && cycle.reopened_pid > 0
+                    && cycle.killed_ns >= prior
+                    && cycle.killed_ns <= cycle.ready_ns
+                    && cycle.ready_ns <= cycle.finished_ns
+                    && cycle.finished_ns <= self.finished_ns
+                    && cycle.original_receipts_sha256 == cycle.replay_receipts_sha256,
+                "reopen omitted a prior ACK, changed receipts or reordered native events",
+            )?;
+            prior = cycle.finished_ns;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SustainedSegment {
     pub format_version: u16,
     pub campaign_sha256: Digest,
@@ -416,6 +491,8 @@ pub struct SustainedSegment {
     pub started_ns: u64,
     pub finished_ns: u64,
     pub corpus: Option<CorpusEvidence>,
+    pub reopens: Option<ReopenEvidence>,
+    pub backup: Option<BackupEvidence>,
     /// Frozen before this segment's operations; full candidate/environment and
     /// installed configuration must equal the campaign's template identities.
     pub manifest: StorageManifest,
@@ -727,6 +804,69 @@ pub fn validate_segment(
             "corpus receipt must precede the first warmup segment",
         )?;
         corpus.validate(campaign, segment.started_ns)?;
+    }
+    if let Some(reopens) = &segment.reopens {
+        require(
+            segment.phase == LoadPhase::Warmup && summary.first_sequence == 0,
+            "reopen receipt must precede first warmup segment",
+        )?;
+        reopens.validate(campaign, segment.started_ns)?;
+        require(
+            segment.lanes.iter().any(|lane| {
+                lane.lane == CapacityLane::ForcedReopens
+                    && lane.repetitions.get() == reopens.cycles.len() as u64
+                    && digest("c07g.reopen-evidence", reopens).as_ref() == Ok(&lane.receipt_sha256)
+            }),
+            "reopen lane does not bind its raw observations",
+        )?;
+    } else {
+        require(
+            !segment
+                .lanes
+                .iter()
+                .any(|lane| lane.lane == CapacityLane::ForcedReopens),
+            "reopen lane omitted its raw observations",
+        )?;
+    }
+    if let Some(backup) = &segment.backup {
+        require(
+            backup.started_ns >= segment.started_ns
+                && backup.started_ns <= backup.finished_ns
+                && backup.finished_ns <= backup.verified_ns
+                && backup.verified_ns <= segment.finished_ns
+                && backup.receipt.backup.application_complete
+                && segment.attempts.iter().any(|attempt| {
+                    attempt.kind == StorageLoadKind::MixedWrite
+                        && attempt.outcome == LoadOutcome::Acknowledged
+                        && attempt.started_ns < backup.finished_ns
+                        && attempt.finished_ns > backup.started_ns
+                })
+                && segment.lanes.iter().any(|lane| {
+                    lane.lane == CapacityLane::BackupUnderWrite
+                        && lane.repetitions.get() == 1
+                        && digest("c07g.backup-evidence", backup).as_ref()
+                            == Ok(&lane.receipt_sha256)
+                }),
+            "backup lane lacks a complete archive, overlapping ACK or matching raw receipt",
+        )?;
+    } else {
+        require(
+            !segment
+                .lanes
+                .iter()
+                .any(|lane| lane.lane == CapacityLane::BackupUnderWrite),
+            "backup lane omitted its raw receipt",
+        )?;
+    }
+    for lane in &segment.lanes {
+        if lane.lane == CapacityLane::Warm {
+            require(
+                segment.phase == LoadPhase::Measured
+                    && summary.first_sequence == 0
+                    && digest("c07g.warm-readback", &segment.result)? == lane.receipt_sha256,
+                "warm lane lacks the first measured independent ledger",
+            )?;
+        }
     }
     let mut last = None;
     let rate = point.requests_per_second.get()
@@ -1231,6 +1371,7 @@ mod tests {
             },
             schedule: SustainedSchedule {
                 setup_ms: limit(1000),
+                lifecycle_ms: limit(1000),
                 warmup_ms: limit(1000),
                 measured_ms: limit(1000),
                 burst_ms: limit(1000),
@@ -1290,6 +1431,8 @@ mod tests {
             started_ns: 0,
             finished_ns: 1_000_000_000,
             corpus: None,
+            reopens: None,
+            backup: None,
             manifest,
             result,
             attempts: vec![LoadAttempt {
@@ -1478,5 +1621,36 @@ mod tests {
         corpus.finished_ns = 0;
         corpus.edges = 0;
         assert!(corpus.validate(&campaign, 1_000_000_000).is_err());
+    }
+
+    #[test]
+    fn reopen_receipt_denies_missing_ack_and_changed_replay() {
+        let (campaign, _) = fixture();
+        let hash = digest("fixture", &1).unwrap();
+        let mut proof = ReopenEvidence {
+            started_ns: 0,
+            finished_ns: 1000,
+            corpus_records_verified: 1,
+            corpus_readback_sha256: hash.clone(),
+            cycles: vec![ReopenObservation {
+                cycle: 0,
+                killed_pid: 1,
+                reopened_pid: 2,
+                killed_ns: 100,
+                ready_ns: 200,
+                finished_ns: 300,
+                checked_operations: 1,
+                expected_sha256: hash.clone(),
+                original_receipts_sha256: hash.clone(),
+                replay_receipts_sha256: hash.clone(),
+                readback_sha256: hash,
+            }],
+        };
+        assert!(proof.validate(&campaign, 1000).is_ok());
+        proof.cycles[0].checked_operations = 0;
+        assert!(proof.validate(&campaign, 1000).is_err());
+        proof.cycles[0].checked_operations = 1;
+        proof.cycles[0].replay_receipts_sha256 = digest("different", &1).unwrap();
+        assert!(proof.validate(&campaign, 1000).is_err());
     }
 }

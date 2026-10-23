@@ -1420,6 +1420,10 @@
         "forced_reopens": {
           "$ref": "#/$defs/Limit"
         },
+        "lifecycle_ms": {
+          "$ref": "#/$defs/Limit",
+          "description": "Installed kill/reopen and interference preparation, outside offered load."
+        },
         "measured_ms": {
           "$ref": "#/$defs/Limit"
         },
@@ -1442,6 +1446,7 @@
       },
       "required": [
         "setup_ms",
+        "lifecycle_ms",
         "warmup_ms",
         "measured_ms",
         "burst_ms",

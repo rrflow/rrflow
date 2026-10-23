@@ -12,6 +12,8 @@ use std::{
 use tokio::task::JoinSet;
 #[path = "sustained/corpus.rs"]
 mod corpus;
+#[path = "sustained/lifecycle.rs"]
+mod lifecycle;
 #[path = "sustained/native.rs"]
 mod native;
 #[path = "sustained/workload.rs"]
@@ -305,6 +307,8 @@ impl PointRun<'_> {
             started_ns: started,
             finished_ns: ns(self.clock),
             corpus: None,
+            reopens: None,
+            backup: None,
             manifest,
             result,
             attempts: vec![],
@@ -364,6 +368,7 @@ impl PointRun<'_> {
         let mut resources = vec![sample(&self.workload, self.pid, self.clock).await?];
         let mut attempts = Vec::new();
         let mut joins = JoinSet::new();
+        let mut backup = JoinSet::new();
         let deadline = Duration::from_millis(campaign.schedule.operation_deadline_ms.get());
         let mut next_sample =
             tokio::time::Instant::now() + Duration::from_millis(campaign.schedule.sample_ms.get());
@@ -387,6 +392,15 @@ impl PointRun<'_> {
             let work = self.workload.clone();
             let operation = operation.clone();
             let clock = self.clock;
+            if phase == LoadPhase::Measured && sequence == 14 {
+                let work = work.clone();
+                let name = format!("capacity-backup-{}", writer.next_index());
+                backup.spawn(async move {
+                    tokio::time::timeout(deadline, lifecycle::backup(work, name, clock))
+                        .await
+                        .map_err(|_| "backup interference deadline".to_owned())?
+                });
+            }
             if joins.len() as u64 >= self.point.clients.get() {
                 let at = ns(clock);
                 collect(
@@ -412,6 +426,21 @@ impl PointRun<'_> {
                 result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger)?,
                 _=tokio::time::sleep_until(next_sample) => {
                     if resources.len() as u64>=campaign.evidence.samples_per_segment.get(){return Err("resource sample cap exhausted".into());}
+                    resources.push(sample(&self.workload,self.pid,self.clock).await?);
+                    next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                }
+            }
+        }
+        let mut backup_receipt = None;
+        while !backup.is_empty() {
+            tokio::select! {
+                value=backup.join_next() => {
+                    backup_receipt=Some(value.ok_or("backup task missing")?.map_err(|_|"backup task panicked")??);
+                }
+                _=tokio::time::sleep_until(next_sample) => {
+                    if resources.len() as u64+1>=campaign.evidence.samples_per_segment.get() {
+                        return Err("backup resource sample cap exhausted".into());
+                    }
                     resources.push(sample(&self.workload,self.pid,self.clock).await?);
                     next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                 }
@@ -467,6 +496,15 @@ impl PointRun<'_> {
         }
         resources.push(sample(&self.workload, self.pid, self.clock).await?);
         attempts.sort_by_key(|a| a.sequence);
+        let mut lanes = match &backup_receipt {
+            Some(raw) => vec![LaneEvidence {
+                lane: CapacityLane::BackupUnderWrite,
+                repetitions: 1u64.try_into()?,
+                receipt_sha256: digest("c07g.backup-evidence", raw)?,
+                acknowledged_readback_verified: verified,
+            }],
+            None => vec![],
+        };
         let result = StorageResult {
             format_version: 1,
             manifest_sha256: manifest_digest(&manifest)?,
@@ -487,6 +525,14 @@ impl PointRun<'_> {
                 ledger,
             }],
         };
+        if phase == LoadPhase::Measured && first == 0 {
+            lanes.push(LaneEvidence {
+                lane: CapacityLane::Warm,
+                repetitions: 1u64.try_into()?,
+                receipt_sha256: digest("c07g.warm-readback", &result)?,
+                acknowledged_readback_verified: verified,
+            });
+        }
         Ok(SustainedSegment {
             format_version: 1,
             campaign_sha256: writer.identity().clone(),
@@ -498,11 +544,13 @@ impl PointRun<'_> {
             started_ns: started,
             finished_ns: ns(self.clock),
             corpus: None,
+            reopens: None,
+            backup: backup_receipt,
             manifest,
             result,
             attempts,
             resources,
-            lanes: vec![],
+            lanes,
         })
     }
 }
@@ -603,6 +651,27 @@ fn installed_sustained_capacity() {
 }
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
+    if campaign.required_lanes.iter().any(|lane| {
+        matches!(
+            lane,
+            CapacityLane::Cold | CapacityLane::ReaderPinInterference
+        )
+    }) {
+        return Err("native cold-cache and retained-reader controls are not available in this installed driver".into());
+    }
+    if campaign
+        .required_lanes
+        .contains(&CapacityLane::BackupUnderWrite)
+        && campaign.points.iter().any(|point| {
+            u128::from(campaign.schedule.measured_ms.get())
+                * u128::from(point.requests_per_second.get())
+                < 15_000
+        })
+    {
+        return Err(
+            "backup interference requires the measured mix to reach its first mixed write".into(),
+        );
+    }
     if campaign.schedule.operation_deadline_ms.get() > 60_000 {
         return Err("installed request deadline exceeds the driver's one-minute bound".into());
     }
@@ -637,12 +706,14 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     .schedule
                     .setup_ms
                     .get()
-                    .checked_add(600_000)
+                    .checked_add(campaign.schedule.lifecycle_ms.get())
+                    .and_then(|v| v.checked_add(600_000))
                     .ok_or("setup deadline overflow")?,
                 |n, p| n.checked_add(campaign.schedule.duration_ms(p)),
             )
             .ok_or("campaign deadline overflow")?;
             let (child, client, _) = estate.start_for(clock, Duration::from_millis(lifetime_ms));
+            let mut child = Some(child);
             let mut session_ordinal = 0;
             let mut session_opened = Instant::now();
             let mut work = session(
@@ -666,11 +737,37 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 )
                 .await?,
             );
+            // Fresh session for the bounded lifecycle lane, avoiding inherited
+            // setup age. Subsequent load still rotates joined session segments.
+            session_opened = Instant::now() - Duration::from_secs(120);
+            rotate_session(
+                &estate,
+                &mut work,
+                campaign,
+                point.clients.get(),
+                &mut session_ordinal,
+                &mut session_opened,
+            )
+            .await?;
+            let mut reopens = Some(
+                lifecycle::reopens(
+                    &estate,
+                    &mut child,
+                    &mut work,
+                    campaign,
+                    clock,
+                    Duration::from_millis(lifetime_ms),
+                )
+                .await?,
+            );
             let mut driver = PointRun {
                 campaign,
                 point,
                 workload: work,
-                pid: child.id(),
+                pid: child
+                    .as_ref()
+                    .ok_or("owned server missing after lifecycle lane")?
+                    .id(),
                 clock,
             };
             for phase in [
@@ -765,6 +862,15 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     .map_err(|_| "installed segment exceeded its frozen deadline")??;
                     if phase == LoadPhase::Warmup && next == 0 {
                         segment.corpus = corpus.take();
+                        segment.reopens = reopens.take();
+                        if let Some(raw) = &segment.reopens {
+                            segment.lanes.push(LaneEvidence {
+                                lane: CapacityLane::ForcedReopens,
+                                repetitions: (raw.cycles.len() as u64).try_into()?,
+                                receipt_sha256: digest("c07g.reopen-evidence", raw)?,
+                                acknowledged_readback_verified: true,
+                            });
+                        }
                     }
                     writer.append(&segment)?;
                     next += take;

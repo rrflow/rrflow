@@ -498,7 +498,7 @@ jobs:
         timeout-minutes: 65
         env:
           RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2
       - name: Require both complete ordinary-primary receipts
         shell: bash
         env:

@@ -33,6 +33,7 @@ pub(super) struct Prepared {
 
 pub(super) struct Completed {
     pub receipt_sha256: Digest,
+    pub idempotent_replay: bool,
 }
 
 fn id(value: &str) -> CanonicalId {
@@ -284,6 +285,7 @@ impl Workload {
         })
     }
     pub async fn execute(&self, request: &Prepared) -> Result<Completed> {
+        let mut idempotent_replay = false;
         let receipt_sha256 = match request.kind {
             StorageLoadKind::MixedWrite => {
                 let mut receipt = self
@@ -295,6 +297,7 @@ impl Workload {
                             .ok_or("missing prepared mutation")?,
                     )
                     .await?;
+                idempotent_replay = receipt.idempotent_replay;
                 receipt.idempotent_replay = false;
                 digest("c07g.commit-receipt", &receipt)?
             }
@@ -368,7 +371,10 @@ impl Workload {
                 digest("c07g.cancel-receipt", &cancelled)?
             }
         };
-        Ok(Completed { receipt_sha256 })
+        Ok(Completed {
+            receipt_sha256,
+            idempotent_replay,
+        })
     }
     async fn query(
         &self,

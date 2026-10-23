@@ -195,3 +195,53 @@ runtime suite or native campaign ran. Candidate CI remains required. Full
 lifecycle lanes, native allocation binding, fleet execution, update/delete
 histories and complete native qualification remain open; no objective,
 roadmap or POA&M completion status changed.
+
+
+## Installed reopen and backup interference lanes
+
+Continued from `1681b098a65a0972118ee52ff55b97062fff8c87`. The same configured
+estate now performs its frozen number of forced-process kills before warmup.
+Every cycle commits a linked record/relation/vector operation, reaps the owned
+server, reconnects, reads every preceding lifecycle effect before retry and
+requires each original receipt plus an explicit idempotent replay. A final
+complete seed-corpus readback checks the immutable project data across all
+kills. Bounded raw cycle observations bind process IDs, monotonic times,
+expected/effect chains and original/replayed receipt chains. A lane summary
+without those matching observations is rejected. Lifecycle setup has its own
+finite deadline (at most thirty minutes) and bounded cycle count, included in
+the runner deadline. It is separate from the offered-load duration.
+
+One bounded backup management client begins alongside the first mixed write
+of measured load. It verifies the saved archive through the existing public
+backup catalogue, binds the exact complete backup receipt and requires actual
+client-observed overlap with an acknowledged write. Independent segment
+readback still checks the live ACKs. This is backup-under-write observation,
+not restored-backup readback or proof of simultaneous disk instructions.
+The first measured readback supplies the warm-lane receipt. Cold-cache control
+and externally retained reader interference remain explicitly unavailable;
+requesting those lanes fails admission rather than silently omitting them.
+
+The candidate 100-cycle workflow previously selected every ignored test in
+installed_reopen. That would also select the new manually configured campaign
+without its required manifest. Its command now selects the two existing
+`installed_100_acknowledged_reopens` cases explicitly. This preserves the
+required 200-cycle candidate corpus and keeps the optional sustained entry
+behind its own explicit frozen invocation. No required case was removed.
+
+Reads: installed lifecycle backup/reopen paths, client session/backup methods,
+engine transaction read-stamp and backup authority, evaluation ledger and
+sustained validators, native process ownership, and CI owner/workflow. Native
+transaction leases contain logical read stamps; they are not evidence that a
+client holds a physical page pin. No such equivalence was introduced.
+
+Validation: `cargo clippy -p rrflow-eval -p rrflow-cli --all-targets --locked
+-- -D warnings` passed after the reopen extension (4.29 seconds), backup
+integration (2.51 seconds), and final lane guards (2.72 seconds). Storage
+schema regeneration passed (6.07 seconds). Added regression definitions deny
+missing prior ACK counts and changed replay receipts. No local runtime suite,
+campaign, backup, process-kill corpus or soak ran. Native/full-size acceptance
+still depends on explicit candidate facilities and evidence, including failure
+artifact retention during preparation, native allocation binding, reader/cold
+lanes, fleet, update/delete histories and the complete profile/24-hour matrix.
+PR 65's resource-limit prerequisite passed its complete candidate chain and
+merged as `6de0c5be56a6b7c888586186babb3b1648eb55ae`; C-07 remains open.
