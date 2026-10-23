@@ -463,9 +463,24 @@ impl Memtable {
         profile
     }
 
-    pub fn all_versions(&self) -> impl Iterator<Item = (&[u8], &[VersionedValue])> {
+    pub fn all_versions(&self) -> impl Iterator<Item = (&[u8], &[VersionedValue])> + Clone {
         self.versions
             .iter()
+            .map(|(key, versions)| (key.as_ref(), versions.as_slice()))
+    }
+
+    /// Borrow a half-open immutable-output partition without copying its keys
+    /// or version chains. BTreeMap seeks directly to the lower boundary.
+    pub(crate) fn range_versions(
+        &self,
+        first: Option<&[u8]>,
+        end: Option<&[u8]>,
+    ) -> impl Iterator<Item = (&[u8], &[VersionedValue])> + Clone {
+        self.versions
+            .range::<[u8], _>((
+                first.map_or(Unbounded, Included),
+                end.map_or(Unbounded, Excluded),
+            ))
             .map(|(key, versions)| (key.as_ref(), versions.as_slice()))
     }
 
