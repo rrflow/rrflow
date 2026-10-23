@@ -631,7 +631,32 @@ fn traversal_evidence_follows_visited_edges_not_estate_size() {
         .unwrap()
         .range_scans;
     assert_eq!(adjacency_scans, 4);
-    assert!(large_run.read_evidence.keys_examined < 100);
+    // Keep the original executor bound. A complete pipeline now additionally
+    // reports its authenticated schema-capture work instead of hiding it.
+    let pipeline = StampedQueryPipeline::new(&large, large_read.clone()).unwrap();
+    let bound = pipeline
+        .bind(
+            &parse(text).unwrap(),
+            &Parameters::new(),
+            &ExecutionBudget::default(),
+        )
+        .unwrap();
+    let physical = pipeline.plan(&bound).unwrap();
+    let direct = pipeline
+        .execute(&physical, &ExecutionBudget::default())
+        .unwrap();
+    assert!(direct.read_evidence.keys_examined < 100);
+    let metadata = rrd_query::Catalog::capture_for_sources_at(
+        &large,
+        large_read.clone(),
+        &[],
+        RuntimeReadBudget::new(100_000).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        large_run.read_evidence.keys_examined,
+        direct.read_evidence.keys_examined + metadata.read_evidence.keys_examined
+    );
 
     // The family ranges the reader replaced grow with the estate.
     let family = large
