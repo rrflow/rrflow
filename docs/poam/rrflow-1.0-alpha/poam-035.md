@@ -303,6 +303,15 @@ the unchanged 30-second backup-interference deadline. The earlier setup blocker
 is cleared in this characterization; the operating point remains failed and
 backup timing, full profiles and soak qualification remain open.
 
+The [projected-read frontier repair](../../evidence/change-journals/gate-c/c-07g-projected-frontier.md)
+reduces a reproduced first-row read from twelve disjoint row groups to one,
+while preserving admission, snapshots, overlap merging and retained buffers.
+Its owning storage suite passes; native backup benefit is not yet established.
+Linux19's diagnostic repeat on the preceding binary failed earlier at corpus
+ordinal 608 with an unclassified internal API rejection, despite resident memory
+below its cap and no failed flush/compaction counters. Its cause remains open;
+Linux18's successful setup does not establish repeatability.
+
 Native run 39979675928 failed the macOS existing/WAL capacity case after a
 real filler ENOSPC: the client returned resource denial without a selected
 native I/O error receipt. The
