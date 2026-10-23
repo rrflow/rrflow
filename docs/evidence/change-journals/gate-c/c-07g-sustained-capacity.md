@@ -749,3 +749,17 @@ journal amendment followed inventory generation. Regenerated after the final
 journal content, and checked again before commit. This is a publication-order
 error; no engine or acceptance threshold changed. New exact-candidate CI is
 required.
+
+## Candidate corpus schema correction
+
+Candidate run 39910913330, Linux installed reopen job 120274396699, failed
+its capacity workload setup with the explicit contract denial `schemaless
+table capacity_document cannot declare a strict property contract` (2.79s).
+Read Workload::initialize and rrd-contract::validate_data_schema. The existing
+schemaless fixture incorrectly set the strict additional-properties flag.
+Corrected that flag to false with empty properties for all three corpus tables;
+engine validation remains unchanged. The existing installed capacity smoke is
+the failure oracle. Pre-edit scope was recorded on PR 72 comment 6359454924.
+No local installed workload ran; corrected native acceptance remains pending.
+Navigation, inventory, documentation and workflow policy checks passed before
+publication. C-07 and POAM-035 remain open.
