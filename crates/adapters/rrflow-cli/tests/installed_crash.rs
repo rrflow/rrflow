@@ -312,7 +312,11 @@ async fn read(
 }
 
 fn run(mode: &str, points: &[&str]) {
-    let estate = Estate::install(mode);
+    run_history(mode, points, false);
+}
+
+fn run_history(mode: &str, points: &[&str], publication: bool) {
+    let estate = Estate::install_at(mode, None, publication);
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -392,6 +396,10 @@ fn run(mode: &str, points: &[&str]) {
         for (index, point) in points.iter().enumerate() {
             eprintln!("installed_domain_case mode={mode} point={point}");
             let name = format!("case-{index}");
+            // Flush/GC run in prepare_write before the selected semantic batch
+            // reaches its WAL. Its prior ACKs must survive, while this new
+            // operation must remain absent until the explicit retry.
+            let committed_before_pause = !publication && *point != "wal_before_write";
             let request = request(&name, estate.at);
             let logical_id = name.clone().try_into().unwrap();
             ledger.expected.push(ExpectedOperation {
@@ -439,10 +447,17 @@ fn run(mode: &str, points: &[&str]) {
                     reason: "process-killed".to_owned().try_into().unwrap(),
                 },
             });
-            let recovery = estate.control("recovery_read", index as u16 + 1, None);
+            // A newly published successor can be empty. Kill after verified
+            // manifest read instead of pretending an absent WAL frame was read.
+            let recovery_point = if publication {
+                "recovery_manifest"
+            } else {
+                "recovery_read"
+            };
+            let recovery = estate.control(recovery_point, index as u16 + 1, None);
             hits.push(estate.launch(&recovery).hit_and_kill(recovery));
             let (child, client) = estate.serve(&Value::Null);
-            if *point != "wal_before_write" {
+            if committed_before_pause {
                 values.extend(expected(&name));
             }
             read(&client, &session, estate.at, &values).await;
@@ -487,7 +502,7 @@ fn run(mode: &str, points: &[&str]) {
                 assert_eq!(receipt.mutation_count, 2);
                 assert_eq!(
                     receipt.idempotent_replay,
-                    retry > 0 || *point != "wal_before_write"
+                    retry > 0 || committed_before_pause
                 );
                 let hash = receipt_hash(&receipt);
                 if let Some(previous) = &stable {
@@ -525,11 +540,25 @@ fn run(mode: &str, points: &[&str]) {
     assert_eq!(hits.len(), points.len() * 2);
     assert_eq!(report.unresolved, 0);
     assert!(report.violations.is_empty(), "{report:?}");
-    println!(
-        "installed_domain_crash_receipt={}",
-        json!({"instrumentation":"crash-test-primary","mode":mode,"build":estate.build,
-        "native_os":std::env::consts::OS,"hits":hits,"ledger":ledger,"report":report})
-    );
+    let receipt = json!({"instrumentation":"crash-test-primary","mode":mode,"build":estate.build,
+        "native_os":std::env::consts::OS,"publication":publication,"hits":hits,"ledger":ledger,"report":report});
+    if publication {
+        if let Some(directory) = std::env::var_os("RRFLOW_PUBLICATION_RECEIPT_DIR") {
+            use std::io::Write;
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let bytes = serde_json::to_vec_pretty(&receipt).unwrap();
+            assert!(bytes.len() <= LIMIT);
+            let mut output = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(directory.join(format!("{mode}.json")))
+                .unwrap();
+            output.write_all(&bytes).unwrap();
+            output.sync_all().unwrap();
+        }
+    }
+    println!("installed_domain_crash_receipt={receipt}");
 }
 
 #[test]
@@ -559,6 +588,25 @@ fn existing_installed_domain_boundaries() {
     );
 }
 
+const PUBLICATION_POINTS: &[&str] = &[
+    "segment_synced",
+    "successor_wal_synced",
+    "current_before_rename",
+    "current_renamed",
+    "reclaim_before_remove",
+    "reclaim_removed",
+];
+
+#[test]
+fn fresh_installed_publication_and_reclamation() {
+    run_history("fresh", PUBLICATION_POINTS, true);
+}
+
+#[test]
+fn existing_installed_publication_and_reclamation() {
+    run_history("existing", PUBLICATION_POINTS, true);
+}
+
 #[test]
 fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
     let estate = Estate::install("fresh");
@@ -568,6 +616,7 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
         ("nonce", json!("invalid")),
         ("id", json!(0)),
         ("point", json!("unreachable")),
+        ("point", json!("recovery_manifest")),
         ("operation_sha256", Value::Null),
         ("root", json!("foreign")),
     ];
@@ -643,6 +692,6 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
     println!(
         "installed_crash_admission_receipt={}",
         json!({"instrumentation":"crash-test-primary",
-        "build":estate.build,"invalid_schedules":6,"nonmatching_commit":true})
+        "build":estate.build,"invalid_schedules":7,"nonmatching_commit":true})
     );
 }

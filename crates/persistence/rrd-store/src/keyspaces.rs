@@ -519,7 +519,8 @@ pub(crate) fn runtime_kind_prefix(
 ) -> Vec<u8> {
     debug_assert!(matches!(
         space,
-        Space::RuntimeRecordVersions
+        Space::RuntimeRecords
+            | Space::RuntimeRecordVersions
             | Space::RuntimeRelationVersions
             | Space::RuntimeEventVersions
             | Space::RuntimeVectorVersions
@@ -638,9 +639,8 @@ pub(crate) fn runtime_adjacency_version_key(
     )
 }
 
-/// Temporal adjacency range for one node and relation type. Every version
-/// whose relation had `node` at the space's near endpoint, plus every
-/// retirement of such a relation, sorts under this prefix.
+/// Current or temporal adjacency range for one node and relation type.
+/// Temporal ranges include every version and retirement at that endpoint.
 pub(crate) fn runtime_adjacency_prefix(
     space: Space,
     scope: &ScopeId,
@@ -649,7 +649,10 @@ pub(crate) fn runtime_adjacency_prefix(
 ) -> Vec<u8> {
     debug_assert!(matches!(
         space,
-        Space::RuntimeOutgoingEdgeVersions | Space::RuntimeIncomingEdgeVersions
+        Space::RuntimeOutgoingEdges
+            | Space::RuntimeIncomingEdges
+            | Space::RuntimeOutgoingEdgeVersions
+            | Space::RuntimeIncomingEdgeVersions
     ));
     encode(
         space,
@@ -658,6 +661,24 @@ pub(crate) fn runtime_adjacency_prefix(
             KeyPart::Text(node.kind.as_str()),
             KeyPart::Text(node.id.as_str()),
             KeyPart::Text(relation_kind.as_str()),
+        ],
+    )
+}
+
+/// Current outgoing identities for one typed endpoint pair.
+pub(crate) fn runtime_adjacency_pair_prefix(
+    scope: &ScopeId,
+    relation: &RuntimeRelation,
+) -> Vec<u8> {
+    encode(
+        RUNTIME_OUTGOING_EDGES,
+        &[
+            KeyPart::Text(scope.as_str()),
+            KeyPart::Text(relation.from.kind.as_str()),
+            KeyPart::Text(relation.from.id.as_str()),
+            KeyPart::Text(relation.reference.kind.as_str()),
+            KeyPart::Text(relation.to.kind.as_str()),
+            KeyPart::Text(relation.to.id.as_str()),
         ],
     )
 }
@@ -1058,6 +1079,10 @@ pub(crate) fn control_journal_last_digest_key() -> Vec<u8> {
 
 pub(crate) fn control_journal_key(sequence: u64) -> Vec<u8> {
     system_key(SystemEntry::ControlJournalEntry, &[KeyPart::U64(sequence)])
+}
+
+pub(crate) fn control_journal_prefix() -> Vec<u8> {
+    system_key(SystemEntry::ControlJournalEntry, &[])
 }
 
 pub(crate) fn is_control_journal_key(codec: KeyCodec, stored: &[u8]) -> bool {
