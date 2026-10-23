@@ -494,3 +494,7 @@ rrd-engine, rrd-contract, rrflow-eval and rrflow-cli all targets passed (8.41s).
 Default installation/public fixture and synthetic storage projection generation
 passed; no engine workload was invoked by these generators. Whitespace and
 generated-surface checks passed before staging.
+
+### Candidate SDK identity projection correction
+
+Starting revision: `9f0f3bf3b3e0bcd41411308a4086f268ce38be76`. Required candidate run `39902969502` exposed a stale shared corpus: optional-engine job `120248753326` and macOS estate job `120248753430` failed the existing `shared_sdk_corpus_identity_matches_bundled_installation` assertion; SDK job `120248753437` independently reported the same planned identity `304f5c8569d429363f7d65c1`. The new sealed default recovery reserve changes the deterministic installation identity. Read the complete shared corpus, its typed validation, the identity characterization and the installation projection example. Refreshed the six instance/estate/scope occurrences in `fixtures/rrd-sdk-conformance-v1.json`; all payloads, expectations and anchor bytes remain intact. PR brief was posted before this correction. No local runtime suite executed; the next candidate must repeat the unchanged identity and five-language conformance oracles. No gate/status change.
