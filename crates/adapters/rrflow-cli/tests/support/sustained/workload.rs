@@ -74,12 +74,37 @@ fn error(value: impl std::fmt::Display) -> String {
     value.to_string()
 }
 
+// Diagnostic-only projection of the current engine's error spelling. This is
+// never used to infer effects or retryability. Return constants, not message
+// slices: even an arbitrary server body can disclose only an allowlisted label.
+fn engine_error_label(message: &str) -> Option<&'static str> {
+    let variant = message.split_once('(').map_or(message, |(name, _)| name);
+    match variant {
+        "TransactionQuota" => Some("transaction-quota"),
+        "RenewalQuota" => Some("renewal-quota"),
+        "StorageAdmission" => Some("storage-admission"),
+        "ConfigurationLimit" => Some("configuration-limit"),
+        "StorageConflict" => Some("storage-conflict"),
+        "InvocationInProgress" => Some("invocation-in-progress"),
+        "IdempotencyConflict" => Some("idempotency-conflict"),
+        "CommitInProgress" => Some("commit-in-progress"),
+        _ => None,
+    }
+}
+
 // Preserve only the closed client/API classification and a digest of details.
 // Server messages, transport text and credentials never enter campaign output.
 fn client_error(value: rrd_client::Error) -> String {
     use rrd_client::Error;
     let code = match &value {
-        Error::Api { error, .. } => format!("api-{:?}", error.code).to_ascii_lowercase(),
+        Error::Api { error, .. } => {
+            let mut code = format!("api-{:?}", error.code).to_ascii_lowercase();
+            if let Some(label) = engine_error_label(&error.message) {
+                code.push('-');
+                code.push_str(label);
+            }
+            code
+        }
         Error::Contract(_) => "client-contract".into(),
         Error::Transport(_) => "client-transport".into(),
         Error::Timeout => "client-timeout".into(),
@@ -92,6 +117,30 @@ fn client_error(value: rrd_client::Error) -> String {
     };
     let detail = digest("c07g.client-error", &value.to_string()).expect("error digest");
     format!("{code}:{}", detail.as_str())
+}
+
+#[test]
+fn diagnostic_labels_never_copy_server_details_or_imply_outcomes() {
+    assert_eq!(
+        engine_error_label("TransactionQuota"),
+        Some("transaction-quota")
+    );
+    assert_eq!(
+        engine_error_label("StorageAdmission(\"private payload\")"),
+        Some("storage-admission")
+    );
+    assert_eq!(
+        engine_error_label("ConfigurationLimit(\"private payload\")"),
+        Some("configuration-limit")
+    );
+    for message in [
+        "TransactionQuota private payload",
+        "StorageAdmissionSecret",
+        "private payload",
+        "(StorageAdmission)",
+    ] {
+        assert_eq!(engine_error_label(message), None);
+    }
 }
 
 impl Workload {
