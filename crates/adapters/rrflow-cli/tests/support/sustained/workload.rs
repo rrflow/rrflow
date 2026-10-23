@@ -198,10 +198,37 @@ impl Workload {
             )
             .await
             .map_err(client_error)?;
-        self.client
+        let result = self
+            .client
             .commit_transaction(&self.session, &lease.transaction_id, request, options(key))
-            .await
-            .map_err(client_error)
+            .await;
+        match result {
+            Ok(receipt) => Ok(receipt),
+            Err(error) => {
+                let cause = client_error(error);
+                // A broad Conflict/ResourceExhausted code is not proof of no
+                // effect. The engine refuses abort while an intent is uncertain
+                // or already committed. Only its explicit abort acknowledgement
+                // permits rejection classification and releases the lease.
+                let aborted = self
+                    .client
+                    .abort_transaction(
+                        &self.session,
+                        &lease.transaction_id,
+                        AbortTransaction {},
+                        options(&format!("{key}-abort-failed")),
+                    )
+                    .await;
+                if let Ok(aborted) = aborted {
+                    if aborted.state == TransactionState::Aborted {
+                        let proof = digest("c07g.rejected-transaction", &(&cause, &aborted))?;
+                        let code = cause.split_once(':').expect("closed client cause").0;
+                        return Err(format!("rejected-{code}:{}", proof.as_str()));
+                    }
+                }
+                Err(cause)
+            }
+        }
     }
     pub async fn initialize(&self) -> Result<()> {
         let lease = self

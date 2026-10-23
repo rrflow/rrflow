@@ -269,6 +269,13 @@ open. The current macOS capacity candidate also times out awaiting its first
 WAL native-error event; bounded owned-process diagnostics are being retained
 without weakening the real filesystem-error requirement.
 
+The subsequent classified campaign identified three commit conflicts followed
+by seven resource-exhaustion responses, with all acknowledgements read back.
+The [rejected-transaction cleanup](../../evidence/change-journals/gate-c/c-07g-rejected-transaction-cleanup.md)
+uses explicit engine-approved abort to release a failed workload lease and
+classify rejection; ambiguous outcomes stay uncertain. Its real load acceptance
+and sustainable envelope remain pending.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
