@@ -63,7 +63,7 @@ version, which remains frozen at `1.0.0` by the
 [version policy](../release/version-policy.md).
 
 The deterministic OpenAPI projection is currently bound to SHA-256
-`737574186cd6443f5aa108bf429c7a4e8b078d5cf48406472e4bd6038604b6de`.
+`adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against
@@ -157,11 +157,11 @@ The boundary is intentionally explicit:
 | HTTP | 40 catalogued operations with method, path, authentication mode, mutation flag, security action, and request/response type names. | H-04 cross-surface semantic equivalence and Gate J release qualification. |
 | WebSocket | One generic authenticated descriptor and one closed frame envelope for request/response, cancellation, subscription/delivery, ACK, heartbeat, unsubscribe, error, backpressure, and exact reconnect resume. The server intentionally rejects generic operation execution until H-04. | H-03 commit-impact delivery, H-04 shared operation dispatch and cancellation, generated-SDK carriage, and Gate J qualification. |
 | Rust client | Uses `rrd-contract` as its only normal RRFlow dependency, implements 37 of 42 catalogued HTTP operations, and implements the bounded multiplexed WebSocket over loopback HTTP or explicit mutual TLS. | The [Rust SDK reference](../sdk/rust.md) records the five missing HTTP operations and the exact H-03/H-04/H-07/J convergence boundary. |
-| TypeScript client | Generates compile-time types and a generic call over all 43 HTTP descriptors, but has no complete runtime payload validation, WebSocket, remote transport, or installable JavaScript/declaration artifact. | The [TypeScript SDK reference](../sdk/typescript.md) records the exact request/response, credential, retry/cancellation, Node/browser, packaging, and conformance boundary. |
-| Python client | Generates an operation literal and generic synchronous call over all 43 HTTP descriptors, but has no complete runtime payload validation, async/WebSocket client, remote transport, opaque credential, or typed-package/interpreter qualification. | The [Python SDK reference](../sdk/python.md) records the exact request/response, credential, retry/cancellation, sync/async, packaging, and conformance boundary. |
-| Go client | Generates constants and a generic context-aware synchronous call over all 43 HTTP descriptors, but has no concrete operation payload validation, WebSocket, remote transport, opaque credential, or module/toolchain qualification. | The [Go SDK reference](../sdk/go.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, module, and conformance boundary. |
-| Java client | Generates an enum and a generic synchronous call over all 43 HTTP descriptors, but has no concrete operation payload validation, async/WebSocket or remote transport, opaque credential, or reproducible offline Maven/JAR qualification. | The [Java SDK reference](../sdk/java.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, JDK/toolchain, and conformance boundary. |
-| .NET client | Generates an enum and a generic asynchronous call over all 43 HTTP descriptors, but has no concrete operation payload validation, WebSocket or remote transport, opaque credential, or reproducible signed NuGet/toolchain qualification. | The [.NET SDK reference](../sdk/dotnet.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, trimming/AOT, SDK/runtime, and conformance boundary. |
+| TypeScript client | Generates compile-time types and a generic call over all 44 HTTP descriptors, but has no complete runtime payload validation, WebSocket, remote transport, or installable JavaScript/declaration artifact. | The [TypeScript SDK reference](../sdk/typescript.md) records the exact request/response, credential, retry/cancellation, Node/browser, packaging, and conformance boundary. |
+| Python client | Generates an operation literal and generic synchronous call over all 44 HTTP descriptors, but has no complete runtime payload validation, async/WebSocket client, remote transport, opaque credential, or typed-package/interpreter qualification. | The [Python SDK reference](../sdk/python.md) records the exact request/response, credential, retry/cancellation, sync/async, packaging, and conformance boundary. |
+| Go client | Generates constants and a generic context-aware synchronous call over all 44 HTTP descriptors, but has no concrete operation payload validation, WebSocket, remote transport, opaque credential, or module/toolchain qualification. | The [Go SDK reference](../sdk/go.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, module, and conformance boundary. |
+| Java client | Generates an enum and a generic synchronous call over all 44 HTTP descriptors, but has no concrete operation payload validation, async/WebSocket or remote transport, opaque credential, or reproducible offline Maven/JAR qualification. | The [Java SDK reference](../sdk/java.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, JDK/toolchain, and conformance boundary. |
+| .NET client | Generates an enum and a generic asynchronous call over all 44 HTTP descriptors, but has no concrete operation payload validation, WebSocket or remote transport, opaque credential, or reproducible signed NuGet/toolchain qualification. | The [.NET SDK reference](../sdk/dotnet.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, trimming/AOT, SDK/runtime, and conformance boundary. |
 | Generated signal discovery | OpenAPI, a coordinated reference, and TypeScript, Python, Go, Java, and .NET expose the exact kernel catalogue JSON, signal fingerprint, and OpenAPI fingerprint from one renderer. | H-05 still requires build identity, runtime levels, correlated emission, exporters, captures, parity, overhead, and release evidence. |
 | Shared generated-SDK corpus | OpenAPI and one shared semantic corpus exist as generation/conformance inputs. | Every supported language must run the same real-daemon corpus; schema generation alone is not qualification. |
 | GraphQL | B-05 supplies bounded, schema-derived query lowering into the same `Query`, `Parameters`, and `BoundQuery` path as rrflowQL. No public GraphQL operation, resolver, or second executor is established. | H-04 outward HTTP carriage and cross-surface authorization/semantic equivalence. |
@@ -295,3 +295,34 @@ history assembly. Counters are process-local observations, not a cross-model
 consistent snapshot; the full diagnostic operation retains its existing
 consistency requirements. This permits storage monitoring independent of
 project-history size without creating another storage authority.
+
+
+## Bounded storage inspection cursors
+
+`POST /v1/diagnostics/storage/cursor` is an authenticated `DiagnosticsRead`
+operation scoped to the exact instance. It retains an ephemeral native physical
+snapshot for inspection; it is not a semantic query result, durable transaction
+or resumable cross-restart cursor. No physical key or value is returned.
+
+The request supplies a session-local `cursor_id` and an action. `open` declares
+`batch_rows` (1?4,096), `batch_bytes` (1?4 MiB) and `lifetime_ms` (1?60,000).
+Native installed view/pin/output ceilings also apply; the metadata registry
+admits at most the smaller of 64 or the installed active-view ceiling. Open
+retries with different parameters conflict; matching retries observe the
+current retained page. Cursor IDs may be reused after release or expiry.
+
+`observe` hashes the current retained page without advancing. `advance`
+supplies `expected_ordinal`; replaying the immediately previous advance returns
+the existing page. Older/future ordinals fail. `cancel_source` releases physical
+source leases but retains the copied page; `release` drops both and is safe to
+repeat. Session closure and monotonic lifetime expiry also drop owned data.
+The installed server sweeps expiry once per second; embedded hosts call
+`RrdEngine::reap_storage_cursors`, and cursor operations also sweep. No renewal
+extends a captured cursor's deadline. Process restart discards every cursor.
+
+The snapshot reports physical sequence, page ordinal, row count, actual batch
+allocation, source state and `page_sha256`. The hash frames the domain
+`rrflow-storage-inspection-page-v1`, big-endian u64 sequence, ordinal and row
+count, then length-prefixed key/value bytes in native order. It proves observed
+page identity only. Cursor state is not a provider's private reasoning trace,
+and process counters remain observations rather than an authoritative read stamp.

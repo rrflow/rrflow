@@ -160,9 +160,10 @@ Launching is an explicit resource-consuming operation on a clean frozen
 candidate using the ordinary release binary and harness. Linux additionally requires `--cgroup-parent` naming an already
 delegated cgroup; Windows uses an owned Job Object. The driver verifies live
 native limits and process membership rather than trusting environment labels.
-No privileged host setup is implicit. The current runner rejects full
-qualification, reader-pin lanes and multi-estate allocation until
-those facilities exist. macOS constrained-capacity launch is unavailable.
+No privileged host setup is implicit. Qualification requires verified native
+allocation and every frozen acceptance condition. Actual retained physical
+readers and multi-estate orchestration are implemented; their presence does
+not qualify a profile. macOS constrained-capacity launch is unavailable.
 Characterization results cannot close the profile or 24-hour requirement.
 
 The Linux cold lane stops the owned engine, synchronizes and advises eviction
@@ -189,8 +190,39 @@ load coordinates. `campaign profiles` exposes the bundled projection without
 running a workload. `scripts/knowledge/render_capacity_profiles.py` derives it
 from the owning workload table; CI rejects drift. A qualifying operating point
 is not proof of the entire load sweep. Reduced characterization remains
-explicitly unqualified. Fleet qualification is refused until quiet/equal/abusive
-per-estate interference can be represented and observed.
+explicitly unqualified. Fleet manifests derive independent child campaigns
+from the same frozen allocation and corpus; they require four clients per
+estate and an exactly divisible aggregate request rate. Quiet rotates the measured interval through every estate, one at a time,
+while neighbours retain their engines and sampled drain without offered load;
+equal loads every estate; abusive offers estate zero twice its admitted rate.
+Each trial retains the full warmup/measured/burst/drain/soak durations. All
+members warm up before the quiet trial begins. Phase barriers share one clock
+and wait for every member; joined sessions renew while waiting.
+
+The aggregate cgroup/Windows Job bounds the harness and every child together
+to `engine_bytes`; the host envelope remains independently observed. Native
+membership is checked before ingestion and at resource sampling/reopen.
+Pre-phase boundaries capture idle overhead, unique instance/PID identities
+and explicit cross-estate session denial. Per-estate child histories retain
+canonical record/relation/vector verification, lifecycle lanes, final restart
+and readback. The aggregate reducer checks overlapping concurrent phases, non-overlapping
+isolated measured intervals, quiet-neighbour drain, shared allocation, and a
+conservative sum of member RSS peaks. It derives bounded p99 intervals from
+raw measured attempt timings using 4,096 integer bins (at most 1/64 relative
+bin width above 64 ns). Every compliant estate's abusive p99 upper bound must
+be no greater than twice its own quiet p99 lower bound; ambiguous boundary
+bins fail conservatively. `isolated_latency_passed` reports this separately
+from complete qualification.
+That sum is explicitly not a simultaneous RSS sample.
+
+`storage-fleet-trial-v1.json` and `storage-fleet-result-v1.json` are generated
+projections. `campaign verify` dispatches to the fleet reducer for multiple
+estates and streams each bounded child campaign. Failed/aborted members retain
+raw progress; missing members or trials cannot become completed evidence.
+Root metadata and child evidence quotas are reserved before engine installation.
+The coordinator uses at most twelve worker threads for ten estates. Fleet
+execution is implemented but the complete native ten-estate matrix and 24-hour
+trial receipts remain required; no capacity result is claimed here.
 
 Installed read retention has per-open active-view and pinned-byte ceilings.
 Requests can lower these limits but cannot raise them. Storage observations
@@ -202,3 +234,66 @@ reservation. These restart-only installed ceilings are visible in configuration;
 actual counts/bytes are observed in storage diagnostics and must drain to
 baseline. The reservation charges vector capacities and explicit record/handoff
 representations; allocator metadata and caller input are not process-RSS proof.
+
+## C-07 acceptance reconciliation
+
+The offline acceptance boundary binds one clean tested source revision/tree,
+the current public catalogue and J-04 profile/threshold projection, retained
+candidate CI records, and explicitly enumerated capacity campaigns. It reuses
+the campaign/fleet reducers, including their raw histories, native allocation,
+readback, lifetime, failure and soak checks. It does not launch an engine or
+change the roadmap. Generated contracts are `storage-acceptance-manifest-v1`,
+`storage-acceptance-report-v1` and `storage-candidate-ci-v1` under `eval/schemas`.
+
+```text
+python scripts/ci/collect_storage_acceptance.py --run RUN_ID --output evidence/ci
+cargo run --locked -p rrflow-eval -- storage schema acceptance-manifest
+cargo run --locked -p rrflow-eval -- storage acceptance verify evidence acceptance.json new-report.json
+```
+
+The collector reads the development repository through authenticated GitHub
+API calls, retains bounded run/job/commit records, and asks the Rust owner to
+validate mandatory successful native jobs and steps. It preserves the PR head
+separately from the actual tested reusable-workflow revision. Candidate checkout
+policy prohibits alternate ref/repository/path inputs so that default checkout
+continues to test that triggering source. The reusable workflow and PR merge
+revision may differ from the branch head; campaigns must bind the tested
+revision, never silently substitute the head. Reruns/attempt changes during
+collection fail. Offline raw-record digests establish integrity and internal
+provenance, not a cryptographic GitHub attestation; collect from the API again
+when establishing current candidate status. No official promotion is implied.
+
+The manifest names direct, non-symlink evidence directories and semantic hashes.
+A missing result requires explicit `not_run` or `interrupted` status and a reason;
+it cannot count as attempted coverage. Failed results remain visible alongside
+missing coordinates and the largest actually qualified rate for each client
+count. The report requires every declared point to qualify before indicating
+readiness for owner review; a lower successful point cannot erase a failed
+higher point. This conservative flag does not automatically accept a reduced
+operating envelope or close any gate.
+
+Nominal desktop/service observations are separately recomputed from raw measured
+scheduled-to-finished timings for each seed/client count. The bounded integer
+histogram is shared with fleet isolation; p95/p99 upper bounds must meet J-04's
+owning limits and unexpected terminal errors must meet its exact basis-point
+limit. Author-supplied campaign thresholds cannot substitute for those limits.
+Three distinct seeds are required at every nominal client count. Physical range
+timing is explicitly a C-07 proxy; graph/context/model quality remains under its
+own later gates. Unknown owner grammar fails projection generation. Full
+capacity and 24-hour native evidence remain required and are not supplied by
+these commands or synthetic regression fixtures.
+
+
+Outer launch cleanup is part of acceptance. The existing sustained launcher
+now seals a bounded `launch.json` only after its owned cgroup/Job cleanup has
+returned. An unavailable facility, interrupted launcher or failed cleanup
+retains the frozen campaign and explicit outer outcome even if the harness
+never created a result. Existing inner results are preserved. Each manifest
+member binds this receipt with `launch_sha256` (semantic domain
+`rrflow-storage-launch-v1`); absent launch evidence cannot qualify. Acceptance
+compares its allocation/harness identity against every bound raw resource
+sample across all segments and fleet children, then requires successful exit
+and confirmed cleanup. A successful inner result cannot override an outer
+failure. Campaign/fleet evidence admission reserves 8 KiB for this receipt.
+The generated `storage-launch-v1.json` describes its bounded structure. No
+native resource limit is changed by offline receipt verification.

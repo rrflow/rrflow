@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Mechanical projection of J-04's owning workload ladder; no qualification."""
 from __future__ import annotations
+from decimal import Decimal
 import argparse
 import hashlib
 import json
@@ -74,9 +75,25 @@ def render(text):
         profiles.append(profile)
     if [p["id"] for p in profiles] != ["desktop", "single-service-estate", "fleet-isolation", "data-larger-than-memory"]:
         raise ValueError("owning profile coordinates changed")
+    threshold_section = text.split("### Proposed pass/fail thresholds\n", 1)[1].split("### Workload and evidence structure", 1)[0]
+    normalized = " ".join(threshold_section.split())
+    values = re.search(r"At desktop (\d+) requests/s and single-estate (\d+) requests/s, propose point-read p95 <= (\d+) ms, durable-commit p95 <= (\d+) ms, and bounded recall/context p95 <= (\d+) ms, all client end-to-end on loopback, with corresponding p99 ceilings of (\d+)/(\d+)/(\d+) ms", normalized)
+    error = re.search(r"unexpected terminal errors must be <= ([0-9.]+)%", normalized)
+    if values is None or error is None:
+        raise ValueError("J-04 nominal threshold grammar changed")
+    desktop_rate, service_rate, point95, write95, range95, point99, write99, range99 = map(int, values.groups())
+    error_bps = Decimal(error[1]) * 100
+    if error_bps != int(error_bps) or not 0 <= error_bps <= 10000:
+        raise ValueError("J-04 error threshold is not exact basis points")
+    thresholds = {"nominal_rates": [{"profile": "desktop", "requests_per_second": desktop_rate},
+                                     {"profile": "single-service-estate", "requests_per_second": service_rate}],
+                  "point_read": {"p95_ns": point95*1000000, "p99_ns": point99*1000000},
+                  "mixed_write": {"p95_ns": write95*1000000, "p99_ns": write99*1000000},
+                  "range_read": {"p95_ns": range95*1000000, "p99_ns": range99*1000000},
+                  "maximum_error_basis_points": int(error_bps)}
     return {"format_version": 1, "owner": OWNER,
-            "owner_projection_sha256": hashlib.sha256(section.encode()).hexdigest(),
-            "record_payload_bytes": payload_bytes, "profiles": profiles}
+            "owner_projection_sha256": hashlib.sha256((section+"\n"+threshold_section).encode()).hexdigest(),
+            "record_payload_bytes": payload_bytes, "profiles": profiles, "thresholds": thresholds}
 
 
 def main():

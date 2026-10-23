@@ -1,6 +1,7 @@
 format_version = 3
 
 [storage]
+checkpoint_entries = 1024
 recovery_reserve_bytes = 16777216
 mutable_accounted_bytes = 134217728
 mutable_versions = 1048576

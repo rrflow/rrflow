@@ -35,9 +35,9 @@
   "candidate": {
     "clean": true,
     "commit": "1111111111111111111111111111111111111111",
-    "configuration_sha256": "d4f28eec17effe5d50947d8b6ca25c967e8c7f6cf31af6d284c2031de73444da",
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
     "executable_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-    "public_catalogue_sha256": "90fc78a1f785a1c779009bf655a23eea06308bb382e721c38896d97e1f5893d1",
+    "public_catalogue_sha256": "5c9e8e6f9586649da1297e4dcd0b220e4fdbc37c930b4f38fbffd933757e1b3c",
     "tree": "2222222222222222222222222222222222222222"
   },
   "corpus_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
@@ -59,7 +59,7 @@
     "clock": {
       "maximum_rollback_ms": 0
     },
-    "configuration_sha256": "d4f28eec17effe5d50947d8b6ca25c967e8c7f6cf31af6d284c2031de73444da",
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
     "format_version": 3,
     "query": {
       "max_batch_rows": 256,
@@ -84,6 +84,7 @@
     "revision": 1,
     "storage": {
       "active_read_views": 1024,
+      "checkpoint_entries": 1024,
       "compaction_elapsed_ms": 30000,
       "compaction_input_bytes": 1073741824,
       "compaction_input_logical_bytes": 268435456,

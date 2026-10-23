@@ -9,6 +9,8 @@ mod attunement;
 mod capability_surface;
 mod deployment;
 mod diagnostic;
+mod storage_cursor;
+pub use storage_cursor::{InspectStorageCursor, StorageCursorAction, StorageCursorSnapshot};
 mod endpoint_binding;
 mod flight;
 mod function;
@@ -219,7 +221,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "737574186cd6443f5aa108bf429c7a4e8b078d5cf48406472e4bd6038604b6de";
+    "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3538,6 +3540,16 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "ContextPacket",
         ),
         endpoint(
+            "diagnostics-storage-cursor",
+            HttpMethod::Post,
+            "/v1/diagnostics/storage/cursor",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "InspectStorageCursor",
+            "StorageCursorSnapshot",
+        ),
+        endpoint(
             "diagnostics-storage-read",
             HttpMethod::Post,
             "/v1/diagnostics/storage/read",
@@ -4216,6 +4228,7 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "InspectStorageCursor" => schema_json::<RequestEnvelope<InspectStorageCursor>>(),
         "ReadStorageDiagnostics" => schema_json::<RequestEnvelope<ReadStorageDiagnostics>>(),
         "ReadDataSchema" => schema_json::<RequestEnvelope<ReadDataSchema>>(),
         "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
@@ -4250,6 +4263,7 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "StorageCursorSnapshot" => schema_json::<ResponseEnvelope<StorageCursorSnapshot>>(),
         "DiagnosticStorageSnapshot" => schema_json::<ResponseEnvelope<DiagnosticStorageSnapshot>>(),
         "DataSchemaSnapshot" => schema_json::<ResponseEnvelope<DataSchemaSnapshot>>(),
         "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),

@@ -10,6 +10,11 @@ pub enum Error {
         limit: usize,
         observed: usize,
     },
+    /// Known checkpoint admission denial before a new publication.
+    CheckpointLimit {
+        limit: usize,
+        observed: usize,
+    },
     TransactionLimit {
         resource: rrd_lsm::TransactionResource,
         limit: usize,
@@ -141,6 +146,7 @@ impl fmt::Display for Error {
         match self {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
             Error::SourcePageLimit { limit, observed } => write!(f, "source page allocation limit {limit} would be exceeded by {observed}"),
+            Error::CheckpointLimit { limit, observed } => write!(f, "checkpoint entry limit {limit} would be exceeded by {observed}"),
             Error::TransactionLimit { resource, limit, observed } => write!(f, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
@@ -259,6 +265,9 @@ impl From<rrd_lsm::Error> for Error {
                 limit,
                 observed,
             },
+            rrd_lsm::Error::CheckpointLimit { limit, observed } => {
+                Self::CheckpointLimit { limit, observed }
+            }
             rrd_lsm::Error::TransactionLimit {
                 resource,
                 limit,

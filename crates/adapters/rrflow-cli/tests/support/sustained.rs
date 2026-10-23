@@ -16,10 +16,14 @@ mod cold;
 mod corpus;
 #[path = "sustained/damage.rs"]
 mod damage;
+#[path = "sustained/fleet.rs"]
+mod fleet;
 #[path = "sustained/lifecycle.rs"]
 mod lifecycle;
 #[path = "sustained/native.rs"]
 mod native;
+#[path = "sustained/reader.rs"]
+mod reader;
 #[path = "sustained/workload.rs"]
 mod workload;
 use workload::{Prepared, Workload};
@@ -256,6 +260,22 @@ impl PointRun<'_> {
         writer: &CampaignWriter,
         duration_ms: u64,
     ) -> DriverResult<SustainedSegment> {
+        if self.campaign.idle_segment_ms(duration_ms)? != duration_ms {
+            return Err("idle duration exceeds its frozen segment admission".into());
+        }
+        tokio::time::timeout(
+            Duration::from_millis(self.campaign.storage.budgets.run_ms.get().min(180_000)),
+            self.drain_inner(writer, duration_ms),
+        )
+        .await
+        .map_err(|_| "idle segment exceeded its frozen deadline")?
+    }
+
+    async fn drain_inner(
+        &self,
+        writer: &CampaignWriter,
+        duration_ms: u64,
+    ) -> DriverResult<SustainedSegment> {
         let started = ns(self.clock);
         let baseline =
             self.workload
@@ -365,6 +385,7 @@ impl PointRun<'_> {
             cold_start: None,
             reopens: None,
             backup: None,
+            reader: None,
             manifest,
             result,
             attempts: vec![],
@@ -441,6 +462,16 @@ impl PointRun<'_> {
             expected_ledger_sha256: expected_digest(&ledger.expected)?,
         }];
         let mut resources = vec![self.sample(writer).await?];
+        let held_reader = if phase == LoadPhase::Measured
+            && campaign
+                .required_lanes
+                .contains(&CapacityLane::ReaderPinInterference)
+            && prepared.iter().any(|operation| operation.write.is_some())
+        {
+            Some(reader::HeldReader::open(&self.workload, writer.next_index(), self.clock).await?)
+        } else {
+            None
+        };
         let mut attempts = Vec::new();
         let mut failure = ReadbackFailures::default();
         let mut joins = JoinSet::new();
@@ -542,6 +573,17 @@ impl PointRun<'_> {
                 }
             }
         }
+        let reader_receipt = match held_reader {
+            Some(reader) => Some(reader.finish(&self.workload, self.clock).await?),
+            None => None,
+        };
+        if let Some(observation) = &reader_receipt {
+            writer.record_event(&ProgressEvent::ReaderInterference {
+                segment: writer.next_index(),
+                observation: Box::new(observation.clone()),
+            })?;
+            writer.checkpoint_progress()?;
+        }
         let mut backup_receipt = None;
         while !backup.is_empty() {
             tokio::select! {
@@ -605,6 +647,16 @@ impl PointRun<'_> {
             }],
             None => vec![],
         };
+        if let Some(raw) = &reader_receipt {
+            if raw.qualifies(&attempts) {
+                lanes.push(LaneEvidence {
+                    lane: CapacityLane::ReaderPinInterference,
+                    repetitions: 1u64.try_into()?,
+                    receipt_sha256: digest("c07g.reader-interference", raw)?,
+                    acknowledged_readback_verified: verified,
+                });
+            }
+        }
         let result = StorageResult {
             format_version: 1,
             manifest_sha256: manifest_digest(&manifest)?,
@@ -647,6 +699,7 @@ impl PointRun<'_> {
             cold_start: None,
             reopens: None,
             backup: backup_receipt,
+            reader: reader_receipt,
             manifest,
             result,
             attempts,
@@ -854,6 +907,9 @@ fn installed_sustained_capacity() {
         PathBuf::from(std::env::var_os("RRFLOW_SUSTAINED_EVIDENCE").expect("new evidence path"));
     let campaign: StorageCampaign = bounded_json(&campaign_path).unwrap();
     campaign.validate().unwrap();
+    if campaign.allocation.estates.get() > 1 {
+        return fleet::execute(campaign, evidence);
+    }
     let mut writer = CampaignWriter::create(&evidence, campaign.clone()).unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         tokio::runtime::Builder::new_current_thread()
@@ -886,6 +942,10 @@ fn installed_sustained_capacity() {
     assert!(
         result.is_ok(),
         "installed sustained driver failed: {result:?}"
+    );
+    assert!(
+        campaign.purpose != CampaignPurpose::Qualification || report.qualification_passed,
+        "campaign completed but did not satisfy its frozen qualification requirements"
     );
 }
 
@@ -986,12 +1046,14 @@ fn installed_capacity_workload_smoke() {
                 99,
             )
             .unwrap();
+        let retained_reader = reader::HeldReader::open(&work, 0, clock).await.unwrap();
         let (written, backup) = tokio::join!(
             work.execute(&write),
             lifecycle::backup(work.clone(), "smoke-backup".into(), clock)
         );
         let written = written.unwrap();
         let backup = backup.unwrap();
+        let reader_evidence = retained_reader.finish(&work, clock).await.unwrap();
         work.verify(&write).await.unwrap();
         let killed = super::kill(child, clock);
         let (reopened, client, identity) = estate.start_for(clock, Duration::from_secs(300));
@@ -1020,18 +1082,26 @@ fn installed_capacity_workload_smoke() {
             serde_json::json!({
             "build":estate.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
             "replayed_transactions":12,"write_transitions":{"insert":3,"update":4,"retire":3,"recreate":2},"backup_sha256":backup.receipt.backup.backup_sha256,
-            "termination":killed,"reopened":identity,"capacity_qualification":false})
+            "reader_interference":reader_evidence,"termination":killed,"reopened":identity,"capacity_qualification":false})
         );
         super::kill(reopened, clock);
     });
 }
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
-    if campaign.required_lanes.iter().any(|lane| {
-        *lane == CapacityLane::ReaderPinInterference
-            || (*lane == CapacityLane::Cold && !cfg!(target_os = "linux"))
-    }) {
-        return Err("native cold-cache and retained-reader controls are not available in this installed driver".into());
+    run_estate(campaign, writer, None).await
+}
+async fn run_estate(
+    campaign: &StorageCampaign,
+    writer: &mut CampaignWriter,
+    fleet: Option<&fleet::Participation>,
+) -> DriverResult<()> {
+    if campaign
+        .required_lanes
+        .iter()
+        .any(|lane| *lane == CapacityLane::Cold && !cfg!(target_os = "linux"))
+    {
+        return Err("native cold-cache control is not available on this platform".into());
     }
     if campaign
         .required_lanes
@@ -1052,12 +1122,19 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
     if campaign.allocation.estates.get() != 1 {
         return Err("fleet requires native aggregate estate driver".into());
     }
-    if campaign.purpose == CampaignPurpose::Qualification {
-        return Err("native allocation enforcement and complete resource gauges required before qualification execution".into());
+    if campaign
+        .required_lanes
+        .contains(&CapacityLane::ReaderPinInterference)
+        && campaign.schedule.operation_deadline_ms.get() > 30_000
+    {
+        return Err("retained-reader lane requires operation deadline at most 30 seconds".into());
     }
     let allocation = native::receipt(campaign)?;
+    if campaign.purpose == CampaignPurpose::Qualification && allocation.is_none() {
+        return Err("qualification requires launcher-owned native allocation receipt".into());
+    }
     let configuration = std::env::var_os("RRFLOW_SUSTAINED_CONFIGURATION").map(PathBuf::from);
-    let clock = Instant::now();
+    let clock = fleet.map_or_else(Instant::now, |fleet| fleet.clock);
     for point in &campaign.points {
         for seed in &campaign.seeds {
             writer.admit_next()?;
@@ -1087,8 +1164,11 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     .ok_or("setup deadline overflow")?,
                 |n, p| n.checked_add(campaign.schedule.duration_ms(p)),
             )
-            .ok_or("campaign deadline overflow")?;
+            .ok_or("campaign deadline overflow")?
+            .checked_add(fleet.map_or(0, |f| f.quiet_extra_ms(campaign.schedule.measured_ms.get())))
+            .ok_or("fleet isolated baseline deadline overflow")?;
             let (child, client, _) = estate.start_for(clock, Duration::from_millis(lifetime_ms));
+            native::enforcement(child.id(), allocation.as_ref())?;
             let mut child = Some(child);
             let mut session_ordinal = 0;
             let mut session_opened = Instant::now();
@@ -1172,21 +1252,58 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 LoadPhase::Drain,
                 LoadPhase::Soak,
             ] {
-                if phase == LoadPhase::Drain {
-                    let mut remaining = campaign.schedule.drain_ms.get();
-                    let cap = campaign
-                        .schedule
-                        .sample_ms
-                        .get()
-                        .checked_mul(
-                            campaign
-                                .evidence
-                                .samples_per_segment
-                                .get()
-                                .saturating_sub(2),
-                        )
-                        .filter(|v| *v > 0)
-                        .ok_or("drain sample capacity must exceed two")?;
+                let mut phase_origin = if let Some(fleet) = fleet {
+                    rotate_session(
+                        &estate,
+                        &mut driver.workload,
+                        campaign,
+                        point.clients.get(),
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
+                    let stage = match phase {
+                        LoadPhase::Warmup => "warmup",
+                        LoadPhase::Measured => "measured",
+                        LoadPhase::Burst => "burst",
+                        LoadPhase::Drain => "drain",
+                        LoadPhase::Soak => "soak",
+                    };
+                    Some(
+                        fleet
+                            .boundary(
+                                stage,
+                                &estate,
+                                &mut driver,
+                                &mut session_ordinal,
+                                &mut session_opened,
+                            )
+                            .await?,
+                    )
+                } else {
+                    None
+                };
+                if phase == LoadPhase::Measured {
+                    if let Some(fleet) = fleet.filter(|f| f.trial == FleetTrial::Quiet) {
+                        fleet
+                            .wait_quiet(
+                                fleet.estate,
+                                &mut driver,
+                                writer,
+                                (&estate, &mut session_ordinal, &mut session_opened),
+                            )
+                            .await?;
+                        phase_origin = Some(ns(clock));
+                    }
+                }
+                if phase == LoadPhase::Drain
+                    || (phase != LoadPhase::Warmup
+                        && fleet.is_some_and(|f| {
+                            !f.trial.active(f.estate)
+                                && !(phase == LoadPhase::Measured && f.trial == FleetTrial::Quiet)
+                        }))
+                {
+                    let mut remaining = campaign.schedule.duration_ms(phase);
                     while remaining > 0 {
                         writer.admit_next()?;
                         rotate_session(
@@ -1198,7 +1315,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                             &mut session_opened,
                         )
                         .await?;
-                        let duration = remaining.min(cap).min(120_000);
+                        let duration = campaign.idle_segment_ms(remaining)?;
                         writer.append(&driver.drain(writer, duration).await?)?;
                         remaining -= duration;
                     }
@@ -1210,7 +1327,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 let count =
                     (campaign.schedule.duration_ms(phase) as u128 * rate as u128).div_ceil(1000);
                 let count: u64 = count.try_into().map_err(|_| "offered count overflow")?;
-                let origin = ns(clock);
+                let origin = phase_origin.unwrap_or_else(|| ns(clock));
                 let mut next = 0;
                 while next < count {
                     writer.admit_next()?;
@@ -1231,7 +1348,16 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                         .checked_sub(campaign.schedule.operation_deadline_ms.get())
                         .filter(|v| *v > 0)
                         .ok_or("segment must reserve an operation deadline")?
-                        .min(120_000);
+                        .min(
+                            if campaign
+                                .required_lanes
+                                .contains(&CapacityLane::ReaderPinInterference)
+                            {
+                                10_000
+                            } else {
+                                120_000
+                            },
+                        );
                     let timed_cap = (u128::from(rate) * u128::from(active_ms) / 1000)
                         .max(1)
                         .min(u128::from(u64::MAX)) as u64;
@@ -1283,6 +1409,39 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     writer.append(&segment)?;
                     next += take;
                 }
+                if phase == LoadPhase::Measured {
+                    if let Some(fleet) = fleet.filter(|f| f.trial == FleetTrial::Quiet) {
+                        let all = fleet.finish_quiet()?;
+                        fleet
+                            .wait_quiet(
+                                all,
+                                &mut driver,
+                                writer,
+                                (&estate, &mut session_ordinal, &mut session_opened),
+                            )
+                            .await?;
+                    }
+                }
+            }
+            if let Some(fleet) = fleet {
+                rotate_session(
+                    &estate,
+                    &mut driver.workload,
+                    campaign,
+                    point.clients.get(),
+                    &mut session_ordinal,
+                    &mut session_opened,
+                )
+                .await?;
+                fleet
+                    .boundary(
+                        "loaded",
+                        &estate,
+                        &mut driver,
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
             }
             // Reopen after offered load and verify the final generated state
             // before any retry can rewrite it. Progress retains incomplete runs.
@@ -1294,6 +1453,8 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     let (reopened, client, _) =
                         estate.start_for(clock, Duration::from_millis(lifetime_ms));
                     let reopened_pid = reopened.id();
+                    native::enforcement(reopened_pid, allocation.as_ref())?;
+                    driver.pid = reopened_pid;
                     child = Some(reopened);
                     driver.workload.client = client;
                     session_opened = Instant::now() - Duration::from_secs(120);
@@ -1369,6 +1530,26 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
             )
             .await
             .map_err(|_| "final readback exceeded lifecycle deadline")??;
+            if let Some(fleet) = fleet {
+                rotate_session(
+                    &estate,
+                    &mut driver.workload,
+                    campaign,
+                    point.clients.get(),
+                    &mut session_ordinal,
+                    &mut session_opened,
+                )
+                .await?;
+                fleet
+                    .boundary(
+                        "reopened",
+                        &estate,
+                        &mut driver,
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
+            }
             drop(driver);
             drop(child);
         }

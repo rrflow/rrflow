@@ -105,3 +105,51 @@ Logs: `target/c07g-addressed-red-02.log`, `c07g-addressed-green.log`,
 
 C-07, OBJ-02 and POAM-035 remain open. No competitive, latency, throughput,
 full-alpha or full-profile qualification is claimed.
+
+## Combined prerequisite integration
+
+Before native reruns, integrated PR 78 head
+`79ebe22dbf11667cc6c17862192a5a7adac1c4f4` and its PR 73–77 dependency
+chain into the implemented point-read candidate `3efff6b60ca042368a631474057d4ef1b14faf74`.
+The PR brief declared this integration before merging. Resolved additive source
+conflicts by preserving both source-page and checkpoint admission fields,
+errors, validation and regression cases. Preserved all linked journals and
+POAM follow-ups. Regenerated OpenAPI, all five SDK projections, attunement and
+evaluation schemas/fixtures from their owning executables. The existing
+read-only SDK installation identity generator derives the new anchor identity.
+No historical receipt was changed.
+
+Reviewed the merged database/store options, native error conversion, engine
+configuration lowering, diagnostics, cursor acquisition, temporal point reads
+and both admission tests. Read-only retained-cursor open/advance now use the
+same typed source-pressure conversion as other read paths; generic durable
+conversion remains uncertain. A reader-interference fixture needed the three
+new source-owner counters. SDK tests exposed the two independently added
+operations composing to 44, rather than either input's 43; fixed all exact
+catalogue counts and asserted the authenticated cursor endpoint in TS/Go.
+
+Combined validation:
+
+| Command | Result |
+|---|---|
+| `cargo test --locked -p rrd-contract` | 112 passed |
+| `cargo test --locked -p rrd-engine --lib` | 162 passed, two existing ignored; 23.92 s |
+| `cargo test --locked -p rrd-lsm` | 197 passed, one existing child entry ignored; 79.91 s including build |
+| `cargo test --locked -p rrflow-eval` | 47 passed |
+| `cargo clippy --locked -p rrd-lsm -p rrd-store -p rrd-engine -p rrflow-eval -p rrflow-cli --all-targets -- -D warnings` | Passed; 36.39 s |
+| `python -X utf8 scripts/ci/check_generated_surfaces.py --check` | Passed; 44 operations |
+| TypeScript `tsc --noEmit`, `tsx --test tests/client.test.ts`; Go `go test ./...` | Passed; five TS tests and Go package suite |
+
+The first combined contract/engine checks failed on stale sealed configuration
+and SDK-anchor fixtures; regenerating from their owners corrected these.
+The first evaluation compile exposed the missing source-owner fields described
+above. Initial TS/Go checks exposed stale operation counts. All those checks
+passed after correction; no thresholds or validation were disabled. Logs are
+under `target/c07-combined-*`. Python 3.15, Java and .NET SDK execution remain
+for candidate CI. Native installed profiles and soak remain unrun for this
+combined candidate.
+
+OpenAPI: `adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee`.
+Sealed configuration: `2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55`.
+Planner-derived SDK identity suffix: `73d0af55a12ccf5d12167911`.
+This integration changes no C-07/alpha/POAM acceptance status.

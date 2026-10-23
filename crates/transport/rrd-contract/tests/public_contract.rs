@@ -323,7 +323,7 @@ fn supported_sdks_share_one_strict_semantic_corpus() {
     .unwrap();
     corpus.validate().unwrap();
     assert_eq!(corpus.required_domains.len(), 13);
-    assert_eq!(corpus.expected.endpoint_count, 43);
+    assert_eq!(corpus.expected.endpoint_count, 44);
     assert_eq!(
         rrd_contract::transaction_operation_sha256(&corpus.transaction.commit.mutations),
         corpus.transaction.commit.operation_sha256
@@ -1348,7 +1348,7 @@ fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();
     catalogue.validate().unwrap();
-    assert_eq!(catalogue.endpoints.len(), 43);
+    assert_eq!(catalogue.endpoints.len(), 44);
     assert_eq!(catalogue.endpoints[0].operation.as_str(), "audit-export");
     let create = catalogue
         .endpoints
@@ -2557,4 +2557,36 @@ fn source_page_capacity_is_explicit_finite_and_part_of_sealed_configuration() {
     let mut wire = serde_json::to_value(rrd_contract::StorageLimits::default()).unwrap();
     wire.as_object_mut().unwrap().remove("source_page_bytes");
     assert!(serde_json::from_value::<rrd_contract::StorageLimits>(wire).is_err());
+}
+
+#[test]
+fn storage_cursor_rejects_unknown_actions_fields_and_unbounded_budgets() {
+    use rrd_contract::{CorrelationId, InspectStorageCursor, StorageCursorAction};
+    for action in [
+        serde_json::json!({"kind":"observe","extra":true}),
+        serde_json::json!({"kind":"release","extra":true}),
+        serde_json::json!({"kind":"unknown"}),
+    ] {
+        assert!(serde_json::from_value::<StorageCursorAction>(action).is_err());
+    }
+    for (rows, bytes, lifetime) in [
+        (0, 4096, 1000),
+        (4097, 4096, 1000),
+        (1, 0, 1000),
+        (1, 4194305, 1000),
+        (1, 4096, 0),
+        (1, 4096, 60001),
+    ] {
+        assert!(InspectStorageCursor {
+            scope: "instance:test".into(),
+            cursor_id: CorrelationId::new("reader").unwrap(),
+            action: StorageCursorAction::Open {
+                batch_rows: rows,
+                batch_bytes: bytes,
+                lifetime_ms: lifetime
+            }
+        }
+        .validate()
+        .is_err());
+    }
 }

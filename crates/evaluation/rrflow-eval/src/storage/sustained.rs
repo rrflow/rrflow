@@ -12,6 +12,8 @@ use std::sync::Mutex;
 
 const NANOSECONDS_PER_MS: u64 = 1_000_000;
 const MAX_SAMPLES: usize = 4096;
+/// Reserved outside workload artifacts for the outer process cleanup receipt.
+pub const MAX_LAUNCH_RECEIPT_BYTES: u64 = 8192;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -216,6 +218,29 @@ pub struct StorageCampaign {
 }
 
 impl StorageCampaign {
+    /// Idle samples and the executed verification probe share one segment's
+    /// existing deadline. Reserve probe time before choosing an idle span.
+    pub fn idle_segment_ms(&self, requested_ms: u64) -> Result<u64> {
+        let available = self
+            .storage
+            .budgets
+            .run_ms
+            .get()
+            .checked_sub(self.schedule.operation_deadline_ms.get())
+            .filter(|value| *value > 0)
+            .ok_or("idle segment must reserve an operation deadline")?;
+        let sampled = self
+            .schedule
+            .sample_ms
+            .get()
+            .checked_mul(self.evidence.samples_per_segment.get().saturating_sub(2))
+            .filter(|value| *value > 0)
+            .ok_or("idle segment needs bounded resource samples")?;
+        let duration = requested_ms.min(available).min(sampled).min(120_000);
+        require(duration > 0, "idle segment requires a positive duration")?;
+        Ok(duration)
+    }
+
     pub fn validate(&self) -> Result<()> {
         self.storage.validate()?;
         self.drain.validate(self)?;
@@ -276,6 +301,13 @@ impl StorageCampaign {
             self.allocation.engine_bytes.get() <= self.allocation.host_bytes.get()
                 && self.allocation.estates.get() == self.storage.budgets.estates.get()
                 && self.allocation.engine_bytes.get() == self.storage.budgets.process_bytes.get()
+                && self
+                    .storage
+                    .budgets
+                    .aggregate_process_bytes
+                    .is_none_or(|pool| pool == self.allocation.engine_bytes)
+                && (self.allocation.estates.get() == 1
+                    || self.storage.budgets.aggregate_process_bytes.is_some())
                 && self.allocation.host_bytes.get() == self.storage.budgets.host_bytes.get(),
             "allocation and storage budget identity differ",
         )?;
@@ -365,7 +397,7 @@ impl NativeMetric {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AllocationEnforcement {
     ObservedOnly,
@@ -663,6 +695,7 @@ pub struct SustainedSegment {
     pub cold_start: Option<ColdStartEvidence>,
     pub reopens: Option<ReopenEvidence>,
     pub backup: Option<BackupEvidence>,
+    pub reader: Option<ReaderInterferenceEvidence>,
     /// Frozen before this segment's operations; full candidate/environment and
     /// installed configuration must equal the campaign's template identities.
     pub manifest: StorageManifest,
@@ -760,7 +793,7 @@ impl CampaignWriter {
         let bytes = encode_bounded(&campaign, MAX_DOCUMENT_BYTES)?;
         require(
             (bytes.len() as u64)
-                .checked_add(MAX_DOCUMENT_BYTES)
+                .checked_add(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES)
                 .and_then(|n| n.checked_add(4096))
                 .is_some_and(|n| n <= campaign.evidence.total_bytes.get()),
             "campaign identity exceeds artifact budget",
@@ -798,7 +831,7 @@ impl CampaignWriter {
             .total_bytes
             .get()
             .checked_sub(self.bytes)
-            .and_then(|n| n.checked_sub(MAX_DOCUMENT_BYTES))
+            .and_then(|n| n.checked_sub(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES))
             .and_then(|n| n.checked_sub(self.campaign.evidence.segment_bytes.get()))
             .ok_or("progress has no reserved evidence capacity")?;
         self.progress
@@ -830,7 +863,7 @@ impl CampaignWriter {
             self.bytes
                 .checked_add(self.campaign.evidence.segment_bytes.get())
                 .and_then(|n| n.checked_add(self.progress_bytes().ok()?))
-                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES))
+                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES))
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "next operating point has no reserved evidence capacity",
         )
@@ -853,7 +886,7 @@ impl CampaignWriter {
         // reporting space. Failed OS writes remain failed, never counted complete.
         require(
             next.checked_add(self.progress_bytes()?)
-                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES))
+                .and_then(|n| n.checked_add(MAX_DOCUMENT_BYTES + MAX_LAUNCH_RECEIPT_BYTES))
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "campaign artifact quota exhausted",
         )?;
@@ -947,7 +980,7 @@ impl CampaignWriter {
         let bytes = encode_bounded(&result, MAX_DOCUMENT_BYTES)?;
         require(
             artifact_bytes
-                .checked_add(bytes.len() as u64)
+                .checked_add(bytes.len() as u64 + MAX_LAUNCH_RECEIPT_BYTES)
                 .is_some_and(|n| n <= self.campaign.evidence.total_bytes.get()),
             "final result exceeds artifact quota",
         )?;
@@ -1135,6 +1168,29 @@ pub fn validate_segment(
                 .iter()
                 .any(|lane| lane.lane == CapacityLane::Cold),
             "cold lane omitted its native residency evidence",
+        )?;
+    }
+    if let Some(reader) = &segment.reader {
+        reader.validate()?;
+        require(
+            reader.opened_ns >= segment.started_ns && reader.released_ns <= segment.finished_ns,
+            "reader interference lies outside its segment",
+        )?;
+    }
+    for lane in segment
+        .lanes
+        .iter()
+        .filter(|lane| lane.lane == CapacityLane::ReaderPinInterference)
+    {
+        let reader = segment
+            .reader
+            .as_ref()
+            .ok_or("reader lane omitted raw ownership evidence")?;
+        require(
+            reader.qualifies(&segment.attempts)
+                && lane.repetitions.get() == 1
+                && digest("c07g.reader-interference", reader)? == lane.receipt_sha256,
+            "reader lane lacks overlapping ACK, maintenance or matching receipt",
         )?;
     }
     if let Some(backup) = &segment.backup {
@@ -1371,11 +1427,13 @@ pub fn validate_segment(
             if let Some(admission) = &storage.admission {
                 let limits = &campaign.storage.installed_configuration.storage;
                 require(
-                    admission.native_transactions <= limits.native_transactions
+                    admission.checkpoint_limit == limits.checkpoint_entries
+                        && admission.checkpoint_entries <= limits.checkpoint_entries
+                        && admission.native_transactions <= limits.native_transactions
                         && admission.native_transaction_bytes <= limits.native_transaction_bytes
                         && admission.active_read_views <= limits.active_read_views
                         && admission.pinned_read_bytes <= limits.pinned_read_bytes,
-                    "physical read owners exceed installed retention admission",
+                    "physical owners exceed or differ from installed retention admission",
                 )?;
             } else {
                 missing.insert("physical-read-ownership".to_owned().try_into()?);
@@ -1509,8 +1567,18 @@ fn validate_next(
 }
 
 fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool> {
-    if campaign.purpose != CampaignPurpose::Qualification
-        || result.status != CampaignStatus::Completed
+    if campaign.purpose != CampaignPurpose::Qualification || campaign.allocation.estates.get() != 1
+    {
+        return Ok(false);
+    }
+    satisfies_operating_requirements(campaign, result)
+}
+
+pub(super) fn satisfies_operating_requirements(
+    campaign: &StorageCampaign,
+    result: &CampaignResult,
+) -> Result<bool> {
+    if result.status != CampaignStatus::Completed
         || !result.limitations.is_empty()
         || result.segments == 0
         || result.failed_segment.is_some()
@@ -1593,7 +1661,7 @@ pub(super) fn encode_bounded(value: &impl Serialize, limit: u64) -> Result<Vec<u
     serde_json::to_writer(&mut output, value).map_err(|e| e.to_string())?;
     Ok(output.bytes)
 }
-fn write_new(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(super) fn write_new(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -1603,7 +1671,7 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<()> {
         .and_then(|()| file.sync_all())
         .map_err(|e| e.to_string())
 }
-fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
+pub(super) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
     let metadata = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     require(
         metadata.is_file() && !metadata.file_type().is_symlink() && metadata.len() <= limit,
@@ -1723,7 +1791,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
     }
     require(
         bytes
-            .checked_add(result_bytes.len() as u64)
+            .checked_add(result_bytes.len() as u64 + MAX_LAUNCH_RECEIPT_BYTES)
             .is_some_and(|n| n <= campaign.evidence.total_bytes.get()),
         "campaign total evidence quota exceeded",
     )?;
@@ -1751,17 +1819,38 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     fn limit(value: u64) -> Limit {
         value.try_into().unwrap()
     }
-    fn fixture() -> (StorageCampaign, SustainedSegment) {
+    #[test]
+    fn idle_segments_reserve_probe_time_and_respect_sample_capacity() {
+        let (mut campaign, _) = fixture();
+        campaign.storage.budgets.run_ms = limit(120_000);
+        campaign.schedule.operation_deadline_ms = limit(30_000);
+        campaign.schedule.sample_ms = limit(1000);
+        campaign.evidence.samples_per_segment = limit(256);
+        assert_eq!(campaign.idle_segment_ms(120_000).unwrap(), 90_000);
+        assert_eq!(campaign.idle_segment_ms(20_000).unwrap(), 20_000);
+        campaign.evidence.samples_per_segment = limit(4);
+        assert_eq!(campaign.idle_segment_ms(120_000).unwrap(), 2000);
+        campaign.evidence.samples_per_segment = limit(2);
+        assert!(campaign.idle_segment_ms(120_000).is_err());
+        campaign.evidence.samples_per_segment = limit(256);
+        campaign.schedule.operation_deadline_ms = limit(120_000);
+        assert!(campaign.idle_segment_ms(120_000).is_err());
+        campaign.schedule.operation_deadline_ms = limit(30_000);
+        assert!(campaign.idle_segment_ms(0).is_err());
+    }
+
+    pub(crate) fn fixture() -> (StorageCampaign, SustainedSegment) {
         // Contract fixtures deliberately do not represent native observations.
         let mut manifest: StorageManifest =
             serde_json::from_str(include_str!("../../tests/fixtures/storage/manifest.json"))
                 .unwrap();
         manifest.evidence_class = EvidenceClass::NativeCapacity;
+        manifest.budgets.estates = limit(1);
         let mut result: StorageResult =
             serde_json::from_str(include_str!("../../tests/fixtures/storage/result.json")).unwrap();
         result.manifest_sha256 = manifest_digest(&manifest).unwrap();
@@ -1853,6 +1942,7 @@ mod tests {
             cold_start: None,
             reopens: None,
             backup: None,
+            reader: None,
             manifest,
             result,
             attempts: vec![LoadAttempt {
@@ -1916,6 +2006,7 @@ mod tests {
         use super::super::{DrainOwnership, DrainSample};
         let (campaign, segment) = fixture();
         let owner = DrainOwnership {
+            checkpoint_entries: 0,
             native_transactions: 0,
             native_transaction_bytes: 0,
             active_read_views: 0,
@@ -1957,7 +2048,7 @@ mod tests {
             super::super::drain::check(&campaign, &[&warmup, row], &row.point, row.seed)
         };
         check(&drain).unwrap();
-        for field in 0..12 {
+        for field in 0..13 {
             let mut bad = drain.clone();
             let value = bad.drain_tail[0].ownership.as_mut().unwrap();
             match field {
@@ -1972,7 +2063,8 @@ mod tests {
                 8 => value.active_read_views = 1,
                 9 => value.pinned_read_bytes = 1,
                 10 => value.native_transactions = 1,
-                _ => value.native_transaction_bytes = 1,
+                11 => value.native_transaction_bytes = 1,
+                _ => value.checkpoint_entries = 1,
             }
             assert!(
                 check(&bad).is_err(),
@@ -2372,7 +2464,7 @@ mod tests {
         campaign.storage.profile = "fleet-isolation".to_owned().try_into().unwrap();
         assert!(super::super::capacity::validate_capacity_profile(&campaign)
             .unwrap_err()
-            .contains("estate evidence"));
+            .contains("allocation differs"));
         // Smaller arbitrary characterization remains representable, without qualification.
         fixture().0.validate().unwrap();
     }

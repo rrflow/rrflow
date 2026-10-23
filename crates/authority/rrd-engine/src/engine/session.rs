@@ -346,6 +346,7 @@ impl RrdEngine {
             {
                 return Err(ServiceError::IdempotencyConflict);
             }
+            self.release_session_storage_cursors(session_id)?;
             return Ok(termination(state.session_id, closure, true));
         }
         if state.token_sha256 != presented_sha256 {
@@ -389,6 +390,7 @@ impl RrdEngine {
             request_id,
             operation_id,
         )?;
+        self.release_session_storage_cursors(session_id)?;
         Ok(termination(session_id.clone(), &closure, false))
     }
 

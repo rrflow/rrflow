@@ -42,6 +42,9 @@ pub struct PhysicalStoreEvidence {
     pub retained_source_bytes: Option<u64>,
     pub peak_source_bytes: Option<u64>,
     pub denied_source_allocations: Option<u64>,
+
+    pub checkpoint_entries: Option<u64>,
+    pub checkpoint_limit: Option<u64>,
     pub native_transactions: Option<u64>,
     pub native_transaction_bytes: Option<u64>,
     pub active_read_views: Option<u64>,
@@ -117,6 +120,9 @@ impl PhysicalStoreEvidence {
             retained_source_bytes: None,
             peak_source_bytes: None,
             denied_source_allocations: None,
+
+            checkpoint_entries: None,
+            checkpoint_limit: None,
             native_transactions: None,
             native_transaction_bytes: None,
             active_read_views: None,

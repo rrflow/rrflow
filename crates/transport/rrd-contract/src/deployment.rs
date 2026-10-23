@@ -230,6 +230,8 @@ impl RecallLimits {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StorageLimits {
+    /// Named checkpoint-directory entry ceiling; restart required.
+    pub checkpoint_entries: u64,
     /// Native transaction owner count and logical buffer capacity; restart required.
     pub native_transactions: u64,
     pub native_transaction_bytes: u64,
@@ -274,6 +276,7 @@ pub struct StorageLimits {
 impl Default for StorageLimits {
     fn default() -> Self {
         Self {
+            checkpoint_entries: 1024,
             native_transactions: 64,
             native_transaction_bytes: 64 * 1024 * 1024,
             active_read_views: 1024,
@@ -319,6 +322,11 @@ impl StorageLimits {
         // the native adapter additionally checks host-size conversion.
         const MAX_BYTES: u64 = 1 << 40;
         const MAX_VERSIONS: u64 = 1 << 32;
+        validate_nonzero_max(
+            "storage checkpoint_entries",
+            self.checkpoint_entries,
+            65_536,
+        )?;
         validate_nonzero_max(
             "storage native_transactions",
             self.native_transactions,

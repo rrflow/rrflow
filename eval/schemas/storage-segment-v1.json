@@ -241,6 +241,17 @@
       "additionalProperties": false,
       "description": "Proposed, frozen laboratory ceilings. They are NOT installed configuration.\nByte reservations are disjoint; recovery replay bytes differ from memory.",
       "properties": {
+        "aggregate_process_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Limit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-estate disjoint reservations must fit this aggregate."
+        },
         "atomic_batch_bytes": {
           "$ref": "#/$defs/Limit"
         },
@@ -1087,6 +1098,16 @@
           "minimum": 0,
           "type": "integer"
         },
+        "checkpoint_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "denied_source_allocations": {
           "format": "uint64",
           "minimum": 0,
@@ -1150,6 +1171,8 @@
         }
       },
       "required": [
+        "checkpoint_entries",
+        "checkpoint_limit",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",
@@ -1922,6 +1945,72 @@
         }
       ]
     },
+    "ReaderInterferenceEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "cancelled": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "drained": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "maintenance_after": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "maintenance_before": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "observed": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "observed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "opened": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "opened_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "released": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "released_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "source_released": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        }
+      },
+      "required": [
+        "opened_ns",
+        "observed_ns",
+        "released_ns",
+        "opened",
+        "observed",
+        "cancelled",
+        "released",
+        "baseline",
+        "retained",
+        "source_released",
+        "drained",
+        "maintenance_before",
+        "maintenance_after"
+      ],
+      "type": "object"
+    },
     "ReasoningLimits": {
       "additionalProperties": false,
       "properties": {
@@ -2200,12 +2289,66 @@
       ],
       "type": "object"
     },
+    "StorageCursorSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "allocated_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cursor_id": {
+          "type": "string"
+        },
+        "page_ordinal": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_sha256": {
+          "type": "string"
+        },
+        "released": {
+          "type": "boolean"
+        },
+        "rows": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_open": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cursor_id",
+        "released",
+        "source_open",
+        "snapshot_sequence",
+        "page_ordinal",
+        "rows",
+        "allocated_bytes",
+        "page_sha256"
+      ],
+      "type": "object"
+    },
     "StorageLimits": {
       "additionalProperties": false,
       "description": "Installed native storage limits. These bound separately accounted owners,\nnot total process RSS. Changing them requires a new governed configuration\nand reopening storage; they are never hot-applied by a client.",
       "properties": {
         "active_read_views": {
           "description": "Aggregate live physical read owners and charged pinned bytes; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_entries": {
+          "description": "Named checkpoint-directory entry ceiling; restart required.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -2384,6 +2527,7 @@
         }
       },
       "required": [
+        "checkpoint_entries",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",
@@ -2637,6 +2781,16 @@
       "anyOf": [
         {
           "$ref": "#/$defs/Digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reader": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReaderInterferenceEvidence"
         },
         {
           "type": "null"

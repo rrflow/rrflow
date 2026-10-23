@@ -3,6 +3,7 @@ use super::*;
 pub struct RrdHttpServer {
     listener: TcpListener,
     app: Router,
+    state: Arc<AppState>,
     tls: Option<TlsAcceptor>,
 }
 
@@ -206,8 +207,13 @@ impl RrdHttpServer {
         let app = Router::new()
             .route(&websocket_endpoint.path, get(websocket_upgrade))
             .fallback(any(dispatch))
-            .with_state(state);
-        Ok(Self { listener, app, tls })
+            .with_state(Arc::clone(&state));
+        Ok(Self {
+            listener,
+            app,
+            state,
+            tls,
+        })
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -233,13 +239,26 @@ impl RrdHttpServer {
         F: Future<Output = ()> + Send + 'static,
     {
         let listener = tokio::net::TcpListener::from_std(self.listener)?;
-        if let Some(acceptor) = self.tls {
-            return serve_mtls(listener, self.app, acceptor, shutdown).await;
+        let state = self.state;
+        let serve = async move {
+            if let Some(acceptor) = self.tls {
+                return serve_mtls(listener, self.app, acceptor, shutdown).await;
+            }
+            axum::serve(listener, self.app)
+                .with_graceful_shutdown(shutdown)
+                .await
+                .map_err(HttpError::Io)
+        };
+        tokio::pin!(serve);
+        let mut sweep = tokio::time::interval(std::time::Duration::from_secs(1));
+        sweep.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                result = &mut serve => return result,
+                _ = sweep.tick() => state.service.reap_storage_cursors()
+                    .map_err(|error| HttpError::Contract(error.to_string()))?,
+            }
         }
-        axum::serve(listener, self.app)
-            .with_graceful_shutdown(shutdown)
-            .await
-            .map_err(HttpError::Io)
     }
 }
 

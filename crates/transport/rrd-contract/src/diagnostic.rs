@@ -451,6 +451,8 @@ pub struct DiagnosticRrflowKvSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiagnosticStorageAdmission {
+    pub checkpoint_entries: u64,
+    pub checkpoint_limit: u64,
     pub native_transactions: u64,
     pub native_transaction_bytes: u64,
     /// Actual live physical read views and conservative aggregate pin charge.
@@ -489,8 +491,10 @@ impl DiagnosticStorageSnapshot {
             return invalid("diagnostic storage observation time must be greater than zero");
         }
         if let Some(admission) = &self.admission {
-            if admission.retained_source_bytes > admission.peak_source_bytes
-                || self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
+            if self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
+                || !(1..=65_536).contains(&admission.checkpoint_limit)
+                || admission.checkpoint_entries > admission.checkpoint_limit
+                || admission.retained_source_bytes > admission.peak_source_bytes
                 || admission
                     .queued_requests
                     .checked_add(u64::from(admission.active))

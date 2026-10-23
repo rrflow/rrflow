@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "owner": "docs/roadmap/rrflow-1.0/gate-j.md",
-  "owner_projection_sha256": "dd05b9cf68b2e720b53b0feb9f519ed996e7970f2c739c614745945703268743",
+  "owner_projection_sha256": "4d8b30e45b0c53d96b27b8bd1b1a4a1bad70f2050e9f72853b2895c0e98f2e45",
   "record_payload_bytes": 1024,
   "profiles": [
     {
@@ -86,5 +86,30 @@
       "rates": [],
       "requires_estate_interference": false
     }
-  ]
+  ],
+  "thresholds": {
+    "nominal_rates": [
+      {
+        "profile": "desktop",
+        "requests_per_second": 25
+      },
+      {
+        "profile": "single-service-estate",
+        "requests_per_second": 100
+      }
+    ],
+    "point_read": {
+      "p95_ns": 50000000,
+      "p99_ns": 200000000
+    },
+    "mixed_write": {
+      "p95_ns": 100000000,
+      "p99_ns": 500000000
+    },
+    "range_read": {
+      "p95_ns": 250000000,
+      "p99_ns": 1000000000
+    },
+    "maximum_error_basis_points": 10
+  }
 }

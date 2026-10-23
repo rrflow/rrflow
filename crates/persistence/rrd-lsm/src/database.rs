@@ -98,6 +98,8 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Maximum named checkpoint-directory entries, including interrupted temporary files.
+    pub checkpoint_entries: usize,
     pub transaction_limits: crate::TransactionLimits,
     /// Per-open aggregate ownership ceilings, independent of caller budgets.
     pub active_read_views: usize,
@@ -126,6 +128,7 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            checkpoint_entries: crate::manifest::DEFAULT_CHECKPOINT_ENTRIES,
             transaction_limits: crate::TransactionLimits::default(),
             active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
             pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
@@ -150,6 +153,11 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     pub(crate) fn validate(self) -> Result<Self> {
+        if self.checkpoint_entries == 0 || self.checkpoint_entries > 65_536 {
+            return Err(Error::InvalidConfiguration(
+                "checkpoint entries must be in 1..=65536".into(),
+            ));
+        }
         if self.source_page_bytes == 0
             || self.projected_output_bytes == 0
             || self.recovery_reserve_bytes == 0
@@ -450,7 +458,8 @@ impl Database {
         }
         let root = root.pin_directory()?;
         let root = root.with_recovery_reserve(options.recovery_reserve_bytes)?;
-        let manifests = ManifestStore::create_anchored(&root)?;
+        let manifests = ManifestStore::create_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         root.join(WAL_DIRECTORY).create_dir()?;
         root.join(SEGMENT_DIRECTORY).create_dir()?;
         let manifest = new_manifest(1, None, 0, 0, 1, Vec::new(), application_format)?;
@@ -521,10 +530,16 @@ impl Database {
         let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
-        let manifests = ManifestStore::open_existing_anchored(&root)?;
+        let manifests = ManifestStore::open_existing_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         let (_, manifest) = manifests
             .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::boundary(
+            crate::crash_test::Point::RecoveryManifest,
+            root.diagnostic_path(),
+        );
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
         let page_cache = new_page_cache_with_limits(
             options.page_cache_bytes,
@@ -1383,6 +1398,10 @@ impl Database {
 
     pub fn checkpoint(&self, name: &str, at: u64) -> Result<Checkpoint> {
         self.manifests.checkpoint(name, &self.manifest.digest, at)
+    }
+
+    pub fn checkpoint_ownership(&self) -> Result<(u64, u64)> {
+        self.manifests.checkpoint_ownership()
     }
 
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {

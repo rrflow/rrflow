@@ -19,6 +19,7 @@ pub(super) fn installed_storage_options(
         })
     };
     let mut options = rrd_store::DatabaseOptions {
+        checkpoint_entries: native("checkpoint_entries", policy.checkpoint_entries)?,
         recovery_reserve_bytes: policy.recovery_reserve_bytes,
         ..rrd_store::DatabaseOptions::default()
     };
@@ -105,6 +106,7 @@ pub struct RrdEngine {
     /// resource descriptors are public; credentials and runtime sessions are
     /// never serialized into durable RRD state.
     pub(crate) embedding_backends: Mutex<rrd_inference::EmbeddingBackendRegistry>,
+    pub(in crate::engine) storage_cursors: Mutex<super::storage_cursor::CursorRegistry>,
 }
 impl RrdEngine {
     pub fn create_new(root: &Path, instance: CanonicalId, token_key: [u8; 32]) -> Result<Self> {
@@ -261,6 +263,7 @@ impl RrdEngine {
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
+            storage_cursors: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -302,6 +305,7 @@ impl RrdEngine {
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
+            storage_cursors: Mutex::new(BTreeMap::new()),
         })
     }
 

@@ -4,6 +4,17 @@
       "additionalProperties": false,
       "description": "Proposed, frozen laboratory ceilings. They are NOT installed configuration.\nByte reservations are disjoint; recovery replay bytes differ from memory.",
       "properties": {
+        "aggregate_process_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Limit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-estate disjoint reservations must fit this aggregate."
+        },
         "atomic_batch_bytes": {
           "$ref": "#/$defs/Limit"
         },
@@ -671,6 +682,16 @@
           "minimum": 0,
           "type": "integer"
         },
+        "checkpoint_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "denied_source_allocations": {
           "format": "uint64",
           "minimum": 0,
@@ -734,6 +755,8 @@
         }
       },
       "required": [
+        "checkpoint_entries",
+        "checkpoint_limit",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",
@@ -1294,6 +1317,12 @@
           "minimum": 0,
           "type": "integer"
         },
+        "checkpoint_entries": {
+          "description": "Named checkpoint-directory entry ceiling; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "compaction_elapsed_ms": {
           "format": "uint64",
           "minimum": 0,
@@ -1468,6 +1497,7 @@
         }
       },
       "required": [
+        "checkpoint_entries",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",

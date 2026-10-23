@@ -594,6 +594,7 @@ projected_output_bytes = 134217728
 source_page_bytes = 268435456
 native_transactions = 64
 native_transaction_bytes = 67108864
+checkpoint_entries = 1024
 active_read_views = 1024
 pinned_read_bytes = 4294967296
 page_cache_bytes = 4194304

@@ -1,9 +1,10 @@
 //! Refresh synthetic contract projections after an intentional contract change.
 //! This does not run a workload or produce native storage qualification.
 use rrflow_eval::storage::{
-    catalogue_digest, manifest_digest, schema, validate_result, CampaignResult, EvidenceClass,
-    ProgressEvent, StorageCampaign, StorageManifest, StorageResult, SustainedSegment,
-    ValidationReport,
+    catalogue_digest, manifest_digest, schema, validate_result, CampaignResult, CandidateCiReceipt,
+    EvidenceClass, FleetResult, FleetTrialResult, ProgressEvent, StorageAcceptanceManifest,
+    StorageAcceptanceReport, StorageCampaign, StorageLaunchReceipt, StorageManifest, StorageResult,
+    SustainedSegment, ValidationReport,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -65,6 +66,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write(
         &schemas.join("storage-progress-event-v1.json"),
         &schema::<ProgressEvent>(),
+    )?;
+    write(
+        &schemas.join("storage-fleet-result-v1.json"),
+        &schema::<FleetResult>(),
+    )?;
+    write(
+        &schemas.join("storage-fleet-trial-v1.json"),
+        &schema::<FleetTrialResult>(),
+    )?;
+    write(
+        &schemas.join("storage-acceptance-manifest-v1.json"),
+        &schema::<StorageAcceptanceManifest>(),
+    )?;
+    write(
+        &schemas.join("storage-acceptance-report-v1.json"),
+        &schema::<StorageAcceptanceReport>(),
+    )?;
+    write(
+        &schemas.join("storage-candidate-ci-v1.json"),
+        &schema::<CandidateCiReceipt>(),
+    )?;
+    write(
+        &schemas.join("storage-launch-v1.json"),
+        &schema::<StorageLaunchReceipt>(),
     )?;
     println!("refreshed synthetic storage contract projections; no native workload executed");
     Ok(())

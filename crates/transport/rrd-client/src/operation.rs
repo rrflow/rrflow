@@ -475,6 +475,26 @@ impl RrdClient {
         Ok(snapshot)
     }
 
+    pub async fn inspect_storage_cursor(
+        &self,
+        session: &Session,
+        request: rrd_contract::InspectStorageCursor,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::StorageCursorSnapshot> {
+        let result: rrd_contract::StorageCursorSnapshot = self
+            .session_call(
+                Method::POST,
+                "/v1/diagnostics/storage/cursor",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
     /// Bounded physical observations without materializing graph history.
     pub async fn read_storage_diagnostics(
         &self,

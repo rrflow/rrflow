@@ -34,6 +34,7 @@ impl DrainPolicy {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DrainOwnership {
+    pub checkpoint_entries: u64,
     pub native_transactions: u64,
     pub native_transaction_bytes: u64,
     pub active_read_views: u64,
@@ -62,6 +63,7 @@ impl From<&ResourceSample> for DrainSample {
             let admission = storage.admission.as_ref()?;
             let native = storage.rrflow_kv.as_ref()?;
             Some(DrainOwnership {
+                checkpoint_entries: admission.checkpoint_entries,
                 native_transactions: admission.native_transactions,
                 native_transaction_bytes: admission.native_transaction_bytes,
                 active_read_views: admission.active_read_views,
@@ -140,7 +142,8 @@ pub(super) fn check(
             .as_ref()
             .ok_or("drain ownership observation unavailable")?;
         require(
-            owner.native_transactions <= baseline.native_transactions
+            owner.checkpoint_entries <= baseline.checkpoint_entries
+                && owner.native_transactions <= baseline.native_transactions
                 && owner.native_transaction_bytes <= baseline.native_transaction_bytes
                 && owner.active_read_views <= baseline.active_read_views
                 && owner.pinned_read_bytes <= baseline.pinned_read_bytes
