@@ -441,3 +441,13 @@ explicit resource-exhaustion classification at the public query boundary.
 Seventy query tests and 163 engine tests pass, including cap/cap-minus-one,
 historical/schema changes and native reopen. Exact current native comparison,
 complete profile qualification, soak and candidate CI remain required.
+
+The [bounded control-journal repair](../../evidence/change-journals/gate-c/c-07g-bounded-control-journal.md)
+removes whole-META materialization before page limits. A three-entry native
+page previously exceeded an 8 KiB ceiling; ordered pagination, reopen,
+corruption rejection and oversized-page denial now pass. All 221 store tests
+and five engine backup tests pass. Linux06/07 completed the 1,000-record corpus
+but failed backup interference at the 128 MiB projected-output ceiling; exact
+candidate native comparison remains required. Projected-read admission still
+loses its typed classification through generic substrate/internal errors.
+These bounded repairs and failed characterizations do not close C-07.
