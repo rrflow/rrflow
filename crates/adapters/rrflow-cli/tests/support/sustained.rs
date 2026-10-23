@@ -24,6 +24,8 @@ mod lifecycle;
 mod native;
 #[path = "sustained/reader.rs"]
 mod reader;
+#[path = "sustained/resource_window.rs"]
+mod resource_window;
 #[path = "sustained/workload.rs"]
 mod workload;
 use workload::{Prepared, Workload};
@@ -243,6 +245,7 @@ struct PointRun<'a> {
     clock: Instant,
     allocation: Option<NativeAllocationReceipt>,
     generations: Vec<u64>,
+    previous_resources: Vec<ResourceSample>,
 }
 
 impl PointRun<'_> {
@@ -460,7 +463,22 @@ impl PointRun<'_> {
             seed: self.workload.seed,
             expected_ledger_sha256: expected_digest(&ledger.expected)?,
         }];
-        let mut resources = vec![self.sample(writer).await?];
+        // Offered windows may overlap when the preceding segment drains late.
+        // Its actual observations still cover that time; never invent a new
+        // origin or lose their evidence merely because the ledger changed.
+        let mut resources = resource_window::overlapping_samples(
+            &self.previous_resources,
+            started,
+            self.pid,
+            campaign.evidence.samples_per_segment.get() as usize,
+        )?;
+        for value in &resources {
+            writer.record_event(&ProgressEvent::Resource {
+                segment: writer.next_index(),
+                sample: Box::new(value.clone()),
+            })?;
+        }
+        resources.push(self.sample(writer).await?);
         let held_reader = if phase == LoadPhase::Measured
             && campaign
                 .required_lanes
@@ -684,6 +702,9 @@ impl PointRun<'_> {
                 acknowledged_readback_verified: verified,
             });
         }
+        // One admitted segment only. A failure to append/validate the segment
+        // stops the campaign, so unvalidated observations cannot advance it.
+        self.previous_resources.clone_from(&resources);
         Ok(SustainedSegment {
             format_version: 1,
             campaign_sha256: writer.identity().clone(),
@@ -1243,6 +1264,7 @@ async fn run_estate(
                 clock,
                 allocation: allocation.clone(),
                 generations: vec![0; campaign.evidence.segment_attempts.get() as usize],
+                previous_resources: Vec::new(),
             };
             for phase in [
                 LoadPhase::Warmup,

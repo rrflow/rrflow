@@ -383,3 +383,11 @@ before restart. Fleet and Linux small runs have exact histories and no rejected
 or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
 All remain characterization. Required corpus profiles, complete 24-hour evidence,
 current-candidate CI and final acceptance reconciliation remain open.
+
+The [overlapping resource-window repair](../../evidence/change-journals/gate-c/c-07g-overlapping-resource-windows.md)
+preserves real samples collected by a preceding late segment inside the next
+offered window. Windows campaign13 stopped after 255 completed segments because
+those observations were omitted, producing an apparent initial coverage gap.
+The fix keeps timestamps, bounds and late/rejected attempts intact. That failed
+42.86-minute run remains retained; fresh native and 24-hour acceptance remain
+open.
