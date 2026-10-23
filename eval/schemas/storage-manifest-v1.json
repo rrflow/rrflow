@@ -4,6 +4,17 @@
       "additionalProperties": false,
       "description": "Proposed, frozen laboratory ceilings. They are NOT installed configuration.\nByte reservations are disjoint; recovery replay bytes differ from memory.",
       "properties": {
+        "aggregate_process_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Limit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-estate disjoint reservations must fit this aggregate."
+        },
         "atomic_batch_bytes": {
           "$ref": "#/$defs/Limit"
         },
@@ -592,6 +603,111 @@
       ],
       "type": "object"
     },
+    "DiagnosticStorageAdmission": {
+      "additionalProperties": false,
+      "description": "Process-local physical storage observation for the instance's storage\nprofile. It carries `observation` authority: counters are measured at\n`observed_at_unix_ms`, are not bound to the read stamp, and reset when the\nprocess reopens its store.",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "active_read_views": {
+          "description": "Actual live physical read views and conservative aggregate pin charge.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "denied_source_allocations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fenced": {
+          "type": "boolean"
+        },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_logical_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_requests": {
+          "description": "Includes the active request plus admitted waiters, matching admission.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "peak_source_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "queued_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_bytes": {
+          "description": "Logical owner charges; these are not allocator or process RSS bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_projected_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_source_bytes": {
+          "description": "Owned source-page allocation charges; excludes borrowed mmap residency.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checkpoint_entries",
+        "checkpoint_limit",
+        "native_transactions",
+        "native_transaction_bytes",
+        "active_read_views",
+        "pinned_read_bytes",
+        "retained_mutable_bytes",
+        "retained_projected_bytes",
+        "retained_source_bytes",
+        "peak_source_bytes",
+        "denied_source_allocations",
+        "outstanding_requests",
+        "outstanding_logical_bytes",
+        "queued_requests",
+        "active",
+        "fenced"
+      ],
+      "type": "object"
+    },
     "DiagnosticStorageEvidenceLevel": {
       "description": "How much physical evidence the instance's storage profile reports.",
       "oneOf": [
@@ -609,8 +725,17 @@
     },
     "DiagnosticStorageSnapshot": {
       "additionalProperties": false,
-      "description": "Process-local physical storage observation for the instance's storage\nprofile. It carries `observation` authority: counters are measured at\n`observed_at_unix_ms`, are not bound to the read stamp, and reset when the\nprocess reopens its store.",
       "properties": {
+        "admission": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiagnosticStorageAdmission"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "evidence_level": {
           "$ref": "#/$defs/DiagnosticStorageEvidenceLevel"
         },
@@ -970,6 +1095,18 @@
       "additionalProperties": false,
       "description": "Installed native storage limits. These bound separately accounted owners,\nnot total process RSS. Changing them requires a new governed configuration\nand reopening storage; they are never hot-applied by a client.",
       "properties": {
+        "active_read_views": {
+          "description": "Aggregate live physical read owners and charged pinned bytes; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_entries": {
+          "description": "Named checkpoint-directory entry ceiling; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "compaction_elapsed_ms": {
           "format": "uint64",
           "minimum": 0,
@@ -1015,7 +1152,23 @@
           "minimum": 0,
           "type": "integer"
         },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "description": "Native transaction owner count and logical buffer capacity; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "page_cache_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_read_bytes": {
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -1101,6 +1254,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "source_page_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "transaction_admission_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1123,10 +1281,16 @@
         }
       },
       "required": [
+        "checkpoint_entries",
+        "native_transactions",
+        "native_transaction_bytes",
+        "active_read_views",
+        "pinned_read_bytes",
         "recovery_reserve_bytes",
         "mutable_accounted_bytes",
         "mutable_versions",
         "projected_output_bytes",
+        "source_page_bytes",
         "page_cache_bytes",
         "wal_flush_target_bytes",
         "memtable_flush_target_versions",
