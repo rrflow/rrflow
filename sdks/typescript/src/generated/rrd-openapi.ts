@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 28fdf404064be9b507ed2bc2780242ce15237eabe86cee5a7297af4470d4da3c
+// OpenAPI SHA-256: 13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -21163,6 +21163,11 @@ export interface operations {
                             /** Format: uint64 */
                             max_steps: number;
                         };
+                        /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                        repetition_policy?: {
+                            /** Format: uint64 */
+                            max_equivalent_attempts: number;
+                        } | null;
                         scope: string;
                         /**
                          * @description A canonical public identifier component.
@@ -21217,6 +21222,9 @@ export interface operations {
                                     configuration_sha256: string;
                                     /** Format: uint64 */
                                     deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
                                     /**
                                      * @description Conservative persisted observation; only explicit future reconciliation
                                      *     may clear uncertainty about non-cooperative external work.
@@ -21245,6 +21253,11 @@ export interface operations {
                                         /** Format: uint64 */
                                         max_steps: number;
                                     };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
                                     /** Format: uint64 */
                                     reserved_steps: number;
                                     scope: string;
@@ -21252,7 +21265,7 @@ export interface operations {
                                     started_at_unix_ms: number;
                                     stop_expected_sha256?: string | null;
                                     /** @enum {string|null} */
-                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | null;
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -21306,6 +21319,9 @@ export interface operations {
                                     configuration_sha256: string;
                                     /** Format: uint64 */
                                     deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
                                     /**
                                      * @description Conservative persisted observation; only explicit future reconciliation
                                      *     may clear uncertainty about non-cooperative external work.
@@ -21334,6 +21350,11 @@ export interface operations {
                                         /** Format: uint64 */
                                         max_steps: number;
                                     };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
                                     /** Format: uint64 */
                                     reserved_steps: number;
                                     scope: string;
@@ -21341,7 +21362,7 @@ export interface operations {
                                     started_at_unix_ms: number;
                                     stop_expected_sha256?: string | null;
                                     /** @enum {string|null} */
-                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | null;
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -21450,6 +21471,9 @@ export interface operations {
                                     configuration_sha256: string;
                                     /** Format: uint64 */
                                     deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
                                     /**
                                      * @description Conservative persisted observation; only explicit future reconciliation
                                      *     may clear uncertainty about non-cooperative external work.
@@ -21478,6 +21502,11 @@ export interface operations {
                                         /** Format: uint64 */
                                         max_steps: number;
                                     };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
                                     /** Format: uint64 */
                                     reserved_steps: number;
                                     scope: string;
@@ -21485,7 +21514,7 @@ export interface operations {
                                     started_at_unix_ms: number;
                                     stop_expected_sha256?: string | null;
                                     /** @enum {string|null} */
-                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | null;
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -21539,6 +21568,9 @@ export interface operations {
                                     configuration_sha256: string;
                                     /** Format: uint64 */
                                     deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
                                     /**
                                      * @description Conservative persisted observation; only explicit future reconciliation
                                      *     may clear uncertainty about non-cooperative external work.
@@ -21567,6 +21599,11 @@ export interface operations {
                                         /** Format: uint64 */
                                         max_steps: number;
                                     };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
                                     /** Format: uint64 */
                                     reserved_steps: number;
                                     scope: string;
@@ -21574,7 +21611,7 @@ export interface operations {
                                     started_at_unix_ms: number;
                                     stop_expected_sha256?: string | null;
                                     /** @enum {string|null} */
-                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | null;
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -21684,6 +21721,9 @@ export interface operations {
                                     configuration_sha256: string;
                                     /** Format: uint64 */
                                     deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
                                     /**
                                      * @description Conservative persisted observation; only explicit future reconciliation
                                      *     may clear uncertainty about non-cooperative external work.
@@ -21712,6 +21752,11 @@ export interface operations {
                                         /** Format: uint64 */
                                         max_steps: number;
                                     };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
                                     /** Format: uint64 */
                                     reserved_steps: number;
                                     scope: string;
@@ -21719,7 +21764,7 @@ export interface operations {
                                     started_at_unix_ms: number;
                                     stop_expected_sha256?: string | null;
                                     /** @enum {string|null} */
-                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | null;
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -21773,6 +21818,9 @@ export interface operations {
                                     configuration_sha256: string;
                                     /** Format: uint64 */
                                     deadline_unix_ms: number;
+                                    equivalent_attempts?: {
+                                        [key: string]: number;
+                                    };
                                     /**
                                      * @description Conservative persisted observation; only explicit future reconciliation
                                      *     may clear uncertainty about non-cooperative external work.
@@ -21801,6 +21849,11 @@ export interface operations {
                                         /** Format: uint64 */
                                         max_steps: number;
                                     };
+                                    /** @description Optional bound on equivalent embedding attempts across the entire task. */
+                                    repetition_policy?: {
+                                        /** Format: uint64 */
+                                        max_equivalent_attempts: number;
+                                    } | null;
                                     /** Format: uint64 */
                                     reserved_steps: number;
                                     scope: string;
@@ -21808,7 +21861,7 @@ export interface operations {
                                     started_at_unix_ms: number;
                                     stop_expected_sha256?: string | null;
                                     /** @enum {string|null} */
-                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | null;
+                                    stopped?: "step_limit" | "deadline" | "cancelled" | "clock_rollback" | "configuration_changed" | "unresolved_attempt" | "attempt_failed" | "repeated_work" | "repetition_tracking_limit" | null;
                                     /**
                                      * @description A canonical public identifier component.
                                      *

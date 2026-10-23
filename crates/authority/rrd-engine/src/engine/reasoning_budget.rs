@@ -7,6 +7,7 @@ use rrd_inference::{EmbeddingCancellation, EmbeddingExecutionControl};
 
 mod persistence;
 mod public;
+mod repetition;
 
 pub use rrd_contract::{ReasoningBudgetStop, TaskReasoningBudget};
 
@@ -204,6 +205,8 @@ impl RrdEngine {
             execution_may_continue: false,
             stopped: None,
             stop_expected_sha256: None,
+            repetition_policy: None,
+            equivalent_attempts: BTreeMap::new(),
         });
         if let Some(reason) = budget.stopped {
             return Err(ServiceError::ReasoningBudgetStopped(reason));
@@ -213,7 +216,7 @@ impl RrdEngine {
                 ReasoningBudgetStop::UnresolvedAttempt,
             ));
         }
-        let stop = if at < budget.last_observed_at_unix_ms {
+        let mut stop = if at < budget.last_observed_at_unix_ms {
             Some(ReasoningBudgetStop::ClockRollback)
         } else if budget.configuration_sha256 != self.estate_configuration.configuration_sha256 {
             Some(ReasoningBudgetStop::ConfigurationChanged)
@@ -228,6 +231,14 @@ impl RrdEngine {
         } else {
             None
         };
+        let identity = if stop.is_none() && budget.repetition_policy.is_some() {
+            Some(self.embedding_repetition_identity(input.request)?)
+        } else {
+            None
+        };
+        if let Some(identity) = &identity {
+            stop = repetition::check(&budget, identity);
+        }
         budget.last_observed_at_unix_ms = budget.last_observed_at_unix_ms.max(at);
         if let Some(reason) = stop {
             budget.stopped = Some(reason);
@@ -241,6 +252,9 @@ impl RrdEngine {
             .checked_add(Duration::from_millis(remaining))
             .ok_or(ServiceError::DeadlineExceeded)?;
         budget.reserved_steps += 1;
+        if let Some(identity) = identity {
+            *budget.equivalent_attempts.entry(identity).or_default() += 1;
+        }
         budget.active_attempt = Some(input.attempt_id.clone());
         budget.execution_may_continue = true;
         let attempt = AttemptRecord {

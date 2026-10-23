@@ -144,6 +144,7 @@ async fn public_task_effort_executes_stops_and_replays_after_reopen() {
         .task
         .task_id;
     let config = ConfigureTaskBudget {
+        repetition_policy: None,
         scope: scope.clone(),
         task_id: task.clone(),
         limits: ReasoningLimits {
@@ -288,7 +289,7 @@ async fn public_task_effort_executes_stops_and_replays_after_reopen() {
             .unwrap(),
         stopped
     );
-    let mut next = execute;
+    let mut next = execute.clone();
     next.attempt_id = CorrelationId::new("second").unwrap();
     assert!(client
         .execute_task_embedding(session, next, mutation("after-stop"))
@@ -300,6 +301,84 @@ async fn public_task_effort_executes_stops_and_replays_after_reopen() {
         .read_task_budget(session, foreign, read("foreign"))
         .await
         .is_err());
+
+    let repeat_task = client
+        .open_task(
+            session,
+            OpenTask {
+                scope: scope.clone(),
+                title: "No repeated work".into(),
+                goal: "Detect cycles across request IDs".into(),
+            },
+            mutation("repeat-open"),
+        )
+        .await
+        .unwrap()
+        .task
+        .task_id;
+    let repeat_config = ConfigureTaskBudget {
+        scope: scope.clone(),
+        task_id: repeat_task.clone(),
+        limits: ReasoningLimits {
+            max_run_elapsed_ms: 60_000,
+            max_steps: 4,
+            max_step_elapsed_ms: 5_000,
+        },
+        repetition_policy: Some(TaskRepetitionPolicy {
+            max_equivalent_attempts: 1,
+        }),
+    };
+    client
+        .configure_task_budget(session, repeat_config.clone(), mutation("repeat-config"))
+        .await
+        .unwrap();
+    let mut repeat_request = ExecuteTaskEmbedding {
+        task_id: repeat_task.clone(),
+        ..execute
+    };
+    client
+        .execute_task_embedding(session, repeat_request.clone(), mutation("repeat-a"))
+        .await
+        .unwrap();
+    let original_bytes = repeat_request.request.inputs[0].bytes.clone();
+    repeat_request.attempt_id = CorrelationId::new("different-source").unwrap();
+    repeat_request.request.inputs[0].bytes.push(b'!');
+    client
+        .execute_task_embedding(session, repeat_request.clone(), mutation("repeat-b"))
+        .await
+        .unwrap();
+    repeat_request.attempt_id = CorrelationId::new("renamed-attempt").unwrap();
+    repeat_request.request.inputs[0].id = CanonicalId::new("renamed-input").unwrap();
+    repeat_request.request.inputs[0].bytes = original_bytes;
+    let error = client
+        .execute_task_embedding(session, repeat_request, mutation("repeat-a-again"))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(error, rrd_client::Error::Api { error, .. } if error.code == ErrorCode::FailedPrecondition)
+    );
+    let repeat_read = ReadTaskBudget {
+        scope: scope.clone(),
+        task_id: repeat_task,
+    };
+    let repeat_stopped = client
+        .read_task_budget(session, repeat_read.clone(), read("repeat-stopped"))
+        .await
+        .unwrap();
+    assert_eq!(
+        repeat_stopped.budget.as_ref().unwrap().stopped,
+        Some(ReasoningBudgetStop::RepeatedWork)
+    );
+    assert_eq!(repeat_stopped.budget.as_ref().unwrap().reserved_steps, 2);
+    assert_eq!(
+        repeat_stopped
+            .budget
+            .as_ref()
+            .unwrap()
+            .equivalent_attempts
+            .len(),
+        2
+    );
     drop(client);
     shutdown.send(()).unwrap();
     running.await.unwrap().unwrap();
@@ -340,6 +419,20 @@ async fn public_task_effort_executes_stops_and_replays_after_reopen() {
             .await
             .unwrap(),
         stopped
+    );
+    assert_eq!(
+        client
+            .read_task_budget(session, repeat_read, read("reopened-repetition"))
+            .await
+            .unwrap(),
+        repeat_stopped
+    );
+    assert_eq!(
+        client
+            .configure_task_budget(session, repeat_config, mutation("reopened-repeat-config"))
+            .await
+            .unwrap(),
+        repeat_stopped
     );
     shutdown.send(()).unwrap();
     running.await.unwrap().unwrap();

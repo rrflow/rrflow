@@ -139,7 +139,7 @@ checked-in `Generated/OperationId.g.cs` contains:
 - wire operation name, HTTP method, route template, first authentication
   scheme, and mutation flag for each member; and
 - OpenAPI SHA-256
-  `28fdf404064be9b507ed2bc2780242ce15237eabe86cee5a7297af4470d4da3c`.
+  `13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814`.
 
 An earlier flat record incorrectly said 34 routes when the generator, enum,
 unit assertion, public catalogue, and OpenAPI projection contained 33. The

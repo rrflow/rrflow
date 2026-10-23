@@ -240,6 +240,36 @@ budget stays stopped across configuration retries, new sessions and reopen.
 There is no extension or reconciliation operation in this package. See the
 [public-flow evidence](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md).
 
+#### Configurable repeated embedding work
+
+`task-budget-configure` optionally accepts
+`"repetition_policy":{"max_equivalent_attempts":2}` alongside its existing
+limits. The value must be positive and no greater than `max_steps`. Omitting
+the policy preserves time/step-only admission. Once configured, the policy
+cannot be raised, disabled or replaced on that task. It consumes no separate
+budget authority: reservation atomically records its count in the existing
+task budget, with the existing runtime evidence event.
+
+Equivalence version 1 hashes the exact model digest, modality, dimensions and
+normalization plus a sorted multiset of media-type/content-digest inputs.
+Batch multiplicity is preserved. Attempt/session/input labels, backend aliases,
+batch order and runtime cursors advanced by budget events do not establish new
+embedding evidence. New bytes or model processing identity are distinct;
+ordinary source/authorization/deadline validation still applies. This is exact
+embedding-batch repetition control, not a judgement of semantic progress or
+reasoning quality. Whitespace changes are different bytes, and arbitrary
+router/context/fallback cycles still require their own governed admission.
+
+Counts cover the whole task, so an A/B/A cycle cannot reset A's allowance.
+Excess repetition persists `repeated_work` before another provider dispatch.
+Tracking retains at most 128 distinct digests. A new identity beyond that bound
+persists `repetition_tracking_limit`; no eviction silently enables old work.
+An existing identity may still spend its configured remainder while the map
+is full. Time/step exhaustion, unresolved work and durable Stop remain stronger
+admission fences. Reads expose the bounded digest/count map; accepted-result
+replay does not increment it. Reconnect and reopen preserve policy and counts.
+See the [repetition evidence](../../evidence/change-journals/gate-g/g-03-task-repetition.md).
+
 Extend that same engine-owned revision and eventual run admission with:
 
 | User control | Required engine semantics |

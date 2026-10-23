@@ -123,6 +123,15 @@ exact evidence and open boundaries; Gate G and POAM-009 stay open.
 
 ### Public effort flow and next implementation boundaries
 
+[PR104](https://github.com/rrflow/rrflow-development/pull/104) extends the public
+task budget with optional immutable repeated-embedding admission. It detects
+equivalent batches across changed labels/order, cycles and reopen, retaining
+at most 128 identities in the same durable owner. The
+[package evidence](../../evidence/change-journals/gate-g/g-03-task-repetition.md)
+records validation. This advances the existing no-progress prerequisite for
+embedding work only. General semantic route/context/fallback progress and
+installed qualification remain open; no gate checkbox changes.
+
 [PR103](https://github.com/rrflow/rrflow-development/pull/103) composes the
 existing task budget through six catalogue-owned operations: explicit bundled
 reference-adapter activation, immutable narrowed configuration, bounded task

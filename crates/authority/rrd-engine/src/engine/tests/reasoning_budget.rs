@@ -18,6 +18,242 @@ use std::time::Duration;
 
 const SCOPE: &str = "instance:test-instance";
 
+fn repetition_budget(
+    engine: &RrdEngine,
+    lease: &SessionLease,
+    task: &CanonicalId,
+    maximum: u64,
+) -> TaskReasoningBudget {
+    engine
+        .configure_task_budget(
+            &lease.session_id,
+            &lease.token,
+            &rrd_contract::ConfigureTaskBudget {
+                scope: SCOPE.into(),
+                task_id: task.clone(),
+                limits: engine.estate_configuration.reasoning.clone(),
+                repetition_policy: Some(rrd_contract::TaskRepetitionPolicy {
+                    max_equivalent_attempts: maximum,
+                }),
+            },
+            30,
+            "repetition-config",
+            "repetition-config",
+        )
+        .unwrap()
+        .budget
+        .unwrap()
+}
+
+#[test]
+fn repetition_denies_cycles_and_renamed_reordered_inputs_after_reopen() {
+    let (root, engine, lease, task, mut request, calls) = fixture(6);
+    request.inputs.push(EmbeddingInput {
+        id: CanonicalId::new("second").unwrap(),
+        media_type: "text/plain".into(),
+        bytes: b"another source".to_vec(),
+    });
+    let configured = repetition_budget(&engine, &lease, &task, 1);
+    let clock = FixedClock::at(configured.started_at_unix_ms + 1);
+    let first = call(&engine, &lease, &task, &request, "first", &clock).unwrap();
+    let mut changed = request.clone();
+    changed.inputs[0].bytes.push(b'!');
+    call(&engine, &lease, &task, &changed, "changed-source", &clock).unwrap();
+    let inner = FeatureHashBackend::new(32, 45).unwrap();
+    let mut descriptor = inner.descriptor().clone();
+    descriptor.id = "test:changed-model:cpu:v1".into();
+    let mut changed_model = request.clone();
+    changed_model.backend_id = descriptor.id.clone();
+    engine
+        .install_embedding_backend(CountedBackend {
+            inner,
+            descriptor: Some(descriptor),
+            calls: calls.clone(),
+            blocked: None,
+        })
+        .unwrap();
+    call(
+        &engine,
+        &lease,
+        &task,
+        &changed_model,
+        "changed-model",
+        &clock,
+    )
+    .unwrap();
+    assert_eq!(state(&engine, &lease, &task).equivalent_attempts.len(), 3);
+    drop(engine);
+    let mut engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
+    configure(&mut engine, 6);
+    let inner = FeatureHashBackend::new(32, 44).unwrap();
+    let mut descriptor = inner.descriptor().clone();
+    descriptor.id = "test:renamed-backend:cpu:v1".into();
+    engine
+        .install_embedding_backend(CountedBackend {
+            inner,
+            descriptor: Some(descriptor),
+            calls: calls.clone(),
+            blocked: None,
+        })
+        .unwrap();
+    let lease = engine
+        .create_session(
+            &session_request(9_000, 4),
+            &id("reconnected"),
+            40,
+            "reconnected",
+            "reconnected",
+        )
+        .unwrap();
+    let receipt = engine
+        .read_task_attempt(
+            &lease.session_id,
+            &lease.token,
+            &rrd_contract::ReadTaskAttempt {
+                scope: SCOPE.into(),
+                task_id: task.clone(),
+                attempt_id: id("first"),
+            },
+            45,
+            "receipt",
+            "receipt",
+        )
+        .unwrap();
+    assert_eq!(receipt.attempt.unwrap().result, Some(first));
+    assert!(matches!(
+        call(&engine, &lease, &task, &request, "first", &clock),
+        Err(ServiceError::ReasoningAttemptRecorded { .. })
+    ));
+    request.backend_id = "test:renamed-backend:cpu:v1".into();
+    request.inputs.reverse();
+    for (i, input) in request.inputs.iter_mut().enumerate() {
+        input.id = CanonicalId::new(format!("renamed-{i}")).unwrap();
+    }
+    assert!(matches!(
+        call(&engine, &lease, &task, &request, "renamed-attempt", &clock),
+        Err(ServiceError::ReasoningBudgetStopped(
+            ReasoningBudgetStop::RepeatedWork
+        ))
+    ));
+    let stopped = state(&engine, &lease, &task);
+    assert_eq!(stopped.reserved_steps, 3);
+    assert_eq!(stopped.deadline_unix_ms, configured.deadline_unix_ms);
+    assert_eq!(calls.load(Ordering::SeqCst), 6);
+    let mut policy_change = rrd_contract::ConfigureTaskBudget {
+        scope: SCOPE.into(),
+        task_id: task.clone(),
+        limits: configured.limits,
+        repetition_policy: None,
+    };
+    assert!(matches!(
+        engine.configure_task_budget(
+            &lease.session_id,
+            &lease.token,
+            &policy_change,
+            61,
+            "disable",
+            "disable"
+        ),
+        Err(ServiceError::IdempotencyConflict)
+    ));
+    policy_change.repetition_policy = Some(rrd_contract::TaskRepetitionPolicy {
+        max_equivalent_attempts: 2,
+    });
+    assert!(matches!(
+        engine.configure_task_budget(
+            &lease.session_id,
+            &lease.token,
+            &policy_change,
+            62,
+            "raise",
+            "raise"
+        ),
+        Err(ServiceError::IdempotencyConflict)
+    ));
+    drop(engine);
+    let mut engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
+    configure(&mut engine, 6);
+    assert_eq!(state(&engine, &lease, &task), stopped);
+}
+
+#[test]
+fn repetition_allowance_is_not_double_spent_by_competing_workers() {
+    let (_root, engine, lease, task, request, calls) = fixture(4);
+    let configured = repetition_budget(&engine, &lease, &task, 1);
+    let clock = FixedClock::at(configured.started_at_unix_ms + 1);
+    let barrier = Barrier::new(2);
+    let results = std::thread::scope(|threads| {
+        let run = |key| {
+            barrier.wait();
+            call(&engine, &lease, &task, &request, key, &clock)
+        };
+        let first = threads.spawn(move || run("one"));
+        let second = threads.spawn(move || run("two"));
+        [first.join().unwrap(), second.join().unwrap()]
+    });
+    assert_eq!(
+        results.iter().filter(|r| r.is_ok()).count(),
+        1,
+        "{results:?}"
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        call(&engine, &lease, &task, &request, "third", &clock),
+        Err(ServiceError::ReasoningBudgetStopped(
+            ReasoningBudgetStop::RepeatedWork
+        ))
+    ));
+    assert_eq!(state(&engine, &lease, &task).reserved_steps, 1);
+}
+
+#[test]
+fn repetition_history_is_bounded_without_evicting_old_identities() {
+    let (root, mut engine, lease, task, mut request, calls) = fixture(130);
+    engine.estate_configuration.reasoning.max_run_elapsed_ms = 60_000;
+    engine.estate_configuration.configuration_sha256 =
+        rrd_contract::estate_configuration_sha256(&engine.estate_configuration).unwrap();
+    let configured = repetition_budget(&engine, &lease, &task, 2);
+    let clock = FixedClock::at(configured.started_at_unix_ms + 1);
+    for index in 0..128 {
+        // One token guarantees a nonzero FeatureHash vector. Multi-token
+        // cancellation is a separate adapter deficiency, not this oracle.
+        request.inputs[0].bytes = format!("source{index}").into_bytes();
+        call(
+            &engine,
+            &lease,
+            &task,
+            &request,
+            &format!("attempt-{index}"),
+            &clock,
+        )
+        .unwrap();
+    }
+    request.inputs[0].bytes = b"source0".to_vec();
+    call(
+        &engine,
+        &lease,
+        &task,
+        &request,
+        "existing-remainder",
+        &clock,
+    )
+    .unwrap();
+    request.inputs[0].bytes = b"source128".to_vec();
+    assert!(matches!(
+        call(&engine, &lease, &task, &request, "over-capacity", &clock),
+        Err(ServiceError::ReasoningBudgetStopped(
+            ReasoningBudgetStop::RepetitionTrackingLimit
+        ))
+    ));
+    let stopped = state(&engine, &lease, &task);
+    assert_eq!(stopped.equivalent_attempts.len(), 128);
+    assert_eq!(stopped.reserved_steps, 129);
+    assert_eq!(calls.load(Ordering::SeqCst), 129);
+    drop(engine);
+    let engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
+    assert_eq!(state(&engine, &lease, &task), stopped);
+}
+
 #[test]
 fn public_budget_is_immutable_narrowed_and_stop_survives_provider_completion() {
     use rrd_contract::{
@@ -26,6 +262,7 @@ fn public_budget_is_immutable_narrowed_and_stop_survives_provider_completion() {
     };
     let (root, engine, lease, task, mut request, calls) = fixture(3);
     let config = ConfigureTaskBudget {
+        repetition_policy: None,
         scope: SCOPE.into(),
         task_id: task.clone(),
         limits: rrd_contract::ReasoningLimits {

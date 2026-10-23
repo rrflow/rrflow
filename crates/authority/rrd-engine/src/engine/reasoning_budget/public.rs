@@ -54,6 +54,7 @@ impl RrdEngine {
         let (expected, existing) = self.load_task_budget(&request.scope, &request.task_id)?;
         if let Some(existing) = existing {
             if existing.limits != request.limits
+                || existing.repetition_policy != request.repetition_policy
                 || existing.configuration_sha256 != self.estate_configuration.configuration_sha256
             {
                 return Err(ServiceError::IdempotencyConflict);
@@ -79,6 +80,8 @@ impl RrdEngine {
             execution_may_continue: false,
             stopped: None,
             stop_expected_sha256: None,
+            repetition_policy: request.repetition_policy.clone(),
+            equivalent_attempts: BTreeMap::new(),
         };
         self.commit_budget(
             &read,

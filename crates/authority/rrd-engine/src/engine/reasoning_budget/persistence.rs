@@ -47,6 +47,9 @@ impl RrdEngine {
             .map_err(contract_json)?;
         if let Some(state) = &state {
             state
+                .validate_repetition()
+                .map_err(|e| ServiceError::Storage(e.to_string()))?;
+            state
                 .limits
                 .validate()
                 .map_err(|e| ServiceError::Storage(e.to_string()))?;

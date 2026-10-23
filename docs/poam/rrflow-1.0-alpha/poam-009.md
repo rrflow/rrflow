@@ -98,6 +98,20 @@ unqualified. See the
 
 ## Owning gates
 
+Repeated-work capacity qualification exposed an existing FeatureHash adapter
+deficiency: signed token contributions can cancel to a zero vector, and its
+normalization divides by zero. The shared output validator rejects the
+non-finite result before acceptance, but the adapter needs an explicit
+zero-norm outcome and a regression under G-01a. This is not fixed by repetition
+admission; its bounded-history fixture uses single-token, nonzero vectors.
+
+[PR104](https://github.com/rrflow/rrflow-development/pull/104) adds optional
+immutable repeated-embedding limits to the same task budget, with bounded
+history and durable denial across cycles/reconnect/reopen. Its
+[evidence](../../evidence/change-journals/gate-g/g-03-task-repetition.md)
+does not qualify general semantic no-progress control or the missing governed
+router/context/fallback runner. POAM-009 remains open.
+
 [PR103](https://github.com/rrflow/rrflow-development/pull/103) exposes the same
 task embedding budget through the public catalogue, HTTP and Rust client, with
 explicit reference-adapter activation, narrowed immutable limits, durable Stop
@@ -117,6 +131,9 @@ Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
 Installed resource qualification depends on
 [Gate C](../../roadmap/rrflow-1.0/gate-c.md); public effort controls cannot
 replace its crash, capacity or sustained-load evidence.
+Vector validation and client-flow qualification remain dependencies under
+[Gate F](../../roadmap/rrflow-1.0/gate-f.md) and
+[Gate H](../../roadmap/rrflow-1.0/gate-h.md).
 
 ## Closure evidence
 
