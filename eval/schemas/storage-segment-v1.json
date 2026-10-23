@@ -421,6 +421,89 @@
       ],
       "type": "object"
     },
+    "CorpusEvidence": {
+      "additionalProperties": false,
+      "description": "Streaming corpus receipts bind generated input, acknowledged writes and a\nsecond complete readback pass without retaining the corpus in driver memory.",
+      "properties": {
+        "acknowledgement_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "anchor_records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "edges": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "encoded_mutation_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "logical_source_bytes": {
+          "description": "UTF-8 source payload only; vectors and protocol encoding are additional.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "records": {
+          "description": "Project documents; the separately counted graph anchor is not workload data.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vector_dimensions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vectors": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verified_records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "records",
+        "anchor_records",
+        "edges",
+        "vectors",
+        "vector_dimensions",
+        "logical_source_bytes",
+        "encoded_mutation_bytes",
+        "verified_records",
+        "started_ns",
+        "finished_ns",
+        "input_sha256",
+        "acknowledgement_sha256",
+        "readback_sha256"
+      ],
+      "type": "object"
+    },
     "DiagnosticMaintenanceSnapshot": {
       "additionalProperties": false,
       "description": "Cumulative flush and compaction work since the process opened the store.",
@@ -1929,6 +2012,16 @@
     },
     "campaign_sha256": {
       "$ref": "#/$defs/Digest"
+    },
+    "corpus": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CorpusEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "finished_ns": {
       "format": "uint64",

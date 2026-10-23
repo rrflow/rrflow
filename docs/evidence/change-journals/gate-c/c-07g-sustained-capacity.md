@@ -125,10 +125,9 @@ short-run rejection and quota admission before directory creation.
 ## Current limitations and stop conditions
 
 This is an in-progress implementation, not C-07 completion. The installed driver
-currently admits a single-estate, one-record linked characterization corpus;
-it explicitly denies full qualification/fleet execution until complete corpus
-seeding, lifecycle lanes, native allocation binding, longer-lived session
-handling and remaining native measurements are integrated. macOS native memory
+admits a single-estate configurable linked characterization corpus;
+it explicitly denies full qualification/fleet execution until lifecycle lanes,
+native allocation binding and remaining native measurements are integrated. macOS native memory
 enforcement is unavailable. Exhaustion/recovery and 100-cycle evidence belong
 to their prerequisite candidates. No 24-hour evidence exists for this change.
 
@@ -146,3 +145,53 @@ The native Windows memory walker now distinguishes reaching the supported
 address-space end from other query failures; partial mapping walks stay
 unavailable. Evidence capacity is reserved before the next operating point,
 with actual encoded/native write checks still applied at append.
+
+## Configurable corpus and long-lived session implementation
+
+Continued from `5060bcb88aefb757d3872b95d1e46d03061e425d`; merged the
+native-capacity dependency correction `117c388385db3c2f6bc879c1b8bc4dc54192e471`.
+The generated inventory conflicted during the merge. Staging the resolved
+index and regenerating it restored the mechanical projection; it was not
+resolved by choosing a stale branch copy.
+
+The ordinary sustained driver now seeds the requested document count with
+configured relation/vector fanout and dimensions, a minimum 1 KiB payload,
+and deterministic varying ASCII source data. The one-record admission guard
+is removed. Ceil-divided fanout can exceed a requested family minimum; the
+receipt records the actual counts, including the separate graph anchor.
+A complete second independent readback pass precedes measured load. Rolling
+input, ACK and readback digests keep one corpus request in memory instead of
+retaining every generated document. Typed corpus evidence is bound into the
+first warmup segment and qualification requires its presence. Source payload
+bytes and encoded mutation bytes remain separate; neither is physical disk
+footprint or cold-cache evidence.
+
+Setup has a frozen finite deadline, included in launcher/process lifetime.
+Single-record dimensions/fanout/payload and query output are admitted before
+allocation. Segment preparation is bounded by a conservative request-owner
+allowance, retained-byte budget and one quarter of the engine allocation;
+active requests have deadlines and segments have an additional bounded wall
+clock. These are driver bounds, not substituted engine enforcement.
+
+Session replacement occurs between joined segments and during streaming setup,
+after explicitly closing the previous session. Segment/drain intervals are
+bounded well below the absolute session lifetime. Query budgets now come from
+the sealed installation instead of requesting one million keys against the
+default one-hundred-thousand-key ceiling. Point reads include uniform and hot
+sets; bounded ranges validate every returned identity/value. Existing graph
+and vector readback checks now cover the configured fanout at one known cursor.
+
+Additional grounded reads: client session/backup operations, engine transaction
+and backup authority, installed lifecycle/reopen, contract deployment/query
+limits, sustained evidence writer/validator and J-04/C-07 workload owners.
+No new third-party implementation or research assumption was introduced.
+
+Validation: strict Clippy initially rejected a manual modulo predicate; changed
+to `is_multiple_of`. `cargo clippy -p rrflow-eval -p rrflow-cli --all-targets
+--locked -- -D warnings` then passed (0.91 seconds). The declared storage
+schema generator passed (3.65 seconds). Regression definitions cover complete
+corpus readback, missing families and setup deadline rejection. No local
+runtime suite or native campaign ran. Candidate CI remains required. Full
+lifecycle lanes, native allocation binding, fleet execution, update/delete
+histories and complete native qualification remain open; no objective,
+roadmap or POA&M completion status changed.

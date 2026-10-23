@@ -1429,6 +1429,10 @@
         "sample_ms": {
           "$ref": "#/$defs/Limit"
         },
+        "setup_ms": {
+          "$ref": "#/$defs/Limit",
+          "description": "Separate finite admission for corpus ingestion and full independent readback."
+        },
         "soak_ms": {
           "$ref": "#/$defs/Limit"
         },
@@ -1437,6 +1441,7 @@
         }
       },
       "required": [
+        "setup_ms",
         "warmup_ms",
         "measured_ms",
         "burst_ms",

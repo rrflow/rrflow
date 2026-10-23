@@ -2,7 +2,7 @@
 //! campaign out of ordinary correctness CI; failure artifacts are never green.
 use super::Estate;
 use rrd_client::RequestOptions;
-use rrd_contract::{CreateSession, ReadDiagnosticSnapshot, SessionLimits};
+use rrd_contract::{CloseSession, CreateSession, ReadDiagnosticSnapshot, SessionLimits};
 use rrflow_eval::storage::*;
 use std::{
     io::Read,
@@ -10,6 +10,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::task::JoinSet;
+#[path = "sustained/corpus.rs"]
+mod corpus;
 #[path = "sustained/native.rs"]
 mod native;
 #[path = "sustained/workload.rs"]
@@ -41,7 +43,7 @@ async fn session(
     estate: &Estate,
     client: rrd_client::RrdClient,
     seed: u64,
-    dimensions: u32,
+    campaign: &StorageCampaign,
     clients: u64,
     ordinal: u64,
 ) -> DriverResult<Workload> {
@@ -69,9 +71,75 @@ async fn session(
         client,
         session,
         valid_at: estate.at,
-        dimensions,
+        dimensions: campaign
+            .allocation
+            .vector_dimensions
+            .get()
+            .try_into()
+            .map_err(|_| "vector dimensions overflow")?,
         seed,
+        records: campaign.allocation.records.get(),
+        edges_per_record: campaign
+            .allocation
+            .edges
+            .get()
+            .div_ceil(campaign.allocation.records.get())
+            .try_into()
+            .map_err(|_| "edge fanout overflow")?,
+        vectors_per_record: campaign
+            .allocation
+            .vectors
+            .get()
+            .div_ceil(campaign.allocation.records.get())
+            .try_into()
+            .map_err(|_| "vector fanout overflow")?,
+        payload_bytes: campaign
+            .allocation
+            .logical_source_bytes
+            .get()
+            .div_ceil(campaign.allocation.records.get())
+            .max(1024)
+            .try_into()
+            .map_err(|_| "source payload overflow")?,
+        query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            .map_err(|e| e.to_string())?,
     })
+}
+
+/// Rotate only between bounded segments, after every in-flight request has
+/// joined. Closing the old lease prevents a day of accumulated live sessions.
+async fn rotate_session(
+    estate: &Estate,
+    work: &mut Workload,
+    campaign: &StorageCampaign,
+    clients: u64,
+    ordinal: &mut u64,
+    opened: &mut Instant,
+) -> DriverResult<()> {
+    if opened.elapsed() < Duration::from_secs(120) {
+        return Ok(());
+    }
+    let key = format!("capacity-close-{ordinal}");
+    work.client
+        .close_session(
+            &work.session,
+            CloseSession {},
+            RequestOptions::new(&key, &key, Some(&key), Some(u64::MAX)).unwrap(),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    *ordinal = ordinal.checked_add(1).ok_or("session ordinal overflow")?;
+    *work = session(
+        estate,
+        work.client.clone(),
+        work.seed,
+        campaign,
+        clients,
+        *ordinal,
+    )
+    .await?;
+    *opened = Instant::now();
+    Ok(())
 }
 
 async fn sample(workload: &Workload, pid: u32, clock: Instant) -> DriverResult<ResourceSample> {
@@ -236,6 +304,7 @@ impl PointRun<'_> {
             phase: LoadPhase::Drain,
             started_ns: started,
             finished_ns: ns(self.clock),
+            corpus: None,
             manifest,
             result,
             attempts: vec![],
@@ -428,6 +497,7 @@ impl PointRun<'_> {
             phase,
             started_ns: started,
             finished_ns: ns(self.clock),
+            corpus: None,
             manifest,
             result,
             attempts,
@@ -533,6 +603,9 @@ fn installed_sustained_capacity() {
 }
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
+    if campaign.schedule.operation_deadline_ms.get() > 60_000 {
+        return Err("installed request deadline exceeds the driver's one-minute bound".into());
+    }
     if campaign.allocation.estates.get() != 1 {
         return Err("fleet requires native aggregate estate driver".into());
     }
@@ -559,38 +632,41 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 LoadPhase::Soak,
             ]
             .into_iter()
-            .try_fold(600_000u64, |n, p| {
-                n.checked_add(campaign.schedule.duration_ms(p))
-            })
+            .try_fold(
+                campaign
+                    .schedule
+                    .setup_ms
+                    .get()
+                    .checked_add(600_000)
+                    .ok_or("setup deadline overflow")?,
+                |n, p| n.checked_add(campaign.schedule.duration_ms(p)),
+            )
             .ok_or("campaign deadline overflow")?;
             let (child, client, _) = estate.start_for(clock, Duration::from_millis(lifetime_ms));
-            let work = session(
+            let mut session_ordinal = 0;
+            let mut session_opened = Instant::now();
+            let mut work = session(
                 &estate,
                 client,
                 *seed,
-                campaign
-                    .allocation
-                    .vector_dimensions
-                    .get()
-                    .try_into()
-                    .map_err(|_| "vector dimensions overflow")?,
+                campaign,
                 point.clients.get(),
-                writer.next_index(),
+                session_ordinal,
             )
             .await?;
-            work.initialize().await?;
-            // Characterization is currently the one-record linked corpus. Reject a
-            // larger frozen allocation rather than label it as having been seeded.
-            if campaign.allocation.records.get() != 1
-                || campaign.allocation.edges.get() != 1
-                || campaign.allocation.vectors.get() != 1
-            {
-                return Err(
-                    "requested profile corpus has not been seeded by this characterization driver"
-                        .into(),
-                );
-            }
-            let driver = PointRun {
+            let mut corpus = Some(
+                corpus::seed(
+                    &estate,
+                    &mut work,
+                    campaign,
+                    point,
+                    clock,
+                    &mut session_ordinal,
+                    &mut session_opened,
+                )
+                .await?,
+            );
+            let mut driver = PointRun {
                 campaign,
                 point,
                 workload: work,
@@ -621,7 +697,16 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                         .ok_or("drain sample capacity must exceed two")?;
                     while remaining > 0 {
                         writer.admit_next()?;
-                        let duration = remaining.min(cap);
+                        rotate_session(
+                            &estate,
+                            &mut driver.workload,
+                            campaign,
+                            point.clients.get(),
+                            &mut session_ordinal,
+                            &mut session_opened,
+                        )
+                        .await?;
+                        let duration = remaining.min(cap).min(120_000);
                         writer.append(&driver.drain(writer, duration).await?)?;
                         remaining -= duration;
                     }
@@ -636,6 +721,15 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 let mut next = 0;
                 while next < count {
                     writer.admit_next()?;
+                    rotate_session(
+                        &estate,
+                        &mut driver.workload,
+                        campaign,
+                        point.clients.get(),
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
                     let active_ms = campaign
                         .storage
                         .budgets
@@ -643,14 +737,35 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                         .get()
                         .checked_sub(campaign.schedule.operation_deadline_ms.get())
                         .filter(|v| *v > 0)
-                        .ok_or("segment must reserve an operation deadline")?;
+                        .ok_or("segment must reserve an operation deadline")?
+                        .min(120_000);
                     let timed_cap = (u128::from(rate) * u128::from(active_ms) / 1000)
                         .max(1)
                         .min(u128::from(u64::MAX)) as u64;
                     let take = (count - next)
                         .min(campaign.evidence.segment_attempts.get())
-                        .min(timed_cap);
-                    let segment = driver.segment(writer, phase, origin, next, take).await?;
+                        .min(timed_cap)
+                        .min(
+                            campaign
+                                .storage
+                                .budgets
+                                .retained_bytes
+                                .get()
+                                .min(campaign.allocation.engine_bytes.get() / 4)
+                                / driver.workload.retained_request_bound().saturating_mul(2),
+                        );
+                    if take == 0 {
+                        return Err("prepared corpus exceeds retained driver admission".into());
+                    }
+                    let mut segment = tokio::time::timeout(
+                        Duration::from_millis(campaign.storage.budgets.run_ms.get().min(180_000)),
+                        driver.segment(writer, phase, origin, next, take),
+                    )
+                    .await
+                    .map_err(|_| "installed segment exceeded its frozen deadline")??;
+                    if phase == LoadPhase::Warmup && next == 0 {
+                        segment.corpus = corpus.take();
+                    }
                     writer.append(&segment)?;
                     next += take;
                 }

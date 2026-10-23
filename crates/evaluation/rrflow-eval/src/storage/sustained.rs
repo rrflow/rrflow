@@ -93,6 +93,8 @@ pub struct OperatingPoint {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SustainedSchedule {
+    /// Separate finite admission for corpus ingestion and full independent readback.
+    pub setup_ms: Limit,
     pub warmup_ms: Limit,
     pub measured_ms: Limit,
     pub burst_ms: Limit,
@@ -214,6 +216,10 @@ impl StorageCampaign {
                 "phase duration or sampling interval is invalid",
             )?;
         }
+        require(
+            self.schedule.setup_ms.get() <= 7 * 86_400_000,
+            "corpus setup exceeds the seven-day admission ceiling",
+        )?;
         require(
             self.schedule.operation_deadline_ms.get() <= self.storage.budgets.run_ms.get(),
             "operation deadline exceeds segment run bound",
@@ -344,6 +350,59 @@ pub struct LaneEvidence {
     pub acknowledged_readback_verified: bool,
 }
 
+/// Streaming corpus receipts bind generated input, acknowledged writes and a
+/// second complete readback pass without retaining the corpus in driver memory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CorpusEvidence {
+    /// Project documents; the separately counted graph anchor is not workload data.
+    pub records: u64,
+    pub anchor_records: u64,
+    pub edges: u64,
+    pub vectors: u64,
+    pub vector_dimensions: u64,
+    /// UTF-8 source payload only; vectors and protocol encoding are additional.
+    pub logical_source_bytes: u64,
+    pub encoded_mutation_bytes: u64,
+    pub verified_records: u64,
+    pub started_ns: u64,
+    pub finished_ns: u64,
+    pub input_sha256: Digest,
+    pub acknowledgement_sha256: Digest,
+    pub readback_sha256: Digest,
+}
+
+impl CorpusEvidence {
+    fn validate(&self, campaign: &StorageCampaign, before_ns: u64) -> Result<()> {
+        let allocation = &campaign.allocation;
+        require(
+            self.records == allocation.records.get()
+                && self.anchor_records == 1
+                && self.edges >= allocation.edges.get()
+                && self.vectors >= allocation.vectors.get()
+                && self.vector_dimensions == allocation.vector_dimensions.get()
+                && self.logical_source_bytes >= allocation.logical_source_bytes.get()
+                && self.encoded_mutation_bytes >= self.logical_source_bytes
+                && self.verified_records == self.records
+                && self.started_ns <= self.finished_ns
+                && self.finished_ns <= before_ns
+                && self.finished_ns - self.started_ns
+                    <= campaign.schedule.setup_ms.get() * NANOSECONDS_PER_MS
+                && [
+                    self.records,
+                    self.edges,
+                    self.vectors,
+                    self.logical_source_bytes,
+                    self.encoded_mutation_bytes,
+                    self.finished_ns,
+                ]
+                .iter()
+                .all(|v| *v <= MAX_EXACT_INTEGER),
+            "corpus is incomplete, exceeds setup admission or differs from allocation",
+        )
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SustainedSegment {
@@ -356,6 +415,7 @@ pub struct SustainedSegment {
     pub phase: LoadPhase,
     pub started_ns: u64,
     pub finished_ns: u64,
+    pub corpus: Option<CorpusEvidence>,
     /// Frozen before this segment's operations; full candidate/environment and
     /// installed configuration must equal the campaign's template identities.
     pub manifest: StorageManifest,
@@ -389,6 +449,7 @@ pub struct OperatingPointResult {
     pub missing_metrics: Vec<Id>,
     pub lanes: Vec<CapacityLane>,
     pub forced_reopens: u64,
+    pub corpus: Option<CorpusEvidence>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -658,7 +719,15 @@ pub fn validate_segment(
         missing_metrics: Vec::new(),
         lanes: Vec::new(),
         forced_reopens: 0,
+        corpus: segment.corpus.clone(),
     };
+    if let Some(corpus) = &segment.corpus {
+        require(
+            segment.phase == LoadPhase::Warmup && summary.first_sequence == 0,
+            "corpus receipt must precede the first warmup segment",
+        )?;
+        corpus.validate(campaign, segment.started_ns)?;
+    }
     let mut last = None;
     let rate = point.requests_per_second.get()
         * if segment.phase == LoadPhase::Burst {
@@ -836,6 +905,10 @@ fn merge_summary(
     let key = (value.point.clone(), value.seed, value.phase);
     if let Some(total) = totals.get_mut(&key) {
         require(
+            value.corpus.is_none(),
+            "corpus receipt repeated within operating point",
+        )?;
+        require(
             total.next_sequence == value.first_sequence
                 && total.schedule_origin_ns == value.schedule_origin_ns,
             "operating point omitted/repeated attempts or changed offered schedule",
@@ -924,6 +997,7 @@ fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool
                     return Ok(false);
                 };
                 if row.elapsed_ns < campaign.schedule.duration_ms(phase) * NANOSECONDS_PER_MS
+                    || (phase == LoadPhase::Warmup && row.corpus.is_none())
                     || row.unresolved != 0
                     || !row.missing_metrics.is_empty()
                     || (phase != LoadPhase::Drain && row.attempts == 0)
@@ -1156,6 +1230,7 @@ mod tests {
                 logical_source_bytes: limit(1),
             },
             schedule: SustainedSchedule {
+                setup_ms: limit(1000),
                 warmup_ms: limit(1000),
                 measured_ms: limit(1000),
                 burst_ms: limit(1000),
@@ -1214,6 +1289,7 @@ mod tests {
             phase: LoadPhase::Measured,
             started_ns: 0,
             finished_ns: 1_000_000_000,
+            corpus: None,
             manifest,
             result,
             attempts: vec![LoadAttempt {
@@ -1324,6 +1400,23 @@ mod tests {
                 row.missing_metrics.clear();
                 row.lanes = all_lanes().into_iter().collect();
                 row.forced_reopens = 100;
+                if phase == LoadPhase::Warmup {
+                    row.corpus = Some(CorpusEvidence {
+                        records: 1,
+                        anchor_records: 1,
+                        edges: 1,
+                        vectors: 1,
+                        vector_dimensions: 1,
+                        logical_source_bytes: 1024,
+                        encoded_mutation_bytes: 2048,
+                        verified_records: 1,
+                        started_ns: 0,
+                        finished_ns: 0,
+                        input_sha256: digest("fixture", &1).unwrap(),
+                        acknowledgement_sha256: digest("fixture", &2).unwrap(),
+                        readback_sha256: digest("fixture", &3).unwrap(),
+                    });
+                }
                 row.attempts = if phase == LoadPhase::Drain {
                     0
                 } else {
@@ -1356,5 +1449,34 @@ mod tests {
         campaign.evidence.total_bytes = limit(MAX_DOCUMENT_BYTES);
         assert!(CampaignWriter::create(&directory, campaign).is_err());
         assert!(!directory.exists());
+    }
+
+    #[test]
+    fn corpus_receipt_requires_full_readback_and_frozen_setup_budget() {
+        let (campaign, _) = fixture();
+        let mut corpus = CorpusEvidence {
+            records: 1,
+            anchor_records: 1,
+            edges: 1,
+            vectors: 1,
+            vector_dimensions: 1,
+            logical_source_bytes: 1024,
+            encoded_mutation_bytes: 2048,
+            verified_records: 1,
+            started_ns: 0,
+            finished_ns: 1_000_000_000,
+            input_sha256: digest("fixture", &1).unwrap(),
+            acknowledgement_sha256: digest("fixture", &2).unwrap(),
+            readback_sha256: digest("fixture", &3).unwrap(),
+        };
+        assert!(corpus.validate(&campaign, 1_000_000_000).is_ok());
+        corpus.verified_records = 0;
+        assert!(corpus.validate(&campaign, 1_000_000_000).is_err());
+        corpus.verified_records = 1;
+        corpus.finished_ns += 1;
+        assert!(corpus.validate(&campaign, 2_000_000_000).is_err());
+        corpus.finished_ns = 0;
+        corpus.edges = 0;
+        assert!(corpus.validate(&campaign, 1_000_000_000).is_err());
     }
 }
