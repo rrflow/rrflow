@@ -63,6 +63,54 @@ commands above do not prove the planned cases already exist or pass. Fix test
 names from the actual checkout before running; keep real-model and installed
 acceptance separate from reference-adapter results.
 
+### Aggregate reasoning-budget acceptance
+
+The [user-selected effort contract](../../reference/inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+is mandatory across G-01a adapter execution, G-02a durable dispatch and G-05
+context escalation. Implement one engine-owned aggregate run budget; retries,
+fallbacks, reads and planning consume its remaining time/attempts. Extend the
+existing installed limits and run/receipt authority, never a provider loop or
+client timer. D-06 owns governed configuration changes; H-06 exposes finite
+presets/custom limits, remaining budget, stop reasons and explicit extensions.
+
+The falsifying corpus includes endless context requests, repeated invalid
+output, fallback cycles, no progress, blocked/late providers, cancellation,
+lost ACK/restart, clock rollback and concurrent budget reservations. No case
+may reset consumption or silently extend the deadline. Accepted effects remain
+durable and uncertain work remains visible. Unit/mock timers alone cannot
+close this requirement; G-06 needs installed evidence with the chosen real
+adapter. Existing configuration fields and examples do not implement it.
+This preparation changes no gate status or dependency order.
+
+### Budget-control delivery sequence
+
+The user has prioritized usable budget controls. The existing embedding
+deadline repair advances the current executable boundary without introducing
+a reasoning loop before its storage/authorization prerequisites. Gate G stays
+open. Each following row is a bounded implementation package within the owners
+above, not an additional engine or independent roadmap.
+
+| Order / owner | Code and required behavior | Falsifying acceptance history |
+|---|---|---|
+| 1 / G-01a | `rrd-inference::EmbeddingExecution` and `rrd-engine::generate_embeddings_at`: consume the sealed step ceiling, preserve worker admission after caller timeout, reject late output; common validation remains shared. | Block a real engine's admitted adapter, configure 250 ms, receive non-retryable deadline before release; deny another dispatch, then release and recover capacity. Expired requests invoke no backend; actual FeatureHash output/provenance equals synchronous execution. This proves a bounded wait, not a stopped provider. |
+| 2 / G-01a, G-01b | Extend the existing adapter descriptor and execution owner with qualified cancellation/termination behavior and router dispatch. No detached replacement workers or implicit retry. | Cancel before dispatch and during work; a late result cannot advance the tree. A non-cooperative adapter cannot satisfy a hard stop profile. Real adapter cancellation evidence is required alongside controlled failure cases. |
+| 3 / D-06, G-02a | Extend `EstateConfiguration`, kernel reasoning-tree/task identities and store semantic transactions with one durable resolved budget, original deadline, attempt reservations, usage and terminal reason. No client/provider-owned ledger. | Two workers contend for the final allowance; exactly one reserves it. Crash before dispatch, after response and after commit; replay never resets consumption or repeats an uncertain effect. Clock rollback denies further dispatch. |
+| 4 / G-03, G-05 | All route/context/fallback attempts consume that same owner. Detect repeated semantic request/source/configuration identity with no accepted progress. Bound tracking state by the configured step/attempt cap. | An endless context requester, malformed-output controller and fallback cycle terminate at the configured limit. Changed correlation IDs cannot evade repetition; new authorized source evidence permits useful work within the remaining budget. |
+| 5 / D-06, H-06 | Resolve editable finite Quick/Balanced/Thorough/Custom profiles through the same configuration and public catalogue; Connectome previews exact limits and displays remaining allowance, Stop, partial output and authorized extension. | A stale override or extension fails CAS; a client cannot raise estate caps. Reloading the UI or resuming work preserves original consumption. Unsupported cost/cancellation guarantees are visibly unavailable. |
+| 6 / G-06 | Installed histories with one qualified real adapter, exact source/configuration/model identity and retained public decisions/receipts. | Repeat blocked/late/invalid/retry/concurrent/restart/no-progress cases through the shipped process. Measure actual last dispatch, output acceptance, usage and uncertain work. Candidate CI and installed evidence must pass before claiming loop prevention. |
+
+The [research rationale](../../reference/inference/lfg-swag.md#research-decisions-for-budget-enforcement)
+explains why timers, attempt limits, cancellation and durable accounting need
+separate proof. No row is complete merely because its contract or unit fixture
+exists. A per-batch deadline cannot close aggregate run accounting.
+
+[PR 101](https://github.com/rrflow/rrflow-development/pull/101) advances row 2
+with process-local cooperative cancellation through the existing embedding
+owner and the actual bundled FeatureHash implementation. It does not qualify
+router dispatch, remote provider cancellation, hard termination, a durable run
+Stop operation or UI controls. The descriptor and wire catalogue are unchanged;
+no adapter is advertised as forcibly stoppable because it implements a trait.
+
 ## Controller learning packages
 
 The [learning contract](../../reference/inference/learning/controller-training.md)

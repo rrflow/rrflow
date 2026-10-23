@@ -26,6 +26,12 @@ pub enum ServiceError {
     Query(String),
     Inference(String),
     InferenceBusy,
+    InferenceCancelled {
+        execution_may_continue: bool,
+    },
+    InferenceDeadlineExceeded {
+        execution_may_continue: bool,
+    },
     Vector(String),
     VectorPressure(String),
     Changefeed(String),
@@ -113,6 +119,7 @@ impl ServiceError {
             | Self::ClockUnavailable(_)
             | Self::ClockRollback { .. }
             | Self::AdmissionCancelled
+            | Self::InferenceCancelled { .. }
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
             | Self::StorageAdmission(_)
@@ -122,7 +129,9 @@ impl ServiceError {
             | Self::FunctionLimit(_)
             | Self::ConfigurationLimit(_)
             | Self::VectorPressure(_) => ServiceErrorKind::ResourceExhausted,
-            Self::DeadlineExceeded => ServiceErrorKind::DeadlineExceeded,
+            Self::DeadlineExceeded | Self::InferenceDeadlineExceeded { .. } => {
+                ServiceErrorKind::DeadlineExceeded
+            }
             Self::StorageConflict(_) => ServiceErrorKind::Conflict,
             Self::Storage(_) | Self::Backup(_) | Self::Estate(_) => ServiceErrorKind::Internal,
         }

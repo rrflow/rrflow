@@ -66,6 +66,30 @@ impl RrdEngine {
         request_id: &str,
         operation_id: &str,
     ) -> Result<GenerateEmbeddingsResult> {
+        self.generate_embeddings_with_cancellation(
+            session_id,
+            token,
+            request,
+            now,
+            request_id,
+            operation_id,
+            &rrd_inference::EmbeddingCancellation::default(),
+        )
+    }
+
+    /// Embedded caller-owned cancellation. Authorization and the installed
+    /// ceiling remain engine-owned; cancellation never extends that ceiling.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_embeddings_with_cancellation(
+        &self,
+        session_id: &CorrelationId,
+        token: &CorrelationId,
+        request: &GenerateEmbeddings,
+        now: u64,
+        request_id: &str,
+        operation_id: &str,
+        cancellation: &rrd_inference::EmbeddingCancellation,
+    ) -> Result<GenerateEmbeddingsResult> {
         request
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
@@ -79,7 +103,7 @@ impl RrdEngine {
         )?;
         let scope = self.query_scope(&request.scope)?;
         let read = self.storage.runtime().read_stamp(&scope)?;
-        self.generate_embeddings_at(request, read)
+        self.generate_embeddings_at_with_cancellation(request, read, cancellation)
     }
 
     pub fn embed_and_search_vectors(
@@ -172,7 +196,29 @@ impl RrdEngine {
         request: &GenerateEmbeddings,
         read: ReadStamp,
     ) -> Result<GenerateEmbeddingsResult> {
+        self.generate_embeddings_at_with_cancellation(
+            request,
+            read,
+            &rrd_inference::EmbeddingCancellation::default(),
+        )
+    }
+
+    fn generate_embeddings_at_with_cancellation(
+        &self,
+        request: &GenerateEmbeddings,
+        read: ReadStamp,
+        cancellation: &rrd_inference::EmbeddingCancellation,
+    ) -> Result<GenerateEmbeddingsResult> {
         let scope = self.query_scope(&request.scope)?;
+        // Bind the sealed estate ceiling once, before input preparation. The
+        // adapter cannot reset it by taking longer to validate or execute.
+        let deadline = std::time::Instant::now()
+            .checked_add(std::time::Duration::from_millis(
+                self.estate_configuration.reasoning.max_step_elapsed_ms,
+            ))
+            .ok_or(ServiceError::DeadlineExceeded)?;
+        let control = rrd_inference::EmbeddingExecutionControl::new(deadline, cancellation.clone());
+        control.check().map_err(embedding_dispatch_error)?;
         if read.scope != scope {
             return Err(ServiceError::WrongScope);
         }
@@ -186,14 +232,18 @@ impl RrdEngine {
         let requests = request
             .inputs
             .iter()
-            .map(|input| embedding_request(&read, descriptor, input))
+            .map(|input| {
+                control.check().map_err(embedding_dispatch_error)?;
+                embedding_request(&read, descriptor, input)
+            })
             .collect::<Result<Vec<_>>>()?;
         let model = descriptor.model.clone();
         let batch = execution
-            .embed_batch(
-                &model,
+            .embed_batch_with_control(
+                model,
                 internal_network_policy(request.network_policy),
-                &requests,
+                requests,
+                rrd_inference::EmbeddingExecutionControl::new(deadline, cancellation.clone()),
             )
             .map_err(embedding_dispatch_error)?;
         let backend = public_embedding_backend(&batch.backend);
@@ -202,6 +252,7 @@ impl RrdEngine {
             .iter()
             .zip(batch.vectors.iter())
             .map(|(input, value)| {
+                control.check().map_err(embedding_dispatch_error)?;
                 let generated = GeneratedEmbedding {
                     input_id: input.id.clone(),
                     value: public_vector_value(value),
@@ -237,6 +288,7 @@ impl RrdEngine {
                 Ok(generated)
             })
             .collect::<Result<Vec<_>>>()?;
+        control.check().map_err(embedding_dispatch_error)?;
         Ok(GenerateEmbeddingsResult {
             scope: request.scope.clone(),
             read_manifest_sha256: read.manifest_id,
@@ -415,6 +467,19 @@ fn embedding_dispatch_error(error: rrd_inference::EmbeddingDispatchError) -> Ser
         rrd_inference::EmbeddingDispatchError::UnhealthyBackend => {
             ServiceError::Storage("embedding backend lock is poisoned".into())
         }
+        rrd_inference::EmbeddingDispatchError::DeadlineExceeded {
+            execution_may_continue,
+        } => ServiceError::InferenceDeadlineExceeded {
+            execution_may_continue,
+        },
+        rrd_inference::EmbeddingDispatchError::WorkerUnavailable => {
+            ServiceError::Storage("embedding worker unavailable".into())
+        }
+        rrd_inference::EmbeddingDispatchError::Cancelled {
+            execution_may_continue,
+        } => ServiceError::InferenceCancelled {
+            execution_may_continue,
+        },
         rrd_inference::EmbeddingDispatchError::Rejected(error) => inference_error(error),
     }
 }
