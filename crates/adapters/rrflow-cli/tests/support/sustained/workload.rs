@@ -4,6 +4,7 @@ use rrd_client::{RequestOptions, RrdClient, Session};
 use rrd_contract::*;
 use rrflow_eval::storage::{digest, Digest, ReadKeyDistribution, StorageLoadKind, WriteTransition};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -51,6 +52,17 @@ fn reference(kind: &str, value: &str) -> DataReference {
 fn options(value: &str) -> RequestOptions {
     RequestOptions::new(value, value, Some(value), Some(u64::MAX)).unwrap()
 }
+fn read_options(family: &str) -> Result<RequestOptions> {
+    static NEXT_READ: AtomicU64 = AtomicU64::new(0);
+    let ordinal = NEXT_READ
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            value.checked_add(1)
+        })
+        .map_err(|_| "read invocation counter exhausted")?;
+    let name = format!("{family}-{ordinal:016x}");
+    RequestOptions::read(&name, &name).map_err(error)
+}
+
 fn check(value: bool, reason: &str) -> Result<()> {
     if value {
         Ok(())
@@ -197,7 +209,7 @@ impl Workload {
                             .min(u64::from(MAX_DATA_SNAPSHOT_STORAGE_KEYS))
                             as u32,
                     },
-                    RequestOptions::read("capacity-schema-read", "capacity-schema-read").unwrap(),
+                    read_options("capacity-schema-read")?,
                 )
                 .await
                 .map_err(error)?;
@@ -446,7 +458,7 @@ impl Workload {
                         .max_storage_keys
                         .min(MAX_VECTOR_STORAGE_KEYS),
                 },
-                RequestOptions::read("capacity-retired", "capacity-retired").unwrap(),
+                read_options("capacity-retired")?,
             )
             .await
             .map_err(error)?;
@@ -577,7 +589,7 @@ impl Workload {
         let result=self.client.execute_query(&self.session,ExecuteQuery {scope:self.scope(),
             query:format!("FROM {source} AT VALID {} KNOWN {known} WHERE {filter} PROJECT {projection} EXPLAIN CONTRACT",self.valid_at),
             parameters:BTreeMap::new(),budget:self.query_budget.clone()},
-            RequestOptions::read("capacity-read","capacity-read").unwrap()).await.map_err(error)?;
+            read_options("capacity-read")?).await.map_err(error)?;
         check(!result.execution.truncated, "capacity read truncated")?;
         Ok(result)
     }
@@ -619,7 +631,7 @@ impl Workload {
                         .max_storage_keys
                         .min(MAX_VECTOR_STORAGE_KEYS),
                 },
-                RequestOptions::read("capacity-vector-read", "capacity-vector-read").unwrap(),
+                read_options("capacity-vector-read")?,
             )
             .await
             .map_err(error)?;

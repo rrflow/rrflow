@@ -254,6 +254,12 @@ binds one admitted read-only physical snapshot across archive, object closure,
 catalogue and control reads. Native candidate acceptance remains pending;
 this implementation does not qualify large-corpus backup latency or soak.
 
+The combined two-estate flow exposed concurrent session-state replacement
+between transaction begin/abort and commit. The [session admission correction](../../evidence/change-journals/gate-c/c-07g-session-admission.md)
+extends the existing bounded transaction gate to begin, preview, abort, renewal
+and closure, preserving exact identities and explicit conflicts. Native
+concurrent characterization passes; full candidate acceptance remains pending.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
