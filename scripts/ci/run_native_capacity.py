@@ -71,6 +71,15 @@ def loop_binding(device: str, image: Path):
             and Path(rows[0]["back-file"]).resolve(strict=True) == image, "loop device is not our image")
 
 
+def native_command(*arguments, **kwargs):
+    # These are owned-image OS commands only, never credential-bearing product
+    # output. Keep the failing tool and bounded native message in CI evidence.
+    result = run(*arguments, check=False, **kwargs)
+    require(result.returncode == 0, f"native {arguments[0]} failed ({result.returncode}): "
+            + result.stderr[-2048:] + result.stdout[-2048:])
+    return result
+
+
 def associated_loops(image):
     # util-linux can return a successful empty stdout when no matching loop
     # remains after autoclear. Only that successful empty result means none.
@@ -85,6 +94,7 @@ def windows_volume(action, fixture, size):
                  str(SCRIPT.with_name("owned_capacity_volume.ps1")), "-Action", action,
                  "-Fixture", str(fixture), "-SizeMiB", str(size)], env=dict(os.environ), timeout=120)
     require(result.returncode == 0, "owned NTFS image control failed: " + result.stderr[-2048:])
+    require(bool(result.stdout.strip()), f"owned NTFS {action} returned no structured receipt; stderr=" + result.stderr[-2048:])
     return json.loads(result.stdout.strip())
 
 
@@ -118,14 +128,14 @@ def volume(fixture: Path, size: int):
             loop_binding(device, image)
             identity = {"device": device, "image": str(image), "mount": info[0]}
         elif sys.platform == "darwin":
-            run("hdiutil", "create", "-size", f"{size}m", "-fs", "APFS", "-format", "UDRW",
+            native_command("hdiutil", "create", "-size", f"{size}m", "-fs", "APFS", "-format", "UDRW",
                 "-volname", "RRFlowCapacity", str(image), timeout=120)
-            attach = plistlib.loads(run("hdiutil", "attach", "-nobrowse", "-mountpoint", str(root),
+            attach = plistlib.loads(native_command("hdiutil", "attach", "-nobrowse", "-mountpoint", str(root),
                                         "-plist", str(image), timeout=60).stdout.encode())
             attached = True
             rows = [row for row in attach["system-entities"] if row.get("mount-point") == str(root)]
             require(len(rows) == 1, "owned APFS image has no exact mount")
-            info = plistlib.loads(run("diskutil", "info", "-plist", str(root)).stdout.encode())
+            info = plistlib.loads(native_command("diskutil", "info", "-plist", str(root)).stdout.encode())
             require(info.get("FilesystemType", "").lower() == "apfs"
                     and info.get("DeviceNode") == rows[0]["dev-entry"], "APFS device identity differs")
             identity = {"image": str(image), "device": info["DeviceNode"], "volume_uuid": info["VolumeUUID"]}
