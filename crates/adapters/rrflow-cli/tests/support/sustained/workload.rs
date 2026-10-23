@@ -185,7 +185,7 @@ impl Workload {
                     model,
                     mode: DataSchemaMode::Schemaless,
                     properties: BTreeMap::new(),
-                    allow_additional_properties: true,
+                    allow_additional_properties: false,
                 },
             )
         })
