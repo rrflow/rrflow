@@ -126,6 +126,14 @@ seed data serves point/range reads. Mixed writes reuse at most
 `evidence.segment_attempts` mutable slots and cycle through insert, update,
 atomic retirement and recreation. Transaction identities remain unique;
 canonical version history can still grow even though live key count is bounded.
+The required `read_distribution` is frozen in each campaign: `{"kind":"uniform"}`,
+`{"kind":"hot_key","ordinal":0}`, or
+`{"kind":"hot_set","keys":64,"traffic_basis_points":2500}`. The hot-set
+fraction selects its first `keys` records; the remainder selects the disjoint
+cold region. Keys and fractions must fit the declared corpus. Seeded selection
+is reproducible, and changing it changes campaign/request identity. This
+configures point-read keys and bounded-range starting keys; write-slot
+generation and finite live key count keep their separate contract.
 After load the driver kills/reopens the engine and independently reads seed
 and final slot state before any retry.
 
@@ -138,7 +146,7 @@ cargo run --locked -p rrflow-eval -- storage campaign verify path/to/new-evidenc
 ```
 
 Launching is an explicit resource-consuming operation on a clean frozen
-candidate. Linux additionally requires `--cgroup-parent` naming an already
+candidate using the ordinary release binary and harness. Linux additionally requires `--cgroup-parent` naming an already
 delegated cgroup; Windows uses an owned Job Object. The driver verifies live
 native limits and process membership rather than trusting environment labels.
 No privileged host setup is implicit. The current runner rejects full

@@ -2,7 +2,7 @@
 //! independently from request coordinates, never copied out of engine answers.
 use rrd_client::{RequestOptions, RrdClient, Session};
 use rrd_contract::*;
-use rrflow_eval::storage::{digest, Digest, StorageLoadKind, WriteTransition};
+use rrflow_eval::storage::{digest, Digest, ReadKeyDistribution, StorageLoadKind, WriteTransition};
 use std::collections::BTreeMap;
 
 type Result<T> = std::result::Result<T, String>;
@@ -15,6 +15,7 @@ pub(super) struct Workload {
     pub dimensions: u32,
     pub seed: u64,
     pub records: u64,
+    pub read_distribution: ReadKeyDistribution,
     pub edges_per_record: u32,
     pub vectors_per_record: u32,
     pub payload_bytes: usize,
@@ -141,19 +142,9 @@ impl Workload {
         }
         mutations
     }
-    fn read_ordinal(&self, revision: u64) -> u64 {
-        // Stable SplitMix64 coordinates, including uniform and hot-set lanes.
-        let mut x = self
-            .seed
-            .wrapping_add(revision.wrapping_mul(0x9e3779b97f4a7c15));
-        x = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-        x = (x ^ (x >> 27)).wrapping_mul(0x94d049bb133111eb);
-        let width = if revision.is_multiple_of(4) {
-            self.records.min(64)
-        } else {
-            self.records
-        };
-        (x ^ (x >> 31)) % width
+    fn read_ordinal(&self, revision: u64) -> Result<u64> {
+        self.read_distribution
+            .ordinal(self.seed, revision, self.records)
     }
     pub fn seed_record(&self, ordinal: u64) -> Result<Prepared> {
         self.prepare(
@@ -260,7 +251,15 @@ impl Workload {
         };
         let request_sha256 = digest(
             "c07g.public-request",
-            &(&key, kind, revision, self.seed, self.dimensions, &mutation),
+            &(
+                &key,
+                kind,
+                revision,
+                self.seed,
+                self.dimensions,
+                &self.read_distribution,
+                &mutation,
+            ),
         )?;
         let effect_sha256 = digest(
             "c07g.expected-effect",
@@ -268,7 +267,7 @@ impl Workload {
                 kind,
                 &key,
                 revision,
-                self.read_ordinal(revision),
+                self.read_ordinal(revision)?,
                 self.seed,
                 self.dimensions,
                 self.records,
@@ -397,13 +396,13 @@ impl Workload {
                 digest("c07g.commit-receipt", &receipt)?
             }
             StorageLoadKind::PointRead => {
-                let ordinal = self.read_ordinal(request.revision);
+                let ordinal = self.read_ordinal(request.revision)?;
                 self.verify_key(&format!("seed-{ordinal:020}"), ordinal)
                     .await?;
                 digest("c07g.read-receipt", &request.effect_sha256)?
             }
             StorageLoadKind::RangeRead => {
-                let first = self.read_ordinal(request.revision);
+                let first = self.read_ordinal(request.revision)?;
                 let width =
                     (self.query_budget.max_output_bytes as usize / 2 / (self.payload_bytes + 2048))
                         .clamp(1, 16) as u64;
@@ -494,7 +493,7 @@ impl Workload {
                 self.verify_key(&request.key, request.revision).await
             }
         } else {
-            let ordinal = self.read_ordinal(request.revision);
+            let ordinal = self.read_ordinal(request.revision)?;
             self.verify_key(&format!("seed-{ordinal:020}"), ordinal)
                 .await
         }

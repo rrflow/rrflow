@@ -82,6 +82,70 @@ pub struct CapacityAllocation {
     pub logical_source_bytes: Limit,
 }
 
+/// Frozen read-key selection; mutation slots have their separate generation
+/// contract. Hot-set traffic outside the selected fraction uses the cold set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ReadKeyDistribution {
+    Uniform,
+    HotKey {
+        ordinal: u64,
+    },
+    HotSet {
+        keys: Limit,
+        traffic_basis_points: u16,
+    },
+}
+
+impl ReadKeyDistribution {
+    pub fn validate(&self, records: u64) -> Result<()> {
+        require(
+            (1..=MAX_EXACT_INTEGER).contains(&records),
+            "invalid read-key corpus",
+        )?;
+        match self {
+            Self::Uniform => Ok(()),
+            Self::HotKey { ordinal } => require(*ordinal < records, "hot key outside corpus"),
+            Self::HotSet {
+                keys,
+                traffic_basis_points,
+            } => require(
+                keys.get() <= records
+                    && (1..=10_000).contains(traffic_basis_points)
+                    && (keys.get() < records || *traffic_basis_points == 10_000),
+                "hot-set size or traffic fraction outside corpus",
+            ),
+        }
+    }
+
+    pub fn ordinal(&self, seed: u64, sequence: u64, records: u64) -> Result<u64> {
+        self.validate(records)?;
+        // Stable SplitMix64 coordinates; this selects workload keys, never secrets.
+        let mix = |mut value: u64| {
+            value = (value ^ (value >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+            value = (value ^ (value >> 27)).wrapping_mul(0x94d049bb133111eb);
+            value ^ (value >> 31)
+        };
+        let coordinate = seed.wrapping_add(sequence.wrapping_mul(0x9e3779b97f4a7c15));
+        let key = mix(coordinate);
+        Ok(match self {
+            Self::Uniform => key % records,
+            Self::HotKey { ordinal } => *ordinal,
+            Self::HotSet {
+                keys,
+                traffic_basis_points,
+            } => {
+                if mix(coordinate ^ 0xa0761d6478bd642f) % 10_000 < u64::from(*traffic_basis_points)
+                {
+                    key % keys.get()
+                } else {
+                    keys.get() + key % (records - keys.get())
+                }
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OperatingPoint {
@@ -140,6 +204,7 @@ pub struct StorageCampaign {
     pub storage: StorageManifest,
     pub allocation: CapacityAllocation,
     pub schedule: SustainedSchedule,
+    pub read_distribution: ReadKeyDistribution,
     #[schemars(length(min = 1, max = 32))]
     pub seeds: Vec<u64>,
     #[schemars(length(min = 1, max = 32))]
@@ -152,6 +217,8 @@ pub struct StorageCampaign {
 impl StorageCampaign {
     pub fn validate(&self) -> Result<()> {
         self.storage.validate()?;
+        self.read_distribution
+            .validate(self.allocation.records.get())?;
         require(self.format_version == 1, "unsupported campaign format")?;
         require(
             matches!(self.storage.evidence_class, EvidenceClass::NativeCapacity),
@@ -1646,6 +1713,7 @@ mod tests {
                 forced_reopens: limit(1),
             },
             seeds: vec![7],
+            read_distribution: ReadKeyDistribution::Uniform,
             points: vec![OperatingPoint {
                 id: "one".to_owned().try_into().unwrap(),
                 clients: limit(1),
@@ -1755,6 +1823,61 @@ mod tests {
         )
         .unwrap();
         assert!(verify_campaign(&directory).is_err());
+    }
+
+    #[test]
+    fn read_distribution_is_frozen_bounded_and_selects_the_requested_region() {
+        let uniform = ReadKeyDistribution::Uniform;
+        let hot = ReadKeyDistribution::HotKey { ordinal: 99 };
+        let skew = ReadKeyDistribution::HotSet {
+            keys: limit(4),
+            traffic_basis_points: 2500,
+        };
+        let all_hot = ReadKeyDistribution::HotSet {
+            keys: limit(4),
+            traffic_basis_points: 10_000,
+        };
+        let mut uniform_keys = BTreeSet::new();
+        let mut hot_reads = 0;
+        for sequence in 0..1024 {
+            let ordinal = uniform.ordinal(73, sequence, 100).unwrap();
+            assert!(ordinal < 100);
+            uniform_keys.insert(ordinal);
+            assert_eq!(hot.ordinal(73, sequence, 100).unwrap(), 99);
+            assert!(all_hot.ordinal(73, sequence, 100).unwrap() < 4);
+            let ordinal = skew.ordinal(73, sequence, 100).unwrap();
+            assert!(ordinal < 100);
+            hot_reads += usize::from(ordinal < 4);
+        }
+        assert_eq!(uniform_keys.len(), 100);
+        assert!((180..=330).contains(&hot_reads));
+        for invalid in [
+            ReadKeyDistribution::HotKey { ordinal: 100 },
+            ReadKeyDistribution::HotSet {
+                keys: limit(101),
+                traffic_basis_points: 2500,
+            },
+            ReadKeyDistribution::HotSet {
+                keys: limit(100),
+                traffic_basis_points: 9999,
+            },
+            ReadKeyDistribution::HotSet {
+                keys: limit(1),
+                traffic_basis_points: 0,
+            },
+            ReadKeyDistribution::HotSet {
+                keys: limit(1),
+                traffic_basis_points: 10001,
+            },
+        ] {
+            assert!(invalid.ordinal(0, 0, 100).is_err());
+        }
+        assert!(uniform.ordinal(0, 0, 0).is_err());
+        let (mut campaign, _) = fixture();
+        let original = campaign.sha256().unwrap();
+        campaign.read_distribution = ReadKeyDistribution::HotKey { ordinal: 0 };
+        assert_ne!(campaign.sha256().unwrap(), original);
+        assert!(decode::<ReadKeyDistribution>(br#"{"kind":"uniform","keys":1}"#).is_err());
     }
     #[test]
     fn missing_sequence_and_changed_offered_schedule_are_rejected() {

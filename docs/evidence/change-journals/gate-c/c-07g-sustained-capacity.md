@@ -546,3 +546,37 @@ No local runtime tests, capacity effects or soak ran. Required candidate CI
 owns execution. C-07g still lacks installed retained-reader interference,
 multi-estate capacity execution and full profile/24-hour evidence; Gate C,
 OBJ-02 and POAM-035 remain open. Full diff reviewed before commit.
+## Configurable read distribution and release campaign selection
+
+Continued from `8f66c55a2f20a9eb9869a61444768ee6a2639990`; PR 72 brief
+updated before implementation. Replaced the installed driver's embedded
+25%-of-sequences/64-key behavior with required frozen ReadKeyDistribution:
+uniform, exact hot key, or bounded hot set and traffic basis points. The
+existing deterministic SplitMix64 coordinate selector now belongs to the
+sustained model and validates corpus/region bounds. Non-hot traffic selects
+the disjoint cold region. Point and range-start selection and prepared
+request/effect identities use this policy. Mixed-write finite slots and their
+generation cycle remain unchanged; read hot-key support is not write-hot-key
+qualification. Evaluation instructions describe the actual input shapes.
+
+Source inspection found that the launcher selected a debug harness despite
+J-04's release-build requirement. It now explicitly builds with --release
+and accepts only the resulting optimized, no-debug-assertion test artifact.
+The existing executable/configuration digests and ordinary-binary diagnostic
+marker exclusion still apply. This does not run a campaign or qualify scale.
+
+Read/reviewed: full workload selector/preparation/independent readback;
+sustained allocation validation/fixture, session and smoke constructors;
+launcher Cargo selection, current J-04 workload owner and evaluation
+instructions. No new research, dependency, algorithm adaptation or runtime
+authority; the same noncryptographic coordinate mixing is used for workload
+selection only. Regression definitions cover full-corpus selection, exact
+hot-key selection, hot-only and mixed regions, invalid key/fraction/corpus
+bounds, unknown fields and changed campaign identity.
+
+Strict Clippy for rrflow-eval/rrflow-cli all targets passed (21.64 seconds).
+Synthetic storage schema generation passed (5.64 seconds); Python syntax
+compilation passed. No local runtime test, native resource effect, campaign
+or soak executed. Candidate CI is pending; full retained-reader/fleet/native
+profile and 24-hour evidence remain open. Full changed diff reviewed; no
+objective, roadmap or POA&M completion status changed.

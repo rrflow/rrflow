@@ -83,6 +83,7 @@ async fn session(
             .map_err(|_| "vector dimensions overflow")?,
         seed,
         records: campaign.allocation.records.get(),
+        read_distribution: campaign.read_distribution.clone(),
         edges_per_record: campaign
             .allocation
             .edges
@@ -770,6 +771,7 @@ fn installed_capacity_workload_smoke() {
             dimensions: 16,
             seed: 73,
             records: 8,
+            read_distribution: ReadKeyDistribution::Uniform,
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,

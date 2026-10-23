@@ -111,11 +111,12 @@ def main():
     require(run("git", "rev-parse", "HEAD").stdout.strip() == candidate["commit"]
             and run("git", "rev-parse", "HEAD^{tree}").stdout.strip() == candidate["tree"]
             and not run("git", "status", "--porcelain").stdout, "campaign source is not the frozen clean candidate")
-    output = run("cargo", "test", "--locked", "-p", "rrflow-cli", "--test", "installed_reopen", "--no-run", "--message-format=json", timeout=3600)
+    output = run("cargo", "test", "--release", "--locked", "-p", "rrflow-cli", "--test", "installed_reopen", "--no-run", "--message-format=json", timeout=3600)
     messages = [json.loads(line) for line in output.stdout.splitlines()]
     paths = {Path(row["executable"]).resolve(strict=True) for row in messages
              if row.get("reason") == "compiler-artifact" and row.get("executable")
-             and row["target"]["name"] == "installed_reopen" and row["profile"]["test"]}
+             and row["target"]["name"] == "installed_reopen" and row["profile"]["test"]
+             and not row["profile"]["debug_assertions"] and row["profile"]["opt_level"] in {"2", "3", "s", "z"}}
     require(len(paths) == 1, "Cargo must select one ordinary installed harness")
     harness = paths.pop()
     require(f"{CASE}: test" in run(str(harness), "--list").stdout.splitlines(), "installed sustained entry missing")

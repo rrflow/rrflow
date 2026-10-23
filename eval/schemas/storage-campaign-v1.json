@@ -1062,6 +1062,67 @@
       ],
       "type": "object"
     },
+    "ReadKeyDistribution": {
+      "description": "Frozen read-key selection; mutation slots have their separate generation\ncontract. Hot-set traffic outside the selected fraction uses the cold set.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "uniform",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "hot_key",
+              "type": "string"
+            },
+            "ordinal": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "ordinal"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "keys": {
+              "$ref": "#/$defs/Limit"
+            },
+            "kind": {
+              "const": "hot_set",
+              "type": "string"
+            },
+            "traffic_basis_points": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "keys",
+            "traffic_basis_points"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ReasoningLimits": {
       "additionalProperties": false,
       "properties": {
@@ -1485,6 +1546,9 @@
     "purpose": {
       "$ref": "#/$defs/CampaignPurpose"
     },
+    "read_distribution": {
+      "$ref": "#/$defs/ReadKeyDistribution"
+    },
     "required_lanes": {
       "items": {
         "$ref": "#/$defs/CapacityLane"
@@ -1517,6 +1581,7 @@
     "storage",
     "allocation",
     "schedule",
+    "read_distribution",
     "seeds",
     "points",
     "required_lanes",
