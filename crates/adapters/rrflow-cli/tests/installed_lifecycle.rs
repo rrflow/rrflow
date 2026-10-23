@@ -591,6 +591,12 @@ fn installed_lifecycle(mode: &str) {
 mutable_accounted_bytes = 134217728
 mutable_versions = 1048576
 projected_output_bytes = 134217728
+source_page_bytes = 268435456
+native_transactions = 64
+native_transaction_bytes = 67108864
+checkpoint_entries = 1024
+active_read_views = 1024
+pinned_read_bytes = 4294967296
 page_cache_bytes = 4194304
 wal_flush_target_bytes = 67108864
 memtable_flush_target_versions = 524288

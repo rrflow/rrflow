@@ -389,6 +389,18 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         explain_analyze: bound.explain_analyze,
     };
     let event_cursor = event_cursor_filter(bound);
+    let identity_read = matches!(
+        bound.version_sources.as_slice(),
+        [RuntimeVersionedSource::Identity { .. }]
+    );
+    let adjacency_read = matches!(
+        bound.version_sources.as_slice(),
+        [RuntimeVersionedSource::Adjacency { .. }]
+    );
+    let identity_range_read = matches!(
+        bound.version_sources.as_slice(),
+        [RuntimeVersionedSource::IdentityRange { .. }]
+    );
     let traversal = std::iter::once(&bound.source)
         .chain(bound.join.as_ref().map(|join| &join.source))
         .any(|source| matches!(source, Source::Traversal { .. }));
@@ -397,7 +409,7 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         .iter()
         .find(|filter| filter.comparison.is_match())
         .map(|filter| filter.field.as_str());
-    let selected_index = (event_cursor.is_none() && !traversal)
+    let selected_index = (!identity_read && !identity_range_read && !adjacency_read && !traversal)
         .then(|| {
             bound
                 .index_candidates
@@ -449,21 +461,56 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
                 reason: "rejected: no projection generation and grounding proof supplied".into(),
             },
         ]
-    } else if let Some(cursor) = event_cursor {
+    } else if identity_range_read {
+        vec![
+            CandidatePath {
+                name: "versioned_identity_range_read".into(),
+                selected: true,
+                exact: true,
+                reason: "reads complete identity histories inside the bound ID interval before temporal and residual predicate evaluation".into(),
+            },
+            CandidatePath {
+                name: "versioned_source_read".into(),
+                selected: false,
+                exact: true,
+                reason: "rejected: identities outside the ID interval cannot satisfy the query".into(),
+            },
+        ]
+    } else if adjacency_read {
+        vec![
+            CandidatePath {
+                name: "versioned_adjacency_read".into(),
+                selected: true,
+                exact: true,
+                reason: "reads the bound endpoint adjacency and complete histories of its named relations before temporal and residual predicate evaluation".into(),
+            },
+            CandidatePath {
+                name: "versioned_source_read".into(),
+                selected: false,
+                exact: true,
+                reason: "rejected: unrelated relation histories do not belong to the addressed endpoint".into(),
+            },
+        ]
+    } else if identity_read {
         vec![
             CandidatePath {
                 name: "versioned_identity_read".into(),
                 selected: selected_index.is_none(),
                 exact: true,
-                reason: format!(
-                    "selects the typed event identity for bound global cursor {cursor} at the captured read stamp"
+                reason: event_cursor.map_or_else(
+                    || "selects the typed record or relation identity for bound id equality at the captured read stamp; all predicates remain evaluated".into(),
+                    |cursor| format!("selects the typed event identity for bound global cursor {cursor} at the captured read stamp"),
                 ),
             },
             CandidatePath {
                 name: "versioned_source_read".into(),
                 selected: false,
                 exact: true,
-                reason: "rejected: the typed identity range is narrower than the event-family range".into(),
+                reason: if event_cursor.is_some() {
+                    "rejected: the typed identity range is narrower than the event-family range"
+                } else {
+                    "rejected: the bound identity range excludes unrelated family histories"
+                }.into(),
             },
             CandidatePath {
                 name: "derived_projection".into(),
@@ -620,6 +667,32 @@ fn bound_version_sources(
     schema: &RuntimeSchemaRegistry,
 ) -> Result<Vec<RuntimeVersionedSource>> {
     if query.join.is_none() {
+        // ID equality addresses one temporal identity. Preserve every logical
+        // predicate for evaluation after materialization. MATCH depends on
+        // family-wide corpus statistics and must keep its original source.
+        if !filters.iter().any(|filter| filter.comparison.is_match()) {
+            if let Source::Record { kind } | Source::Relation { kind } = &query.source {
+                if let Some(RuntimeValue::String(id)) = filters.iter().find_map(|filter| {
+                    (filter.field == "id" && filter.comparison == ComparisonOperator::Equal)
+                        .then_some(&filter.value)
+                }) {
+                    // An arbitrary comparison string need not be a valid
+                    // runtime ID. Preserve its existing empty-result behavior.
+                    if let Ok(reference) = rrd_core::RuntimeRef::new(kind.to_string(), id.clone()) {
+                        let model = schema
+                            .logical_model(kind)
+                            .map_err(|error| Error::Binding(error.to_string()))?;
+                        return Ok(vec![RuntimeVersionedSource::Identity { model, reference }]);
+                    }
+                }
+            }
+            if let Some(source) = bound_adjacency_source(&query.source, filters, schema) {
+                return Ok(vec![source]);
+            }
+            if let Some(source) = bound_identity_range(&query.source, filters, schema) {
+                return Ok(vec![source]);
+            }
+        }
         if let Source::Event { kind } = &query.source {
             if let Some(cursor) = filters.iter().find_map(|filter| {
                 (filter.field == "cursor" && filter.comparison == ComparisonOperator::Equal)
@@ -671,6 +744,127 @@ fn bound_version_sources(
         }
     }
     Ok(normalize_version_sources(sources))
+}
+
+/// Only a fully addressed endpoint can narrow the relation source. Multiple
+/// allowed kinds without an explicit kind predicate retain the family scan.
+fn bound_adjacency_source(
+    source: &Source,
+    filters: &[BoundFilter],
+    schema: &RuntimeSchemaRegistry,
+) -> Option<RuntimeVersionedSource> {
+    let Source::Relation { kind } = source else {
+        return None;
+    };
+    let definition = schema.relations.get(kind)?;
+    let equality = |field: &str| {
+        filters.iter().find_map(|filter| {
+            if filter.field == field && filter.comparison == ComparisonOperator::Equal {
+                if let RuntimeValue::String(value) = &filter.value {
+                    return Some(value.as_str());
+                }
+            }
+            None
+        })
+    };
+    for (id_field, kind_field, allowed, direction) in [
+        (
+            "from_id",
+            "from_kind",
+            &definition.from,
+            rrd_store::RuntimeAdjacencyDirection::Outgoing,
+        ),
+        (
+            "to_id",
+            "to_kind",
+            &definition.to,
+            rrd_store::RuntimeAdjacencyDirection::Incoming,
+        ),
+    ] {
+        let Some(id) = equality(id_field) else {
+            continue;
+        };
+        let node_kind = equality(kind_field).or_else(|| {
+            (allowed.len() == 1)
+                .then(|| allowed.first().expect("one allowed endpoint kind").as_str())
+        });
+        let Some(node_kind) = node_kind else { continue };
+        let Ok(node) = rrd_core::RuntimeRef::new(node_kind, id) else {
+            continue;
+        };
+        return Some(RuntimeVersionedSource::Adjacency {
+            relation: kind.clone(),
+            node,
+            direction,
+        });
+    }
+    None
+}
+
+fn bound_identity_range(
+    source: &Source,
+    filters: &[BoundFilter],
+    schema: &RuntimeSchemaRegistry,
+) -> Option<RuntimeVersionedSource> {
+    use std::ops::Bound;
+    let (Source::Record { kind } | Source::Relation { kind }) = source else {
+        return None;
+    };
+    let mut lower = Bound::Unbounded;
+    let mut upper = Bound::Unbounded;
+    for filter in filters.iter().filter(|filter| filter.field == "id") {
+        let RuntimeValue::String(value) = &filter.value else {
+            continue;
+        };
+        let Ok(id) = rrd_core::RuntimeId::new(value.clone()) else {
+            continue;
+        };
+        match filter.comparison {
+            ComparisonOperator::GreaterThan | ComparisonOperator::GreaterThanOrEqual => {
+                let strict = filter.comparison == ComparisonOperator::GreaterThan;
+                let tighter = match &lower {
+                    Bound::Unbounded => true,
+                    Bound::Included(previous) => id > *previous || (id == *previous && strict),
+                    Bound::Excluded(previous) => id > *previous,
+                };
+                if tighter {
+                    lower = if strict {
+                        Bound::Excluded(id)
+                    } else {
+                        Bound::Included(id)
+                    };
+                }
+            }
+            ComparisonOperator::LessThan | ComparisonOperator::LessThanOrEqual => {
+                let strict = filter.comparison == ComparisonOperator::LessThan;
+                let tighter = match &upper {
+                    Bound::Unbounded => true,
+                    Bound::Included(previous) => id < *previous || (id == *previous && strict),
+                    Bound::Excluded(previous) => id < *previous,
+                };
+                if tighter {
+                    upper = if strict {
+                        Bound::Excluded(id)
+                    } else {
+                        Bound::Included(id)
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    if matches!((&lower, &upper), (Bound::Unbounded, Bound::Unbounded))
+        || matches!((&lower, &upper),
+            (Bound::Included(a) | Bound::Excluded(a), Bound::Included(b) | Bound::Excluded(b)) if a > b)
+    {
+        return None;
+    }
+    Some(RuntimeVersionedSource::IdentityRange {
+        model: schema.logical_model(kind).ok()?,
+        kind: kind.clone(),
+        lower,
+        upper,
+    })
 }
 
 impl PhysicalPlan {

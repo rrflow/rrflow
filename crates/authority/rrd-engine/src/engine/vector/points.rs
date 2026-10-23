@@ -144,7 +144,29 @@ impl RrdEngine {
                 ))
             })?;
         let read = self.storage.runtime().read_stamp(&scope)?;
-        let direct = read_vector_versions(self, &read, request.max_storage_keys)?;
+        // Named point retrieval reads only the requested authenticated histories.
+        // The store owns temporal ordering, retirement rows and the shared proof
+        // budget; unrelated vector identities never enter this request's scan.
+        let sources = request
+            .references
+            .iter()
+            .map(|reference| {
+                Ok(rrd_store::RuntimeVersionedSource::Identity {
+                    model: rrd_core::RuntimeLogicalModel::Vector,
+                    reference: runtime_ref(reference)?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let direct = public_vector_read(
+            self.storage
+                .runtime()
+                .read_versioned(
+                    &read,
+                    &sources,
+                    rrd_store::RuntimeReadBudget::new(request.max_storage_keys)?,
+                )
+                .map_err(crate::engine::error::storage_read_error)?,
+        )?;
         let visibility = rrd_vector::VectorVisibilityRequest {
             scope: scope.clone(),
             read: read.clone(),
@@ -153,7 +175,11 @@ impl RrdEngine {
             embedding_model: config.embedding_model.clone(),
             filter: None,
         };
-        let addressed = rrd_vector::candidates_from_changes(&direct.changes, &scope)
+        // Resolve the latest valid identity before filtering its address. A
+        // collection/name move must not resurrect an older matching version.
+        let candidates = rrd_vector::candidates_from_changes(&direct.changes, &scope);
+        let visible = rrd_vector::materialize_visible(&visibility, candidates)
+            .map_err(core_vector)?
             .into_iter()
             .filter(|candidate| {
                 vector_matches_collection(
@@ -161,10 +187,7 @@ impl RrdEngine {
                     &request.collection_id,
                     &request.vector_name,
                 )
-            });
-        let visible = rrd_vector::materialize_visible(&visibility, addressed)
-            .map_err(core_vector)?
-            .into_iter()
+            })
             .map(|candidate| (candidate.vector.reference.clone(), candidate))
             .collect::<BTreeMap<_, _>>();
         let mut points = Vec::new();

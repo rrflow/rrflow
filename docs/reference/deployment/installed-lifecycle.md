@@ -328,15 +328,27 @@ startup slice without claiming the complete target above:
 The required `[storage]` configuration separates active-state, output, cache,
 and maintenance controls:
 `mutable_accounted_bytes` (128 MiB default), `mutable_versions` (1,048,576),
-`projected_output_bytes` (128 MiB), `page_cache_bytes` (4 MiB, zero disables
+`projected_output_bytes` (128 MiB), `source_page_bytes` (256 MiB),
+`page_cache_bytes` (4 MiB, zero disables
 caching), `wal_flush_target_bytes` (64 MiB) and
 `memtable_flush_target_versions` (524,288). The first two are native active-state
-hard caps; the next two bound retained projected allocations and cache bytes;
+hard caps; the next three bound retained projected allocations, live owned
+source-page allocations and cache residency;
 the last two are soft synchronous maintenance targets. A single atomic batch
 may exceed a soft target only within hard admission. These are not aggregate
 RSS bounds. Protocol ceilings and checked native conversion
 reject invalid configuration. Current limits require reopening; no live
 configure operation or qualified capacity profile is implied.
+
+Source-page admission precedes file-page allocation and decompression. It
+counts the compressed input and decoded output while both exist, and retains
+the charge through cache eviction, Arrow clones/slices and reader/database
+close. Raw mapped pages remain borrowed and use the separate file-pin policy.
+Cache pressure evicts cache owners before returning typed resource exhaustion;
+held reader buffers cannot lose their charge. Storage admission diagnostics
+expose `retained_source_bytes`, `peak_source_bytes` and
+`denied_source_allocations`. These count owned page payload allocations, not
+allocator overhead, borrowed mappings, snapshot-input backing bytes or RSS.
 
 Immutable maintenance adds `compaction_input_bytes` (1 GiB),
 `compaction_input_logical_bytes` (256 MiB), `compaction_input_versions`
