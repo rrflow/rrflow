@@ -270,6 +270,12 @@ uses explicit engine-approved abort to release a failed workload lease and
 classify rejection; ambiguous outcomes stay uncertain. Its real load acceptance
 and sustainable envelope remain pending.
 
+Characterization03 also exposed a scheduler pause: serial independent readback
+after each offered segment manufactured overdue-load rejections and a resource
+coverage gap. The [bounded-worker readback correction](../../evidence/change-journals/gate-c/c-07g-bounded-worker-readback.md)
+moves the same independent oracle into existing admitted workers while keeping
+real API latency and final restart readback. Actual timing acceptance is pending.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
