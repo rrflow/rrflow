@@ -16,6 +16,8 @@ mod cold;
 mod corpus;
 #[path = "sustained/damage.rs"]
 mod damage;
+#[path = "sustained/fleet.rs"]
+mod fleet;
 #[path = "sustained/lifecycle.rs"]
 mod lifecycle;
 #[path = "sustained/native.rs"]

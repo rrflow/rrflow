@@ -585,6 +585,7 @@ def main() -> None:
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
         "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
         "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
         "RRFLOW_REOPEN_RECEIPT_DIR:",
         "'attempts': 5150",

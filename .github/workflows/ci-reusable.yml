@@ -505,6 +505,8 @@ jobs:
       - name: Exercise installed capacity workload and backup readback
         timeout-minutes: 10
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
+      - name: Independent installed estates under concurrent load
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture
       - name: Require fresh and existing installed damage denial
         timeout-minutes: 10
         run: >-
