@@ -763,3 +763,32 @@ the failure oracle. Pre-edit scope was recorded on PR 72 comment 6359454924.
 No local installed workload ran; corrected native acceptance remains pending.
 Navigation, inventory, documentation and workflow policy checks passed before
 publication. C-07 and POAM-035 remain open.
+
+
+### Native NTFS exhaustion correction
+
+PR comment 6359986493 records the pre-edit refinement. Candidate
+39915579945, Windows job 120288970973, passed fresh WAL/segment/manifest
+native exhaustion but timed out awaiting CURRENT's native error. A filler
+create failure in one directory was insufficient evidence of global NTFS
+metadata exhaustion. Microsoft documents reusable MFT records and distinct
+MFT/data allocation: https://learn.microsoft.com/en-us/windows/win32/fileio/master-file-table.
+No upstream implementation was copied. The precise absence of a CURRENT
+error is observed; residual MFT/index capacity is the working diagnosis.
+
+Read capacity.rs, installed_crash.rs, filesystem.rs persist_rename, manifest.rs
+CURRENT publication, and fault_io/crash.rs plus crash/installed.rs control.
+Changed only the owned-volume filler: descend 64KiB/4KiB/256/16/1-byte
+writes after capacity errors; on Windows, precreate 16 private directories
+and retain entries in each to consume reusable MFT records independently of
+one full directory index. Aggregate metadata stays at 8192 entries and the
+existing 25-second/volume-byte bounds remain. Cleanup removes exact owned
+files and then empty directories, never recursively or from an unverified host
+path. The engine must still emit actual native capacity failure and the full
+reopen/retry/readback oracle remains unchanged. No timeout increase.
+
+`cargo clippy -p rrflow-cli --test installed_crash --features crash-test
+--locked -- -D warnings` passed (18.67s); `cargo fmt -p rrflow-cli` passed.
+No local VHD, disk fill or installed workload was run. Native candidate
+rerun is required; this correction is not itself proof of real exhaustion.
+All earlier failed evidence remains retained. C-07/POAM-035 remain open.
