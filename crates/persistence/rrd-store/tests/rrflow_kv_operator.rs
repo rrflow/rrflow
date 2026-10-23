@@ -303,3 +303,79 @@ fn idle_maintenance_reclaims_superseded_versions_without_losing_owned_history() 
         claims
     );
 }
+
+#[test]
+fn foreground_maintenance_bounds_obsolete_versions_with_and_without_diagnostics() {
+    use rrd_store::Durability;
+    let mut identities = Vec::new();
+    for diagnostics in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("foreground-history");
+        let options = DatabaseOptions {
+            maintenance: MaintenancePolicy {
+                wal_payload_max_bytes: usize::MAX,
+                memtable_max_versions: 1,
+            },
+            compaction: rrd_lsm::CompactionPolicy {
+                l0_compaction_trigger: 4,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let store = RrflowKvStore::open_with_options(&path, options).unwrap();
+        if diagnostics {
+            store.enable_native_write_path_diagnostics(128).unwrap();
+        }
+        let mut tx = store.begin_transaction().unwrap();
+        tx.put(b"hot".to_vec(), b"initial".to_vec()).unwrap();
+        tx.put(b"deleted".to_vec(), b"initial".to_vec()).unwrap();
+        tx.commit(Durability::Authoritative).unwrap();
+        let held = store.begin_transaction().unwrap();
+        for ordinal in 1..=64 {
+            let mut tx = store.begin_transaction().unwrap();
+            let value = ordinal.to_string().into_bytes();
+            tx.put(b"hot".to_vec(), value.clone()).unwrap();
+            tx.put(format!("history/{ordinal}").into_bytes(), value)
+                .unwrap();
+            tx.delete(b"deleted".to_vec()).unwrap();
+            tx.commit(Durability::Authoritative).unwrap();
+            assert_eq!(held.get(b"hot").unwrap(), Some(b"initial".to_vec()));
+            assert_eq!(held.get(b"deleted").unwrap(), Some(b"initial".to_vec()));
+        }
+        let physical = store.physical_store_evidence().unwrap();
+        assert!(physical.automatic_compactions.unwrap() > 0);
+        let manifest = store.manifest().unwrap();
+        let entries = manifest.segments.iter().map(|s| s.entries).sum::<u64>();
+        eprintln!("foreground_history diagnostics={diagnostics} physical_entries={entries}");
+        assert!(
+            entries <= 84,
+            "64 logical history keys plus bounded protected/tail versions, observed {entries}"
+        );
+        identities.push((manifest.digest, physical.physical_sequence));
+        if diagnostics {
+            let samples = store.take_native_write_path_diagnostics().unwrap().unwrap();
+            assert_eq!(samples.observed_samples, 65);
+            assert_eq!(samples.dropped_samples, 0);
+        }
+        drop(held);
+        drop(store);
+        let reopened = RrflowKvStore::open_with_options(&path, options).unwrap();
+        assert_eq!(
+            reopened
+                .physical_store_evidence()
+                .unwrap()
+                .physical_sequence,
+            physical.physical_sequence
+        );
+        let tx = reopened.begin_transaction().unwrap();
+        assert_eq!(tx.get(b"hot").unwrap(), Some(b"64".to_vec()));
+        assert_eq!(tx.get(b"deleted").unwrap(), None);
+        for ordinal in 1..=64 {
+            assert_eq!(
+                tx.get(format!("history/{ordinal}").as_bytes()).unwrap(),
+                Some(ordinal.to_string().into_bytes())
+            );
+        }
+    }
+    assert_eq!(identities[0], identities[1]);
+}

@@ -197,18 +197,17 @@ impl StorageTransaction for RrflowKvTransaction<'_> {
             Durability::Authoritative => rrd_lsm::Durability::Authoritative,
             Durability::Buffered => rrd_lsm::Durability::Buffered,
         };
-        let commit = if diagnostics_enabled {
-            database.commit_transaction_with_write_context(
-                transaction,
-                physical_durability,
-                WriteLockWait {
-                    begin_mutex_wait_ns,
-                    commit_mutex_wait_ns,
-                },
-            )
-        } else {
-            database.commit_transaction(transaction, physical_durability)
-        };
+        // No untracked physical Snapshot escapes this store. Foreground and
+        // idle maintenance use the same registered-reader retention contract.
+        let commit = database.commit_transaction_with_protected_snapshots(
+            transaction,
+            physical_durability,
+            &[],
+            WriteLockWait {
+                begin_mutex_wait_ns,
+                commit_mutex_wait_ns,
+            },
+        );
         let outcome = match commit {
             Ok(outcome) => outcome,
             Err(error) => {

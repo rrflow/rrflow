@@ -518,3 +518,15 @@ retention. Linux12 completed all 1000 corpus acknowledgements/readbacks and two
 reopens but failed the unchanged backup-interference deadline; its initial
 maintenance debt remained 39. Installed comparison, debt/latency convergence
 and full qualification remain open.
+
+The [foreground retention repair](../../evidence/change-journals/gate-c/c-07d-write-history-retention.md)
+extends that explicit owner contract to compaction performed during commit.
+Otherwise a writer can consume the debt before idle work runs while retaining
+all overwritten versions. The repeated-write fixture shrinks 191 physical
+entries to 67 with identical logical history and diagnostics-on/off identity.
+Windows17 still failed an actual 2.215-second sampling gap at its first
+automatic compaction; that earlier source does not prove this repair's timing.
+macOS capacity qualification also has metadata-fill deadline failures in PR79
+and PR82, and PR76's offline lifecycle exceeded its deadline before either
+complete storage-history receipt. These
+remain unqualified; no bypass or relaxed acceptance follows.

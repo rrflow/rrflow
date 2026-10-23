@@ -420,6 +420,58 @@ fn idle_pruning_is_explicit_and_preserves_snapshots_transactions_and_checkpoints
 }
 
 #[test]
+fn foreground_commit_retains_explicit_untracked_snapshots() {
+    let directory = tempdir().unwrap();
+    let root = directory.path().join("foreground-protected");
+    let options = DatabaseOptions {
+        maintenance: MaintenancePolicy {
+            wal_payload_max_bytes: usize::MAX,
+            memtable_max_versions: 1,
+        },
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 2,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    database
+        .write_owned(
+            WriteBatch::new(vec![put("hot", "initial")]).unwrap(),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    let protected = database.snapshot();
+    for ordinal in 0..16 {
+        let mut transaction = database.begin_transaction().unwrap();
+        transaction
+            .put(b"hot".to_vec(), ordinal.to_string().into_bytes())
+            .unwrap();
+        database
+            .commit_transaction_with_protected_snapshots(
+                transaction,
+                Durability::Authoritative,
+                &[protected],
+                Default::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            database.get(b"hot", protected).unwrap(),
+            Some(b"initial".to_vec())
+        );
+    }
+    assert!(database.maintenance_stats().automatic_compactions > 0);
+    let head = database.snapshot();
+    drop(database);
+    let database = Database::open_with_options(&root, options).unwrap();
+    assert_eq!(
+        database.get(b"hot", protected).unwrap(),
+        Some(b"initial".to_vec())
+    );
+    assert_eq!(database.get(b"hot", head).unwrap(), Some(b"15".to_vec()));
+}
+
+#[test]
 fn reserve_denies_wal_flush_and_compaction_without_losing_prior_acknowledgements() {
     // Policy denial against observed native free space, not actual ENOSPC proof.
     for phase in ["wal", "flush", "compaction"] {

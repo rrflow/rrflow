@@ -806,7 +806,13 @@ impl Database {
         transaction: crate::Transaction,
         durability: Durability,
     ) -> Result<crate::TransactionCommit> {
-        self.commit_transaction_inner(transaction, durability, None, WriteLockWait::default())
+        self.commit_transaction_inner(
+            transaction,
+            durability,
+            None,
+            WriteLockWait::default(),
+            None,
+        )
     }
 
     /// Commits through the ordinary transaction path while attaching
@@ -818,7 +824,22 @@ impl Database {
         durability: Durability,
         lock_wait: WriteLockWait,
     ) -> Result<crate::TransactionCommit> {
-        self.commit_transaction_inner(transaction, durability, None, lock_wait)
+        self.commit_transaction_inner(transaction, durability, None, lock_wait, None)
+    }
+
+    /// Commits with explicit snapshot retention for any foreground compaction.
+    /// As with [`Self::compact`], callers must supply all untracked snapshots
+    /// they need. Registered transactions are retained automatically; owned
+    /// projected views and named checkpoints preserve their own generations.
+    /// The lock-wait context only records an explicitly enabled diagnostic.
+    pub fn commit_transaction_with_protected_snapshots(
+        &mut self,
+        transaction: crate::Transaction,
+        durability: Durability,
+        protected: &[Snapshot],
+        lock_wait: WriteLockWait,
+    ) -> Result<crate::TransactionCommit> {
+        self.commit_transaction_inner(transaction, durability, None, lock_wait, Some(protected))
     }
 
     /// Commits through one deterministic write-boundary failure. This is the
@@ -836,6 +857,7 @@ impl Database {
             durability,
             Some((boundary, mode)),
             WriteLockWait::default(),
+            None,
         )
     }
 
@@ -845,6 +867,7 @@ impl Database {
         durability: Durability,
         failure: Option<(WriteBoundary, FailureMode)>,
         lock_wait: WriteLockWait,
+        protected: Option<&[Snapshot]>,
     ) -> Result<crate::TransactionCommit> {
         let mut diagnostics = self.write_path_diagnostics.as_ref().map(|_| {
             PendingWriteDiagnostics::start(
@@ -906,7 +929,7 @@ impl Database {
                 .phases
                 .batch_prepare = started.finish();
         }
-        let receipt = self.write_owned_inner(batch, durability, failure, diagnostics)?;
+        let receipt = self.write_owned_inner(batch, durability, failure, diagnostics, protected)?;
         tracing::debug!(
             target: "rrd_lsm::transaction",
             snapshot_sequence,
@@ -975,7 +998,7 @@ impl Database {
         let charge = MutableCharge::batch(batch)?;
         self.mutable_limits.check(charge)?;
         let payload = batch.encode()?;
-        self.prepare_write(batch, payload.len(), charge)?;
+        self.prepare_write(batch, payload.len(), charge, None)?;
         let prepared_mutable = self.mutable_memory.prepare(&self.memtable, charge)?;
         inject_write_failure(failure, WriteBoundary::Prepared)?;
         let append_durability = append_durability(durability, failure);
@@ -1020,7 +1043,7 @@ impl Database {
                 self.memtable.approximate_bytes(),
             )
         });
-        self.write_owned_inner(batch, durability, None, diagnostics)
+        self.write_owned_inner(batch, durability, None, diagnostics, None)
     }
 
     pub fn write_owned_with_failure(
@@ -1037,7 +1060,7 @@ impl Database {
                 self.memtable.approximate_bytes(),
             )
         });
-        self.write_owned_inner(batch, durability, Some((boundary, mode)), diagnostics)
+        self.write_owned_inner(batch, durability, Some((boundary, mode)), diagnostics, None)
     }
 
     fn write_owned_inner(
@@ -1046,6 +1069,7 @@ impl Database {
         durability: Durability,
         failure: Option<(WriteBoundary, FailureMode)>,
         mut diagnostics: Option<PendingWriteDiagnostics>,
+        protected: Option<&[Snapshot]>,
     ) -> Result<AppendReceipt> {
         self.ensure_writer_ready()?;
         let charge = MutableCharge::batch(&batch)?;
@@ -1062,7 +1086,7 @@ impl Database {
         }
         let payload_bytes = payload.len();
         let maintenance_started = diagnostics.is_some().then(PhaseClock::start);
-        self.prepare_write(&batch, payload.len(), charge)?;
+        self.prepare_write(&batch, payload.len(), charge, protected)?;
         if let Some(started) = maintenance_started {
             diagnostics
                 .as_mut()
@@ -1210,6 +1234,7 @@ impl Database {
         batch: &WriteBatch,
         payload_bytes: usize,
         charge: MutableCharge,
+        protected: Option<&[Snapshot]>,
     ) -> Result<()> {
         self.reclaim_if_pending()?;
         let projected_bytes = self.wal_payload_bytes.saturating_add(payload_bytes);
@@ -1228,7 +1253,7 @@ impl Database {
                 Ok(Some(_)) => {
                     self.maintenance_stats.automatic_flushes =
                         self.maintenance_stats.automatic_flushes.saturating_add(1);
-                    let result = self.compact_if_needed(self.manifest.created_at);
+                    let result = self.compact_for_write(protected);
                     match self.record_automatic_compaction(result) {
                         Ok(_) => {}
                         // The merge's hard limits still stop that merge before
@@ -1261,7 +1286,7 @@ impl Database {
             .filter(|segment| segment.descriptor.level == 0)
             .count() as u64;
         if l0_segments >= self.compaction_limits.l0_segments {
-            self.compact_if_needed(self.manifest.created_at)?;
+            self.compact_for_write(protected)?;
             let remaining = self
                 .segments
                 .iter()
@@ -1282,6 +1307,19 @@ impl Database {
                 self.maintenance_stats.oversized_batches.saturating_add(1);
         }
         Ok(())
+    }
+
+    fn compact_for_write(
+        &mut self,
+        protected: Option<&[Snapshot]>,
+    ) -> Result<Option<CompactionOutcome>> {
+        self.compact_inner(
+            protected.unwrap_or(&[]),
+            self.manifest.created_at,
+            None,
+            false,
+            protected.is_none(),
+        )
     }
 
     fn record_memtable_peak(&mut self) {
