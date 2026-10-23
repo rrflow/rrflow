@@ -11,7 +11,9 @@
 use crate::batch::{validate_key, WriteBatchSize};
 use crate::{AppendReceipt, Database, Error, Mutation, Result, Snapshot};
 use std::collections::BTreeMap;
-use std::ops::Bound::{Excluded, Included};
+use std::ops::Bound::Included;
+
+mod scan;
 use std::sync::{Arc, Mutex};
 
 /// Native transaction ownership; separate from active memtables and caller input.
@@ -249,6 +251,9 @@ impl Transaction {
 
     /// Reads at most `limit` visible rows from `[start, end)` in byte order,
     /// with pending puts and deletes overlaid on the captured snapshot.
+    /// Physical work uses projected-read budgets; returned payload and vector
+    /// representation fit the configured projected-output ceiling. Returned
+    /// vectors are caller-owned, separate from live source-buffer reservations.
     pub fn scan(
         &self,
         database: &Database,
@@ -256,35 +261,7 @@ impl Transaction {
         end: &[u8],
         limit: usize,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        if start >= end {
-            return Err(Error::InvalidTransaction(
-                "range start must sort before its exclusive end".into(),
-            ));
-        }
-        if limit == 0 {
-            return Err(Error::InvalidTransaction(
-                "range result limit must be greater than zero".into(),
-            ));
-        }
-        database.validate_transaction_owner(self)?;
-        let mut visible = database
-            .scan(start, Some(end), self.snapshot)?
-            .into_iter()
-            .collect::<BTreeMap<_, _>>();
-        for (key, value) in self
-            .writes
-            .range::<[u8], _>((Included(start), Excluded(end)))
-        {
-            match value {
-                Some(value) => {
-                    visible.insert(key.clone(), value.clone());
-                }
-                None => {
-                    visible.remove(key.as_slice());
-                }
-            }
-        }
-        Ok(visible.into_iter().take(limit).collect())
+        scan::bounded(self, database, start, end, limit)
     }
 
     /// Buffers a value. Repeated mutations of the same key collapse to the

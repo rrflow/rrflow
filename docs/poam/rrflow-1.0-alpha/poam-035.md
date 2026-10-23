@@ -241,6 +241,12 @@ adds sealed native ceilings and actual-owner release, removes duplicate intent
 buffers, and preserves uncertainty when receipt lookup is resource-starved.
 Candidate runtime acceptance remains pending.
 
+The native transaction scan's requested limit was applied after full-range
+materialization. The [bounded transaction-read correction](../../evidence/change-journals/gate-c/c-07d-bounded-transaction-scans.md)
+reuses the projected reader and ordered pending overlay, with bounded result
+copies and explicit work denial. Native candidate acceptance is pending;
+other full-range APIs and caller-owned result residency remain distinct.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
