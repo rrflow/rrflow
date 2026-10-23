@@ -315,7 +315,7 @@ jobs:
         if: ${{ matrix.name == 'service-protocol' }}
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test cohesive engine subsystem
-        run: cargo test $PACKAGE_SELECTION --all-targets --locked
+        run: cargo test $PACKAGE_SELECTION --all-targets --no-fail-fast --locked
       - name: Deny cohesive engine subsystem warnings
         run: cargo clippy $PACKAGE_SELECTION --all-targets --locked -- -D warnings
 
@@ -419,7 +419,7 @@ jobs:
           shared-key: linux-feature-${{ matrix.package }}-test-debug0-lld1
           cache-on-failure: false
       - name: Test package optional features
-        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked
+        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --no-fail-fast --locked
       - name: Deny package optional-feature warnings
         run: cargo clippy -p ${{ matrix.package }} --all-targets --all-features --locked -- -D warnings
 

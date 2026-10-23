@@ -690,7 +690,8 @@ fn flush_rotates_wal_publishes_manifest_and_preserves_old_snapshots() {
         Some(b"v2".as_slice())
     );
     assert_eq!(reopened.checkpoints().unwrap().len(), 1);
-    assert!(root.join("wal/00000000000000000001.wal").exists());
+    // The initial WAL is unreferenced; both snapshot values survive in segments.
+    assert!(!root.join("wal/00000000000000000001.wal").exists());
     assert!(root.join("wal/00000000000000000002.wal").exists());
     assert!(root.join("wal/00000000000000000003.wal").exists());
 }
