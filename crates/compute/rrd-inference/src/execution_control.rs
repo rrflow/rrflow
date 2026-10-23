@@ -34,6 +34,10 @@ impl EmbeddingExecutionControl {
     pub fn deadline(&self) -> Instant {
         self.deadline
     }
+    /// Derive a stricter ceiling while retaining the same sticky stop signal.
+    pub fn with_deadline(&self, deadline: Instant) -> Self {
+        Self::new(self.deadline.min(deadline), self.cancellation.clone())
+    }
     pub(crate) fn cancellation(&self) -> EmbeddingCancellation {
         self.cancellation.clone()
     }

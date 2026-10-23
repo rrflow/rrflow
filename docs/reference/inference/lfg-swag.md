@@ -153,6 +153,60 @@ owns implementation order and the failing histories required for acceptance.
 
 ### Aggregate run requirements
 
+#### Embedded task-budget implementation
+
+`RrdEngine::generate_task_embeddings` now binds one task's embedding attempts
+to the sealed estate reasoning limits. `TaskEmbeddingAttempt` carries the
+existing task ID, stable attempt ID, embedding request and cancellation handle.
+It requires both `ReasoningWrite` and `EmbeddingGenerate`; inspection through
+`inspect_task_reasoning_budget` requires `ReasoningRead`. These are embedded
+Rust methods, not daemon operations or Connectome controls.
+
+The first admitted attempt fixes the configuration digest, original host-clock
+deadline and step cap. Each attempt reserves one step before dispatch. The
+existing control journal owns the budget and attempt state; the existing
+runtime/control transaction atomically commits them with a task-subject evidence
+event at the checked runtime cursor. Ordinary project records cannot replace
+that control state. Point reads avoid scanning the task's growing history.
+Every child deadline is narrowed to the remaining run allowance and step cap;
+completed attempts also accumulate conservatively rounded monotonic elapsed
+time. Unrelated commit contention may retry completion publication up to three
+times, without dispatching another provider call or resetting any allowance.
+
+A repeated attempt never executes automatically. Accepted completion exposes
+its result digest; this package does not retain the full embedding result for
+replay. An interrupted reservation stays unresolved and blocks further task
+attempts. Cancellation or expiry observed before completion publication,
+rollback, changed configuration, exhaustion and execution failure stop further
+work under that budget. A pending or timed-out
+non-cooperative call remains explicitly uncertain; cancellation cannot kill it.
+There is no reset, automatic extension, or reconciliation API yet. New attempt
+IDs and new sessions do not reset the same task's allowance.
+
+Storage publication is not forcibly interruptible. If publication crosses the
+delivery deadline, success is withheld but an accepted receipt can already
+exist. That receipt is not erased or re-executed; inspection/replay must account
+for it. A recorded terminal stop is distinct from a late response to already
+completed work. This is not a durable Stop operation for all task activities.
+
+Host time is explicitly unverified. Any rollback below the last stored
+observation stops this budget, even if the estate permits tolerance elsewhere;
+unavailable completion time withholds output and retains the reservation.
+The original wall deadline survives restart; monotonic child time and charged
+elapsed time cover active computation. This does not prove trusted elapsed time
+across host suspension, clock manipulation or separate hosts. See the Rust
+[clock distinction](https://doc.rust-lang.org/std/time/) and Temporal's
+[aggregate and attempt timeouts](https://docs.temporal.io/encyclopedia/detecting-activity-failures).
+These sources inform the design; no framework implementation is imported.
+
+The [package evidence](../../evidence/change-journals/gate-g/g-02a-task-budget.md)
+separates native rrflowKV reopen/component evidence from installed process-kill
+and real-provider qualification. Ordinary standalone embedding calls retain
+their per-call limits. Router/context/fallback execution, per-run preference
+resolution, cost/token accounting, durable Stop, authorized extension, full
+output replay and UI presentation remain open. This is a G-02a prerequisite,
+not full aggregate reasoning-run or Gate G acceptance.
+
 Extend that same engine-owned revision and eventual run admission with:
 
 | User control | Required engine semantics |

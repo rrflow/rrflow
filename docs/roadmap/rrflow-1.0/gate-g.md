@@ -111,6 +111,16 @@ router dispatch, remote provider cancellation, hard termination, a durable run
 Stop operation or UI controls. The descriptor and wire catalogue are unchanged;
 no adapter is advertised as forcibly stoppable because it implements a trait.
 
+[PR 102](https://github.com/rrflow/rrflow-development/pull/102) advances row 3
+at the existing task/embedding boundary: an immutable task budget and attempt
+reservation use engine control CAS, atomically paired with task-linked runtime
+evidence. The package tests native rrflowKV reopen, contention, lost completion,
+clock/configuration denial and inherited execution limits. It does not supply
+persisted tree routing, installed process-kill qualification, full output replay,
+or the remaining row 3 acceptance. Its
+[journal](../../evidence/change-journals/gate-g/g-02a-task-budget.md) records the
+exact evidence and open boundaries; Gate G and POAM-009 stay open.
+
 ## Controller learning packages
 
 The [learning contract](../../reference/inference/learning/controller-training.md)

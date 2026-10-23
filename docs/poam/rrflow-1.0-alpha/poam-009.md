@@ -86,6 +86,16 @@ resume. Connectome must not advertise those controls as operational while
 the capability is unavailable. This remains an implementation deficiency;
 the clarification does not close this item.
 
+[PR 102](https://github.com/rrflow/rrflow-development/pull/102) adds durable
+task-associated budget admission to an explicit embedded embedding operation.
+It preserves the original allowance across reconnect/reopen, reserves attempts
+atomically and denies automatic repetition of uncertain work. This does not
+close the missing governed runner: ordinary standalone embeddings still have
+only per-call limits, and routed/context/fallback work, installed crash proof,
+full output replay, reconciliation, extensions and UI remain unimplemented or
+unqualified. See the
+[implementation and evidence](../../evidence/change-journals/gate-g/g-02a-task-budget.md).
+
 ## Owning gates
 
 D-05, G-01 through G-06; I-03/I-07 for governed improvement

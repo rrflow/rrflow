@@ -187,3 +187,21 @@ fn real_feature_hash_preserves_output_and_observes_cancelled_control() {
         })
     ));
 }
+
+#[test]
+fn inherited_control_cannot_extend_deadline_or_disconnect_cancellation() {
+    let cancellation = EmbeddingCancellation::default();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let parent = EmbeddingExecutionControl::new(deadline, cancellation.clone());
+    let attempted_extension = parent.with_deadline(deadline + Duration::from_secs(60));
+    assert_eq!(attempted_extension.deadline(), deadline);
+    let shorter = parent.with_deadline(deadline - Duration::from_secs(1));
+    assert!(shorter.deadline() < parent.deadline());
+    cancellation.cancel();
+    for control in [&parent, &shorter, &attempted_extension] {
+        assert!(matches!(
+            control.check(),
+            Err(EmbeddingDispatchError::Cancelled { .. })
+        ));
+    }
+}

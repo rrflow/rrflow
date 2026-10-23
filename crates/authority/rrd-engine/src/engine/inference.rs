@@ -209,7 +209,6 @@ impl RrdEngine {
         read: ReadStamp,
         cancellation: &rrd_inference::EmbeddingCancellation,
     ) -> Result<GenerateEmbeddingsResult> {
-        let scope = self.query_scope(&request.scope)?;
         // Bind the sealed estate ceiling once, before input preparation. The
         // adapter cannot reset it by taking longer to validate or execute.
         let deadline = std::time::Instant::now()
@@ -218,6 +217,25 @@ impl RrdEngine {
             ))
             .ok_or(ServiceError::DeadlineExceeded)?;
         let control = rrd_inference::EmbeddingExecutionControl::new(deadline, cancellation.clone());
+        self.generate_embeddings_at_with_control(request, read, &control)
+    }
+
+    pub(in crate::engine) fn generate_embeddings_at_with_control(
+        &self,
+        request: &GenerateEmbeddings,
+        read: ReadStamp,
+        inherited: &rrd_inference::EmbeddingExecutionControl,
+    ) -> Result<GenerateEmbeddingsResult> {
+        let scope = self.query_scope(&request.scope)?;
+        let deadline = Instant::now()
+            .checked_add(Duration::from_millis(
+                self.estate_configuration.reasoning.max_step_elapsed_ms,
+            ))
+            .ok_or(ServiceError::DeadlineExceeded)?
+            .min(inherited.deadline());
+        // The caller owns the cancellation signal and a possibly stricter
+        // deadline. Reuse it at every checkpoint; never extend either bound.
+        let control = inherited.with_deadline(deadline);
         control.check().map_err(embedding_dispatch_error)?;
         if read.scope != scope {
             return Err(ServiceError::WrongScope);
@@ -243,7 +261,7 @@ impl RrdEngine {
                 model,
                 internal_network_policy(request.network_policy),
                 requests,
-                rrd_inference::EmbeddingExecutionControl::new(deadline, cancellation.clone()),
+                control.with_deadline(deadline),
             )
             .map_err(embedding_dispatch_error)?;
         let backend = public_embedding_backend(&batch.backend);
@@ -461,7 +479,9 @@ fn inference_error(error: rrd_core::Error) -> ServiceError {
     ServiceError::Inference(error.to_string())
 }
 
-fn embedding_dispatch_error(error: rrd_inference::EmbeddingDispatchError) -> ServiceError {
+pub(super) fn embedding_dispatch_error(
+    error: rrd_inference::EmbeddingDispatchError,
+) -> ServiceError {
     match error {
         rrd_inference::EmbeddingDispatchError::Busy => ServiceError::InferenceBusy,
         rrd_inference::EmbeddingDispatchError::UnhealthyBackend => {

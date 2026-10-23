@@ -117,6 +117,8 @@ mod model;
 mod query;
 mod query_export;
 mod query_transaction;
+mod reasoning_budget;
+pub use reasoning_budget::{ReasoningBudgetStop, TaskEmbeddingAttempt, TaskReasoningBudget};
 mod restore_publication;
 mod tail_repair;
 pub use tail_repair::{InstalledTailRepairPlan, InstalledTailRepairReceipt};

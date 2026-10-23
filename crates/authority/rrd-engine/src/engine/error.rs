@@ -26,6 +26,10 @@ pub enum ServiceError {
     Query(String),
     Inference(String),
     InferenceBusy,
+    ReasoningBudgetStopped(ReasoningBudgetStop),
+    ReasoningAttemptRecorded {
+        outcome_sha256: Option<String>,
+    },
     InferenceCancelled {
         execution_may_continue: bool,
     },
@@ -120,6 +124,8 @@ impl ServiceError {
             | Self::ClockRollback { .. }
             | Self::AdmissionCancelled
             | Self::InferenceCancelled { .. }
+            | Self::ReasoningBudgetStopped(_)
+            | Self::ReasoningAttemptRecorded { .. }
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
             | Self::StorageAdmission(_)
