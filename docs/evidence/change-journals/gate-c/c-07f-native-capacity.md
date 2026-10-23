@@ -401,3 +401,20 @@ compression implementation without bypassing verification, but its effect on
 the observed timeout remains unmeasured until candidate CI. Updated the PR
 brief to the verified dependency facts. The command acquired already-locked
 platform source dependencies; Cargo.lock was unchanged.
+
+## Native capacity candidate receipts
+
+Candidate `ebb70266284bfb01c729229bf53d091b257a038a`, PR 71, run
+39897715995 passed all eight native capacity cases on each of Linux/ext4,
+macOS/APFS and Windows/NTFS. Preserved all 24 full case receipts and three
+suite receipts in [the candidate evidence](c-07f-native-capacity-ebb702.json),
+including exact ordinary/diagnostic build identities, observed failures,
+repair/readback results, expected-state digests and per-platform job links.
+These were extracted from completed successful jobs, checked for exactly the
+fresh/existing cross-product of four named boundaries, and checked against
+passed suite receipts. The original logs remain remote CI records.
+
+This is a native capacity result for that exact candidate, not full-candidate
+acceptance: its macOS offline lifecycle deadline failed and later source
+changes require new CI. No local disk-exhaustion workload ran, no 24-hour
+campaign ran, and no capacity-profile or roadmap completion status changed.
