@@ -2,6 +2,8 @@
 //! This fixed correctness workload is not a capacity profile or a soak.
 #[path = "support/process.rs"]
 mod process;
+#[path = "support/sustained.rs"]
+mod sustained;
 
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
@@ -72,6 +74,10 @@ impl Estate {
     }
 
     fn install(mode: &str) -> Self {
+        Self::install_configured(mode, None)
+    }
+
+    fn install_configured(mode: &str, configuration: Option<&std::path::Path>) -> Self {
         let temp = tempfile::Builder::new()
             .prefix("rrflow reopen ")
             .tempdir()
@@ -99,6 +105,12 @@ impl Estate {
             assert!(
                 !tail.windows(marker.len()).any(|bytes| bytes == marker),
                 "diagnostic primary is not ordinary evidence"
+            );
+            assert!(
+                !tail
+                    .windows(b"C07F_NATIVE_IO_V1=".len())
+                    .any(|bytes| bytes == b"C07F_NATIVE_IO_V1="),
+                "native I/O observer is not ordinary evidence"
             );
             tail = tail[tail.len().saturating_sub(marker.len() - 1)..].to_vec();
         }
@@ -130,7 +142,7 @@ impl Estate {
             .as_str()
             .unwrap()
             .to_owned();
-        let preview = estate.invoke(&[
+        let mut arguments = vec![
             "install",
             "plan",
             "--identity",
@@ -139,7 +151,11 @@ impl Estate {
             mode,
             "--project",
             estate.project.to_str().unwrap(),
-        ]);
+        ];
+        if let Some(configuration) = configuration {
+            arguments.extend(["--configuration", configuration.to_str().unwrap()]);
+        }
+        let preview = estate.invoke(&arguments);
         let path = estate.temp.path().join("plan.json");
         std::fs::write(&path, serde_json::to_vec(&preview).unwrap()).unwrap();
         let applied = estate.invoke(&[
@@ -162,6 +178,14 @@ impl Estate {
     }
 
     fn start(&self, clock: Instant) -> (process::Process, RrdClient, Value) {
+        self.start_for(clock, Duration::from_secs(180))
+    }
+
+    fn start_for(
+        &self,
+        clock: Instant,
+        lifetime: Duration,
+    ) -> (process::Process, RrdClient, Value) {
         let started_ns = clock.elapsed().as_nanos() as u64;
         let mut command = self.command();
         command
@@ -169,13 +193,8 @@ impl Estate {
             .arg(&self.project)
             .args(["--bind", "127.0.0.1:0"]);
         let (send, receive) = mpsc::sync_channel(1);
-        let child = process::Process::start(
-            &mut command,
-            Duration::from_secs(180),
-            STREAM_LIMIT,
-            Some(send),
-        )
-        .unwrap();
+        let child =
+            process::Process::start(&mut command, lifetime, STREAM_LIMIT, Some(send)).unwrap();
         let announcement: Value = serde_json::from_slice(
             &receive
                 .recv_timeout(Duration::from_secs(60))

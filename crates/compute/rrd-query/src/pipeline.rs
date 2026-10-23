@@ -3,7 +3,10 @@ use crate::{
     Query, QueryExecution, Result,
 };
 use rrd_core::ReadStamp;
-use rrd_store::{RuntimeReadBudget, StorageEngine};
+use rrd_store::{RuntimeReadBudget, RuntimeReadEvidence, StorageEngine};
+
+#[path = "pipeline/evidence.rs"]
+mod evidence;
 
 /// One provider-neutral rrflowQL pipeline bound to a caller-owned read stamp.
 ///
@@ -39,15 +42,44 @@ impl<'a, E: StorageEngine> StampedQueryPipeline<'a, E> {
         parameters: &Parameters,
         budget: &ExecutionBudget,
     ) -> Result<BoundQuery> {
-        let catalog = Catalog::capture_for_query_at(
+        self.bind_with_evidence(query, parameters, budget)
+            .map(|(bound, _)| bound)
+    }
+
+    fn bind_with_evidence(
+        &self,
+        query: &Query,
+        parameters: &Parameters,
+        budget: &ExecutionBudget,
+    ) -> Result<(BoundQuery, RuntimeReadEvidence)> {
+        let catalog = Catalog::capture_for_sources_at(
             self.engine,
             self.read.clone(),
-            query,
+            &[],
             RuntimeReadBudget::new(budget.max_storage_keys)?,
         )?;
-        let bound = bind(query, parameters, &catalog)?;
+        let (candidate, required) = crate::plan::prepare_binding(query, parameters, &catalog)?;
+        let (bound, captured) = if catalog.covers_version_sources(&required) {
+            (candidate, catalog.read_evidence)
+        } else {
+            let remaining =
+                evidence::remaining(budget.max_storage_keys, catalog.read_evidence.keys_examined)?;
+            let full = Catalog::capture_for_query_at(
+                self.engine,
+                self.read.clone(),
+                query,
+                RuntimeReadBudget::new(remaining)?,
+            )?;
+            let bound = bind(query, parameters, &full)?;
+            let captured = evidence::combine(
+                catalog.read_evidence,
+                full.read_evidence,
+                budget.max_storage_keys,
+            )?;
+            (bound, captured)
+        };
         self.require_bound_read(&bound)?;
-        Ok(bound)
+        Ok((bound, captured))
     }
 
     pub fn plan(&self, bound: &BoundQuery) -> Result<PhysicalPlan> {
@@ -83,9 +115,14 @@ impl<'a, E: StorageEngine> StampedQueryPipeline<'a, E> {
         parameters: &Parameters,
         budget: &ExecutionBudget,
     ) -> Result<StampedQueryExecution> {
-        let bound = self.bind(query, parameters, budget)?;
+        let (bound, captured) = self.bind_with_evidence(query, parameters, budget)?;
         let plan = self.plan(&bound)?;
-        let execution = self.execute(&plan, budget)?;
+        let mut execution_budget = budget.clone();
+        execution_budget.max_storage_keys =
+            evidence::remaining(budget.max_storage_keys, captured.keys_examined)?;
+        let mut execution = self.execute(&plan, &execution_budget)?;
+        execution.read_evidence =
+            evidence::combine(captured, execution.read_evidence, budget.max_storage_keys)?;
         Ok(StampedQueryExecution {
             bound,
             plan,
