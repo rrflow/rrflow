@@ -416,7 +416,7 @@ fn capacity_case(point: &str, mode: &str) {
         child.kill();
         let report = ledger.reconcile(1024, 1_800_000_000_000).unwrap();
         assert!(report.violations.is_empty());
-        println!("native_capacity_receipt={}",json!({"version":1,"mode":mode,"point":point,
+        println!("\nnative_capacity_receipt={}",json!({"version":1,"mode":mode,"point":point,
             "build":estate.build,"native":native,"filler":fill,"repair":repair_receipt,
             "expected_sha256":digest("c07f.values",&values).unwrap(),"ledger":ledger,"report":report}));
     });

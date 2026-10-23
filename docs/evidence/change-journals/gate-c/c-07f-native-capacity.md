@@ -265,3 +265,29 @@ candidate checks at `beb55307a9c54df3eedec45a113084e360a4bdc1` and merged as
 `6de0c5be56a6b7c888586186babb3b1648eb55ae`; this worktree merged that
 unchanged-source main ancestry. Native capacity/repair acceptance still needs
 the corrected candidate pipeline. C-07 remains open.
+
+
+## Native image and receipt framing correction
+
+The same candidate's Windows job 120217937576 executed the fresh WAL capacity
+case in 156.84 seconds. The native write and filler both reported error 112;
+the case's repair/reopen/prior-ACK ledger passed. The outer runner then failed
+while decoding control output, so the suite did not pass. Rust's single-thread
+libtest output placed the receipt immediately after its test-name prefix;
+requiring a standalone `test ... ok` line was invalid with uncaptured output.
+The exact selected test now uses quiet harness output, starts its receipt on a
+new line, and requires the successful one-test summary plus the same exact
+mode/point/build/ledger receipt. This changes framing, not a storage oracle.
+Windows image control now emits a unique framed JSON receipt, verifies exactly
+one frame and identifies attach/detach parse failures. A cleanup failure also
+retains the preceding failure instead of concealing it.
+
+The macOS job 120217937673 passed all three installed crash cases, then failed
+before APFS execution with `hdiutil: create: -format requires -srcfolder or
+-srcdevice`. Blank-image creation now selects `-type UDIF` instead of the
+source-conversion `-format UDRW`; the new owned image's capacity, device and
+filesystem checks remain mandatory. Apple?s archived [APFS tool example](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/ToolsandAPIs/ToolsandAPIs.html)
+uses size/fs image creation; the actual native command error is the direct
+current evidence. No claim is made that the corrected APFS case has executed.
+PowerShell and Python syntax checks are authoring checks only. No local disk
+image, runtime suite or exhaustion run was launched.
