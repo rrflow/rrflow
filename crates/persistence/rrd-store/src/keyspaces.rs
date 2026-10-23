@@ -1060,6 +1060,10 @@ pub(crate) fn control_journal_key(sequence: u64) -> Vec<u8> {
     system_key(SystemEntry::ControlJournalEntry, &[KeyPart::U64(sequence)])
 }
 
+pub(crate) fn control_journal_prefix() -> Vec<u8> {
+    system_key(SystemEntry::ControlJournalEntry, &[])
+}
+
 pub(crate) fn is_control_journal_key(codec: KeyCodec, stored: &[u8]) -> bool {
     matches!(
         decode_space(codec, META, stored).as_deref(),

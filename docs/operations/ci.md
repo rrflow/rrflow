@@ -546,6 +546,15 @@ used to assemble the normal distribution. These tests do not close installed
 publication/GC composition, 100-cycle operating profiles, resource limits,
 retained buffers, real exhaustion, sustained capacity or the 24-hour soak.
 
+The installed domain-crash job also runs the
+[publication and reclamation corpus](../evidence/change-journals/gate-c/c-07c-installed-publication.md)
+separately for fresh/existing estates. It retains two bounded native receipts,
+requires all six maintenance boundaries and their compound manifest-recovery
+kills, and reconciles prior ACKs before retrying each uncertain target. The
+ordinary domain step excludes these cases to avoid duplicate execution. Native
+acceptance requires the explicit execution and receipt-validation steps;
+component histories and a successful older job cannot replace them.
+
 The
 [engine observability contract](../architecture/engine-data-flow.md#runtime-modes-build-profiles-and-build-identity)
 defines one semantic engine with release, optimized-diagnostic,

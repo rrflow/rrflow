@@ -164,3 +164,53 @@ fn concurrent_disjoint_control_writes_serialize_through_the_shared_journal() {
     let root = tempfile::tempdir().unwrap();
     assert_concurrent_disjoint_progress(Arc::new(RrflowKvStore::open(root.path()).unwrap()));
 }
+
+#[test]
+fn small_journal_pages_remain_bounded_after_growth_and_reopen() {
+    let root = tempfile::tempdir().unwrap();
+    let options = rrd_store::DatabaseOptions {
+        projected_output_bytes: 8 * 1024,
+        ..Default::default()
+    };
+    let engine = RrflowKvStore::open_with_options(root.path(), options).unwrap();
+    let expected = (1..=96)
+        .map(|sequence| {
+            engine
+                .control()
+                .commit(&keyed_transition(
+                    &format!("server/state/page/{sequence}"),
+                    None,
+                    Some(b"retained"),
+                    sequence,
+                ))
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    for engine in [Some(engine), None] {
+        let engine = engine.unwrap_or_else(|| {
+            RrflowKvStore::open_existing_with_options(root.path(), options).unwrap()
+        });
+        let mut after = 0;
+        let mut actual = Vec::new();
+        loop {
+            let page = engine.control().journal_since(after, 3).unwrap();
+            if page.is_empty() {
+                break;
+            }
+            assert!(page.len() <= 3);
+            after = page.last().unwrap().sequence;
+            actual.extend(page);
+        }
+        assert_eq!(actual, expected);
+        assert!(engine
+            .control()
+            .journal_since(u64::MAX, 3)
+            .unwrap()
+            .is_empty());
+        assert!(engine.control().journal_since(0, 0).is_err());
+        // Pagination must not disable the existing byte admission ceiling.
+        assert!(engine.control().journal_since(0, 96).is_err());
+        let resources = engine.physical_store_evidence().unwrap();
+        assert_eq!(resources.native_transactions, Some(0));
+    }
+}

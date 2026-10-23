@@ -454,3 +454,83 @@ fn renewal_rotates_without_persisting_tokens_and_close_is_idempotent() {
     drop(service);
     assert_tree_excludes(&path, &[lease.token.as_str(), renewed.token.as_str()]);
 }
+
+#[test]
+fn concurrent_session_transactions_preserve_leases_and_release_quota() {
+    let (_root, engine) = isolated_engine();
+    let session = engine
+        .create_session(
+            &session_request(9_000, 8),
+            &id("parallel-session"),
+            1_000,
+            "parallel-create",
+            "parallel-create",
+        )
+        .unwrap();
+    let barrier = std::sync::Barrier::new(8);
+    std::thread::scope(|scope| {
+        let handles = (0..8)
+            .map(|worker| {
+                let engine = &engine;
+                let session = &session;
+                let barrier = &barrier;
+                scope.spawn(move || {
+                    barrier.wait();
+                    for turn in 0..8 {
+                        let name = format!("parallel-{worker}-{turn}");
+                        let context = mutation_context(&id(&name), &name, &name);
+                        let transaction = engine
+                            .begin_transaction(
+                                &session.session_id,
+                                &session.token,
+                                &begin_request(),
+                                &context,
+                                1_100,
+                            )
+                            .unwrap();
+                        let aborted = engine
+                            .abort_transaction(
+                                &session.session_id,
+                                &session.token,
+                                &transaction.transaction_id,
+                                &AbortTransaction {},
+                                &context,
+                                1_200,
+                            )
+                            .unwrap();
+                        assert_eq!(aborted.state, TransactionState::Aborted);
+                        assert_eq!(
+                            engine
+                                .begin_transaction(
+                                    &session.session_id,
+                                    &session.token,
+                                    &begin_request(),
+                                    &context,
+                                    1_300
+                                )
+                                .unwrap(),
+                            aborted
+                        );
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    });
+    let admission = engine.transaction_admission_snapshot().unwrap();
+    assert_eq!(admission.outstanding_requests, 0);
+    assert_eq!(admission.logical_bytes, 0);
+    assert!(!admission.active);
+    let next = engine
+        .begin_transaction(
+            &session.session_id,
+            &session.token,
+            &begin_request(),
+            &mutation_context(&id("after-parallel"), "after-parallel", "after-parallel"),
+            1_400,
+        )
+        .unwrap();
+    assert_eq!(next.state, TransactionState::Open);
+}
