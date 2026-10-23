@@ -74,6 +74,10 @@ pub enum ProgressEvent {
         seed: u64,
         observation: ReopenObservation,
     },
+    ReaderInterference {
+        segment: u64,
+        observation: Box<ReaderInterferenceEvidence>,
+    },
     Backup {
         segment: u64,
         observation: BackupEvidence,
@@ -284,6 +288,8 @@ struct PointAudit {
 pub(super) struct ProgressAudit {
     points: BTreeMap<(Id, u64), PointAudit>,
     failed: bool,
+    reader_observed: Option<Digest>,
+    reader_bound: Option<Digest>,
 }
 
 impl ProgressAudit {
@@ -300,12 +306,24 @@ impl ProgressAudit {
                 })
                 .collect(),
             failed: false,
+            reader_observed: None,
+            reader_bound: None,
         }
     }
 
     fn observe(&mut self, campaign: &StorageCampaign, event: &ProgressEvent) -> Result<()> {
         match event {
             ProgressEvent::Failure { .. } => self.failed = true,
+            ProgressEvent::ReaderInterference {
+                segment,
+                observation,
+            } => {
+                observation.validate()?;
+                self.reader_observed = Some(digest(
+                    "c07g.reader-progress",
+                    &(&self.reader_observed, segment, observation),
+                )?);
+            }
             ProgressEvent::ColdFile {
                 point,
                 seed,
@@ -437,6 +455,12 @@ impl ProgressAudit {
 
     pub(super) fn bind_segment(&mut self, segment: &SustainedSegment) -> Result<()> {
         self.check_readback_order(&segment.point, segment.seed, segment.finished_ns)?;
+        if let Some(reader) = &segment.reader {
+            self.reader_bound = Some(digest(
+                "c07g.reader-progress",
+                &(&self.reader_bound, segment.index, reader),
+            )?);
+        }
         if let Some(cold) = &segment.cold_start {
             let state = self
                 .points
@@ -469,6 +493,12 @@ impl ProgressAudit {
     }
 
     pub(super) fn require_bound(&self, status: CampaignStatus) -> Result<()> {
+        if status == CampaignStatus::Completed {
+            require(
+                self.reader_observed == self.reader_bound,
+                "reader receipts differ from raw progress",
+            )?;
+        }
         if status == CampaignStatus::Completed {
             require(
                 self.points.values().all(|point| point.cold.is_none()),

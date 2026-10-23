@@ -63,7 +63,7 @@ version, which remains frozen at `1.0.0` by the
 [version policy](../release/version-policy.md).
 
 The deterministic OpenAPI projection is currently bound to SHA-256
-`e30eb4d3002df2664069336a7bd2933ecd058698e0f58a779fdbae7a7f464175`.
+`6a8d3e490eeb0e13a10465b752dee165223c7097e18ccd08acb79b38934e4650`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against
@@ -295,3 +295,34 @@ history assembly. Counters are process-local observations, not a cross-model
 consistent snapshot; the full diagnostic operation retains its existing
 consistency requirements. This permits storage monitoring independent of
 project-history size without creating another storage authority.
+
+
+## Bounded storage inspection cursors
+
+`POST /v1/diagnostics/storage/cursor` is an authenticated `DiagnosticsRead`
+operation scoped to the exact instance. It retains an ephemeral native physical
+snapshot for inspection; it is not a semantic query result, durable transaction
+or resumable cross-restart cursor. No physical key or value is returned.
+
+The request supplies a session-local `cursor_id` and an action. `open` declares
+`batch_rows` (1?4,096), `batch_bytes` (1?4 MiB) and `lifetime_ms` (1?60,000).
+Native installed view/pin/output ceilings also apply; the metadata registry
+admits at most the smaller of 64 or the installed active-view ceiling. Open
+retries with different parameters conflict; matching retries observe the
+current retained page. Cursor IDs may be reused after release or expiry.
+
+`observe` hashes the current retained page without advancing. `advance`
+supplies `expected_ordinal`; replaying the immediately previous advance returns
+the existing page. Older/future ordinals fail. `cancel_source` releases physical
+source leases but retains the copied page; `release` drops both and is safe to
+repeat. Session closure and monotonic lifetime expiry also drop owned data.
+The installed server sweeps expiry once per second; embedded hosts call
+`RrdEngine::reap_storage_cursors`, and cursor operations also sweep. No renewal
+extends a captured cursor's deadline. Process restart discards every cursor.
+
+The snapshot reports physical sequence, page ordinal, row count, actual batch
+allocation, source state and `page_sha256`. The hash frames the domain
+`rrflow-storage-inspection-page-v1`, big-endian u64 sequence, ordinal and row
+count, then length-prefixed key/value bytes in native order. It proves observed
+page identity only. Cursor state is not a provider's private reasoning trace,
+and process counters remain observations rather than an authoritative read stamp.

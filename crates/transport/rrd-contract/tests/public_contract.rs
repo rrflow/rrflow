@@ -2545,3 +2545,35 @@ fn storage_observation_has_bounded_scope_and_a_read_only_authenticated_route() {
     );
     assert!(!endpoint.mutation);
 }
+
+#[test]
+fn storage_cursor_rejects_unknown_actions_fields_and_unbounded_budgets() {
+    use rrd_contract::{CorrelationId, InspectStorageCursor, StorageCursorAction};
+    for action in [
+        serde_json::json!({"kind":"observe","extra":true}),
+        serde_json::json!({"kind":"release","extra":true}),
+        serde_json::json!({"kind":"unknown"}),
+    ] {
+        assert!(serde_json::from_value::<StorageCursorAction>(action).is_err());
+    }
+    for (rows, bytes, lifetime) in [
+        (0, 4096, 1000),
+        (4097, 4096, 1000),
+        (1, 0, 1000),
+        (1, 4194305, 1000),
+        (1, 4096, 0),
+        (1, 4096, 60001),
+    ] {
+        assert!(InspectStorageCursor {
+            scope: "instance:test".into(),
+            cursor_id: CorrelationId::new("reader").unwrap(),
+            action: StorageCursorAction::Open {
+                batch_rows: rows,
+                batch_bytes: bytes,
+                lifetime_ms: lifetime
+            }
+        }
+        .validate()
+        .is_err());
+    }
+}

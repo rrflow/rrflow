@@ -4698,6 +4698,7 @@ dependencies = [
  "rrd-lsm",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tracing",
 ]

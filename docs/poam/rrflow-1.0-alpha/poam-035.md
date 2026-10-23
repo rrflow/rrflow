@@ -256,3 +256,8 @@ profiles. Gate C must accept the complete matrix at exact tested revisions
 before this row closes. Missing facilities or unrun large profiles remain
 visible gaps. J-02/J-03 retain OS/power-cut and distribution-profile claims;
 J-04 retains full-product competitive evidence.
+
+The [installed physical cursor candidate](../../evidence/change-journals/gate-c/c-07e-installed-storage-cursors.md)
+adds session-owned native reader/output retention and raw sustained-interference
+reconciliation. Runtime acceptance, complete capacity profiles and soak remain
+open; a schema or compiled capability does not establish this proof.

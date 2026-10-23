@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: e30eb4d3002df2664069336a7bd2933ecd058698e0f58a779fdbae7a7f464175
+// OpenAPI SHA-256: 6a8d3e490eeb0e13a10465b752dee165223c7097e18ccd08acb79b38934e4650
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -14,6 +14,7 @@ public enum OperationId
     ContextAssemble,
     DataSchemaRead,
     DiagnosticsRead,
+    DiagnosticsStorageCursor,
     DiagnosticsStorageRead,
     EndpointCatalogue,
     EstateRead,
@@ -65,8 +66,8 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const string OpenApiDocumentSha256 = "e30eb4d3002df2664069336a7bd2933ecd058698e0f58a779fdbae7a7f464175";
-    public const int Count = 43;
+    public const string OpenApiDocumentSha256 = "6a8d3e490eeb0e13a10465b752dee165223c7097e18ccd08acb79b38934e4650";
+    public const int Count = 44;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -80,6 +81,7 @@ public static class EndpointCatalog
         OperationId.ContextAssemble => new("context-assemble", "POST", "/v1/context/assemble", Authentication.SessionBearer, false),
         OperationId.DataSchemaRead => new("data-schema-read", "POST", "/v1/data/schema", Authentication.SessionBearer, false),
         OperationId.DiagnosticsRead => new("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SessionBearer, false),
+        OperationId.DiagnosticsStorageCursor => new("diagnostics-storage-cursor", "POST", "/v1/diagnostics/storage/cursor", Authentication.SessionBearer, false),
         OperationId.DiagnosticsStorageRead => new("diagnostics-storage-read", "POST", "/v1/diagnostics/storage/read", Authentication.SessionBearer, false),
         OperationId.EndpointCatalogue => new("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.Public, false),
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),

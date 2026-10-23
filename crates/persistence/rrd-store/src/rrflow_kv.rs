@@ -30,6 +30,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
+mod inspection_cursor;
+pub use inspection_cursor::{StorageInspectionCursor, StorageInspectionPage};
+
 const RUNTIME_CHECKPOINT_PREFIX: &str = "runtime-";
 pub const RRFLOW_KV_OPEN_EVIDENCE_VERSION: u16 = 2;
 

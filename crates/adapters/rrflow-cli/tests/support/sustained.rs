@@ -20,6 +20,8 @@ mod damage;
 mod lifecycle;
 #[path = "sustained/native.rs"]
 mod native;
+#[path = "sustained/reader.rs"]
+mod reader;
 #[path = "sustained/workload.rs"]
 mod workload;
 use workload::{Prepared, Workload};
@@ -334,6 +336,7 @@ impl PointRun<'_> {
             cold_start: None,
             reopens: None,
             backup: None,
+            reader: None,
             manifest,
             result,
             attempts: vec![],
@@ -410,6 +413,16 @@ impl PointRun<'_> {
             expected_ledger_sha256: expected_digest(&ledger.expected)?,
         }];
         let mut resources = vec![self.sample(writer).await?];
+        let held_reader = if phase == LoadPhase::Measured
+            && campaign
+                .required_lanes
+                .contains(&CapacityLane::ReaderPinInterference)
+            && prepared.iter().any(|operation| operation.write.is_some())
+        {
+            Some(reader::HeldReader::open(&self.workload, writer.next_index(), self.clock).await?)
+        } else {
+            None
+        };
         let mut attempts = Vec::new();
         let mut joins = JoinSet::new();
         let mut backup = JoinSet::new();
@@ -475,6 +488,17 @@ impl PointRun<'_> {
                     next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
                 }
             }
+        }
+        let reader_receipt = match held_reader {
+            Some(reader) => Some(reader.finish(&self.workload, self.clock).await?),
+            None => None,
+        };
+        if let Some(observation) = &reader_receipt {
+            writer.record_event(&ProgressEvent::ReaderInterference {
+                segment: writer.next_index(),
+                observation: Box::new(observation.clone()),
+            })?;
+            writer.checkpoint_progress()?;
         }
         let mut backup_receipt = None;
         while !backup.is_empty() {
@@ -571,6 +595,16 @@ impl PointRun<'_> {
             }],
             None => vec![],
         };
+        if let Some(raw) = &reader_receipt {
+            if raw.qualifies(&attempts) {
+                lanes.push(LaneEvidence {
+                    lane: CapacityLane::ReaderPinInterference,
+                    repetitions: 1u64.try_into()?,
+                    receipt_sha256: digest("c07g.reader-interference", raw)?,
+                    acknowledged_readback_verified: verified,
+                });
+            }
+        }
         let result = StorageResult {
             format_version: 1,
             manifest_sha256: manifest_digest(&manifest)?,
@@ -613,6 +647,7 @@ impl PointRun<'_> {
             cold_start: None,
             reopens: None,
             backup: backup_receipt,
+            reader: reader_receipt,
             manifest,
             result,
             attempts,
@@ -830,12 +865,14 @@ fn installed_capacity_workload_smoke() {
                 99,
             )
             .unwrap();
+        let retained_reader = reader::HeldReader::open(&work, 0, clock).await.unwrap();
         let (written, backup) = tokio::join!(
             work.execute(&write),
             lifecycle::backup(work.clone(), "smoke-backup".into(), clock)
         );
         let written = written.unwrap();
         let backup = backup.unwrap();
+        let reader_evidence = retained_reader.finish(&work, clock).await.unwrap();
         work.verify(&write).await.unwrap();
         let killed = super::kill(child, clock);
         let (reopened, client, identity) = estate.start_for(clock, Duration::from_secs(300));
@@ -864,18 +901,19 @@ fn installed_capacity_workload_smoke() {
             serde_json::json!({
             "build":estate.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
             "replayed_transactions":12,"write_transitions":{"insert":3,"update":4,"retire":3,"recreate":2},"backup_sha256":backup.receipt.backup.backup_sha256,
-            "termination":killed,"reopened":identity,"capacity_qualification":false})
+            "reader_interference":reader_evidence,"termination":killed,"reopened":identity,"capacity_qualification":false})
         );
         super::kill(reopened, clock);
     });
 }
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
-    if campaign.required_lanes.iter().any(|lane| {
-        *lane == CapacityLane::ReaderPinInterference
-            || (*lane == CapacityLane::Cold && !cfg!(target_os = "linux"))
-    }) {
-        return Err("native cold-cache and retained-reader controls are not available in this installed driver".into());
+    if campaign
+        .required_lanes
+        .iter()
+        .any(|lane| *lane == CapacityLane::Cold && !cfg!(target_os = "linux"))
+    {
+        return Err("native cold-cache control is not available on this platform".into());
     }
     if campaign
         .required_lanes
@@ -896,10 +934,17 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
     if campaign.allocation.estates.get() != 1 {
         return Err("fleet requires native aggregate estate driver".into());
     }
-    if campaign.purpose == CampaignPurpose::Qualification {
-        return Err("native allocation enforcement and complete resource gauges required before qualification execution".into());
+    if campaign
+        .required_lanes
+        .contains(&CapacityLane::ReaderPinInterference)
+        && campaign.schedule.operation_deadline_ms.get() > 30_000
+    {
+        return Err("retained-reader lane requires operation deadline at most 30 seconds".into());
     }
     let allocation = native::receipt(campaign)?;
+    if campaign.purpose == CampaignPurpose::Qualification && allocation.is_none() {
+        return Err("qualification requires launcher-owned native allocation receipt".into());
+    }
     let configuration = std::env::var_os("RRFLOW_SUSTAINED_CONFIGURATION").map(PathBuf::from);
     let clock = Instant::now();
     for point in &campaign.points {
@@ -933,6 +978,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
             )
             .ok_or("campaign deadline overflow")?;
             let (child, client, _) = estate.start_for(clock, Duration::from_millis(lifetime_ms));
+            native::enforcement(child.id(), allocation.as_ref())?;
             let mut child = Some(child);
             let mut session_ordinal = 0;
             let mut session_opened = Instant::now();
@@ -1075,7 +1121,16 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                         .checked_sub(campaign.schedule.operation_deadline_ms.get())
                         .filter(|v| *v > 0)
                         .ok_or("segment must reserve an operation deadline")?
-                        .min(120_000);
+                        .min(
+                            if campaign
+                                .required_lanes
+                                .contains(&CapacityLane::ReaderPinInterference)
+                            {
+                                10_000
+                            } else {
+                                120_000
+                            },
+                        );
                     let timed_cap = (u128::from(rate) * u128::from(active_ms) / 1000)
                         .max(1)
                         .min(u128::from(u64::MAX)) as u64;

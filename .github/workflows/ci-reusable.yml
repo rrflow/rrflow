@@ -63,6 +63,9 @@ jobs:
       - name: Test retained projected output admission and release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
       - name: Test output reservation arithmetic and partial release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib segment::output::tests --locked
@@ -157,6 +160,9 @@ jobs:
       - name: Test retained projected output admission and release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
       - name: Test output reservation arithmetic and partial release
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib segment::output::tests --locked

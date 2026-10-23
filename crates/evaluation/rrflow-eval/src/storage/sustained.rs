@@ -663,6 +663,7 @@ pub struct SustainedSegment {
     pub cold_start: Option<ColdStartEvidence>,
     pub reopens: Option<ReopenEvidence>,
     pub backup: Option<BackupEvidence>,
+    pub reader: Option<ReaderInterferenceEvidence>,
     /// Frozen before this segment's operations; full candidate/environment and
     /// installed configuration must equal the campaign's template identities.
     pub manifest: StorageManifest,
@@ -1135,6 +1136,29 @@ pub fn validate_segment(
                 .iter()
                 .any(|lane| lane.lane == CapacityLane::Cold),
             "cold lane omitted its native residency evidence",
+        )?;
+    }
+    if let Some(reader) = &segment.reader {
+        reader.validate()?;
+        require(
+            reader.opened_ns >= segment.started_ns && reader.released_ns <= segment.finished_ns,
+            "reader interference lies outside its segment",
+        )?;
+    }
+    for lane in segment
+        .lanes
+        .iter()
+        .filter(|lane| lane.lane == CapacityLane::ReaderPinInterference)
+    {
+        let reader = segment
+            .reader
+            .as_ref()
+            .ok_or("reader lane omitted raw ownership evidence")?;
+        require(
+            reader.qualifies(&segment.attempts)
+                && lane.repetitions.get() == 1
+                && digest("c07g.reader-interference", reader)? == lane.receipt_sha256,
+            "reader lane lacks overlapping ACK, maintenance or matching receipt",
         )?;
     }
     if let Some(backup) = &segment.backup {
@@ -1853,6 +1877,7 @@ mod tests {
             cold_start: None,
             reopens: None,
             backup: None,
+            reader: None,
             manifest,
             result,
             attempts: vec![LoadAttempt {

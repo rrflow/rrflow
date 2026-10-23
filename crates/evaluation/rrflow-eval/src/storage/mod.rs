@@ -8,6 +8,8 @@ mod ledger;
 mod model;
 mod policy;
 mod progress;
+mod reader_interference;
+pub use reader_interference::ReaderInterferenceEvidence;
 mod sustained;
 mod validation;
 

@@ -28,6 +28,7 @@ mod outcome;
 mod projection;
 mod repository;
 mod rrflow_kv;
+pub use rrflow_kv::{StorageInspectionCursor, StorageInspectionPage};
 mod s3;
 mod transaction;
 mod writer;

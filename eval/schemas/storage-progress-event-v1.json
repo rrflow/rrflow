@@ -1205,6 +1205,72 @@
         }
       ]
     },
+    "ReaderInterferenceEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "cancelled": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "drained": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "maintenance_after": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "maintenance_before": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "observed": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "observed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "opened": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "opened_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "released": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "released_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "source_released": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        }
+      },
+      "required": [
+        "opened_ns",
+        "observed_ns",
+        "released_ns",
+        "opened",
+        "observed",
+        "cancelled",
+        "released",
+        "baseline",
+        "retained",
+        "source_released",
+        "drained",
+        "maintenance_before",
+        "maintenance_after"
+      ],
+      "type": "object"
+    },
     "ReopenObservation": {
       "additionalProperties": false,
       "properties": {
@@ -1354,6 +1420,54 @@
         "queue_requests",
         "maintenance_debt_segments",
         "allocation_enforcement"
+      ],
+      "type": "object"
+    },
+    "StorageCursorSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "allocated_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cursor_id": {
+          "type": "string"
+        },
+        "page_ordinal": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_sha256": {
+          "type": "string"
+        },
+        "released": {
+          "type": "boolean"
+        },
+        "rows": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_open": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cursor_id",
+        "released",
+        "source_open",
+        "snapshot_sequence",
+        "page_ordinal",
+        "rows",
+        "allocated_bytes",
+        "page_sha256"
       ],
       "type": "object"
     },
@@ -1726,6 +1840,29 @@
         "kind",
         "point",
         "seed",
+        "observation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "reader_interference",
+          "type": "string"
+        },
+        "observation": {
+          "$ref": "#/$defs/ReaderInterferenceEvidence"
+        },
+        "segment": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "segment",
         "observation"
       ],
       "type": "object"
