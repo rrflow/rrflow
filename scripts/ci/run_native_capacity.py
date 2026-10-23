@@ -224,16 +224,41 @@ def execute(executable: Path, descriptor: Path, point: str, mode: str):
     return rows[0]
 
 
+def cleanup_detached_volume(fixture):
+    # Check every target before deleting any. Never traverse a mount, symlink
+    # or unknown artifact; failure leaves the owned image available for review.
+    require(fixture == fixture.resolve(strict=True) and fixture.name.startswith("rrflow-capacity-"),
+            "cleanup target identity changed")
+    mount = fixture / "volume"
+    require(not mount.is_symlink() and not os.path.ismount(mount), "refuse cleanup of attached mount")
+    if mount.exists():
+        require(mount.is_dir() and not any(mount.iterdir()), "detached mount directory is not empty")
+    paths = [fixture / name for name in
+             ("capacity.img", "capacity.dmg", "capacity.vhd", "volume.json", "create-owned-vhd.txt")]
+    for path in paths:
+        require(not path.is_symlink(), "cleanup file is a symlink")
+        if path.exists():
+            require(path.is_file() and path.resolve().parent == fixture, "cleanup file escaped fixture")
+    for path in paths:
+        if path.exists():
+            path.unlink()
+    if mount.exists():
+        mount.rmdir()
+
+
 def cases(config, fixture):
     results = []
-    with volume(fixture, config["size_mib"]) as (descriptor, identity):
-        for mode in config["modes"]:
-            for point in config["points"]:
+    for mode in config["modes"]:
+        for point in config["points"]:
+            # A new filesystem per case prevents prior exhaustion/deletion
+            # allocation state from influencing the next native error oracle.
+            with volume(fixture, config["size_mib"]) as (descriptor, identity):
                 receipt = execute(Path(config["executable"]), descriptor, point, mode)
                 results.append({"mode": mode, "point": point, "build": receipt["build"],
-                                "expected_sha256": receipt["expected_sha256"]})
+                                "expected_sha256": receipt["expected_sha256"], "filesystem": identity})
+            cleanup_detached_volume(fixture)
     # This statement is reachable only after owned process and volume cleanup.
-    print("native_capacity_suite=" + json.dumps({"version": 1, "status": "passed", "filesystem": identity,
+    print("native_capacity_suite=" + json.dumps({"version": 2, "status": "passed",
           "harness_sha256": config["harness_sha256"], "cases": results}), flush=True)
 
 
@@ -278,16 +303,11 @@ def main():
         # may traverse a residual mount. Only known host-owned regular files and
         # an empty, detached mount directory are removed after success.
         if complete:
-            require(fixture == fixture.resolve(strict=True) and fixture.name.startswith("rrflow-capacity-"),
-                    "cleanup target identity changed")
-            mount = fixture / "volume"
-            require(not os.path.ismount(mount), "refuse cleanup of attached mount")
-            for name in ["capacity.img", "capacity.dmg", "capacity.vhd", "runner.json", "volume.json", "create-owned-vhd.txt"]:
-                path = fixture / name
-                if path.exists():
-                    require(path.is_file() and not path.is_symlink() and path.resolve().parent == fixture, "cleanup file escaped fixture")
-                    path.unlink()
-            mount.rmdir()
+            cleanup_detached_volume(fixture)
+            runner = fixture / "runner.json"
+            require(runner.is_file() and not runner.is_symlink() and runner.resolve().parent == fixture,
+                    "runner configuration escaped fixture")
+            runner.unlink()
             fixture.rmdir()
         else:
             print(json.dumps({"capacity_fixture_retained": str(fixture), "status": "failed"}), file=sys.stderr)

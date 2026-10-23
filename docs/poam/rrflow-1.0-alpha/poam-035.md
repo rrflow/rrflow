@@ -291,6 +291,17 @@ remains pending; the earlier failed resource policies remain retained.
 
 ## Closure evidence
 
+Native run 39979675928 failed the macOS existing/WAL capacity case after a
+real filler ENOSPC: the client returned resource denial without a selected
+native I/O error receipt. The
+[native capacity isolation repair](../../evidence/change-journals/gate-c/c-07f-wal-capacity-selection.md)
+creates a new verified filesystem per exhaustion case and reports the actual
+selected WAL size, with process/recovery and cleanup regression coverage.
+The installed measurement rejected relying on a new payload selector.
+Native macOS resolution is pending;
+this does not substitute resource admission for real disk exhaustion or
+close C-07f.
+
 C-07 requires independent exact histories,
 I/O fault and native process/exhaustion evidence, hard resource admission,
 snapshot/buffer/GC lifetime, and installed scale/soak qualification at declared

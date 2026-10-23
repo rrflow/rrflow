@@ -616,6 +616,10 @@ jobs:
         run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run
       - name: Test bounded diagnostic process control
         run: cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+      - name: Test native capacity ownership and WAL observation
+        run: |
+          python scripts/ci/test_native_capacity.py
+          cargo test -p rrd-lsm --test installed_wal_selection --features crash-test --locked
       - name: Test exact installed domain boundaries and compound recovery
         timeout-minutes: 20
         run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2 --skip publication_and_reclamation

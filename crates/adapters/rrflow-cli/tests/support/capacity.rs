@@ -703,3 +703,110 @@ fn installed_native_capacity_recovers_acknowledged_history() {
     assert!(matches!(mode.as_str(), "fresh" | "existing"));
     capacity_case(&point, &mode);
 }
+
+/// Characterize the actual installed domain's first WAL append without filling
+/// a filesystem. Native exhaustion remains the separate owned-image oracle.
+#[test]
+fn installed_capacity_wal_payload_is_observed_before_domain_commit() {
+    let estate = Estate::install("existing");
+    let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mutations = (0..180)
+                .map(|index| TransactionMutation::AssertClaim {
+                    subject: CanonicalId::new(format!("crash-uncertain-{index}")).unwrap(),
+                    predicate: CanonicalId::new("crash").unwrap(),
+                    object: format!("{index:04}").repeat(1024),
+                    valid_from: estate.at,
+                    tx_time: estate.at,
+                    producer: CanonicalId::new("independent-oracle").unwrap(),
+                    confidence: None,
+                })
+                .collect::<Vec<_>>();
+            let target = CommitTransaction {
+                operation_sha256: transaction_operation_sha256(&mutations),
+                mutations,
+            };
+            let mut control = estate.control("wal_before_write", 1, Some(&target.operation_sha256));
+            control["resume"] = json!(true);
+            let (mut child, client) = estate.serve(&control);
+            let session = client
+                .create_session(
+                    credential.principal_id.clone(),
+                    credential.credential(),
+                    CreateSession {
+                        limits: SessionLimits {
+                            idle_timeout_ms: 600_000,
+                            absolute_timeout_ms: 3_600_000,
+                            max_open_transactions: 2,
+                        },
+                    },
+                    options("capacity-session"),
+                )
+                .await
+                .unwrap();
+            let lease = begin(&client, &session, "selection").await;
+            let controller = tokio::task::spawn_blocking(move || {
+                let line = child.line();
+                let hit: Value = serde_json::from_str(
+                    std::str::from_utf8(&line)
+                        .unwrap()
+                        .trim()
+                        .strip_prefix(PREFIX)
+                        .unwrap(),
+                )
+                .unwrap();
+                for key in ["nonce", "id", "point"] {
+                    assert_eq!(hit[key], control[key]);
+                }
+                assert_eq!(hit["pid"], child.child.id());
+                println!("installed_capacity_wal_selection={hit}");
+                child
+                    .child
+                    .resume_controlled(
+                        &serde_json::to_vec(
+                            &json!({"version":1,"nonce":hit["nonce"],"id":hit["id"]}),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                (child, hit)
+            });
+            let receipt = client
+                .commit_transaction(
+                    &session,
+                    &lease.transaction_id,
+                    target.clone(),
+                    options("selection"),
+                )
+                .await
+                .unwrap();
+            let (child, hit) = controller.await.unwrap();
+            assert!(hit["wal_payload_bytes"].as_u64().unwrap() > 0);
+            let replay = client
+                .commit_transaction(
+                    &session,
+                    &lease.transaction_id,
+                    target.clone(),
+                    options("selection"),
+                )
+                .await
+                .unwrap();
+            assert!(replay.idempotent_replay);
+            assert_eq!(receipt_hash(&receipt), receipt_hash(&replay));
+            assert_eq!(
+                read_values(&client, &session, estate.at).await,
+                requested_values(&target)
+            );
+            child.kill();
+            let (child, client) = estate.serve(&Value::Null);
+            assert_eq!(
+                read_values(&client, &session, estate.at).await,
+                requested_values(&target)
+            );
+            child.kill();
+        });
+}

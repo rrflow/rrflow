@@ -31,6 +31,7 @@ static RESUMABLE: AtomicBool = AtomicBool::new(false);
 struct Observation {
     schedule: Schedule,
     emitted: bool,
+    wal_payload_bytes: Option<usize>,
 }
 thread_local! { static OBSERVATION: RefCell<Option<Observation>> = const { RefCell::new(None) }; }
 
@@ -138,6 +139,7 @@ fn enter_selected(matches: impl FnOnce(&Pending) -> bool) -> ScopeGuard {
             *slot = Some(Observation {
                 schedule: selected.schedule.clone(),
                 emitted: false,
+                wal_payload_bytes: None,
             })
         });
     }
@@ -163,6 +165,25 @@ impl Drop for ScopeGuard {
 /// armed. Root containment also rejects another database in that thread.
 pub fn boundary(point: Point, path: &Path) {
     pause_if(|active| active.schedule.point == point && path.starts_with(&active.schedule.root));
+}
+
+/// Record the selected physical append's size without changing selection,
+/// admission or I/O. Values and keys never enter the private pause receipt.
+pub fn wal_before_write(path: &Path, payload_bytes: usize) {
+    OBSERVATION.with_borrow_mut(|slot| {
+        if let Some(active) = slot.as_mut() {
+            if active.schedule.point == Point::WalBeforeWrite
+                && path.starts_with(&active.schedule.root)
+            {
+                active.wal_payload_bytes = Some(payload_bytes);
+            }
+        }
+    });
+    boundary(Point::WalBeforeWrite, path);
+}
+
+pub(super) fn selected_wal_payload_bytes() -> Option<usize> {
+    OBSERVATION.with_borrow(|slot| slot.as_ref().and_then(|active| active.wal_payload_bytes))
 }
 
 /// Continue only through the already-private controller pipe with the exact
