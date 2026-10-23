@@ -358,3 +358,10 @@ before restart. Fleet and Linux small runs have exact histories and no rejected
 or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
 All remain characterization. Required corpus profiles, complete 24-hour evidence,
 current-candidate CI and final acceptance reconciliation remain open.
+
+The [retained native failure record](../../evidence/change-journals/gate-c/c-07h-retained-native-failures.md)
+preserves Windows13's coverage failure and Linux04/05's frozen setup deadline
+failures with exact source/binary/campaign identities and confirmed cleanup.
+Combined component checks at d209218d pass but do not override those native
+failures. The repaired pipeline candidate and ongoing long characterization
+remain separate evidence; full profiles and completed soak are still required.
