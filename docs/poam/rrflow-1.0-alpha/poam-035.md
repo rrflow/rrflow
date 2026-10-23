@@ -466,3 +466,11 @@ Endpoint/pair histories and selected-key counts are checked against the
 full-state constraint oracle, including native reopen. This advances the
 POAM-034 scale prerequisite without closing its remaining unique-value-index
 requirement or substituting for native C-07 capacity/soak acceptance.
+
+The [backup page-admission repair](../../evidence/change-journals/gate-c/c-07g-backup-page-admission.md)
+retains finite adaptive page counts within configured native byte ceilings.
+Native 8 KiB backup/restore/reopen and indivisible-entry rejection/recovery
+histories pass. Linux08 still failed backup after the earlier journal-prefix
+repair, and Windows14 failed its actual resource-sampling interval after
+497 segments; both failures remain recorded. Exact new native comparison,
+full profiles, 24-hour soak and candidate CI remain required.
