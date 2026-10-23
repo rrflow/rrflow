@@ -6,6 +6,61 @@ use rrd_lsm::{
 const CACHE_BYTES: usize = 16 * 1024;
 const REQUEST_BYTES: usize = 16 * 1024 * 1024;
 
+#[test]
+fn compacted_hot_key_history_reads_in_bounded_requests_after_reopen() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().join("hot-key");
+    let options = DatabaseOptions {
+        segment_compression: SegmentCompressionPolicy::None,
+        segment_io: SegmentIoPolicy {
+            mode: SegmentIoMode::Bounded,
+            allow_fallback: false,
+            max_request_bytes: 4096,
+        },
+        compaction: rrd_lsm::CompactionPolicy {
+            l0_compaction_trigger: 2,
+            ..rrd_lsm::CompactionPolicy::default()
+        },
+        ..DatabaseOptions::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    let mut history = Vec::new();
+    for ordinal in 0..2_u8 {
+        let value = vec![ordinal; 3000];
+        database
+            .write(
+                &WriteBatch::new(vec![Mutation::Put {
+                    key: b"hot-key".to_vec(),
+                    value: value.clone(),
+                }])
+                .unwrap(),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        history.push((database.snapshot(), value));
+        database.flush_memtable(u64::from(ordinal)).unwrap();
+    }
+    let compacted = database.compact_if_needed(3).unwrap().unwrap();
+    assert_eq!(compacted.input_segments, 2);
+    assert!(!compacted.history_pruned);
+    for (snapshot, value) in &history {
+        assert_eq!(
+            database.get(b"hot-key", *snapshot).unwrap(),
+            Some(value.clone())
+        );
+    }
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    for (snapshot, value) in history {
+        assert_eq!(reopened.get(b"hot-key", snapshot).unwrap(), Some(value));
+    }
+    let stats = reopened.segment_io_stats();
+    assert!(stats.bytes_read > 4096);
+    assert!(stats.peak_request_bytes <= 4096);
+    assert_eq!(stats.fallback_count, 0);
+    assert_eq!(stats.mmap_segments, 0);
+}
+
 fn write_fixture(root: &std::path::Path, segment_compression: SegmentCompressionPolicy) {
     let mut database = Database::create_with_options(
         root,
