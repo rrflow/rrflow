@@ -43,6 +43,8 @@ pub fn run(args: &[String]) -> Result<()> {
                 "segment" => schema::<SustainedSegment>(),
                 "campaign-result" => schema::<CampaignResult>(),
                 "progress-event" => schema::<ProgressEvent>(),
+                "fleet-result" => schema::<FleetResult>(),
+                "fleet-trial" => schema::<FleetTrialResult>(),
                 _ => return Err("unknown storage schema projection".into()),
             };
             std::io::stdout()
@@ -56,11 +58,19 @@ pub fn run(args: &[String]) -> Result<()> {
         }
         ["campaign", "validate", path] => {
             let campaign: StorageCampaign = decode(&read(Path::new(path))?)?;
+            if campaign.allocation.estates.get()>1 {validate_fleet(&campaign)?;}
             println!("valid storage campaign: {} purpose={:?}; no workload executed",
                 campaign.sha256()?.as_str(), campaign.purpose);
             Ok(())
         }
         ["campaign", "verify", directory] => {
+            let campaign: StorageCampaign = decode(&read(&Path::new(directory).join("campaign.json"))?)?;
+            if campaign.allocation.estates.get()>1 {
+                let result=verify_fleet(Path::new(directory))?;
+                std::io::stdout().lock().write_all(&pretty(&result)?).map_err(|e|e.to_string())?;
+                require(result.status==CampaignStatus::Completed,"fleet failed; raw evidence retained")?;
+                return require(campaign.purpose!=CampaignPurpose::Qualification || result.qualification_passed,"fleet completed without qualification");
+            }
             let result = verify_campaign(Path::new(directory))?;
             std::io::stdout().lock().write_all(&pretty(&result)?)
                 .map_err(|e| e.to_string())?;
@@ -106,6 +116,6 @@ pub fn run(args: &[String]) -> Result<()> {
             );
             Ok(())
         }
-        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event> | validate <manifest> | verify <manifest> <result> <new-report> | campaign profiles | campaign validate <campaign> | campaign verify <directory>".into()),
+        _ => Err("usage: rrflow-eval storage schema <manifest|result|report|campaign|segment|campaign-result|progress-event|fleet-result|fleet-trial> | validate <manifest> | verify <manifest> <result> <new-report> | campaign profiles | campaign validate <campaign> | campaign verify <directory>".into()),
     }
 }

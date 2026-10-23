@@ -218,7 +218,7 @@ fn verify(pid: u32, receipt: &NativeAllocationReceipt) -> bool {
         limits.basic.flags & (0x2000 | 0x100 | 0x200) == (0x2000 | 0x100 | 0x200)
             && limits.basic.flags & (0x800 | 0x1000) == 0
             && limits.process_memory as u64 == receipt.engine_bytes.get()
-            && limits.job_memory as u64 == receipt.host_bytes.get()
+            && limits.job_memory as u64 == receipt.engine_bytes.get()
     }
 }
 

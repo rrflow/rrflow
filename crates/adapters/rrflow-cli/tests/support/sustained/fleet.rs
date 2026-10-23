@@ -1,6 +1,9 @@
 //! Independent installed estates, sharing only the bounded workload oracle.
 use super::super::process;
 use super::*;
+#[path = "fleet_campaign.rs"]
+mod campaign;
+pub(super) use campaign::{execute, Participation};
 use rrd_contract::{ErrorCode, InspectStorageCursor, StorageCursorAction};
 
 struct Member {

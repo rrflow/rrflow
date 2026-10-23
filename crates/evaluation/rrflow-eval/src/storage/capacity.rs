@@ -53,10 +53,6 @@ pub(super) fn validate_capacity_profile(campaign: &StorageCampaign) -> Result<()
         .find(|profile| profile.id == campaign.storage.profile.as_str())
         .ok_or("qualification requires a known J-04 capacity profile")?;
     require(
-        !profile.requires_estate_interference,
-        "fleet qualification requires unimplemented quiet/equal/abusive estate evidence",
-    )?;
-    require(
         allocation.vcpus.get() == profile.vcpus
             && allocation.host_bytes.get() == profile.host_bytes
             && allocation.engine_bytes.get() == profile.engine_bytes

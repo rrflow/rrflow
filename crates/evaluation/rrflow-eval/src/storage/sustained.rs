@@ -365,7 +365,7 @@ impl NativeMetric {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AllocationEnforcement {
     ObservedOnly,
@@ -1533,8 +1533,18 @@ fn validate_next(
 }
 
 fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool> {
-    if campaign.purpose != CampaignPurpose::Qualification
-        || result.status != CampaignStatus::Completed
+    if campaign.purpose != CampaignPurpose::Qualification || campaign.allocation.estates.get() != 1
+    {
+        return Ok(false);
+    }
+    satisfies_operating_requirements(campaign, result)
+}
+
+pub(super) fn satisfies_operating_requirements(
+    campaign: &StorageCampaign,
+    result: &CampaignResult,
+) -> Result<bool> {
+    if result.status != CampaignStatus::Completed
         || !result.limitations.is_empty()
         || result.segments == 0
         || result.failed_segment.is_some()
@@ -1617,7 +1627,7 @@ pub(super) fn encode_bounded(value: &impl Serialize, limit: u64) -> Result<Vec<u
     serde_json::to_writer(&mut output, value).map_err(|e| e.to_string())?;
     Ok(output.bytes)
 }
-fn write_new(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(super) fn write_new(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -1627,7 +1637,7 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<()> {
         .and_then(|()| file.sync_all())
         .map_err(|e| e.to_string())
 }
-fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
+pub(super) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
     let metadata = std::fs::symlink_metadata(path).map_err(|e| e.to_string())?;
     require(
         metadata.is_file() && !metadata.file_type().is_symlink() && metadata.len() <= limit,
@@ -1775,12 +1785,12 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     fn limit(value: u64) -> Limit {
         value.try_into().unwrap()
     }
-    fn fixture() -> (StorageCampaign, SustainedSegment) {
+    pub(crate) fn fixture() -> (StorageCampaign, SustainedSegment) {
         // Contract fixtures deliberately do not represent native observations.
         let mut manifest: StorageManifest =
             serde_json::from_str(include_str!("../../tests/fixtures/storage/manifest.json"))
@@ -2397,7 +2407,7 @@ mod tests {
         campaign.storage.profile = "fleet-isolation".to_owned().try_into().unwrap();
         assert!(super::super::capacity::validate_capacity_profile(&campaign)
             .unwrap_err()
-            .contains("estate evidence"));
+            .contains("allocation differs"));
         // Smaller arbitrary characterization remains representable, without qualification.
         fixture().0.validate().unwrap();
     }

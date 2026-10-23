@@ -4,6 +4,8 @@
 mod capacity;
 pub mod cli;
 mod drain;
+mod fleet;
+pub use fleet::*;
 mod ledger;
 mod model;
 mod policy;

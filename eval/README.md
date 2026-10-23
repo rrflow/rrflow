@@ -160,9 +160,10 @@ Launching is an explicit resource-consuming operation on a clean frozen
 candidate using the ordinary release binary and harness. Linux additionally requires `--cgroup-parent` naming an already
 delegated cgroup; Windows uses an owned Job Object. The driver verifies live
 native limits and process membership rather than trusting environment labels.
-No privileged host setup is implicit. The current runner rejects full
-qualification, reader-pin lanes and multi-estate allocation until
-those facilities exist. macOS constrained-capacity launch is unavailable.
+No privileged host setup is implicit. Qualification requires verified native
+allocation and every frozen acceptance condition. Actual retained physical
+readers and multi-estate orchestration are implemented; their presence does
+not qualify a profile. macOS constrained-capacity launch is unavailable.
 Characterization results cannot close the profile or 24-hour requirement.
 
 The Linux cold lane stops the owned engine, synchronizes and advises eviction
@@ -189,8 +190,33 @@ load coordinates. `campaign profiles` exposes the bundled projection without
 running a workload. `scripts/knowledge/render_capacity_profiles.py` derives it
 from the owning workload table; CI rejects drift. A qualifying operating point
 is not proof of the entire load sweep. Reduced characterization remains
-explicitly unqualified. Fleet qualification is refused until quiet/equal/abusive
-per-estate interference can be represented and observed.
+explicitly unqualified. Fleet manifests derive independent child campaigns
+from the same frozen allocation and corpus; they require four clients per
+estate and an exactly divisible aggregate request rate. Quiet loads estate
+zero while neighbours retain their engines and sample without offered load;
+equal loads every estate; abusive offers estate zero twice its admitted rate.
+Each trial retains the full warmup/measured/burst/drain/soak durations. All
+members warm up before the quiet trial begins. Phase barriers share one clock
+and wait for every member; joined sessions renew while waiting.
+
+The aggregate cgroup/Windows Job bounds the harness and every child together
+to `engine_bytes`; the host envelope remains independently observed. Native
+membership is checked before ingestion and at resource sampling/reopen.
+Pre-phase boundaries capture idle overhead, unique instance/PID identities
+and explicit cross-estate session denial. Per-estate child histories retain
+canonical record/relation/vector verification, lifecycle lanes, final restart
+and readback. The aggregate reducer checks overlapping active phases, quiet
+neighbour drain, shared allocation, and a conservative sum of member RSS peaks.
+That sum is explicitly not a simultaneous RSS sample.
+
+`storage-fleet-trial-v1.json` and `storage-fleet-result-v1.json` are generated
+projections. `campaign verify` dispatches to the fleet reducer for multiple
+estates and streams each bounded child campaign. Failed/aborted members retain
+raw progress; missing members or trials cannot become completed evidence.
+Root metadata and child evidence quotas are reserved before engine installation.
+The coordinator uses at most twelve worker threads for ten estates. Fleet
+execution is implemented but the complete native ten-estate matrix and 24-hour
+trial receipts remain required; no capacity result is claimed here.
 
 Installed read retention has per-open active-view and pinned-byte ceilings.
 Requests can lower these limits but cannot raise them. Storage observations

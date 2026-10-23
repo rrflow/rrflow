@@ -735,6 +735,9 @@ fn installed_sustained_capacity() {
         PathBuf::from(std::env::var_os("RRFLOW_SUSTAINED_EVIDENCE").expect("new evidence path"));
     let campaign: StorageCampaign = bounded_json(&campaign_path).unwrap();
     campaign.validate().unwrap();
+    if campaign.allocation.estates.get() > 1 {
+        return fleet::execute(campaign, evidence);
+    }
     let mut writer = CampaignWriter::create(&evidence, campaign.clone()).unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         tokio::runtime::Builder::new_current_thread()
@@ -914,6 +917,13 @@ fn installed_capacity_workload_smoke() {
 }
 
 async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverResult<()> {
+    run_estate(campaign, writer, None).await
+}
+async fn run_estate(
+    campaign: &StorageCampaign,
+    writer: &mut CampaignWriter,
+    fleet: Option<&fleet::Participation>,
+) -> DriverResult<()> {
     if campaign
         .required_lanes
         .iter()
@@ -952,7 +962,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
         return Err("qualification requires launcher-owned native allocation receipt".into());
     }
     let configuration = std::env::var_os("RRFLOW_SUSTAINED_CONFIGURATION").map(PathBuf::from);
-    let clock = Instant::now();
+    let clock = fleet.map_or_else(Instant::now, |fleet| fleet.clock);
     for point in &campaign.points {
         for seed in &campaign.seeds {
             writer.admit_next()?;
@@ -1068,8 +1078,42 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 LoadPhase::Drain,
                 LoadPhase::Soak,
             ] {
-                if phase == LoadPhase::Drain {
-                    let mut remaining = campaign.schedule.drain_ms.get();
+                let phase_origin = if let Some(fleet) = fleet {
+                    rotate_session(
+                        &estate,
+                        &mut driver.workload,
+                        campaign,
+                        point.clients.get(),
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
+                    let stage = match phase {
+                        LoadPhase::Warmup => "warmup",
+                        LoadPhase::Measured => "measured",
+                        LoadPhase::Burst => "burst",
+                        LoadPhase::Drain => "drain",
+                        LoadPhase::Soak => "soak",
+                    };
+                    Some(
+                        fleet
+                            .boundary(
+                                stage,
+                                &estate,
+                                &mut driver,
+                                &mut session_ordinal,
+                                &mut session_opened,
+                            )
+                            .await?,
+                    )
+                } else {
+                    None
+                };
+                if phase == LoadPhase::Drain
+                    || (phase != LoadPhase::Warmup
+                        && fleet.is_some_and(|f| !f.trial.active(f.estate)))
+                {
+                    let mut remaining = campaign.schedule.duration_ms(phase);
                     let cap = campaign
                         .schedule
                         .sample_ms
@@ -1106,7 +1150,7 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                 let count =
                     (campaign.schedule.duration_ms(phase) as u128 * rate as u128).div_ceil(1000);
                 let count: u64 = count.try_into().map_err(|_| "offered count overflow")?;
-                let origin = ns(clock);
+                let origin = phase_origin.unwrap_or_else(|| ns(clock));
                 let mut next = 0;
                 while next < count {
                     writer.admit_next()?;
@@ -1189,6 +1233,26 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     next += take;
                 }
             }
+            if let Some(fleet) = fleet {
+                rotate_session(
+                    &estate,
+                    &mut driver.workload,
+                    campaign,
+                    point.clients.get(),
+                    &mut session_ordinal,
+                    &mut session_opened,
+                )
+                .await?;
+                fleet
+                    .boundary(
+                        "loaded",
+                        &estate,
+                        &mut driver,
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
+            }
             // Reopen after offered load and verify the final generated state
             // before any retry can rewrite it. Progress retains incomplete runs.
             tokio::time::timeout(
@@ -1199,6 +1263,8 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
                     let (reopened, client, _) =
                         estate.start_for(clock, Duration::from_millis(lifetime_ms));
                     let reopened_pid = reopened.id();
+                    native::enforcement(reopened_pid, allocation.as_ref())?;
+                    driver.pid = reopened_pid;
                     child = Some(reopened);
                     driver.workload.client = client;
                     session_opened = Instant::now() - Duration::from_secs(120);
@@ -1274,6 +1340,26 @@ async fn run(campaign: &StorageCampaign, writer: &mut CampaignWriter) -> DriverR
             )
             .await
             .map_err(|_| "final readback exceeded lifecycle deadline")??;
+            if let Some(fleet) = fleet {
+                rotate_session(
+                    &estate,
+                    &mut driver.workload,
+                    campaign,
+                    point.clients.get(),
+                    &mut session_ordinal,
+                    &mut session_opened,
+                )
+                .await?;
+                fleet
+                    .boundary(
+                        "reopened",
+                        &estate,
+                        &mut driver,
+                        &mut session_ordinal,
+                        &mut session_opened,
+                    )
+                    .await?;
+            }
             drop(driver);
             drop(child);
         }

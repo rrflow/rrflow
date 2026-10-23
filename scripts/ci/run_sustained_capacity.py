@@ -127,6 +127,8 @@ def main():
     if "cold" in campaign["required_lanes"]:
         duration += schedule["lifecycle_ms"]
     timeout = (duration // 1000 + 600) * len(campaign["points"]) * len(campaign["seeds"])
+    if campaign["allocation"]["estates"] > 1:
+        timeout *= 3  # quiet, equal and abusive trials, each with full durations
     require(0 < timeout <= 31 * 86400, "campaign exceeds explicit one-month run bound")
     allocation = campaign["allocation"]
     environment = dict(os.environ, RRFLOW_SUSTAINED_CAMPAIGN=str(args.campaign.resolve()),
@@ -150,7 +152,7 @@ def main():
         result = run_owned(command, env=environment, timeout=timeout,
                            job_name="Local\\RRFlowCapacity-" + receipt["nonce"],
                            cpu_rate=10000 * receipt["vcpus"] // receipt["host_logical_cpus"],
-                           process_memory_bytes=allocation["engine_bytes"], job_memory_bytes=allocation["host_bytes"],
+                           process_memory_bytes=allocation["engine_bytes"], job_memory_bytes=allocation["engine_bytes"],
                            on_bound=lambda: print("native_sustained_enforcement=" + json.dumps(receipt), flush=True))
     else:
         raise NotRun("this platform needs an independently verified native VM memory allocation")

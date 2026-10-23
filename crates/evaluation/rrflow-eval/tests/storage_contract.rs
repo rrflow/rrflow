@@ -460,6 +460,14 @@ fn generated_schemas_and_synthetic_receipts_match_goldens() {
         &schema_root.join("storage-progress-event-v1.json"),
         &schema::<ProgressEvent>(),
     );
+    golden(
+        &schema_root.join("storage-fleet-result-v1.json"),
+        &schema::<FleetResult>(),
+    );
+    golden(
+        &schema_root.join("storage-fleet-trial-v1.json"),
+        &schema::<FleetTrialResult>(),
+    );
     let (manifest, result) = fixtures();
     let fixture_root = root.join("tests/fixtures/storage");
     golden(
