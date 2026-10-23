@@ -175,6 +175,10 @@ pub struct Budgets {
     pub recovery_frames: Limit,
     pub recovery_ms: Limit,
     pub process_bytes: Limit,
+    /// Optional shared native pool. Individual ceilings are not reservations;
+    /// the summed per-estate disjoint reservations must fit this aggregate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_process_bytes: Option<Limit>,
     pub host_bytes: Limit,
     pub estates: Limit,
     pub disk_bytes: Limit,

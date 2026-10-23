@@ -296,3 +296,9 @@ The [installed physical cursor candidate](../../evidence/change-journals/gate-c/
 adds session-owned native reader/output retention and raw sustained-interference
 reconciliation. Runtime acceptance, complete capacity profiles and soak remain
 open; a schema or compiled capability does not establish this proof.
+
+The canonical ten-estate J-04 declaration was itself inadmissible: the shared
+8 GiB ceiling was multiplied into an 80 GiB host reservation. The
+[shared fleet budget correction](../../evidence/change-journals/gate-c/c-07g-shared-fleet-budget.md)
+binds an explicit aggregate pool and rejects true summed-reservation overcommit.
+Contract acceptance now passes; actual native fleet qualification remains open.
