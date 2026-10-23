@@ -335,6 +335,11 @@ impl ReadPath {
                         "versioned_identity_read"
                     } else if matches!(
                         sources.as_slice(),
+                        [RuntimeVersionedSource::IdentityRange { .. }]
+                    ) {
+                        "versioned_identity_range_read"
+                    } else if matches!(
+                        sources.as_slice(),
                         [RuntimeVersionedSource::Adjacency { .. }]
                     ) {
                         "versioned_adjacency_read"

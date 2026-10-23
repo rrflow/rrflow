@@ -397,6 +397,10 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         bound.version_sources.as_slice(),
         [RuntimeVersionedSource::Adjacency { .. }]
     );
+    let identity_range_read = matches!(
+        bound.version_sources.as_slice(),
+        [RuntimeVersionedSource::IdentityRange { .. }]
+    );
     let traversal = std::iter::once(&bound.source)
         .chain(bound.join.as_ref().map(|join| &join.source))
         .any(|source| matches!(source, Source::Traversal { .. }));
@@ -405,7 +409,7 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
         .iter()
         .find(|filter| filter.comparison.is_match())
         .map(|filter| filter.field.as_str());
-    let selected_index = (!identity_read && !adjacency_read && !traversal)
+    let selected_index = (!identity_read && !identity_range_read && !adjacency_read && !traversal)
         .then(|| {
             bound
                 .index_candidates
@@ -455,6 +459,21 @@ pub fn plan(bound: &BoundQuery) -> Result<PhysicalPlan> {
                 selected: false,
                 exact: false,
                 reason: "rejected: no projection generation and grounding proof supplied".into(),
+            },
+        ]
+    } else if identity_range_read {
+        vec![
+            CandidatePath {
+                name: "versioned_identity_range_read".into(),
+                selected: true,
+                exact: true,
+                reason: "reads complete identity histories inside the bound ID interval before temporal and residual predicate evaluation".into(),
+            },
+            CandidatePath {
+                name: "versioned_source_read".into(),
+                selected: false,
+                exact: true,
+                reason: "rejected: identities outside the ID interval cannot satisfy the query".into(),
             },
         ]
     } else if adjacency_read {
@@ -670,6 +689,9 @@ fn bound_version_sources(
             if let Some(source) = bound_adjacency_source(&query.source, filters, schema) {
                 return Ok(vec![source]);
             }
+            if let Some(source) = bound_identity_range(&query.source, filters, schema) {
+                return Ok(vec![source]);
+            }
         }
         if let Source::Event { kind } = &query.source {
             if let Some(cursor) = filters.iter().find_map(|filter| {
@@ -777,6 +799,72 @@ fn bound_adjacency_source(
         });
     }
     None
+}
+
+fn bound_identity_range(
+    source: &Source,
+    filters: &[BoundFilter],
+    schema: &RuntimeSchemaRegistry,
+) -> Option<RuntimeVersionedSource> {
+    use std::ops::Bound;
+    let (Source::Record { kind } | Source::Relation { kind }) = source else {
+        return None;
+    };
+    let mut lower = Bound::Unbounded;
+    let mut upper = Bound::Unbounded;
+    for filter in filters.iter().filter(|filter| filter.field == "id") {
+        let RuntimeValue::String(value) = &filter.value else {
+            continue;
+        };
+        let Ok(id) = rrd_core::RuntimeId::new(value.clone()) else {
+            continue;
+        };
+        match filter.comparison {
+            ComparisonOperator::GreaterThan | ComparisonOperator::GreaterThanOrEqual => {
+                let strict = filter.comparison == ComparisonOperator::GreaterThan;
+                let tighter = match &lower {
+                    Bound::Unbounded => true,
+                    Bound::Included(previous) => id > *previous || (id == *previous && strict),
+                    Bound::Excluded(previous) => id > *previous,
+                };
+                if tighter {
+                    lower = if strict {
+                        Bound::Excluded(id)
+                    } else {
+                        Bound::Included(id)
+                    };
+                }
+            }
+            ComparisonOperator::LessThan | ComparisonOperator::LessThanOrEqual => {
+                let strict = filter.comparison == ComparisonOperator::LessThan;
+                let tighter = match &upper {
+                    Bound::Unbounded => true,
+                    Bound::Included(previous) => id < *previous || (id == *previous && strict),
+                    Bound::Excluded(previous) => id < *previous,
+                };
+                if tighter {
+                    upper = if strict {
+                        Bound::Excluded(id)
+                    } else {
+                        Bound::Included(id)
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    if matches!((&lower, &upper), (Bound::Unbounded, Bound::Unbounded))
+        || matches!((&lower, &upper),
+            (Bound::Included(a) | Bound::Excluded(a), Bound::Included(b) | Bound::Excluded(b)) if a > b)
+    {
+        return None;
+    }
+    Some(RuntimeVersionedSource::IdentityRange {
+        model: schema.logical_model(kind).ok()?,
+        kind: kind.clone(),
+        lower,
+        upper,
+    })
 }
 
 impl PhysicalPlan {

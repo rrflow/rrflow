@@ -424,3 +424,12 @@ filtering. Fixed-budget differential tests preserve moved, backdated and
 retired edges, colliding IDs and native reopen. All 63 query tests and six engine
 query tests pass. Native comparison and full qualification remain open;
 POAM-034's independent commit-constraint cost is unchanged.
+
+The [identity-interval implementation](../../evidence/change-journals/gate-c/c-07g-identity-range-reads.md)
+narrows ordered ID predicates to authenticated complete histories. Both store
+and query suites pass (284 tests). Review also confirmed that public pipeline
+catalogue capture still scans the full source family before those reads;
+pipeline binding/watermark and aggregate-budget repair is required before
+claiming end-to-end bounded access. Linux campaign05 retained all 1,000 writes
+but timed out after 950 setup verifications; it is failed characterization,
+not a qualified operating point. Full profiles and soak remain open.

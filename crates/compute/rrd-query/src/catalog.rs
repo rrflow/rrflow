@@ -411,6 +411,7 @@ pub(crate) fn version_source_covers(
 ) -> bool {
     use RuntimeVersionedSource as Version;
     match (available, required) {
+        (Version::IdentityRange { .. }, Version::IdentityRange { .. }) => available == required,
         (Version::Schema, Version::Schema) => true,
         (
             Version::Claims {
@@ -448,6 +449,24 @@ pub(crate) fn version_source_covers(
             if *model == RuntimeLogicalModel::GraphRelation =>
         {
             kind.as_ref().is_none_or(|kind| kind == &reference.kind)
+        }
+        (
+            Version::Records { kind },
+            Version::IdentityRange {
+                model,
+                kind: selected,
+                ..
+            },
+        ) if model.is_record_like() => kind.as_ref().is_none_or(|kind| kind == selected),
+        (
+            Version::Relations { kind },
+            Version::IdentityRange {
+                model,
+                kind: selected,
+                ..
+            },
+        ) if *model == RuntimeLogicalModel::GraphRelation => {
+            kind.as_ref().is_none_or(|kind| kind == selected)
         }
         (Version::Events { kind }, Version::Identity { model, reference })
             if model.is_event_like() =>
