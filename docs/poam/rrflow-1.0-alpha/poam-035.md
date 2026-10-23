@@ -322,3 +322,10 @@ Selection now admits complete overlap closures and lower-level relief within
 the existing limits. All 183 native storage tests pass; the old long-run candidate
 was stopped with retained incomplete evidence. Repaired installed capacity and
 full soak qualification remain required.
+
+The [large-page acquisition repair](../../evidence/change-journals/gate-c/c-07e-large-page-acquisition.md)
+reproduces a valid compacted key/history page exceeding the per-request I/O
+cap. Bounded chunks now preserve the full-page checksum and exact historical
+reads without raising any limit. Native component tests pass; attribution of
+the retained installed Internal failure and updated installed capacity/soak
+acceptance remain open.
