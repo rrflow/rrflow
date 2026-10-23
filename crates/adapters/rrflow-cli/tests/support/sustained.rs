@@ -300,6 +300,8 @@ impl PointRun<'_> {
         let mut resources = Vec::new();
         let deadline =
             self.clock + Duration::from_nanos(started) + Duration::from_millis(duration_ms);
+        let period = Duration::from_millis(self.campaign.schedule.sample_ms.get());
+        let mut next_sample = Instant::now();
         loop {
             resources.push(self.sample(writer).await?);
             if Instant::now() >= deadline {
@@ -308,12 +310,9 @@ impl PointRun<'_> {
             if resources.len() as u64 >= self.campaign.evidence.samples_per_segment.get() {
                 return Err("drain resource sample cap exhausted".into());
             }
-            tokio::time::sleep_until(
-                (Instant::now() + Duration::from_millis(self.campaign.schedule.sample_ms.get()))
-                    .min(deadline)
-                    .into(),
-            )
-            .await;
+            next_sample =
+                resource_window::next_sample_deadline(next_sample, period, Instant::now())?;
+            tokio::time::sleep_until(next_sample.min(deadline).into()).await;
         }
         writer.record_event(&ProgressEvent::LoadIntent {
             segment: writer.next_index(),
@@ -495,8 +494,16 @@ impl PointRun<'_> {
         let mut joins = JoinSet::new();
         let mut backup = JoinSet::new();
         let deadline = Duration::from_millis(campaign.schedule.operation_deadline_ms.get());
+        let period = Duration::from_millis(campaign.schedule.sample_ms.get());
+        let last_observed = self.clock
+            + Duration::from_nanos(
+                resources
+                    .last()
+                    .ok_or("missing first resource sample")?
+                    .elapsed_ns,
+            );
         let mut next_sample =
-            tokio::time::Instant::now() + Duration::from_millis(campaign.schedule.sample_ms.get());
+            resource_window::next_sample_deadline(last_observed, period, Instant::now())?;
         for (offset, operation) in prepared.iter().enumerate() {
             let sequence = first + offset as u64;
             let due = self.clock + Duration::from_nanos(scheduled(sequence));
@@ -506,12 +513,12 @@ impl PointRun<'_> {
                     result=joins.join_next(), if !joins.is_empty() => {
                         collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,&mut failure,writer)?;
                     }
-                    _=tokio::time::sleep_until(next_sample) => {
+                    _=tokio::time::sleep_until(due.into()) => break,
+                    _=tokio::time::sleep_until(next_sample.into()) => {
                         if resources.len() as u64>=campaign.evidence.samples_per_segment.get() {return Err("resource sample cap exhausted".into());}
                         resources.push(self.sample(writer).await?);
-                        next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                        next_sample=resource_window::next_sample_deadline(next_sample,period,Instant::now())?;
                     }
-                    _=tokio::time::sleep_until(due.into()) => break,
                 }
             }
             let work = self.workload.clone();
@@ -584,10 +591,10 @@ impl PointRun<'_> {
         while !joins.is_empty() {
             tokio::select! {
                 result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,&mut failure,writer)?,
-                _=tokio::time::sleep_until(next_sample) => {
+                _=tokio::time::sleep_until(next_sample.into()) => {
                     if resources.len() as u64>=campaign.evidence.samples_per_segment.get(){return Err("resource sample cap exhausted".into());}
                     resources.push(self.sample(writer).await?);
-                    next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                    next_sample=resource_window::next_sample_deadline(next_sample,period,Instant::now())?;
                 }
             }
         }
@@ -608,12 +615,12 @@ impl PointRun<'_> {
                 value=backup.join_next() => {
                     backup_receipt=Some(value.ok_or("backup task missing")?.map_err(|_|"backup task panicked")??);
                 }
-                _=tokio::time::sleep_until(next_sample) => {
+                _=tokio::time::sleep_until(next_sample.into()) => {
                     if resources.len() as u64+1>=campaign.evidence.samples_per_segment.get() {
                         return Err("backup resource sample cap exhausted".into());
                     }
                     resources.push(self.sample(writer).await?);
-                    next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                    next_sample=resource_window::next_sample_deadline(next_sample,period,Instant::now())?;
                 }
             }
         }
@@ -642,16 +649,13 @@ impl PointRun<'_> {
         }
         let offered_end = self.clock + Duration::from_nanos(scheduled(first + count));
         while Instant::now() < offered_end {
-            tokio::time::sleep_until(
-                (Instant::now() + Duration::from_millis(campaign.schedule.sample_ms.get()))
-                    .min(offered_end)
-                    .into(),
-            )
-            .await;
+            tokio::time::sleep_until(next_sample.min(offered_end).into()).await;
             if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
                 return Err("offered interval resource sample cap exhausted".into());
             }
             resources.push(self.sample(writer).await?);
+            next_sample =
+                resource_window::next_sample_deadline(next_sample, period, Instant::now())?;
         }
         resources.push(self.sample(writer).await?);
         attempts.sort_by_key(|a| a.sequence);

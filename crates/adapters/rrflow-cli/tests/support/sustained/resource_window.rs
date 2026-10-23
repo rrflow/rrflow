@@ -1,6 +1,24 @@
 //! Preserve actual observations across overlapping offered windows. This does
 //! not acquire samples or relax the campaign's independent coverage validator.
 use super::{DriverResult, ResourceSample};
+use std::time::{Duration, Instant};
+
+pub(super) fn next_sample_deadline(
+    scheduled: Instant,
+    period: Duration,
+    observed: Instant,
+) -> DriverResult<Instant> {
+    if period.is_zero() {
+        return Err("resource sampling period must be positive".into());
+    }
+    // Collection consumes part of the interval, not a fresh interval of its
+    // own. After an overrun acquire once immediately and reset the cadence;
+    // never queue synthetic observations for missed ticks.
+    scheduled
+        .checked_add(period)
+        .map(|next| next.max(observed))
+        .ok_or_else(|| "resource sampling deadline overflow".into())
+}
 
 pub(super) fn overlapping_samples(
     previous: &[ResourceSample],
@@ -26,6 +44,28 @@ pub(super) fn overlapping_samples(
 mod tests {
     use super::*;
     use rrflow_eval::storage::{AllocationEnforcement, NativeMetric};
+
+    #[test]
+    fn resource_window_schedule_does_not_add_collection_latency_or_replay_missed_ticks() {
+        let origin = Instant::now();
+        let at = |ms| origin + Duration::from_millis(ms);
+        let period = Duration::from_millis(1000);
+        let mut due = at(1000);
+        for tick in 1..=100 {
+            assert_eq!(due, at(tick * 1000));
+            due = next_sample_deadline(due, period, at(tick * 1000 + 89)).unwrap();
+        }
+        // One long collection overruns a tick. Acquire once immediately;
+        // do not fabricate observations or replay an arbitrarily long backlog.
+        let next = next_sample_deadline(at(1000), period, at(2089)).unwrap();
+        assert_eq!(next, at(2089));
+        assert_eq!(
+            next_sample_deadline(next, period, at(2130)).unwrap(),
+            at(3089)
+        );
+        assert!(next_sample_deadline(origin, Duration::ZERO, origin).is_err());
+        assert!(next_sample_deadline(origin, Duration::MAX, origin).is_err());
+    }
 
     fn sample(elapsed_ns: u64) -> ResourceSample {
         let observed = NativeMetric::Observed { value: 1234 };

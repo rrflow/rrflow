@@ -483,3 +483,11 @@ native timing acceptance remains open. PR76's macOS native-capacity lane also
 failed because the selected engine I/O error receipt was absent despite filler
 ENOSPC and a public ResourceExhausted response. Its cause is unresolved;
 admission denial cannot substitute for required native-I/O failure evidence.
+
+The [sampling-cadence repair](../../evidence/change-journals/gate-c/c-07g-sample-cadence.md)
+removes collection-relative delay without changing actual timestamps or gap
+limits. Windows15 failed a real 2.089-second gap after 259 segments; the next
+native soak is still required. Linux10 completed and verified backup within
+the unchanged 30-second deadline, but failed drain with 43 maintenance-debt
+segments and retained measured-load failures. Idle maintenance progress and
+latency remain C-07d/g deficiencies; no profile or 24-hour qualification follows.
