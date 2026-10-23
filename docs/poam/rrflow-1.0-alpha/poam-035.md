@@ -260,6 +260,15 @@ extends the existing bounded transaction gate to begin, preview, abort, renewal
 and closure, preserving exact identities and explicit conflicts. Native
 concurrent characterization passes; full candidate acceptance remains pending.
 
+The first optimized Windows Job characterization of the combined candidate
+failed its measured backup/reader segment with nine uncertain requests. The
+driver discarded request errors and omitted failed-case provenance; the
+[native failure record](../../evidence/change-journals/gate-c/c-07g-native-failure-provenance.md)
+binds the reporting repair and retained failure. The actual load failure remains
+open. The current macOS capacity candidate also times out awaiting its first
+WAL native-error event; bounded owned-process diagnostics are being retained
+without weakening the real filesystem-error requirement.
+
 ## Closure evidence
 
 C-07 requires independent exact histories,
