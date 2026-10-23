@@ -31,6 +31,7 @@ static RESUMABLE: AtomicBool = AtomicBool::new(false);
 struct Observation {
     schedule: Schedule,
     emitted: bool,
+    wal_payload_bytes: Option<usize>,
 }
 thread_local! { static OBSERVATION: RefCell<Option<Observation>> = const { RefCell::new(None) }; }
 
@@ -70,12 +71,19 @@ pub fn configure_from_stdin(root: &Path) -> io::Result<()> {
                 | Point::Visible
                 | Point::ReceiptPersisted
                 | Point::RecoveryRead
+                | Point::RecoveryManifest
+                | Point::SegmentSynced
+                | Point::SuccessorWalSynced
+                | Point::CurrentRenamed
+                | Point::ReclaimBeforeRemove
+                | Point::ReclaimRemoved
                 | Point::SegmentBeforeCreate
                 | Point::ManifestBeforeCreate
                 | Point::CurrentBeforeCreate
                 | Point::CurrentBeforeRename
         )
-        || (control.point == Point::RecoveryRead) != control.operation_sha256.is_none()
+        || matches!(control.point, Point::RecoveryRead | Point::RecoveryManifest)
+            != control.operation_sha256.is_none()
         || control
             .operation_sha256
             .as_deref()
@@ -83,7 +91,7 @@ pub fn configure_from_stdin(root: &Path) -> io::Result<()> {
     {
         return Err(io::Error::other("inadmissible diagnostic schedule"));
     }
-    if control.resume && control.point == Point::RecoveryRead {
+    if control.resume && matches!(control.point, Point::RecoveryRead | Point::RecoveryManifest) {
         return Err(io::Error::other(
             "capacity resume requires a domain effect boundary",
         ));
@@ -131,6 +139,7 @@ fn enter_selected(matches: impl FnOnce(&Pending) -> bool) -> ScopeGuard {
             *slot = Some(Observation {
                 schedule: selected.schedule.clone(),
                 emitted: false,
+                wal_payload_bytes: None,
             })
         });
     }
@@ -156,6 +165,25 @@ impl Drop for ScopeGuard {
 /// armed. Root containment also rejects another database in that thread.
 pub fn boundary(point: Point, path: &Path) {
     pause_if(|active| active.schedule.point == point && path.starts_with(&active.schedule.root));
+}
+
+/// Record the selected physical append's size without changing selection,
+/// admission or I/O. Values and keys never enter the private pause receipt.
+pub fn wal_before_write(path: &Path, payload_bytes: usize) {
+    OBSERVATION.with_borrow_mut(|slot| {
+        if let Some(active) = slot.as_mut() {
+            if active.schedule.point == Point::WalBeforeWrite
+                && path.starts_with(&active.schedule.root)
+            {
+                active.wal_payload_bytes = Some(payload_bytes);
+            }
+        }
+    });
+    boundary(Point::WalBeforeWrite, path);
+}
+
+pub(super) fn selected_wal_payload_bytes() -> Option<usize> {
+    OBSERVATION.with_borrow(|slot| slot.as_ref().and_then(|active| active.wal_payload_bytes))
 }
 
 /// Continue only through the already-private controller pipe with the exact
@@ -195,6 +223,16 @@ pub(super) fn resume_private(hit: &Hit, deadline: Instant) -> bool {
 }
 
 pub fn before_io(operation: &'static str, path: &Path) {
+    io_boundary(operation, path, false);
+}
+
+/// A successful native effect, before any following directory barrier. This
+/// observes process-death ordering; it does not simulate a failed native call.
+pub fn after_io(operation: &'static str, path: &Path) {
+    io_boundary(operation, path, true);
+}
+
+fn io_boundary(operation: &'static str, path: &Path, after: bool) {
     let parent = path
         .parent()
         .and_then(Path::file_name)
@@ -203,11 +241,21 @@ pub fn before_io(operation: &'static str, path: &Path) {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("");
-    let point = match operation {
-        "create" if parent == Some("segments") => Some(Point::SegmentBeforeCreate),
-        "create" if parent == Some("manifests") => Some(Point::ManifestBeforeCreate),
-        "create" if name.starts_with(".CURRENT.") => Some(Point::CurrentBeforeCreate),
-        "rename" if name.starts_with(".CURRENT.") => Some(Point::CurrentBeforeRename),
+    let collectible = matches!(parent, Some("segments" | "manifests" | "wal"))
+        && matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("seg" | "json" | "wal")
+        );
+    let point = match (operation, after) {
+        ("create", false) if parent == Some("segments") => Some(Point::SegmentBeforeCreate),
+        ("create", false) if parent == Some("manifests") => Some(Point::ManifestBeforeCreate),
+        ("create", false) if name.starts_with(".CURRENT.") => Some(Point::CurrentBeforeCreate),
+        ("rename", false) if name.starts_with(".CURRENT.") => Some(Point::CurrentBeforeRename),
+        ("rename", true) if name.starts_with(".CURRENT.") => Some(Point::CurrentRenamed),
+        ("sync_all", true) if parent == Some("segments") => Some(Point::SegmentSynced),
+        ("sync_all", true) if parent == Some("wal") => Some(Point::SuccessorWalSynced),
+        ("remove", false) if collectible => Some(Point::ReclaimBeforeRemove),
+        ("remove", true) if collectible => Some(Point::ReclaimRemoved),
         _ => None,
     };
     if let Some(point) = point {

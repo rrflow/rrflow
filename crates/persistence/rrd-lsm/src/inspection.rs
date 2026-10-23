@@ -17,7 +17,7 @@ use crate::manifest::{
     MANIFEST_LOCK_FILE,
 };
 use crate::recovery_budget::RecoveryBudget;
-use crate::segment::{new_page_cache_with_policy, Segment};
+use crate::segment::{new_page_cache_with_limits, Segment};
 use crate::wal::replay_file_bounded;
 use crate::{DatabaseOptions, Error, Memtable, Result, VersionedValue};
 use rrd_core::digest::Sha256;
@@ -232,8 +232,11 @@ impl ReadOnlyDatabase {
             ));
         }
 
-        let page_cache =
-            new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
+        let page_cache = new_page_cache_with_limits(
+            options.page_cache_bytes,
+            options.page_cache_policy,
+            options.source_page_bytes,
+        )?;
         let io = IoContext::new(options.segment_io)?;
         let mut segments = Vec::with_capacity(manifest.segments.len());
         for descriptor in &manifest.segments {

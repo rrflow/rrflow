@@ -107,7 +107,7 @@ def main() -> None:
             raise SystemExit("generated .NET RRD endpoint map is stale; run python scripts/generate.py")
         return
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(generated)
+    OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

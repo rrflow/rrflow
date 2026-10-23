@@ -43,6 +43,183 @@ fn transition(
     }
 }
 
+#[test]
+fn application_backup_pages_fit_configured_bytes_through_restore_and_reopen() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let options = rrd_store::DatabaseOptions {
+        projected_output_bytes: 8 * 1024,
+        ..Default::default()
+    };
+    let engine = RrflowKvStore::open_with_options(&source, options).unwrap();
+    let objects = LocalObjectStore::open(root.path().join("objects")).unwrap();
+    let value = vec![b'x'; 128];
+    for sequence in 1..=96 {
+        engine
+            .control()
+            .commit(&transition(
+                &format!("server/state/test/audit/{sequence}"),
+                None,
+                Some(&value),
+                sequence,
+                "audit.append",
+            ))
+            .unwrap();
+    }
+    assert!(matches!(
+        engine.control().journal_since(0, 1024),
+        Err(rrd_store::Error::ProjectedReadLimit { .. })
+    ));
+    for (cut, engine) in [Some(engine), None].into_iter().enumerate() {
+        let engine = engine.unwrap_or_else(|| {
+            RrflowKvStore::open_existing_with_options(&source, options).unwrap()
+        });
+        let catalogue = root.path().join(format!("catalogue-{cut}"));
+        let entry = create_application_backup(
+            &engine,
+            &objects,
+            &catalogue,
+            "bounded",
+            200,
+            &control_families(),
+        )
+        .unwrap();
+        assert!(entry.application_complete);
+        assert_eq!(entry.control_archive.as_ref().unwrap().entry_count, 96);
+        assert_eq!(
+            verify_backup_catalogue(&catalogue).unwrap().backups,
+            vec![entry.clone()]
+        );
+        let restored = root.path().join(format!("restored-{cut}"));
+        rrd_store::restore_catalogued_backup_with_options(
+            &catalogue,
+            &entry.backup_id,
+            &restored,
+            300,
+            options,
+        )
+        .unwrap();
+        rrd_store::verify_restored_backup_objects_with_options(
+            &catalogue,
+            &entry.backup_id,
+            &restored,
+            options,
+        )
+        .unwrap();
+        let restored = RrflowKvStore::open_existing_with_options(&restored, options).unwrap();
+        for sequence in 1..=96 {
+            assert_eq!(
+                restored
+                    .control()
+                    .get(&format!("server/state/test/audit/{sequence}"))
+                    .unwrap(),
+                Some(value.clone())
+            );
+        }
+        let progress = control_restore_progress(&restored).unwrap().unwrap();
+        assert!(progress.complete);
+        assert_eq!(progress.applied, 96);
+        assert_eq!(
+            engine
+                .physical_store_evidence()
+                .unwrap()
+                .native_transactions,
+            Some(0)
+        );
+    }
+}
+
+#[test]
+fn indivisible_backup_entry_is_denied_without_publication_and_can_resume() {
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    let options = rrd_store::DatabaseOptions {
+        projected_output_bytes: 8 * 1024,
+        ..Default::default()
+    };
+    let engine = RrflowKvStore::open_with_options(&source, options).unwrap();
+    let objects = LocalObjectStore::open(root.path().join("objects")).unwrap();
+    let value = vec![b'x'; 8 * 1024];
+    engine
+        .control()
+        .commit(&transition(
+            "server/state/install/record",
+            None,
+            Some(&value),
+            1,
+            "install.record",
+        ))
+        .unwrap();
+    let catalogue = root.path().join("catalogue");
+    let error = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue,
+        "oversized",
+        200,
+        &control_families(),
+    )
+    .unwrap_err();
+    assert!(
+        matches!(error, rrd_store::Error::ProjectedReadLimit {
+            resource: rrd_store::ProjectedReadResource::OutputBufferBytes
+                | rrd_store::ProjectedReadResource::BatchAllocatedBytes,
+        limit: 8192, observed,
+    } if observed > 8192),
+        "{error}"
+    );
+    assert!(load_backup_catalogue(&catalogue)
+        .unwrap()
+        .backups
+        .is_empty());
+    assert_eq!(engine.control().sequence().unwrap(), 1);
+    assert_eq!(
+        engine
+            .physical_store_evidence()
+            .unwrap()
+            .native_transactions,
+        Some(0)
+    );
+    drop(engine);
+    // The operator explicitly changes configuration; backup never raises it.
+    let engine = RrflowKvStore::open_existing(&source).unwrap();
+    let entry = create_application_backup(
+        &engine,
+        &objects,
+        &catalogue,
+        "oversized",
+        200,
+        &control_families(),
+    )
+    .unwrap();
+    assert_eq!(entry.control_archive.as_ref().unwrap().entry_count, 1);
+    let target = root.path().join("restored");
+    assert!(rrd_store::restore_catalogued_backup_with_options(
+        &catalogue,
+        &entry.backup_id,
+        &target,
+        300,
+        options
+    )
+    .is_err());
+    assert!(
+        !target.exists(),
+        "verification denial must not publish the target"
+    );
+    restore_catalogued_backup(&catalogue, &entry.backup_id, &target, 301).unwrap();
+    let restored = RrflowKvStore::open_existing(&target).unwrap();
+    assert_eq!(
+        restored
+            .control()
+            .get("server/state/install/record")
+            .unwrap(),
+        Some(value)
+    );
+    let progress = control_restore_progress(&restored).unwrap().unwrap();
+    assert!(progress.complete);
+    assert_eq!(progress.applied, 1);
+}
+
 fn claim(name: &str, at: u64) -> Claim {
     Claim::new(
         Subject::new(format!("backup:{name}")).unwrap(),
