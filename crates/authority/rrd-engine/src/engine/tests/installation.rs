@@ -401,6 +401,133 @@ fn installed_open_and_verify_never_repair_a_torn_or_missing_active_wal() {
 }
 
 #[test]
+fn installed_tail_repair_preserves_the_original_and_resumes_publication_boundaries() {
+    use std::io::Write as _;
+    for boundary in [
+        "candidate-copied",
+        "active-quarantined",
+        "candidate-published",
+        "receipt-committed",
+    ] {
+        let project = tempfile::tempdir().unwrap();
+        std::fs::write(project.path().join("README.md"), b"project-owned\n").unwrap();
+        let preview = plan(project.path());
+        let executable = test_executable();
+        let now = crate::engine::clock::observe_required(
+            &crate::engine::clock::HostSystemClock,
+            "repair.test",
+        )
+        .unwrap()
+        .observed_at_unix_ms;
+        RrdEngine::apply_installation_at(
+            project.path(),
+            InstallationTargetKind::ExistingProject,
+            &preview,
+            &preview.installation.plan_sha256,
+            now,
+            &executable,
+        )
+        .unwrap();
+        let locator = RrdEngine::read_project_locator(project.path()).unwrap();
+        let active = project.path().join(&locator.storage_root);
+        let wal = std::fs::read_dir(active.join("wal"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let mut file = std::fs::OpenOptions::new().append(true).open(&wal).unwrap();
+        file.write_all(b"incomplete-tail").unwrap();
+        file.sync_all().unwrap();
+        drop(file);
+        let damaged = inventory(&active);
+        let before_plan = inventory(project.path());
+        let repair = RrdEngine::plan_installed_tail_repair(project.path(), &executable).unwrap();
+        assert_eq!(
+            inventory(project.path()),
+            before_plan,
+            "repair planning changed bytes"
+        );
+        assert!(RrdEngine::apply_installed_tail_repair(
+            project.path(),
+            &executable,
+            &repair,
+            &"0".repeat(64)
+        )
+        .is_err());
+        assert_eq!(
+            inventory(project.path()),
+            before_plan,
+            "unapproved repair changed bytes"
+        );
+        let mut reached = false;
+        let result = crate::engine::tail_repair::publication::apply_with_observer(
+            project.path(),
+            &executable,
+            &repair,
+            &mut |point| {
+                if point == boundary {
+                    reached = true;
+                    Err(ServiceError::Storage("owned repair interruption".into()))
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert!(
+            reached && result.is_err(),
+            "repair boundary not reached: {boundary}"
+        );
+        let quarantine = project.path().join(&repair.publication.quarantine_root);
+        let preserved = if quarantine.exists() {
+            &quarantine
+        } else {
+            &active
+        };
+        assert_eq!(
+            inventory(preserved),
+            damaged,
+            "repair mutated its damaged input at {boundary}"
+        );
+        let receipt = RrdEngine::apply_installed_tail_repair(
+            project.path(),
+            &executable,
+            &repair,
+            &repair.plan_sha256,
+        )
+        .unwrap();
+        assert_eq!(receipt.runtime_cursor, 2);
+        assert_eq!(receipt.storage.discarded_bytes, 15);
+        assert_eq!(
+            inventory(&quarantine),
+            damaged,
+            "quarantined evidence changed"
+        );
+        let report = RrdEngine::inspect_installed(project.path(), &executable).unwrap();
+        assert_eq!(report.status, InstallationVerificationStatus::Passed);
+        let completed = inventory(project.path());
+        let replay = RrdEngine::apply_installed_tail_repair(
+            project.path(),
+            &executable,
+            &repair,
+            &repair.plan_sha256,
+        )
+        .unwrap();
+        assert!(replay.idempotent_replay);
+        assert_eq!(replay.plan_sha256, receipt.plan_sha256);
+        assert_eq!(
+            inventory(project.path()),
+            completed,
+            "completed retry wrote another repair"
+        );
+        assert_eq!(
+            std::fs::read(project.path().join("README.md")).unwrap(),
+            b"project-owned\n"
+        );
+    }
+}
+
+#[test]
 fn unavailable_or_rolled_back_clock_blocks_effects_but_not_read_only_diagnosis() {
     let project = tempfile::tempdir().unwrap();
     std::fs::write(project.path().join("README.md"), "clock boundary\n").unwrap();
@@ -694,7 +821,45 @@ fn explicit_configuration_is_sealed_and_apply_does_not_reread_it() {
     let input = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
         input.path(),
-        r#"format_version = 2
+        r#"format_version = 3
+
+[storage]
+recovery_reserve_bytes = 16777216
+mutable_accounted_bytes = 134217728
+mutable_versions = 1048576
+projected_output_bytes = 134217728
+source_page_bytes = 268435456
+native_transactions = 64
+native_transaction_bytes = 67108864
+checkpoint_entries = 1024
+active_read_views = 1024
+pinned_read_bytes = 4294967296
+page_cache_bytes = 4194304
+wal_flush_target_bytes = 67108864
+memtable_flush_target_versions = 524288
+compaction_input_bytes = 1073741824
+compaction_input_logical_bytes = 268435456
+compaction_input_versions = 4194304
+compaction_output_segments = 256
+compaction_elapsed_ms = 30000
+compaction_l0_segments = 64
+retained_mutable_bytes = 536870912
+retained_mutable_versions = 4194304
+retained_mutable_generations = 64
+reclamation_inventory_entries = 262144
+reclamation_metadata_bytes = 67108864
+reclamation_delete_files = 1024
+reclamation_delete_bytes = 1073741824
+reclamation_elapsed_ms = 30000
+transaction_admission_requests = 64
+transaction_admission_bytes = 67108864
+transaction_admission_wait_ms = 30000
+recovery_metadata_bytes = 67108864
+recovery_files = 262144
+recovery_read_bytes = 1099511627776
+recovery_wal_bytes = 268435456
+recovery_wal_frames = 1048576
+recovery_elapsed_ms = 120000
 
 [clock]
 maximum_rollback_ms = 250

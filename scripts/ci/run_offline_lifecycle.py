@@ -255,6 +255,7 @@ def run(*arguments: str, **kwargs: object) -> subprocess.CompletedProcess:
     kwargs.pop("capture_output", None)
     kwargs.pop("text", None)
     process_group = kwargs.pop("process_group", False)
+    on_completion = kwargs.pop("on_completion", None)
     if process_group:
         require(os.name == "posix", "native process group is unavailable")
         kwargs["start_new_session"] = True
@@ -303,12 +304,40 @@ def run(*arguments: str, **kwargs: object) -> subprocess.CompletedProcess:
         for reader in readers:
             reader.join(timeout=2)
     require(not any(reader.is_alive() for reader in readers), "command output did not close")
+    result = subprocess.CompletedProcess(arguments, child.returncode,
+                                         streams[0].decode("utf-8", errors="replace"),
+                                         streams[1].decode("utf-8", errors="replace"))
+    if on_completion is not None:
+        on_completion(result)
     require(error is None and not exceeded.is_set() and not failures, error or "command output limit exceeded")
     if check:
         require(child.returncode == 0, f"qualification command failed with exit status {child.returncode}")
-    return subprocess.CompletedProcess(arguments, child.returncode,
-                                       streams[0].decode("utf-8", errors="replace"),
-                                       streams[1].decode("utf-8", errors="replace"))
+    return result
+
+
+def partial_lifecycle_progress(result: subprocess.CompletedProcess) -> dict:
+    """Keep only closed fixture identifiers/counts, never arbitrary output."""
+    cases = {}
+    for match in re.finditer(r"(?m)^test (\w+) \.\.\. (ok|FAILED|ignored)(?:\s|$)", result.stdout):
+        name, status = match.groups()
+        if name in REQUIRED_CASES:
+            entry = cases.setdefault(name, {"case": name, "status": status, "occurrences": 0})
+            entry["status"] = status
+            entry["occurrences"] += 1
+    markers = {name: {"fresh": 0, "existing": 0} for name in ["native_lifecycle_receipt", "native_storage_history"]}
+    for line in result.stdout.splitlines():
+        name, separator, payload = line.partition("=")
+        if separator and name in markers and len(payload) <= 1024 * 1024:
+            try:
+                receipt = json.loads(payload)
+            except (ValueError, RecursionError):
+                continue
+            if isinstance(receipt, dict) and receipt.get("mode") in ("fresh", "existing"):
+                markers[name][receipt["mode"]] += 1
+    return {"cases": list(cases.values()), "markers": markers,
+            "stdout_bytes": len(result.stdout.encode("utf-8")),
+            "stderr_bytes": len(result.stderr.encode("utf-8")),
+            "readiness_observations": len(re.findall(r"(?m)^native readiness output stdout_bytes=\d+ stderr_bytes=\d+$", result.stderr))}
 
 
 def inside(stage: Path) -> None:
@@ -368,10 +397,15 @@ def qualify_payload(stage: Path, configuration: dict) -> None:
     listing = run(str(harness), "--list", "--format=terse", cwd=stage,
                   env=environment, capture_output=True, text=True)
     require_lifecycle_tests(listing.stdout)
+    def retain_partial(result):
+        (stage / "receipt.json").write_text(json.dumps({"schema_version": 1, "status": "failed",
+            "platform": sys.platform, "sha256": configuration["sha256"],
+            "exit_status": result.returncode, "isolation": configuration["isolation"],
+            "partial_progress": partial_lifecycle_progress(result)}, indent=2), encoding="utf-8")
     # The two independent project fixtures may run together; serial execution
     # duplicates their full restore/verification latency inside one deadline.
     result = run(str(harness), "--nocapture", "--test-threads=2", cwd=stage,
-                 env=environment, timeout=540, check=False)
+                 env=environment, timeout=540, check=False, on_completion=retain_partial)
     observed = re.findall(r"(?m)^test (\w+) \.\.\. (ok|FAILED|ignored[^\n]*)$", result.stdout)
     outcomes = [{"case": name, "status": status.split()[0]} for name, status in observed if name in REQUIRED_CASES]
     (stage / "receipt.json").write_text(json.dumps({"schema_version": 1, "status": "failed",
@@ -551,10 +585,12 @@ def main() -> None:
                 arguments.receipt.parent.mkdir(parents=True, exist_ok=True)
                 if (stage / "receipt.json").is_file():
                     shutil.copyfile(stage / "receipt.json", arguments.receipt)
+                    receipt = json.loads(arguments.receipt.read_text(encoding="utf-8"))
                     if (stage / "startup.json").is_file():
-                        receipt = json.loads(arguments.receipt.read_text(encoding="utf-8"))
                         receipt["startup_diagnostics"] = json.loads((stage / "startup.json").read_text())
-                        arguments.receipt.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+                    if (stage / "failure.json").is_file():
+                        receipt["native_failure"] = json.loads((stage / "failure.json").read_text(encoding="utf-8"))
+                    arguments.receipt.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
                 else:
                     arguments.receipt.write_text(json.dumps({"schema_version": 1, "status": "failed",
                         "platform": sys.platform, "sha256": source_hashes,

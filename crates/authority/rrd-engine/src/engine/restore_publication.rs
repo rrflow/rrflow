@@ -45,14 +45,55 @@ const PUBLICATION_LEASE_FILE: &str = ".publication.lock";
 /// The exclusive offline publication lease of one instance: an advisory lock
 /// on a file beside the restore staging roots, held for the whole apply so two
 /// publications cannot interleave their renames.
-struct PublicationLease {
+pub(super) struct PublicationLease {
     _file: fs::File,
+}
+
+impl Drop for PublicationLease {
+    fn drop(&mut self) {
+        // File close alone leaves the lock held by duplicated/inherited file
+        // descriptions (including a concurrent fork before exec). Ownership
+        // ends here, after publication unwinds, not when the last duplicate closes.
+        let _ = self._file.unlock();
+    }
+}
+
+#[cfg(test)]
+mod publication_lease_tests {
+    use super::*;
+
+    #[test]
+    fn publication_owner_drop_releases_even_with_a_duplicated_handle() {
+        let root = tempfile::tempdir().unwrap();
+        let anchor = AnchoredPath::open_root(root.path()).unwrap();
+        let owner = PublicationLease::acquire_at(&anchor).unwrap();
+        let duplicate = owner._file.try_clone().unwrap();
+        assert!(matches!(
+            PublicationLease::acquire_at(&anchor),
+            Err(ServiceError::StorageConflict(_))
+        ));
+        drop(owner);
+        let replacement = PublicationLease::acquire_at(&anchor).unwrap();
+        drop(duplicate);
+        // Disposing the former descriptor must not release the new owner's lock.
+        assert!(matches!(
+            PublicationLease::acquire_at(&anchor),
+            Err(ServiceError::StorageConflict(_))
+        ));
+        drop(replacement);
+        let _next = PublicationLease::acquire_at(&anchor).unwrap();
+    }
 }
 
 impl PublicationLease {
     fn acquire(paths: &PublicationPaths) -> Result<Self> {
         let path = paths.restores.join(PUBLICATION_LEASE_FILE);
         reject_existing_symlink_path(&paths.project, &path)?;
+        Self::acquire_at(&paths.restores)
+    }
+
+    pub(super) fn acquire_at(restores: &AnchoredPath) -> Result<Self> {
+        let path = restores.join(PUBLICATION_LEASE_FILE);
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -194,7 +235,12 @@ impl RrdEngine {
         require_directory(&paths.active, "active storage root")?;
 
         let backup = catalogued_backup(&paths.backups, backup_sha256)?;
-        rrd_store::verify_restored_backup_objects(&paths.backups, backup_sha256, &paths.candidate)?;
+        rrd_store::verify_restored_backup_objects_with_options(
+            &paths.backups,
+            backup_sha256,
+            &paths.candidate,
+            super::core::installed_storage_options(&locator.storage)?,
+        )?;
         let active = RootReading::open(&paths.active, &locator)?;
         let candidate = RootReading::open(&paths.candidate, &locator)?;
         if candidate.evidence.claim_sequence != backup.archive.claim_sequence
@@ -411,10 +457,11 @@ impl RrdEngine {
                 return Err(ServiceError::ProjectBindingMismatch);
             }
             catalogued_backup(&paths.backups, &plan.backup_sha256)?;
-            rrd_store::verify_restored_backup_objects(
+            rrd_store::verify_restored_backup_objects_with_options(
                 &paths.backups,
                 &plan.backup_sha256,
                 &paths.candidate,
+                super::core::installed_storage_options(&locator.storage)?,
             )?;
             if active_token_key_sha256(&paths.active, &active.installed)? != plan.token_key_sha256 {
                 return Err(ServiceError::ProjectBindingMismatch);
@@ -593,7 +640,10 @@ struct RootReading {
 impl RootReading {
     fn open(root: &AnchoredPath, locator: &ProjectLocator) -> Result<Self> {
         super::core::validate_existing_object_layout(root)?;
-        let inspector = RrflowKvInspector::open_anchored(root)?;
+        let inspector = RrflowKvInspector::open_anchored_with_options(
+            root,
+            super::core::installed_storage_options(&locator.storage)?,
+        )?;
         let installed: InstalledEstateRecord =
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
         installed.validate()?;
@@ -603,6 +653,9 @@ impl RootReading {
             "estate configuration",
         )?;
         configuration.validate().map_err(contract_error)?;
+        if configuration.storage != locator.storage {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
         let inspection = inspector.inspection();
         let evidence = RestoreRootEvidence {
             physical_sha256: json_sha256(inspection)?,
@@ -756,7 +809,10 @@ fn published_receipt(
     if paths.candidate.metadata().is_ok() || paths.quarantine.metadata().is_err() {
         return Ok(None);
     }
-    let inspector = RrflowKvInspector::open_anchored(&paths.active)?;
+    let inspector = RrflowKvInspector::open_anchored_with_options(
+        &paths.active,
+        super::core::installed_storage_options(&locator.storage)?,
+    )?;
     let key = publication_receipt_key(&locator.identity.instance_id, &plan.id);
     let Some(bytes) = inspector.control_record(&key)? else {
         return Ok(None);

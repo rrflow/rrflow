@@ -96,3 +96,17 @@ Change checklist: owner/outcome/baseline and PR brief bound; scope preserved;
 read and diff review completed; research/trace/resource decisions explicit;
 smallest oracle performed; checks and omissions disclosed; linked evidence
 and generated projections included. Roadmap/POA&M status change: none.
+
+## Current-main integration for landing
+
+At the owner's merge request, integrated accepted public main
+`2255c2bee9c2e4c2f7b44f053dc73a92feebc7b6` into candidate
+`ef683f7cf24a83d1b6b584b0bb93b4e141ce4bbf` without rewriting history.
+The only conflict was the generated file inventory; regenerated it from both
+sets of tracked changes. The Connectome owner merged cleanly, retaining the
+newer native-workbench evidence and the target project-to-learning journey.
+No implementation moved or disappeared. Documentation/navigation/inventory,
+version/workflow policy and staged whitespace checks are repeated for this
+combined tree. No runtime code was authored by this integration and no local
+Rust/frontend suites are repeated. The earlier 23-check success is historical;
+a new exact candidate pipeline is required before merge. Status remains open.

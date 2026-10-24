@@ -45,6 +45,29 @@ output surviving database/stream disposal. Weak-owner and registry checks
 cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
 ownership regressions, not aggregate RSS, installed reclamation or soak proof.
 
+The native partitions also require `mutable_admission`: configured writer and
+read-only reopen denial preserves typed byte/version errors and existing file
+bytes; admitted inspection recovers exact semantic and control identities. The
+existing semantic and engine admission suites include both native mutable
+resources through prior-ACK/rejection/reopen/replay/abort/next-work histories.
+These component tests do not qualify installed configuration.
+
+The native partitions also require the `configured_` histories in
+`logical_archive_resilience` and `backup_catalogue`: one native policy follows
+logical/application restore, partial-prefix resume, catalogue/control replay
+and verification reopens. Rejected work stays private; an adequate policy
+resumes exact runtime/control/object evidence without duplicate effects.
+Denied replay preserves file bytes. These are component restore limits, not
+installed configuration binding, aggregate recovery memory or capacity proof.
+
+Those same partitions separately require `projected_output_limits` and
+`segment::output::tests`. These qualify output-byte admission before allocation,
+last-owner release through buffer clones/slices, concurrent readers, failed
+batch construction and retained output through reclamation/reopen. The native
+pool is scoped to one database-open instance and excludes source pages, caller
+copies and allocator metadata; these checks do not establish total-memory or
+installed capacity limits.
+
 The same native partitions require the `interleaved` filter in
 `projected_read_adversarial`, with a five-minute step limit. Nine fixed histories
 combine two reader stamps, a pinned transaction, mixed-family writes/deletes,
@@ -56,6 +79,20 @@ survive database close and disposable-directory removal. Mapped raw, bounded
 raw and bounded adaptive-LZ4 paths must report that they were exercised. This
 is native component lifetime evidence, not installed reclamation or memory
 capacity qualification.
+
+The same three native partitions require `mutable_limits`: hard active-state
+byte/version admission, pre-effect rejection, hot-key pressure with held
+history, and writer/read-only WAL replay denial followed by exact recovery.
+This accounts active key/value/version charges; it does not establish aggregate
+heap/RSS, installed configuration binding or whole-startup work limits.
+
+The same three native partitions require `write_diagnostics` and
+`rrflow_kv_operator`. Uncontended timing may be zero; measured phases/waits
+must fit their independent outer duration and supplied lock context survives
+exactly, including zero and saturating values. Bounded sample/drop accounting,
+maintenance counters and durable readback remain required. Positive timing is
+not evidence of physical synchronization; the native durability/I/O suites
+retain that responsibility.
 
 The topology and native portability jobs run `installed_lifecycle` against the
 actual primary executable, without a surrogate executable-identity fixture.
@@ -487,11 +524,36 @@ native pause 30 seconds. The job allows 45 minutes including builds; the warm
 test step allows 20 minutes and two test threads. Existing ordinary lane
 limits are unchanged. `ci-gate` requires all three diagnostic jobs.
 
+The same required native job now invokes
+`python3 scripts/ci/run_native_capacity.py` for fresh/existing estates at WAL,
+segment, manifest and CURRENT-write boundaries. It creates a capped ext4 loop
+image in a private mount namespace, fixed APFS image, or NTFS VHD. The harness
+requires a separately enumerated small volume, an exact owner marker, a private
+one-use pause/resume, and an actual native capacity error at the selected
+phase. It preserves every acknowledged value/receipt, resolves the uncertain
+call, explicitly publishes a repaired candidate when a final WAL frame is
+incomplete, admits distinct new work, and reopens again. These are actual
+filesystem-failure checks; they do not establish OS power-cut safety or a
+24-hour operating envelope. Missing facilities report not-run with nonzero
+exit; any failed cleanup fails qualification. The normal binary must contain
+neither diagnostic marker. The job's 75-minute bound includes the existing
+corpus and a 30-minute native capacity step. Local execution remains explicit:
+this runner must never be pointed at an existing disk or mount.
+
 The nondefault four-crate `crash-test` composition is owned by this dedicated
 job; other optional features retain their existing matrix. It must never be
 used to assemble the normal distribution. These tests do not close installed
 publication/GC composition, 100-cycle operating profiles, resource limits,
 retained buffers, real exhaustion, sustained capacity or the 24-hour soak.
+
+The installed domain-crash job also runs the
+[publication and reclamation corpus](../evidence/change-journals/gate-c/c-07c-installed-publication.md)
+separately for fresh/existing estates. It retains two bounded native receipts,
+requires all six maintenance boundaries and their compound manifest-recovery
+kills, and reconciles prior ACKs before retrying each uncertain target. The
+ordinary domain step excludes these cases to avoid duplicate execution. Native
+acceptance requires the explicit execution and receipt-validation steps;
+component histories and a successful older job cannot replace them.
 
 The
 [engine observability contract](../architecture/engine-data-flow.md#runtime-modes-build-profiles-and-build-identity)

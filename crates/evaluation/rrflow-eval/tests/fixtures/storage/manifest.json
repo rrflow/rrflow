@@ -35,9 +35,9 @@
   "candidate": {
     "clean": true,
     "commit": "1111111111111111111111111111111111111111",
-    "configuration_sha256": "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105",
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
     "executable_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-    "public_catalogue_sha256": "d08253840962c5c61fe47018ba2f3302343f6b5394afacded439899a8f9c5c97",
+    "public_catalogue_sha256": "5c9e8e6f9586649da1297e4dcd0b220e4fdbc37c930b4f38fbffd933757e1b3c",
     "tree": "2222222222222222222222222222222222222222"
   },
   "corpus_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
@@ -59,8 +59,8 @@
     "clock": {
       "maximum_rollback_ms": 0
     },
-    "configuration_sha256": "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105",
-    "format_version": 2,
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
+    "format_version": 3,
     "query": {
       "max_batch_rows": 256,
       "max_elapsed_ms": 30000,
@@ -81,7 +81,45 @@
       "max_output_bytes": 524288,
       "max_storage_keys": 100000
     },
-    "revision": 1
+    "revision": 1,
+    "storage": {
+      "active_read_views": 1024,
+      "checkpoint_entries": 1024,
+      "compaction_elapsed_ms": 30000,
+      "compaction_input_bytes": 1073741824,
+      "compaction_input_logical_bytes": 268435456,
+      "compaction_input_versions": 4194304,
+      "compaction_l0_segments": 64,
+      "compaction_output_segments": 256,
+      "memtable_flush_target_versions": 524288,
+      "mutable_accounted_bytes": 134217728,
+      "mutable_versions": 1048576,
+      "native_transaction_bytes": 67108864,
+      "native_transactions": 64,
+      "page_cache_bytes": 4194304,
+      "pinned_read_bytes": 4294967296,
+      "projected_output_bytes": 134217728,
+      "reclamation_delete_bytes": 1073741824,
+      "reclamation_delete_files": 1024,
+      "reclamation_elapsed_ms": 30000,
+      "reclamation_inventory_entries": 262144,
+      "reclamation_metadata_bytes": 67108864,
+      "recovery_elapsed_ms": 120000,
+      "recovery_files": 262144,
+      "recovery_metadata_bytes": 67108864,
+      "recovery_read_bytes": 1099511627776,
+      "recovery_reserve_bytes": 16777216,
+      "recovery_wal_bytes": 268435456,
+      "recovery_wal_frames": 1048576,
+      "retained_mutable_bytes": 536870912,
+      "retained_mutable_generations": 64,
+      "retained_mutable_versions": 4194304,
+      "source_page_bytes": 268435456,
+      "transaction_admission_bytes": 67108864,
+      "transaction_admission_requests": 64,
+      "transaction_admission_wait_ms": 30000,
+      "wal_flush_target_bytes": 67108864
+    }
   },
   "profile": "synthetic-contract-oracle",
   "required_cases": [

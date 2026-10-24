@@ -144,6 +144,11 @@ def verify_workflow_security(workflows: dict[Path, str]) -> None:
         )
 
         for line_number, body in checkout_steps(workflow):
+            if path == REUSABLE:
+                require(
+                    not any(re.match(r"(?:ref|repository|path)\s*:", entry) for entry in body),
+                    f"candidate checkout must use its triggering source revision: {relative}:{line_number}",
+                )
             require(
                 "persist-credentials: false" in body,
                 f"checkout credentials must not persist: {relative}:{line_number}",
@@ -523,6 +528,13 @@ def main() -> None:
         reusable.count("python3 scripts/ci/build_execution_inventory.py --check") == 1,
         "the exhaustive execution inventory must be checked exactly once",
     )
+    require(
+        reusable.count("python3 scripts/knowledge/render_capacity_profiles.py --check") == 1
+        and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1
+        and reusable.count("python3 scripts/ci/test_collect_storage_acceptance.py") == 1
+        and reusable.count("python3 scripts/ci/test_sustained_launch.py") == 1,
+        "the owning J-04 capacity projection must be checked exactly once",
+    )
 
     expected_jobs = {
         "installed-reopen",
@@ -560,18 +572,28 @@ def main() -> None:
             f"{job} must exercise the installed primary executable lifecycle",
         )
         for command in [
+            "cargo test -p rrd-lsm --test mutable_limits --locked",
+            "cargo test -p rrd-store --test mutable_admission --locked",
+            "cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked",
+            "cargo test -p rrd-lsm --test write_diagnostics --locked",
+            "cargo test -p rrd-store --test rrflow_kv_operator --locked",
             "cargo test -p rrd-lsm --test projected_lifetime --locked",
             "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
+            "cargo test -p rrd-lsm --test projected_output_limits --locked",
+            "cargo test -p rrd-lsm --lib segment::output::tests --locked",
             "cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture",
         ]:
-            require(command in jobs[job], f"{job} must qualify reader ownership: {command}")
+            require(jobs[job].count(command) == 1, f"{job} must qualify native storage ownership and admission once: {command}")
     reopen = jobs["installed-reopen"]
     for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
         require(f"- {platform}" in reopen, f"ordinary reopen corpus must qualify {platform}")
     for command in [
         "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
-        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
         "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
+        "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
         "RRFLOW_REOPEN_RECEIPT_DIR:",
         "'attempts': 5150",
         "actions/upload-artifact@",
@@ -589,6 +611,10 @@ def main() -> None:
         "cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked",
         "cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings",
         "C07C_NATIVE_PAUSE_V1=",
+        "--skip publication_and_reclamation",
+        "publication_and_reclamation --nocapture --test-threads=2",
+        "Require both complete installed publication receipts",
+        "RRFLOW_PUBLICATION_RECEIPT_DIR:",
     ]:
         require(command in diagnostic, f"installed diagnostic qualification missing: {command}")
     require(diagnostic.index("Verify diagnostic protocol") < diagnostic.index("Build explicit diagnostic"),

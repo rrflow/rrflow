@@ -90,6 +90,7 @@ pub(crate) struct RecoverySummary {
 }
 
 pub struct WalWriter {
+    recovery_reserve_bytes: u64,
     path: PathBuf,
     file: File,
     offset: u64,
@@ -112,6 +113,7 @@ impl WalWriter {
                 "WAL starting sequence must be non-zero".into(),
             ));
         }
+        path.admit_disk(FILE_HEADER_BYTES as u64, true)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -124,6 +126,7 @@ impl WalWriter {
             .sync_directory()?;
         Ok(Self {
             path: path.diagnostic_path().to_owned(),
+            recovery_reserve_bytes: path.recovery_reserve(),
             file,
             offset: FILE_HEADER_BYTES as u64,
             next_sequence,
@@ -176,6 +179,7 @@ impl WalWriter {
         file.seek(SeekFrom::Start(recovery.valid_bytes))?;
         Ok(Self {
             path: path.diagnostic_path().to_owned(),
+            recovery_reserve_bytes: path.recovery_reserve(),
             file,
             offset: recovery.valid_bytes,
             next_sequence: recovery
@@ -231,6 +235,22 @@ impl WalWriter {
                 .expect("phase recorder checked")
                 .record_prepare = started.finish();
         }
+        let allocation = end_offset - offset;
+        #[cfg(target_os = "linux")]
+        let allocation = if offset == FILE_HEADER_BYTES as u64
+            && batch.first_sequence == 1
+            && batch.payload.len() >= INITIAL_WAL_RESERVATION_MIN_BATCH_BYTES
+        {
+            allocation.max(INITIAL_WAL_RESERVATION_BYTES)
+        } else {
+            allocation
+        };
+        crate::filesystem::space::admit(
+            &self.file,
+            self.recovery_reserve_bytes,
+            allocation,
+            false,
+        )?;
         if offset == FILE_HEADER_BYTES as u64
             && batch.first_sequence == 1
             && batch.payload.len() >= INITIAL_WAL_RESERVATION_MIN_BATCH_BYTES
@@ -246,7 +266,7 @@ impl WalWriter {
         }
         let write_started = phases.is_some().then(PhaseClock::start);
         #[cfg(all(feature = "crash-test", not(test)))]
-        crate::crash_test::boundary(crate::crash_test::Point::WalBeforeWrite, &self.path);
+        crate::crash_test::wal_before_write(&self.path, batch.payload.len());
         let write = (|| -> std::io::Result<()> {
             let written = loop {
                 match file_io::write_vectored(
@@ -414,6 +434,30 @@ where
 pub(crate) fn replay_file<F>(
     file: &mut File,
     starting_sequence: u64,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    replay_file_inner(file, starting_sequence, None, replay)
+}
+
+pub(crate) fn replay_file_bounded<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    budget: &mut crate::recovery_budget::RecoveryBudget,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    replay_file_inner(file, starting_sequence, Some(budget), replay)
+}
+
+fn replay_file_inner<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    mut budget: Option<&mut crate::recovery_budget::RecoveryBudget>,
     mut replay: F,
 ) -> Result<RecoverySummary>
 where
@@ -426,6 +470,9 @@ where
     }
     file.seek(SeekFrom::Start(0))?;
     let length = file.metadata()?.len();
+    if let Some(budget) = budget.as_deref_mut() {
+        budget.wal(length)?;
+    }
     if length < FILE_HEADER_BYTES as u64 {
         return Err(Error::Corruption {
             offset: 0,
@@ -441,6 +488,9 @@ where
     let mut torn_tail = None;
     let mut payload_bytes = 0usize;
     while offset < length {
+        if let Some(budget) = budget.as_deref_mut() {
+            budget.frame()?;
+        }
         let remaining = length - offset;
         if remaining < RECORD_HEADER_BYTES as u64 {
             torn_tail = Some(offset);
@@ -504,6 +554,15 @@ where
                     reason: "sequence overflow".into(),
                 })?;
         offset = end;
+    }
+    if file.metadata()?.len() != length {
+        return Err(Error::Corruption {
+            offset,
+            reason: "WAL length changed during recovery".into(),
+        });
+    }
+    if let Some(budget) = budget {
+        budget.tick()?;
     }
     Ok(RecoverySummary {
         recovered_through: expected_sequence.saturating_sub(1),

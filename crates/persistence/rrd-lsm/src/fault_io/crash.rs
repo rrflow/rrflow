@@ -24,9 +24,17 @@ pub enum Point {
     ReclaimBeforeRemove,
     ReclaimRemoved,
     RecoveryRead,
+    #[cfg(not(test))]
+    RecoveryManifest,
     Acknowledged,
     #[cfg(not(test))]
     ReceiptPersisted,
+    #[cfg(not(test))]
+    SegmentBeforeCreate,
+    #[cfg(not(test))]
+    ManifestBeforeCreate,
+    #[cfg(not(test))]
+    CurrentBeforeCreate,
     Unreachable,
 }
 
@@ -60,6 +68,9 @@ struct Hit {
     pid: u32,
     point: Point,
     id: u16,
+    #[cfg(not(test))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    wal_payload_bytes: Option<usize>,
 }
 
 fn arm(schedule: Schedule) {
@@ -106,12 +117,18 @@ fn pause_if(matches: impl FnOnce(&mut Armed) -> bool) {
         pid: std::process::id(),
         point: active.schedule.point,
         id: active.schedule.id,
+        #[cfg(not(test))]
+        wal_payload_bytes: installed::selected_wal_payload_bytes(),
     };
     // Exactly one bounded identity receipt, without paths, values or secrets.
     let line = format!("{PREFIX}{}\n", serde_json::to_string(&hit).unwrap());
     assert!(line.len() < 512);
     std::io::stdout().write_all(line.as_bytes()).unwrap();
     std::io::stdout().flush().unwrap();
+    #[cfg(not(test))]
+    if installed::resume_private(&hit, active.deadline) {
+        return;
+    }
     while Instant::now() < active.deadline {
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -169,4 +186,7 @@ mod tests;
 #[path = "crash/installed.rs"]
 mod installed;
 #[cfg(not(test))]
-pub use installed::{boundary, configure_from_stdin, enter_domain, enter_recovery, ScopeGuard};
+pub use installed::{
+    after_io, before_io, boundary, configure_from_stdin, enter_domain, enter_recovery,
+    observe_native_error, wal_before_write, ScopeGuard,
+};

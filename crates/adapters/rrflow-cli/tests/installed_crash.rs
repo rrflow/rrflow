@@ -1,4 +1,6 @@
 //! Explicit diagnostic-primary proof. Never a default distribution artifact.
+#[path = "support/capacity.rs"]
+mod capacity;
 #[path = "support/process.rs"]
 mod process;
 
@@ -27,6 +29,8 @@ const PREFIX: &str = "C07C_NATIVE_PAUSE_V1=";
 
 struct Estate {
     temp: tempfile::TempDir,
+    _volume_project: Option<tempfile::TempDir>,
+    working: PathBuf,
     binary: PathBuf,
     project: PathBuf,
     identity: String,
@@ -37,16 +41,14 @@ struct Estate {
 impl Estate {
     fn command(&self) -> Command {
         let mut command = Command::new(&self.binary);
-        command
-            .env_clear()
-            .current_dir(self.temp.path().join("working"));
+        command.env_clear().current_dir(&self.working);
         for name in ["SystemRoot", "WINDIR"] {
             if let Some(value) = std::env::var_os(name) {
                 command.env(name, value);
             }
         }
         for name in ["HOME", "USERPROFILE", "TMP", "TEMP", "TMPDIR", "PATH"] {
-            command.env(name, self.temp.path().join("working"));
+            command.env(name, &self.working);
         }
         command
     }
@@ -66,6 +68,10 @@ impl Estate {
     }
 
     fn install(mode: &str) -> Self {
+        Self::install_at(mode, None, false)
+    }
+
+    fn install_at(mode: &str, volume: Option<&std::path::Path>, flush_each: bool) -> Self {
         let temp = tempfile::tempdir().unwrap();
         let binary = temp.path().join(if cfg!(windows) {
             "rrflow.exe"
@@ -74,14 +80,26 @@ impl Estate {
         });
         process::stage_executable(std::path::Path::new(env!("CARGO_BIN_EXE_rrflow")), &binary)
             .unwrap();
-        let project = temp.path().join("project");
+        let volume_project = volume.map(|root| {
+            tempfile::Builder::new()
+                .prefix("rrflow-estate-")
+                .tempdir_in(root)
+                .unwrap()
+        });
+        let estate_root = volume_project
+            .as_ref()
+            .map_or(temp.path(), |owner| owner.path());
+        let project = estate_root.join("project");
+        let working = estate_root.join("working");
         std::fs::create_dir(&project).unwrap();
-        std::fs::create_dir(temp.path().join("working")).unwrap();
+        std::fs::create_dir(&working).unwrap();
         if mode == "existing" {
             std::fs::write(project.join("README.md"), "owned project\n").unwrap();
         }
         let mut estate = Self {
             temp,
+            _volume_project: volume_project,
+            working,
             binary,
             project,
             identity: String::new(),
@@ -93,6 +111,18 @@ impl Estate {
             .as_str()
             .unwrap()
             .to_owned();
+        let configuration = estate.temp.path().join("configuration.toml");
+        let mut policy = include_str!(
+            "../../../authority/rrd-engine/assets/install/default-estate-configuration-v3.toml"
+        )
+        .to_owned();
+        if flush_each {
+            policy = policy.replace(
+                "wal_flush_target_bytes = 67108864",
+                "wal_flush_target_bytes = 1",
+            );
+        }
+        std::fs::write(&configuration, policy).unwrap();
         let preview = estate.invoke(&[
             "install",
             "plan",
@@ -102,6 +132,8 @@ impl Estate {
             mode,
             "--project",
             estate.project.to_str().unwrap(),
+            "--configuration",
+            configuration.to_str().unwrap(),
         ]);
         let path = estate.temp.path().join("plan.json");
         std::fs::write(&path, serde_json::to_vec(&preview).unwrap()).unwrap();
@@ -139,13 +171,24 @@ impl Estate {
             .arg(&self.project)
             .args(["--bind", "127.0.0.1:0"]);
         let (send, lines) = mpsc::sync_channel(4);
-        let child = process::Process::start_observed(
-            &mut command,
-            Duration::from_secs(180),
-            LIMIT,
-            send,
-            &serde_json::to_vec(control).unwrap(),
-        )
+        let input = serde_json::to_vec(control).unwrap();
+        let child = if control["resume"] == true {
+            process::Process::start_controlled(
+                &mut command,
+                Duration::from_secs(180),
+                LIMIT,
+                send,
+                &input,
+            )
+        } else {
+            process::Process::start_observed(
+                &mut command,
+                Duration::from_secs(180),
+                LIMIT,
+                send,
+                &input,
+            )
+        }
         .unwrap();
         Child { child, lines }
     }
@@ -269,7 +312,11 @@ async fn read(
 }
 
 fn run(mode: &str, points: &[&str]) {
-    let estate = Estate::install(mode);
+    run_history(mode, points, false);
+}
+
+fn run_history(mode: &str, points: &[&str], publication: bool) {
+    let estate = Estate::install_at(mode, None, publication);
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -349,6 +396,10 @@ fn run(mode: &str, points: &[&str]) {
         for (index, point) in points.iter().enumerate() {
             eprintln!("installed_domain_case mode={mode} point={point}");
             let name = format!("case-{index}");
+            // Flush/GC run in prepare_write before the selected semantic batch
+            // reaches its WAL. Its prior ACKs must survive, while this new
+            // operation must remain absent until the explicit retry.
+            let committed_before_pause = !publication && *point != "wal_before_write";
             let request = request(&name, estate.at);
             let logical_id = name.clone().try_into().unwrap();
             ledger.expected.push(ExpectedOperation {
@@ -396,10 +447,17 @@ fn run(mode: &str, points: &[&str]) {
                     reason: "process-killed".to_owned().try_into().unwrap(),
                 },
             });
-            let recovery = estate.control("recovery_read", index as u16 + 1, None);
+            // A newly published successor can be empty. Kill after verified
+            // manifest read instead of pretending an absent WAL frame was read.
+            let recovery_point = if publication {
+                "recovery_manifest"
+            } else {
+                "recovery_read"
+            };
+            let recovery = estate.control(recovery_point, index as u16 + 1, None);
             hits.push(estate.launch(&recovery).hit_and_kill(recovery));
             let (child, client) = estate.serve(&Value::Null);
-            if *point != "wal_before_write" {
+            if committed_before_pause {
                 values.extend(expected(&name));
             }
             read(&client, &session, estate.at, &values).await;
@@ -444,7 +502,7 @@ fn run(mode: &str, points: &[&str]) {
                 assert_eq!(receipt.mutation_count, 2);
                 assert_eq!(
                     receipt.idempotent_replay,
-                    retry > 0 || *point != "wal_before_write"
+                    retry > 0 || committed_before_pause
                 );
                 let hash = receipt_hash(&receipt);
                 if let Some(previous) = &stable {
@@ -482,11 +540,25 @@ fn run(mode: &str, points: &[&str]) {
     assert_eq!(hits.len(), points.len() * 2);
     assert_eq!(report.unresolved, 0);
     assert!(report.violations.is_empty(), "{report:?}");
-    println!(
-        "installed_domain_crash_receipt={}",
-        json!({"instrumentation":"crash-test-primary","mode":mode,"build":estate.build,
-        "native_os":std::env::consts::OS,"hits":hits,"ledger":ledger,"report":report})
-    );
+    let receipt = json!({"instrumentation":"crash-test-primary","mode":mode,"build":estate.build,
+        "native_os":std::env::consts::OS,"publication":publication,"hits":hits,"ledger":ledger,"report":report});
+    if publication {
+        if let Some(directory) = std::env::var_os("RRFLOW_PUBLICATION_RECEIPT_DIR") {
+            use std::io::Write;
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let bytes = serde_json::to_vec_pretty(&receipt).unwrap();
+            assert!(bytes.len() <= LIMIT);
+            let mut output = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(directory.join(format!("{mode}.json")))
+                .unwrap();
+            output.write_all(&bytes).unwrap();
+            output.sync_all().unwrap();
+        }
+    }
+    println!("installed_domain_crash_receipt={receipt}");
 }
 
 #[test]
@@ -516,6 +588,25 @@ fn existing_installed_domain_boundaries() {
     );
 }
 
+const PUBLICATION_POINTS: &[&str] = &[
+    "segment_synced",
+    "successor_wal_synced",
+    "current_before_rename",
+    "current_renamed",
+    "reclaim_before_remove",
+    "reclaim_removed",
+];
+
+#[test]
+fn fresh_installed_publication_and_reclamation() {
+    run_history("fresh", PUBLICATION_POINTS, true);
+}
+
+#[test]
+fn existing_installed_publication_and_reclamation() {
+    run_history("existing", PUBLICATION_POINTS, true);
+}
+
 #[test]
 fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
     let estate = Estate::install("fresh");
@@ -525,6 +616,7 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
         ("nonce", json!("invalid")),
         ("id", json!(0)),
         ("point", json!("unreachable")),
+        ("point", json!("recovery_manifest")),
         ("operation_sha256", Value::Null),
         ("root", json!("foreign")),
     ];
@@ -600,6 +692,6 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
     println!(
         "installed_crash_admission_receipt={}",
         json!({"instrumentation":"crash-test-primary",
-        "build":estate.build,"invalid_schedules":6,"nonmatching_commit":true})
+        "build":estate.build,"invalid_schedules":7,"nonmatching_commit":true})
     );
 }

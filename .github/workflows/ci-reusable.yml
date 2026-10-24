@@ -47,13 +47,38 @@ jobs:
         run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
       - name: Test engine rejected-commit recovery and reuse
         run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
         run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
+
       - name: Test overlapping reader checkpoint and reclamation histories
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture
+      - name: Test honest bounded native write diagnostics
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test write_diagnostics --locked
+      - name: Test store diagnostic timing and durable readback
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test rrflow_kv_operator --locked
       - name: Test bounded storage I/O model and compound recovery
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
@@ -119,13 +144,38 @@ jobs:
         run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
       - name: Test engine rejected-commit recovery and reuse
         run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
       - name: Test projected read admission and mixed generations
         run: cargo test -p rrd-lsm --test projected_lifetime --locked
       - name: Test terminal projected source ownership
         run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
+
       - name: Test overlapping reader checkpoint and reclamation histories
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture
+      - name: Test honest bounded native write diagnostics
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test write_diagnostics --locked
+      - name: Test store diagnostic timing and durable readback
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test rrflow_kv_operator --locked
       - name: Test bounded storage I/O model and compound recovery
         timeout-minutes: 5
         run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
@@ -208,6 +258,10 @@ jobs:
         run: |
           python3 scripts/ci/test_execution_inventory.py
           python3 scripts/ci/build_execution_inventory.py --check
+          python3 scripts/knowledge/render_capacity_profiles.py --check
+          python3 scripts/knowledge/test_capacity_profiles.py
+          python3 scripts/ci/test_collect_storage_acceptance.py
+          python3 scripts/ci/test_sustained_launch.py
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership
@@ -271,7 +325,7 @@ jobs:
         if: ${{ matrix.name == 'service-protocol' }}
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test cohesive engine subsystem
-        run: cargo test $PACKAGE_SELECTION --all-targets --locked
+        run: cargo test $PACKAGE_SELECTION --all-targets --locked --no-fail-fast
       - name: Deny cohesive engine subsystem warnings
         run: cargo clippy $PACKAGE_SELECTION --all-targets --locked -- -D warnings
 
@@ -375,7 +429,7 @@ jobs:
           shared-key: linux-feature-${{ matrix.package }}-test-debug0-lld1
           cache-on-failure: false
       - name: Test package optional features
-        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked
+        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked --no-fail-fast
       - name: Deny package optional-feature warnings
         run: cargo clippy -p ${{ matrix.package }} --all-targets --all-features --locked -- -D warnings
 
@@ -450,11 +504,20 @@ jobs:
           cache-on-failure: false
       - name: Build ordinary primary and fixed reopen corpus
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
+      - name: Exercise installed capacity workload and backup readback
+        timeout-minutes: 10
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
+      - name: Independent installed estates under concurrent load
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture
+      - name: Require fresh and existing installed damage denial
+        timeout-minutes: 10
+        run: >-
+          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2
       - name: Require fresh and existing 100-cycle histories
         timeout-minutes: 65
         env:
           RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --nocapture --test-threads=2
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2
       - name: Require both complete ordinary-primary receipts
         shell: bash
         env:
@@ -506,7 +569,7 @@ jobs:
   installed-crash:
     name: installed domain crash (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -539,23 +602,70 @@ jobs:
           import hashlib, json, os
           from pathlib import Path
           path = Path('target/debug/rrflow' + ('.exe' if os.name == 'nt' else ''))
-          marker = b'C07C_NATIVE_PAUSE_V1='
+          markers = [b'C07C_NATIVE_PAUSE_V1=', b'C07F_NATIVE_IO_V1=']
           digest, tail = hashlib.sha256(), b''
           with path.open('rb') as source:
               while block := source.read(1024 * 1024):
-                  if marker in tail + block:
+                  if any(marker in tail + block for marker in markers):
                       raise SystemExit('diagnostic protocol leaked into ordinary artifact')
                   digest.update(block)
-                  tail = block[-len(marker):]
+                  tail = block[-max(map(len, markers)):]
           print('crash_distribution_receipt=' + json.dumps({'sha256': digest.hexdigest(), 'bytes': path.stat().st_size, 'protocol_absent': True}))
           PY
       - name: Build explicit diagnostic primary and installed oracle
         run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run
       - name: Test bounded diagnostic process control
         run: cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+      - name: Test native capacity ownership and WAL observation
+        run: |
+          python scripts/ci/test_native_capacity.py
+          cargo test -p rrd-lsm --test installed_wal_selection --features crash-test --locked
       - name: Test exact installed domain boundaries and compound recovery
         timeout-minutes: 20
-        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2 --skip publication_and_reclamation
+      - name: Test installed publication and reclamation with compound recovery
+        timeout-minutes: 20
+        env:
+          RRFLOW_PUBLICATION_RECEIPT_DIR: ${{ runner.temp }}/rrflow-publication
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- publication_and_reclamation --nocapture --test-threads=2
+      - name: Require both complete installed publication receipts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'rrflow-publication'
+          points = ['segment_synced', 'successor_wal_synced', 'current_before_rename', 'current_renamed', 'reclaim_before_remove', 'reclaim_removed']
+          builds = []
+          for mode in ['fresh', 'existing']:
+              path = root / (mode + '.json')
+              assert path.is_file() and not path.is_symlink() and path.stat().st_size <= 4 * 1024 * 1024
+              receipt = json.loads(path.read_text())
+              assert receipt['mode'] == mode and receipt['publication'] is True
+              assert receipt['instrumentation'] == 'crash-test-primary'
+              assert receipt['report'] == {'logical_calls': 7, 'attempts': 25, 'acknowledged': 19, 'rejected': 0, 'uncertain': 6, 'resolved_present': 7, 'resolved_absent': 0, 'unresolved': 0, 'violations': []}
+              assert len(receipt['ledger']['expected']) == len(receipt['ledger']['readback']) == 7
+              assert len(receipt['ledger']['attempts']) == 25 and len(receipt['hits']) == 12
+              for index, point in enumerate(points):
+                  effect, recovery = receipt['hits'][2*index:2*index+2]
+                  for event, selected in [(effect, point), (recovery, 'recovery_manifest')]:
+                      assert event['hit']['point'] == selected and event['hit']['id'] == index + 1
+                      assert event['hit']['pid'] > 0 and event['hit_ns'] <= event['reaped_ns']
+                  assert effect['hit']['nonce'] != recovery['hit']['nonce']
+              builds.append(receipt['build'])
+          assert builds[0] == builds[1]
+          print('installed publication: both native histories and all 12 compound kills verified')
+          PY
+      - name: Retain installed publication evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-publication-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-publication/*.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Qualify installed native capacity failure and recovery
+        timeout-minutes: 30
+        run: python3 scripts/ci/run_native_capacity.py
       - name: Deny diagnostic-primary and oracle warnings
         run: cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
 

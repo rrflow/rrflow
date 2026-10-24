@@ -12,10 +12,11 @@ use crate::keyspaces::{self, Durability};
 use crate::repository::prepare_control_batch;
 use crate::{
     control_family_covers, control_family_of, export_logical_archive, inspect_control_archive,
-    inspect_logical_archive, read_control_archive, restore_logical_archive_to_new_root,
-    restore_logical_archive_to_new_root_with, validate_control_families, ControlArchiveInventory,
-    ControlTransition, Error, ImmutableObjectStore, LocalObjectStore, LogicalArchiveInventory,
-    LogicalRestoreReport, Result, RrflowKvStore, StorageEngine, CONTROL_ARCHIVE_VERSION,
+    inspect_logical_archive, read_control_archive,
+    restore_logical_archive_to_new_root_with_options, validate_control_families,
+    ControlArchiveInventory, ControlTransition, Error, ImmutableObjectStore, LocalObjectStore,
+    LogicalArchiveInventory, LogicalRestoreReport, Result, RrflowKvStore, StorageEngine,
+    CONTROL_ARCHIVE_VERSION,
 };
 use rrd_core::digest;
 use rrd_core::{ObjectReference, RuntimeMutation, ScopeId};
@@ -45,6 +46,37 @@ const MAX_ARCHIVE_CATALOGUE_RECORDS: usize = 1_000_000;
 const MAX_ARCHIVE_MANIFEST_BYTES: u64 = 256 * 1024 * 1024;
 pub const MAX_BACKUP_PRUNE_RECEIPTS: usize = 4_096;
 static BACKUP_TEMP_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Page size is an acquisition hint, not permission to exceed native byte
+/// admission. Learn a smaller size for this reader without changing its cut.
+/// Each failed read is discarded before retry; no durable effect is retried.
+struct ControlJournalPages {
+    limit: usize,
+}
+
+impl ControlJournalPages {
+    fn new() -> Self {
+        Self { limit: PAGE_SIZE }
+    }
+
+    fn read(
+        &mut self,
+        engine: &impl StorageEngine,
+        after: u64,
+    ) -> Result<Vec<crate::ControlJournalEntry>> {
+        loop {
+            match engine.control().journal_since(after, self.limit) {
+                Err(Error::ProjectedReadLimit {
+                    resource:
+                        crate::ProjectedReadResource::OutputBufferBytes
+                        | crate::ProjectedReadResource::BatchAllocatedBytes,
+                    ..
+                }) if self.limit > 1 => self.limit /= 2,
+                result => return result,
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -326,8 +358,9 @@ pub fn create_logical_backup<E: StorageEngine>(
 /// families such as sessions, subscriptions, and operation receipts stay out
 /// of the scope. Logical replay, object bytes, catalogues, and control entries
 /// remain separate physical artifacts, but one digest-verified catalogue entry
-/// binds their content identities. A concurrent source mutation rejects the
-/// backup before it is catalogued.
+/// binds their content identities. All repositories read one admitted physical
+/// snapshot, retained through publication; concurrent writes belong to a later
+/// cut and cannot mix into this archive.
 pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     engine: &E,
     objects: &O,
@@ -336,6 +369,8 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     created_at: u64,
     control_families: &[String],
 ) -> Result<BackupEntry> {
+    let snapshot = crate::snapshot::SnapshotStore::capture(engine)?;
+    let engine = &snapshot;
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     validate_label(label)?;
     validate_control_families(control_families)?;
@@ -361,9 +396,10 @@ pub fn create_application_backup<E: StorageEngine, O: ImmutableObjectStore>(
     }
     let (manifest_file, manifest_inventory) =
         retain_object_payloads(objects, catalogue_root, &references)?;
-    let (catalogue_manifest_file, catalogue_manifest) = retain_catalogues(engine, catalogue_root)?;
-    let (control_archive_file, control_archive) =
+    let (control_archive_file, control_archive, catalogues) =
         retain_control_journal(engine, catalogue_root, control_sequence, control_families)?;
+    let (catalogue_manifest_file, catalogue_manifest) =
+        retain_catalogues(engine, catalogue_root, control_sequence, catalogues)?;
     if engine.claims().sequence()? != inventory.claim_sequence
         || engine.runtime().cursor()? != inventory.runtime_cursor
         || engine.control().sequence()? != control_sequence
@@ -580,6 +616,23 @@ pub fn restore_catalogued_backup(
     target: &(impl AnchorInput + ?Sized),
     at: u64,
 ) -> Result<LogicalRestoreReport> {
+    restore_catalogued_backup_with_options(
+        catalogue_root,
+        backup_id,
+        target,
+        at,
+        Default::default(),
+    )
+}
+
+/// Restores using the same native policy for private staging and every reopen.
+pub fn restore_catalogued_backup_with_options(
+    catalogue_root: &(impl AnchorInput + ?Sized),
+    backup_id: &str,
+    target: &(impl AnchorInput + ?Sized),
+    at: u64,
+    options: crate::DatabaseOptions,
+) -> Result<LogicalRestoreReport> {
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     let target = &target.anchor().map_err(backup_io)?;
     let catalogue = verify_backup_catalogue(catalogue_root)?;
@@ -594,13 +647,27 @@ pub fn restore_catalogued_backup(
         let catalogue_manifest = load_catalogue_manifest_for_entry(catalogue_root, entry)?;
         let (control_archive, control_inventory) =
             load_control_archive_for_entry(catalogue_root, entry)?;
-        restore_logical_archive_to_new_root_with(&archive, target, at, |staging| {
-            restore_catalogues(&catalogue_manifest, staging)?;
-            restore_object_payloads(catalogue_root, &object_manifest, staging)?;
-            restore_control_journal(&control_archive, &control_inventory, staging)
-        })
+        restore_logical_archive_to_new_root_with_options(
+            &archive,
+            target,
+            at,
+            options,
+            |staging| {
+                restore_catalogues(&catalogue_manifest, staging, options)?;
+                restore_object_payloads(catalogue_root, &object_manifest, staging)?;
+                restore_control_journal(&control_archive, &control_inventory, staging, options)
+            },
+            |_| Ok(()),
+        )
     } else {
-        restore_logical_archive_to_new_root(&archive, target, at)
+        restore_logical_archive_to_new_root_with_options(
+            &archive,
+            target,
+            at,
+            options,
+            |_| Ok(()),
+            |_| Ok(()),
+        )
     }
 }
 
@@ -611,6 +678,21 @@ pub fn verify_restored_backup_objects(
     catalogue_root: &(impl AnchorInput + ?Sized),
     backup_id: &str,
     restored_root: &(impl AnchorInput + ?Sized),
+) -> Result<()> {
+    verify_restored_backup_objects_with_options(
+        catalogue_root,
+        backup_id,
+        restored_root,
+        Default::default(),
+    )
+}
+
+/// Verifies a published application restore under the caller's native policy.
+pub fn verify_restored_backup_objects_with_options(
+    catalogue_root: &(impl AnchorInput + ?Sized),
+    backup_id: &str,
+    restored_root: &(impl AnchorInput + ?Sized),
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
     let catalogue_root = &catalogue_root.anchor().map_err(backup_io)?;
     let restored_root = &restored_root.anchor().map_err(backup_io)?;
@@ -637,10 +719,10 @@ pub fn verify_restored_backup_objects(
         }
     }
     let catalogues = load_catalogue_manifest_for_entry(catalogue_root, entry)?;
-    verify_restored_catalogues(&catalogues, restored_root)?;
+    verify_restored_catalogues(&catalogues, restored_root, options)?;
     let (control_archive, control_inventory) =
         load_control_archive_for_entry(catalogue_root, entry)?;
-    verify_restored_control_journal(&control_archive, &control_inventory, restored_root)
+    verify_restored_control_journal(&control_archive, &control_inventory, restored_root, options)
 }
 
 /// Reads the control-journal replay progress a restore left in a root, if any.
@@ -679,6 +761,7 @@ fn restore_control_journal(
     archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
     staging_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
     let inspected = inspect_control_archive(archive)?;
     if &inspected != expected {
@@ -686,10 +769,10 @@ fn restore_control_journal(
             "control-journal archive inventory does not match its catalogue entry".into(),
         ));
     }
-    let engine = RrflowKvStore::open_existing_anchored(staging_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(staging_root, options)?;
     replay_control_entries(archive, expected, &engine, None)?;
     drop(engine);
-    verify_restored_control_journal(archive, expected, staging_root)
+    verify_restored_control_journal(archive, expected, staging_root, options)
 }
 
 /// Applies the archived entries after the recorded progress. `stop_after`
@@ -801,8 +884,9 @@ fn verify_restored_control_journal(
     archive: &AnchoredPath,
     expected: &ControlArchiveInventory,
     restored_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
-    let engine = RrflowKvStore::open_existing_anchored(restored_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(restored_root, options)?;
     let progress = control_restore_progress(&engine)?.ok_or_else(|| {
         Error::Archive("restored root carries no control-journal replay marker".into())
     })?;
@@ -834,16 +918,14 @@ fn verify_restored_control_journal(
         ));
     }
     let mut page = Vec::new().into_iter();
+    let mut pages = ControlJournalPages::new();
     let mut cursor = first - 1;
     let mut ordinal = 0u64;
     read_control_archive(archive, |entry| {
         let restored = match page.next() {
             Some(restored) => restored,
             None => {
-                page = engine
-                    .control()
-                    .journal_since(cursor, PAGE_SIZE)?
-                    .into_iter();
+                page = pages.read(&engine, cursor)?.into_iter();
                 page.next().ok_or_else(|| {
                     Error::Archive("restored control journal ends before the archive".into())
                 })?
@@ -879,16 +961,18 @@ fn retain_control_journal(
     catalogue_root: &AnchoredPath,
     source_control_sequence: u64,
     families: &[String],
-) -> Result<(String, ControlArchiveInventory)> {
+) -> Result<(String, ControlArchiveInventory, CatalogueCapture)> {
     let archives = catalogue_root.join(CONTROL_ARCHIVE_DIRECTORY);
     archives.create_dir_all().map_err(backup_io)?;
     let id = BACKUP_TEMP_ID.fetch_add(1, Ordering::Relaxed);
     let staging = archives.join(format!(".control-archive-{}-{id}.tmp", std::process::id()));
     let mut writer = ControlArchiveWriter::create(&staging, source_control_sequence, families)?;
+    let mut catalogues = CatalogueCapture::default();
     let result = (|| {
         let mut after = 0u64;
+        let mut pages = ControlJournalPages::new();
         while after < source_control_sequence {
-            let page = engine.control().journal_since(after, PAGE_SIZE)?;
+            let page = pages.read(engine, after)?;
             if page.is_empty() {
                 return Err(Error::Archive(
                     "control journal ended before the captured backup watermark".into(),
@@ -905,6 +989,10 @@ fn retain_control_journal(
                 if control_family_of(families, &entry.key).is_some() {
                     writer.entry(&entry)?;
                 }
+                // Fold catalogue state from the same already-verified entry.
+                // Excluded control families are still chain-validated, but
+                // their payloads are not retained for a second traversal.
+                catalogues.observe(entry)?;
             }
         }
         if engine.control().sequence()? != source_control_sequence {
@@ -939,6 +1027,7 @@ fn retain_control_journal(
     Ok((
         format!("{CONTROL_ARCHIVE_DIRECTORY}/{file_name}"),
         inventory,
+        catalogues,
     ))
 }
 
@@ -1053,63 +1142,57 @@ fn object_references_at(engine: &impl StorageEngine, head: u64) -> Result<Vec<Ob
     Ok(objects.into_values().collect())
 }
 
+#[derive(Default)]
+struct CatalogueCapture {
+    records: std::collections::BTreeMap<String, CatalogueRecordSnapshot>,
+    scopes: BTreeSet<ScopeId>,
+}
+
+impl CatalogueCapture {
+    fn observe(&mut self, entry: crate::ControlJournalEntry) -> Result<()> {
+        let Some(scope) = catalogue_scope(&entry.key)? else {
+            return Ok(());
+        };
+        self.scopes.insert(scope.clone());
+        match entry.replacement {
+            Some(value) => {
+                if !self.records.contains_key(&entry.key)
+                    && self.records.len() == MAX_ARCHIVE_CATALOGUE_RECORDS
+                {
+                    return Err(Error::Archive(
+                        "backup catalogue closure exceeds the v1 entry bound".into(),
+                    ));
+                }
+                self.records.insert(
+                    entry.key.clone(),
+                    CatalogueRecordSnapshot {
+                        scope,
+                        key: entry.key,
+                        value,
+                    },
+                );
+            }
+            None => {
+                self.records.remove(&entry.key);
+            }
+        }
+        Ok(())
+    }
+}
+
 fn retain_catalogues(
     engine: &impl StorageEngine,
     catalogue_root: &AnchoredPath,
+    source_control_sequence: u64,
+    capture: CatalogueCapture,
 ) -> Result<(String, CatalogueManifestInventory)> {
-    let source_control_sequence = engine.control().sequence()?;
-    let mut after = 0u64;
-    let mut records = std::collections::BTreeMap::<String, CatalogueRecordSnapshot>::new();
-    let mut scopes = std::collections::BTreeSet::<ScopeId>::new();
-    while after < source_control_sequence {
-        let page = engine.control().journal_since(after, PAGE_SIZE)?;
-        if page.is_empty() {
-            return Err(Error::Archive(
-                "control journal ended before the captured backup watermark".into(),
-            ));
-        }
-        for entry in page {
-            if entry.sequence != after + 1 || entry.sequence > source_control_sequence {
-                return Err(Error::Archive(
-                    "control journal changed or became discontinuous during catalogue capture"
-                        .into(),
-                ));
-            }
-            after = entry.sequence;
-            let Some(scope) = catalogue_scope(&entry.key)? else {
-                continue;
-            };
-            scopes.insert(scope.clone());
-            match entry.replacement {
-                Some(value) => {
-                    if !records.contains_key(&entry.key)
-                        && records.len() == MAX_ARCHIVE_CATALOGUE_RECORDS
-                    {
-                        return Err(Error::Archive(
-                            "backup catalogue closure exceeds the v1 entry bound".into(),
-                        ));
-                    }
-                    records.insert(
-                        entry.key.clone(),
-                        CatalogueRecordSnapshot {
-                            scope,
-                            key: entry.key,
-                            value,
-                        },
-                    );
-                }
-                None => {
-                    records.remove(&entry.key);
-                }
-            }
-        }
-    }
     if engine.control().sequence()? != source_control_sequence {
         return Err(Error::Archive(
             "control journal changed while capturing catalogue state".into(),
         ));
     }
-    let scopes = scopes
+    let scopes = capture
+        .scopes
         .into_iter()
         .map(|scope| {
             Ok(CatalogueScopeSnapshot {
@@ -1122,7 +1205,7 @@ fn retain_catalogues(
         format_version: CATALOGUE_MANIFEST_VERSION,
         source_control_sequence,
         scopes,
-        records: records.into_values().collect(),
+        records: capture.records.into_values().collect(),
     };
     validate_catalogue_manifest(&payload)?;
     let inventory = catalogue_manifest_inventory(&payload)?;
@@ -1286,9 +1369,13 @@ fn validate_catalogue_manifest(manifest: &CatalogueManifest) -> Result<()> {
     Ok(())
 }
 
-fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &AnchoredPath) -> Result<()> {
+fn restore_catalogues(
+    manifest: &CatalogueManifest,
+    staging_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
+) -> Result<()> {
     validate_catalogue_manifest(manifest)?;
-    let engine = RrflowKvStore::open_existing_anchored(staging_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(staging_root, options)?;
     for scope in &manifest.scopes {
         let records = manifest
             .records
@@ -1355,14 +1442,15 @@ fn restore_catalogues(manifest: &CatalogueManifest, staging_root: &AnchoredPath)
         }
     }
     drop(engine);
-    verify_restored_catalogues(manifest, staging_root)
+    verify_restored_catalogues(manifest, staging_root, options)
 }
 
 fn verify_restored_catalogues(
     manifest: &CatalogueManifest,
     restored_root: &AnchoredPath,
+    options: crate::DatabaseOptions,
 ) -> Result<()> {
-    let engine = RrflowKvStore::open_existing_anchored(restored_root, Default::default())?;
+    let engine = RrflowKvStore::open_existing_anchored(restored_root, options)?;
     for record in &manifest.records {
         if engine.control().get(&record.key)?.as_deref() != Some(record.value.as_slice()) {
             return Err(Error::Archive(format!(
@@ -2133,6 +2221,9 @@ fn backup_io(error: std::io::Error) -> Error {
 }
 
 #[cfg(test)]
+mod capture_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
@@ -2157,7 +2248,7 @@ mod tests {
         );
     }
 
-    fn transition(
+    pub(super) fn transition(
         key: &str,
         expected: Option<&[u8]>,
         replacement: Option<&[u8]>,
@@ -2175,7 +2266,7 @@ mod tests {
         }
     }
 
-    fn families() -> Vec<String> {
+    pub(super) fn families() -> Vec<String> {
         vec![
             "server/state/install".into(),
             "server/state/one/audit".into(),
@@ -2237,7 +2328,7 @@ mod tests {
             .unwrap();
         let catalogue_root = root.join("catalogue");
         fs::create_dir_all(&catalogue_root).unwrap();
-        let (file, inventory) = retain_control_journal(
+        let (file, inventory, _) = retain_control_journal(
             &source,
             &AnchoredPath::from_path(&catalogue_root).unwrap(),
             6,
@@ -2273,7 +2364,8 @@ mod tests {
             verify_restored_control_journal(
                 &archive,
                 &inventory,
-                &AnchoredPath::from_path(&target_root).unwrap()
+                &AnchoredPath::from_path(&target_root).unwrap(),
+                Default::default(),
             )
             .unwrap_err()
             .to_string()
@@ -2285,6 +2377,7 @@ mod tests {
             &archive,
             &inventory,
             &AnchoredPath::from_path(&target_root).unwrap(),
+            Default::default(),
         )
         .unwrap();
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
@@ -2316,6 +2409,7 @@ mod tests {
             &archive,
             &inventory,
             &AnchoredPath::from_path(&target_root).unwrap(),
+            Default::default(),
         )
         .unwrap();
         let target = RrflowKvStore::open_existing(&target_root).unwrap();
@@ -2342,6 +2436,7 @@ mod tests {
             &archive,
             &inventory,
             &AnchoredPath::from_path(&target_root).unwrap(),
+            Default::default(),
         )
         .unwrap_err();
         assert!(error.to_string().contains("diverged at source sequence 1"));

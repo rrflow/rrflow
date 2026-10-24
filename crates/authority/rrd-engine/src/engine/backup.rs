@@ -239,8 +239,10 @@ impl RrdEngine {
             // existing store, so an empty or foreign directory fails closed
             // instead of becoming a new database, and the handle is released
             // before object verification reopens the root.
-            let restored =
-                rrd_store::RrflowKvStore::open_existing_anchored(&target, Default::default())?;
+            let restored = rrd_store::RrflowKvStore::open_existing_anchored(
+                &target,
+                super::core::installed_storage_options(&self.estate_configuration.storage)?,
+            )?;
             if restored.claims().sequence()? != backup.archive.claim_sequence
                 || restored.runtime().cursor()? != backup.archive.runtime_cursor
             {
@@ -249,18 +251,20 @@ impl RrdEngine {
                 ));
             }
             drop(restored);
-            rrd_store::verify_restored_backup_objects(
+            rrd_store::verify_restored_backup_objects_with_options(
                 &backup_root,
                 &request.backup_sha256,
                 &target,
+                super::core::installed_storage_options(&self.estate_configuration.storage)?,
             )?;
             (backup.archive.clone(), true, true)
         } else {
-            let report = rrd_store::restore_catalogued_backup(
+            let report = rrd_store::restore_catalogued_backup_with_options(
                 &backup_root,
                 &request.backup_sha256,
                 &target,
                 request.restored_at_unix_ms,
+                super::core::installed_storage_options(&self.estate_configuration.storage)?,
             )?;
             (report.inventory, report.reopened, false)
         };

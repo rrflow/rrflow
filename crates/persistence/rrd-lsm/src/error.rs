@@ -6,6 +6,25 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    SourcePageLimit {
+        limit: usize,
+        observed: usize,
+    },
+    /// Known checkpoint admission denial before a new publication.
+    CheckpointLimit {
+        limit: usize,
+        observed: usize,
+    },
+    TransactionLimit {
+        resource: crate::TransactionResource,
+        limit: usize,
+        observed: usize,
+    },
+    DiskAdmission {
+        available: u64,
+        required: u64,
+        reserve: u64,
+    },
     Io(std::io::Error),
     IoContext {
         operation: &'static str,
@@ -19,6 +38,28 @@ pub enum Error {
     UnsupportedVersion {
         object: &'static str,
         version: u16,
+    },
+    /// Maintenance pressure before the incoming batch is appended.
+    RecoveryLimit {
+        resource: crate::RecoveryResource,
+        limit: u64,
+        observed: u64,
+    },
+    ReclamationPending,
+    ReclamationLimit {
+        resource: crate::ReclamationResource,
+        limit: u64,
+        observed: u64,
+    },
+    MaintenanceLimit {
+        resource: crate::MaintenanceResource,
+        limit: u64,
+        observed: u64,
+    },
+    MutableLimit {
+        resource: crate::MutableResource,
+        limit: usize,
+        observed: usize,
     },
     InvalidConfiguration(String),
     InvalidBatch(String),
@@ -77,6 +118,9 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::SourcePageLimit { limit, observed } => write!(formatter, "source page allocation limit {limit} would be exceeded by {observed}"),
+            Self::CheckpointLimit { limit, observed } => write!(formatter, "checkpoint entry limit {limit} would be exceeded by {observed}"),
+            Self::TransactionLimit { resource, limit, observed } => write!(formatter, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::Io(error) => write!(formatter, "RRD LSM I/O: {error}"),
             Self::IoContext {
                 operation,
@@ -93,6 +137,12 @@ impl fmt::Display for Error {
             Self::UnsupportedVersion { object, version } => {
                 write!(formatter, "unsupported {object} format version {version}")
             }
+            Self::RecoveryLimit { resource, limit, observed } => write!(formatter, "recovery {} limit {limit} would be exceeded by {observed}; reopen with explicitly configured capacity", resource.as_str()),
+            Self::ReclamationPending => write!(formatter, "bounded reclamation has remaining work; retry before admitting another write"),
+            Self::ReclamationLimit { resource, limit, observed } => write!(formatter, "reclamation {} limit {limit} would be exceeded by {observed}", resource.as_str()),
+            Self::DiskAdmission { available, required, reserve } => write!(formatter, "disk admission requires {required} bytes including {reserve} recovery reserve; observed {available}"),
+            Self::MaintenanceLimit { resource, limit, observed } => write!(formatter, "maintenance {} limit {limit} would be exceeded by {observed}", resource.as_str()),
+            Self::MutableLimit { resource, limit, observed } => write!(formatter, "mutable {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Self::InvalidConfiguration(reason) => {
                 write!(formatter, "invalid RRD LSM configuration: {reason}")
             }

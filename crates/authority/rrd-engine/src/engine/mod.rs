@@ -112,21 +112,27 @@ mod function;
 mod inference;
 mod installation;
 mod invocation;
+mod maintenance;
 mod memory_estate;
 mod model;
 mod query;
 mod query_export;
 mod query_transaction;
 mod restore_publication;
+mod storage_cursor;
+mod tail_repair;
+pub use tail_repair::{InstalledTailRepairPlan, InstalledTailRepairReceipt};
 mod retrieval;
 mod retrieval_query;
 mod rollback;
 mod security;
 mod session;
+mod session_transactions;
 mod subscription;
 mod task;
 mod token_key;
 mod transaction;
+mod transaction_admission;
 mod vector;
 
 pub use clock::{
@@ -156,6 +162,7 @@ pub use security::{MAX_AUDIT_PAGE_RECORDS, MAX_JWT_CREDENTIAL_BYTES};
 use session::*;
 use token_key::load_or_create_token_key;
 pub use token_key::TOKEN_KEY_BYTES;
+pub use transaction_admission::TransactionAdmissionSnapshot;
 
 const SESSION_STATE_FORMAT: u16 = 3;
 const MAX_SESSION_RENEWALS: usize = 64;
@@ -164,6 +171,11 @@ const MAX_SESSION_RENEWALS: usize = 64;
 #[serde(deny_unknown_fields)]
 struct SessionState {
     format_version: u16,
+    // Earlier strict session readers must reject state whose terminal records
+    // they cannot discover. Absence denotes the existing inline working set;
+    // every new transition serializes the current marker atomically with it.
+    #[serde(default = "session_transactions::terminal_transaction_format")]
+    terminal_transaction_format: u16,
     session_id: CorrelationId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     principal_id: Option<CanonicalId>,

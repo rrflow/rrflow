@@ -4698,6 +4698,7 @@ dependencies = [
  "rrd-lsm",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tracing",
 ]
@@ -4720,6 +4721,7 @@ version = "1.0.0"
 dependencies = [
  "bytes",
  "clap",
+ "libc",
  "parquet",
  "rrd-client",
  "rrd-contract",

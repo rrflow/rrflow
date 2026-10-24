@@ -2,6 +2,75 @@ use super::invocation::ActiveInvocation;
 use super::*;
 use rrd_store::filesystem::AnchoredPath;
 
+/// One checked lowering of installed policy into the native storage owner.
+/// The locator carries a projection for pre-open admission, subsequently
+/// compared with the sealed canonical configuration before readiness.
+pub(super) fn installed_storage_options(
+    policy: &rrd_contract::StorageLimits,
+) -> Result<rrd_store::DatabaseOptions> {
+    policy
+        .validate()
+        .map_err(|error| ServiceError::Contract(error.to_string()))?;
+    let native = |name: &str, value: u64| {
+        usize::try_from(value).map_err(|_| {
+            ServiceError::Contract(format!(
+                "storage {name} exceeds this platform's address space"
+            ))
+        })
+    };
+    let mut options = rrd_store::DatabaseOptions {
+        checkpoint_entries: native("checkpoint_entries", policy.checkpoint_entries)?,
+        recovery_reserve_bytes: policy.recovery_reserve_bytes,
+        ..rrd_store::DatabaseOptions::default()
+    };
+    options.mutable_limits.accounted_bytes =
+        native("mutable_accounted_bytes", policy.mutable_accounted_bytes)?;
+    options.mutable_limits.versions = native("mutable_versions", policy.mutable_versions)?;
+    options.transaction_limits.active = native("native_transactions", policy.native_transactions)?;
+    options.transaction_limits.buffered_bytes =
+        native("native_transaction_bytes", policy.native_transaction_bytes)?;
+    options.active_read_views = native("active_read_views", policy.active_read_views)?;
+    options.pinned_read_bytes = policy.pinned_read_bytes;
+    options.projected_output_bytes =
+        native("projected_output_bytes", policy.projected_output_bytes)?;
+    options.source_page_bytes = native("source_page_bytes", policy.source_page_bytes)?;
+    options.page_cache_bytes = native("page_cache_bytes", policy.page_cache_bytes)?;
+    options.maintenance.wal_payload_max_bytes =
+        native("wal_flush_target_bytes", policy.wal_flush_target_bytes)?;
+    options.maintenance.memtable_max_versions = native(
+        "memtable_flush_target_versions",
+        policy.memtable_flush_target_versions,
+    )?;
+    options.compaction_limits.input_bytes = policy.compaction_input_bytes;
+    options.compaction_limits.input_logical_bytes = policy.compaction_input_logical_bytes;
+    options.compaction_limits.input_versions = policy.compaction_input_versions;
+    options.compaction_limits.output_segments = policy.compaction_output_segments;
+    options.compaction_limits.elapsed_ms = policy.compaction_elapsed_ms;
+    options.compaction_limits.l0_segments = policy.compaction_l0_segments;
+    options.mutable_retention.accounted_bytes =
+        native("retained_mutable_bytes", policy.retained_mutable_bytes)?;
+    options.mutable_retention.versions = native(
+        "retained_mutable_versions",
+        policy.retained_mutable_versions,
+    )?;
+    options.mutable_retention.generations = native(
+        "retained_mutable_generations",
+        policy.retained_mutable_generations,
+    )?;
+    options.reclamation.inventory_entries = policy.reclamation_inventory_entries;
+    options.reclamation.metadata_bytes = policy.reclamation_metadata_bytes;
+    options.reclamation.delete_files = policy.reclamation_delete_files;
+    options.reclamation.delete_bytes = policy.reclamation_delete_bytes;
+    options.reclamation.elapsed_ms = policy.reclamation_elapsed_ms;
+    options.recovery.metadata_bytes = policy.recovery_metadata_bytes;
+    options.recovery.files = policy.recovery_files;
+    options.recovery.read_bytes = policy.recovery_read_bytes;
+    options.recovery.wal_bytes = policy.recovery_wal_bytes;
+    options.recovery.wal_frames = policy.recovery_wal_frames;
+    options.recovery.elapsed_ms = policy.recovery_elapsed_ms;
+    Ok(options)
+}
+
 pub struct RrdEngine {
     pub(crate) storage: StorageProfile,
     pub(crate) storage_profile_kind: StorageProfileKind,
@@ -20,7 +89,7 @@ pub struct RrdEngine {
     /// Serializes the local definition/validation/commit boundary. rrflowKV
     /// already owns the cross-process writer lock; this closes the
     /// in-process race between publishing a unique index and committing data.
-    pub(crate) transaction_gate: Mutex<()>,
+    pub(crate) transaction_gate: super::transaction_admission::TransactionGate,
     /// Tracks invocation reservations currently executing through a supported
     /// adapter. Session-backed methods use this to distinguish a correctly
     /// wrapped call from a direct embedded call and make the latter leave a
@@ -37,6 +106,7 @@ pub struct RrdEngine {
     /// resource descriptors are public; credentials and runtime sessions are
     /// never serialized into durable RRD state.
     pub(crate) embedding_backends: Mutex<rrd_inference::EmbeddingBackendRegistry>,
+    pub(in crate::engine) storage_cursors: Mutex<super::storage_cursor::CursorRegistry>,
 }
 impl RrdEngine {
     pub fn create_new(root: &Path, instance: CanonicalId, token_key: [u8; 32]) -> Result<Self> {
@@ -49,8 +119,17 @@ impl RrdEngine {
         instance: CanonicalId,
         token_key: [u8; 32],
     ) -> Result<Self> {
+        Self::create_new_anchored_with_options(root, instance, token_key, Default::default())
+    }
+
+    pub(super) fn create_new_anchored_with_options(
+        root: &AnchoredPath,
+        instance: CanonicalId,
+        token_key: [u8; 32],
+        options: rrd_store::DatabaseOptions,
+    ) -> Result<Self> {
         let operation_parent = root.parent();
-        let storage = RrflowKvStore::create_new_anchored(root, Default::default())?;
+        let storage = RrflowKvStore::create_new_anchored(root, options)?;
         Self::compose_persistent(
             operation_parent,
             instance,
@@ -70,12 +149,21 @@ impl RrdEngine {
         instance: CanonicalId,
         token_key: [u8; 32],
     ) -> Result<Self> {
+        Self::open_existing_anchored_with_options(root, instance, token_key, Default::default())
+    }
+
+    pub(super) fn open_existing_anchored_with_options(
+        root: &AnchoredPath,
+        instance: CanonicalId,
+        token_key: [u8; 32],
+        options: rrd_store::DatabaseOptions,
+    ) -> Result<Self> {
         let operation_parent = root.parent();
         let root = root
             .pin_directory()
             .map_err(|e| ServiceError::Storage(e.to_string()))?;
         validate_existing_object_layout(&root)?;
-        let storage = RrflowKvStore::open_existing_anchored(&root, Default::default())?;
+        let storage = RrflowKvStore::open_existing_anchored(&root, options)?;
         Self::compose_persistent(
             operation_parent,
             instance,
@@ -142,7 +230,7 @@ impl RrdEngine {
         Self::compose_persistent(operation_parent, instance, token_key, storage, true, limits)
     }
 
-    fn compose_persistent(
+    pub(super) fn compose_persistent(
         operation_parent: Option<AnchoredPath>,
         instance: CanonicalId,
         token_key: [u8; 32],
@@ -170,11 +258,12 @@ impl RrdEngine {
             component_operation_parent: operation_parent,
             instance,
             token_key,
-            transaction_gate: Mutex::new(()),
+            transaction_gate: super::transaction_admission::TransactionGate::default(),
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
+            storage_cursors: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -211,11 +300,12 @@ impl RrdEngine {
             component_operation_parent: None,
             instance,
             token_key,
-            transaction_gate: Mutex::new(()),
+            transaction_gate: super::transaction_admission::TransactionGate::default(),
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
             embedding_backends: Mutex::new(rrd_inference::EmbeddingBackendRegistry::default()),
+            storage_cursors: Mutex::new(BTreeMap::new()),
         })
     }
 

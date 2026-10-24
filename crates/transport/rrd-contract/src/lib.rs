@@ -9,6 +9,8 @@ mod attunement;
 mod capability_surface;
 mod deployment;
 mod diagnostic;
+mod storage_cursor;
+pub use storage_cursor::{InspectStorageCursor, StorageCursorAction, StorageCursorSnapshot};
 mod endpoint_binding;
 mod flight;
 mod function;
@@ -53,9 +55,10 @@ pub use capability_surface::{
 pub use deployment::{
     estate_configuration_sha256, ClockPolicy, DeploymentForm, DeploymentProfile,
     EndpointPresentation, EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity,
-    ReasoningLimits, RecallLimits, StorageProfileKind, DEPLOYMENT_PROFILE_CONTRACT_VERSION,
-    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS,
-    MAX_REASONING_STEPS, MAX_REASONING_STEP_ELAPSED_MS,
+    ReasoningLimits, RecallLimits, StorageLimits, StorageProfileKind,
+    DEPLOYMENT_PROFILE_CONTRACT_VERSION, ESTATE_CONFIGURATION_FORMAT_VERSION,
+    MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS, MAX_REASONING_STEPS,
+    MAX_REASONING_STEP_ELAPSED_MS,
 };
 pub use diagnostic::{
     DiagnosticAuthority, DiagnosticCoverage, DiagnosticGraphDifference,
@@ -66,9 +69,10 @@ pub use diagnostic::{
     DiagnosticRetentionPin, DiagnosticRetentionSnapshot, DiagnosticRrflowKvSnapshot,
     DiagnosticRuntimeReference, DiagnosticSectionSnapshot, DiagnosticSegmentIoMode,
     DiagnosticSegmentIoSnapshot, DiagnosticSegmentSetSnapshot, DiagnosticSnapshot,
-    DiagnosticSnapshotLease, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
-    DiagnosticVectorArtifactCatalogueSnapshot, DiagnosticVectorArtifactKind,
-    DiagnosticVectorArtifactSnapshot, DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot,
+    DiagnosticSnapshotLease, DiagnosticStorageAdmission, DiagnosticStorageEvidenceLevel,
+    DiagnosticStorageSnapshot, DiagnosticVectorArtifactCatalogueSnapshot,
+    DiagnosticVectorArtifactKind, DiagnosticVectorArtifactSnapshot,
+    DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot, ReadStorageDiagnostics,
     DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
     MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
 };
@@ -217,7 +221,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "24650c053e1bab1c2eccea8c62973701d7eda995541f7bccdb03c36b59c592cb";
+    "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3536,6 +3540,26 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "ContextPacket",
         ),
         endpoint(
+            "diagnostics-storage-cursor",
+            HttpMethod::Post,
+            "/v1/diagnostics/storage/cursor",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "InspectStorageCursor",
+            "StorageCursorSnapshot",
+        ),
+        endpoint(
+            "diagnostics-storage-read",
+            HttpMethod::Post,
+            "/v1/diagnostics/storage/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "ReadStorageDiagnostics",
+            "DiagnosticStorageSnapshot",
+        ),
+        endpoint(
             "diagnostics-read",
             HttpMethod::Post,
             "/v1/diagnostics/read",
@@ -4204,6 +4228,8 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "InspectStorageCursor" => schema_json::<RequestEnvelope<InspectStorageCursor>>(),
+        "ReadStorageDiagnostics" => schema_json::<RequestEnvelope<ReadStorageDiagnostics>>(),
         "ReadDataSchema" => schema_json::<RequestEnvelope<ReadDataSchema>>(),
         "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
         "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
@@ -4237,6 +4263,8 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "StorageCursorSnapshot" => schema_json::<ResponseEnvelope<StorageCursorSnapshot>>(),
+        "DiagnosticStorageSnapshot" => schema_json::<ResponseEnvelope<DiagnosticStorageSnapshot>>(),
         "DataSchemaSnapshot" => schema_json::<ResponseEnvelope<DataSchemaSnapshot>>(),
         "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
         "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),

@@ -178,6 +178,27 @@ capacity requirements remain open; this corpus cannot close C-07 independently.
 
 ### Remaining implementation contracts
 
+The [installed storage-policy implementation](../../evidence/change-journals/gate-c/c-07d-installed-storage-policy.md)
+now carries native active-state, retained-output and cache limits plus soft
+flush targets through sealed installation, bounded reopen/inspection and
+configured restore. Configuration/locator projections and generated clients
+advance together. This is implementation with compilation evidence; the linked
+candidate still requires CI, and aggregate owners, maintenance debt, real disk
+exhaustion, capacity profiles and sustained operation remain open.
+
+Native projected-output admission is a bounded d/e prerequisite. Its
+[baseline](../../evidence/change-journals/gate-c/c-07e-output-budget-baseline.md)
+binds a per-open-instance byte pool at the existing reader. An entire output
+batch reserves capacity before allocation; each immutable Arrow allocation
+retains its charge through clones/slices and releases it after its last owner.
+Source-view completion does not release retained output. This native pool is
+distinct from per-stream work limits and does not cover separate reopened
+instances, caller copies, source pages, merge temporaries or process RSS.
+Installed budget binding, aggregate live-owner admission and capacity evidence
+remain required; exact-candidate CI and the
+[implementation journal](../../evidence/change-journals/gate-c/c-07e-output-budget.md)
+own acceptance.
+
 The [encoded staging admission repair](../../evidence/change-journals/gate-c/c-07d-write-admission.md)
 is a bounded C-07d prerequisite: native transactions, rrflowMX and semantic
 plans admit their encoded physical effects before mutating staged maps.
@@ -187,6 +208,32 @@ The joined rejection/reopen tests preserve existing graph, claim, derived,
 audit and receipt state and permit valid subsequent work. The linked journal
 and exact-candidate CI own the results. Configurable aggregate limits, queues,
 maintenance progress and installed capacity evidence remain open below.
+
+The [native mutable-limit implementation](../../evidence/change-journals/gate-c/c-07d-mutable-limits.md)
+adds a C-07d prerequisite: configured active-state accounted-byte/version caps,
+pre-WAL batch rejection, pressure-triggered synchronous flush and bounded WAL
+materialization for native writer/read-only open. Defaults are 128 MiB of
+key/value/version charge and 1,048,576 versions, separate from the soft targets.
+These are safeguards, not measured capacity profiles. Retained generations,
+allocator overhead, queue/maintenance debt, whole-startup work and installed
+configuration projection remain outside this bound and keep C-07d open.
+
+The [mutable admission propagation package](../../evidence/change-journals/gate-c/c-07d-limit-propagation.md)
+keeps native byte/version rejection typed through store open and semantic
+commit, maps known engine rejection to resource exhaustion, and clears prepared
+intent only after confirming no durable outcome. The same native options now
+reach store read-only inspection. Joined rejection/reopen/reuse histories must
+preserve graph, claim, index, audit, function receipt and control evidence; this
+component composition does not bind installed configuration or restore policy.
+
+The [configured restore prerequisite](../../evidence/change-journals/gate-c/c-07d-restore-limits.md)
+carries one native policy through logical/application restore, private staging,
+resumed replay and verification opens. Its rejection/resume histories preserve
+acknowledged prefixes, runtime relationships/provenance, catalogue revisions,
+objects and filtered control transitions. The public target remains absent on
+failure; adequate-budget resume must reproduce exact evidence. This component
+policy plumbing does not bind installed configuration, bound all restore work
+or qualify native exhaustion, capacity profiles or soak.
 
 The [projected reader ownership repair](../../evidence/change-journals/gate-c/c-07e-read-view-release.md)
 addresses reproduced prerequisite defects in empty-view admission release and

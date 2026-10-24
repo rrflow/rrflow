@@ -274,8 +274,9 @@ Packages `D01-02-canonical-estate-layout-and-configuration-v1`,
 startup slice without claiming the complete target above:
 
 - `rrd-contract` owns `InstalledEstateIdentity`, three independent deployment
-  coordinates, and a strict self-digesting format-2 `EstateConfiguration`,
-  including `clock.maximum_rollback_ms` with a zero default;
+  coordinates, and a strict self-digesting format-3 `EstateConfiguration`,
+  including `clock.maximum_rollback_ms` with a zero default and required native
+  storage limits;
 - the bundled default configuration or one explicit regular, non-symlinked
   TOML file up to 64 KiB is read during planning, validated below hard compiled
   maxima, assigned revision 1, and sealed into the plan;
@@ -285,8 +286,9 @@ startup slice without claiming the complete target above:
   one create-new storage root, token key, credential document and `.rrflow/config.toml`;
 - the active configuration is committed inside rrflowDB at
   `server/state/<instance>/configuration/active` before locator publication;
-- installed open validates locator, installed record, configuration revision
-  and digest, then binds the same identity/configuration into `RrdEngine`;
+- locator format 2 projects the sealed storage policy for admission before
+  WAL replay. Installed open and read-only inspection validate that projection
+  against the installed record and effective configuration before readiness;
 - query, live-query, query-index, and context requests above the installed
   ceiling fail before their data operation; and
 - server capabilities and generated OpenAPI/SDK types expose the effective
@@ -322,6 +324,185 @@ startup slice without claiming the complete target above:
   canonical installation/open. The pre-canonical manifest/private binding,
   raw product CLI, development supervisor, standalone security initializer,
   and server initializer are removed with no successful compatibility reader.
+
+### Reasoning-limit configuration
+
+Installation can seal reasoning ceilings from `install plan --configuration
+<toml>`. Copy the complete bundled
+[`default-estate-configuration-v3.toml`](../../../crates/authority/rrd-engine/assets/install/default-estate-configuration-v3.toml)
+as the input and edit its existing `[reasoning]` table, for example:
+
+```toml
+[reasoning]
+max_run_elapsed_ms = 120000
+max_steps = 16
+max_step_elapsed_ms = 15000
+```
+
+This is a two-minute, sixteen-step, fifteen-second-per-step configuration
+example, not a complete configuration file or a running timeout feature.
+The full input must retain its required storage/clock/recall/query sections.
+Preview and apply the sealed installation plan through the existing commands;
+do not edit an installed `.rrflow/config.toml` to bypass the active revision.
+Post-install governed configuration changes remain D-06 work.
+
+The existing parser requires positive limits, per-step time no greater than
+total time, and compiled maxima of one hour per run, 10,000 steps and five
+minutes per step. The default is fifteen minutes, 256 steps and one minute
+per step. `governed-reasoning-runner` is unavailable: these values are currently
+validated configuration and advertised ceilings, not evidence of end-to-end
+loop prevention. The [LFG/SWAG budget contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+owns aggregate accounting, retries, effort presets, stop/resume and required
+runtime proof. Existing query/context limits remain separately enforced.
+
+### Native storage limits
+
+The required `[storage]` configuration separates active-state, output, cache,
+and maintenance controls:
+`mutable_accounted_bytes` (128 MiB default), `mutable_versions` (1,048,576),
+`projected_output_bytes` (128 MiB), `source_page_bytes` (256 MiB),
+`page_cache_bytes` (4 MiB, zero disables
+caching), `wal_flush_target_bytes` (64 MiB) and
+`memtable_flush_target_versions` (524,288). The first two are native active-state
+hard caps; the next three bound retained projected allocations, live owned
+source-page allocations and cache residency;
+the last two are soft synchronous maintenance targets. A single atomic batch
+may exceed a soft target only within hard admission. These are not aggregate
+RSS bounds. Protocol ceilings and checked native conversion
+reject invalid configuration. Current limits require reopening; no live
+configure operation or qualified capacity profile is implied.
+
+Source-page admission precedes file-page allocation and decompression. It
+counts the compressed input and decoded output while both exist, and retains
+the charge through cache eviction, Arrow clones/slices and reader/database
+close. Raw mapped pages remain borrowed and use the separate file-pin policy.
+Cache pressure evicts cache owners before returning typed resource exhaustion;
+held reader buffers cannot lose their charge. Storage admission diagnostics
+expose `retained_source_bytes`, `peak_source_bytes` and
+`denied_source_allocations`. These count owned page payload allocations, not
+allocator overhead, borrowed mappings, snapshot-input backing bytes or RSS.
+
+Immutable maintenance adds `compaction_input_bytes` (1 GiB),
+`compaction_input_logical_bytes` (256 MiB), `compaction_input_versions`
+(4,194,304), `compaction_output_segments` (256), `compaction_elapsed_ms`
+(30,000) and `compaction_l0_segments` (64). Verified segment metadata admits
+compressed and decoded input, including complete hot-key histories, before
+cursor decoding. Logical bytes count page payloads, not heap overhead or RSS.
+The deadline is cooperative between records/partitions and before publication;
+it cannot interrupt a filesystem operation. Output partitions are bounded
+before creation. L0 saturation denies further write admission if synchronous
+maintenance cannot make room, including repeated attempts after a prior flush.
+Explicit flushes also cannot exceed the L0 cap. Pressure never authorizes
+pruning protected history. Unpublished partition files from interrupted work
+remain subject to the existing validated garbage collector. Total on-disk
+history, higher-level debt, retained snapshots and process memory are separate
+qualification obligations; these controls do not claim those are bounded.
+
+Flushes partition the mutable table at key boundaries using the native
+`CompactionPolicy::target_segment_bytes` output target (8 MiB default), also
+used for compaction. This is a logical payload target, not a physical-file or
+RSS cap; one complete version chain stays together even when larger. The plan
+borrows boundary keys and checks the complete output count against both L0
+and output-segment limits before syncing or creating output. Each partition
+uses the existing v6 writer; one manifest publishes every partition and the
+successor WAL together. Failed partial output remains unreachable and is
+reclaimed by the existing collector. The cooperative maintenance deadline
+applies before publication. The [partitioned-flush evidence](../../evidence/change-journals/gate-c/c-07d-partitioned-flush.md)
+does not establish installed capacity or a completed soak.
+
+A compaction-budget denial at a soft write-triggered flush defers that optional
+merge and retains its debt/failure counters. The incoming write still must pass
+hard L0, reclamation and mutable admission before WAL append; a failed optional
+merge cannot by itself consume otherwise available write capacity. Native I/O,
+corruption and publication uncertainty are not ignored. Cleanup ownership begins
+before partition creation, including when idle work fails before publication.
+
+Writers also offer one immutable compaction quantum when L0 debt between
+flushes reaches a full configured input-segment quantum, or the hard L0 cap
+if smaller. Smaller debt remains eligible for idle upkeep. The offer runs
+before a flush needs additional slots; if no earlier quantum
+was offered, a newly flushed table can trigger one afterward. A write never
+loops to drain debt or offers a second compaction at saturation. This path does
+not flush the mutable tail as a side effect of housekeeping. The same hard
+admission and protected-snapshot rules apply; failed admission is backpressure,
+not permission to exceed the cap. The [foreground debt record](../../evidence/change-journals/gate-c/c-07d-foreground-debt-progress.md)
+separates this component behavior from installed capacity evidence.
+
+While serving, the existing one-second host sweep offers one engine-owned
+physical maintenance quantum to a single joined worker. Busy ticks are skipped.
+Each admitted quantum either reclaims a bounded pending inventory or performs
+one bounded compaction to reduce L0 debt. It uses the same writer lock and
+configured limits and does not flush the active mutable tail or advance logical
+cursors. For both foreground commit maintenance and idle upkeep, the store
+explicitly permits pruning superseded physical versions:
+registered transactions remain protected, read views and named checkpoints
+retain their generations, and logical versioned keys remain data. Standalone
+automatic maintenance retains all versions for untracked copyable snapshots;
+an owner may select the explicit protected-snapshot entry point. Shutdown and
+cancellation stop new offers and join any admitted quantum; the cooperative deadline still cannot
+interrupt a blocked filesystem call. Embedded hosts can offer the same work
+through `RrdEngine::maintain_storage`. The
+[idle-maintenance evidence](../../evidence/change-journals/gate-c/c-07d-idle-maintenance.md)
+and [owned-history evidence](../../evidence/change-journals/gate-c/c-07d-tracked-history-maintenance.md)
+do not replace installed latency, drain or soak qualification.
+The [foreground retention evidence](../../evidence/change-journals/gate-c/c-07d-write-history-retention.md)
+also checks that enabling diagnostics does not change retained state.
+
+Retained mutable generations share an ownership-based pool per opened database:
+`retained_mutable_bytes` (512 MiB), `retained_mutable_versions` (4,194,304) and
+`retained_mutable_generations` (64). A writer reserves a complete copy before
+copy-on-write and before WAL append; cancellation releases only the owners it
+actually drops. Readers can retain their charge after the database closes.
+The byte charge covers keys, values and version records, excluding allocator
+and tree overhead. Independently reopened pools do not establish a host quota.
+
+The normal write path now invokes bounded reachability reclamation after
+publication and on reopen, before appending the incoming batch. Controls are
+`reclamation_inventory_entries` (262,144), `reclamation_metadata_bytes` (64 MiB),
+`reclamation_delete_files` (1,024), `reclamation_delete_bytes` (1 GiB), and
+`reclamation_elapsed_ms` (30,000). Current, captured-reader and checkpoint
+manifests protect their files. Complete admitted inventories and protected
+references are checked before deletion; damaged references fail closed.
+Partial deletion cycles synchronize completed removals and retain pending work.
+A partial cycle returns reclamation pressure before the incoming WAL append;
+retries drain that finite work before admitting additional growth.
+A single file larger than the deletion budget reports explicit pressure.
+Elapsed limits are cooperative and cannot interrupt native filesystem calls.
+These controls do not qualify actual disk exhaustion or sustained capacity.
+
+Engine transaction serialization uses a FIFO admission gate with
+`transaction_admission_requests` (64 active plus queued requests),
+`transaction_admission_bytes` (64 MiB aggregate serialized logical request
+charge), and `transaction_admission_wait_ms` (30,000). A bounded counting sink
+measures each request without allocating a second serialized buffer. The
+active owner remains charged until its actual guard drops. Timeout and pending
+cancellation release queued reservations; a panic in effect code fences future
+admission. These controls cover the existing transaction/unique-index/function/
+flight/task/operator gate, not transport parsing or total process allocation.
+`AuthorizedInvocation::cancel_pending` controls an authenticated embedded
+invocation waiting for that gate; it is not an HTTP disconnect hook or rollback
+of effects already admitted. Request-context deadlines are checked before
+admission. Native `transaction_admission_snapshot` exposes content-free current
+and peak charge; no new wire operation or independent lifecycle is introduced.
+
+Recovery and mutation-free inspection use `recovery_metadata_bytes` (64 MiB),
+`recovery_files` (262,144 admitted file reads), `recovery_read_bytes` (1 TiB
+conservative whole-file charge), `recovery_wal_bytes` (256 MiB),
+`recovery_wal_frames` (1,048,576), and `recovery_elapsed_ms` (120,000). Metadata
+is admitted before allocation, immutable files before segment opening, and WAL
+size/frames before payload materialization. Inspection charges repeated reads
+again, including its full-file digest pass. Its hashing loop checks elapsed
+work and rejects changed file lengths. Budget exhaustion preserves bytes and
+returns explicit non-readiness; it does not repair tails or relax the installed
+policy. Elapsed checks are cooperative, not interruption of an OS call. These
+work bounds do not establish recovery disk reserve or total process RSS.
+
+Apply, interrupted installation, reopen, inspection, backup restore and restore
+publication lower the same sealed policy into native storage options. A low
+replay limit denies access without modifying authoritative bytes; inspection
+does not silently retry with larger defaults. Configuration format 2 and locator
+format 1 are replaced pre-release shapes and are rejected, not migrated or
+silently defaulted. Product version remains 1.0.0.
 
 The implementation rejects any pre-existing `.rrflow` tree for a new install.
 It does not migrate, merge, or delete a user's pre-canonical
@@ -511,6 +692,28 @@ retained or quarantined under the exact plan; it is never overwritten.
 Acknowledged complete-frame corruption, an unauthenticated manifest choice,
 irreconcilable semantic divergence, or unknown authorization truth can never
 be "fixed" by guessed values.
+
+### Implemented incomplete-tail candidate repair
+
+The current `repair plan --project <root>` command emits JSON to stdout;
+`repair apply --project <root> --plan <file> --expect <sha256>` accepts that
+exact artifact. Only an incomplete final WAL frame qualifies. Planning and
+ordinary verification preserve bytes; complete checksum corruption, missing
+authoritative files, a stale physical inventory or an insufficient recovery
+budget deny repair.
+
+The bounded copy includes every regular file in the active root, including
+object payloads and the private token. Its plan declares source inventory,
+copy bytes, no fallback, same-filesystem publication and quarantine. Only the
+candidate WAL is truncated. The original root is retained under a
+content-addressed quarantine; a private intent resumes interrupted copy and
+publication, and the existing control journal records completion. The candidate
+carries before/after inventory identities. This implementation retains the
+existing installed root name and locator binding, matching the current restore
+publication profile. General locator replacement, other repair classes and
+full semantic/index verification remain D-11 work. The
+[C-07f journal](../../evidence/change-journals/gate-c/c-07f-native-capacity.md)
+separates implementation and compilation from native qualification results.
 
 ## Backup and restore
 

@@ -229,6 +229,15 @@ support future plan/apply and UI preparation, not a success badge. Context and
 query controls must default at or below the advertised estate ceilings rather
 than blindly sending the protocol hard maximum.
 
+The [user-selected effort contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+owns reasoning controls. H-06 must show the selected preset or custom limits,
+effective estate caps, remaining time/steps/attempts and known cost, plus Stop
+and an explicitly previewed extension. A stopped run shows partial results and
+unresolved work with the engine's reason. Resume cannot reset consumption.
+Until the runner and configuration-apply capabilities are advertised, these
+controls must be unavailable with an explanation; changing a local UI setting
+cannot claim an enforced timeout. All clients share the engine's authority.
+
 ## One object, many bounded lenses
 
 Connectome presents several lenses over the same engine result. Changing a

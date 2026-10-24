@@ -28,7 +28,9 @@ mod outcome;
 mod projection;
 mod repository;
 mod rrflow_kv;
+pub use rrflow_kv::{StorageInspectionCursor, StorageInspectionPage};
 mod s3;
+mod snapshot;
 mod transaction;
 mod writer;
 
@@ -48,16 +50,18 @@ pub use archive::{
     control_family_covers, control_family_of, export_logical_archive,
     export_logical_archive_with_progress, inspect_control_archive, inspect_logical_archive,
     read_control_archive, restore_logical_archive_to_new_root,
-    restore_logical_archive_to_new_root_with, restore_logical_archive_to_new_root_with_progress,
-    validate_control_families, ControlArchiveInventory, LogicalArchiveCheckpoint,
-    LogicalArchiveInventory, LogicalArchiveOperation, LogicalArchiveProgress, LogicalRestoreReport,
-    CONTROL_ARCHIVE_VERSION, LOGICAL_ARCHIVE_VERSION,
+    restore_logical_archive_to_new_root_with, restore_logical_archive_to_new_root_with_options,
+    restore_logical_archive_to_new_root_with_progress, validate_control_families,
+    ControlArchiveInventory, LogicalArchiveCheckpoint, LogicalArchiveInventory,
+    LogicalArchiveOperation, LogicalArchiveProgress, LogicalRestoreReport, CONTROL_ARCHIVE_VERSION,
+    LOGICAL_ARCHIVE_VERSION,
 };
 pub use backup::{
     control_restore_progress, create_application_backup, create_logical_backup,
     load_backup_catalogue, prune_backup_catalogue, restore_catalogued_backup,
-    verify_backup_catalogue, verify_restored_backup_objects, BackupCatalogue, BackupCoverage,
-    BackupEntry, BackupPruneOutcome, BackupPrunePlan, BackupPruneReceipt,
+    restore_catalogued_backup_with_options, verify_backup_catalogue,
+    verify_restored_backup_objects, verify_restored_backup_objects_with_options, BackupCatalogue,
+    BackupCoverage, BackupEntry, BackupPruneOutcome, BackupPrunePlan, BackupPruneReceipt,
     CatalogueManifestInventory, ControlRestoreProgress, ObjectPayloadManifestInventory,
     BACKUP_CATALOGUE_VERSION, CONTROL_RESTORE_PROGRESS_FORMAT, MAX_BACKUP_PRUNE_RECEIPTS,
 };
@@ -92,6 +96,8 @@ pub use rrd_core::{
 pub use rrd_lsm::filesystem;
 pub use rrd_lsm::{
     publish_rename as publish_durable_rename, sync_directory as sync_directory_metadata,
+    DatabaseOptions, MutableLimits, MutableResource, ProjectedReadResource, TailRepairPlan,
+    TailRepairReceipt, TransactionLimits, TransactionResource,
 };
 pub use rrflow_kv::{
     create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,
@@ -99,7 +105,7 @@ pub use rrflow_kv::{
     rrflow_kv_snapshot_all_object_references, rrflow_kv_snapshot_artifact_view,
     rrflow_kv_snapshot_object_references, RrflowKvInitializationFormats, RrflowKvInspection,
     RrflowKvInspector, RrflowKvOpenEvidence, RrflowKvReconciliationEvidence, RrflowKvStore,
-    RRFLOW_KV_OPEN_EVIDENCE_VERSION,
+    RrflowKvTailRepair, RRFLOW_KV_OPEN_EVIDENCE_VERSION,
 };
 pub use s3::{
     ConditionalPut, S3Authentication, S3CompatibleObjectStore, S3MultipartUpload, S3ObjectClient,
