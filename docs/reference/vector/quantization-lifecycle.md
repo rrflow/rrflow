@@ -84,6 +84,23 @@ an explicitly lifecycle-named, revision-neutral planner restoration. There is
 no TurboQuant `ensure_vector_index` adapter or reconstruction-time suppression
 path.
 
+## Required TurboQuant scope
+
+By the repository owner's direction of 2026-10-24, TurboQuant is a complete
+capability, not one codec. [OBJ-13](../../objectives/rrflow-1.0-alpha.md#required-outcomes)
+owns the measurable result; this record owns the contract. In every part,
+canonical full-precision vectors and the exact scorer remain authoritative.
+
+| Part | Current state | Owning gate and required behavior |
+|---|---|---|
+| Persistent vector search | The MSE codec and lifecycle above serve after explicit activation; builds read every vector version and the catalogue replays from cursor zero. | E-04 maintains TurboQuant generations incrementally and atomically with point commits. F-03 runs candidate generation and exact reranking in the stamped Arrow pipeline. Closing [POAM-028](../../poam/rrflow-1.0-alpha/poam-028.md) removes the per-search catalogue rebuild. |
+| Inner-product variant | Absent: `rrd-vector`'s `turboquant` module implements the MSE path only. | E-04 adds the [paper's](https://arxiv.org/abs/2504.19874) product estimator, an MSE stage plus a one-bit Quantized Johnson-Lindenstrauss residual, as an explicit lifecycle codec choice. Recall and score error are measured against the MSE variant and exact search on the same corpus. |
+| Model KV cache | Absent: RRFlow runs embedding models only, and attention caches belong to admitted model runtimes. | In Gate G, SWAG selects a TurboQuant KV-cache format only when an admitted runtime advertises it and qualification passes. The format joins the [cache identity](../inference/lfg-swag.md#cache-identity-and-sharing). This is inference acceleration, not rrflowKV compression. |
+| Sync transfer | Absent. | H-07 may offer a selected-data profile in which a device receives verified quantized artifacts instead of a family's full-precision vectors, which reduces transfer bytes. That device only proposes candidates: its returned hits are exact-reranked by a peer that holds the canonical vectors, or they are labelled approximate. Full synchronization still transfers canonical vectors. |
+
+J-04 qualifies quality, memory, latency, and transfer-size claims for every
+part. A published paper result is not RRFlow evidence.
+
 ## Evidence and remaining gates
 
 The fixed 512-vector by 64-dimension matrix covers eleven codec/ratio rows,
