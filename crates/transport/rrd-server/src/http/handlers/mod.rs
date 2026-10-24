@@ -9,3 +9,5 @@ mod session;
 mod subscription;
 mod task;
 mod vector;
+
+mod endpoint_configuration;

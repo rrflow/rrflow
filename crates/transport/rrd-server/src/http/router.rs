@@ -63,6 +63,9 @@ http_dispatch_catalogue! {
     FlightList => ("flight-list", RrdOperation::FlightRead),
     FlightRead => ("flight-read", RrdOperation::FlightRead),
     EndpointCatalogue => ("endpoint-catalogue", RrdOperation::ServiceInspect),
+    EndpointConfigurationRead => ("endpoint-configuration-read", RrdOperation::EstateRead),
+    EndpointConfigurationPreview => ("endpoint-configuration-preview", RrdOperation::EndpointConfigurationPreview),
+    EndpointConfigurationApply => ("endpoint-configuration-apply", RrdOperation::EstateAdmin),
     EstateRead => ("estate-read", RrdOperation::EstateRead),
     HealthLive => ("health-live", RrdOperation::ServiceInspect),
     HealthReady => ("health-ready", RrdOperation::ServiceInspect),
@@ -213,6 +216,15 @@ impl AppState {
             Some(HttpDispatch::SessionClose) => self.close_session(&headers, &body, &path, now),
             Some(HttpDispatch::TransactionBegin) => self.begin_transaction(&headers, &body, now),
             Some(HttpDispatch::QueryExecute) => self.execute_query(&headers, &body, now),
+            Some(HttpDispatch::EndpointConfigurationRead) => {
+                self.read_endpoint_configuration(&headers, &body, now)
+            }
+            Some(HttpDispatch::EndpointConfigurationPreview) => {
+                self.preview_endpoint_configuration(&headers, &body, now)
+            }
+            Some(HttpDispatch::EndpointConfigurationApply) => {
+                self.apply_endpoint_configuration(&headers, &body, now)
+            }
             Some(HttpDispatch::QueryExport) => self.export_query(&headers, &body, now),
             Some(HttpDispatch::DataSchemaRead) => self.read_data_schema(&headers, &body, now),
             Some(HttpDispatch::QueryIndexEnsure) => self.ensure_query_index(&headers, &body, now),

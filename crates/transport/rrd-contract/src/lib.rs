@@ -12,6 +12,7 @@ mod diagnostic;
 mod storage_cursor;
 pub use storage_cursor::{InspectStorageCursor, StorageCursorAction, StorageCursorSnapshot};
 mod endpoint_binding;
+mod endpoint_configuration;
 mod flight;
 mod function;
 #[path = "generated/signal_catalogue.rs"]
@@ -84,6 +85,11 @@ pub use endpoint_binding::{
     MAX_BINDING_CONCURRENCY, MAX_BINDING_INPUT_BYTES, MAX_BINDING_TIMEOUT_MS,
     MAX_CREDENTIAL_NAME_BYTES, MAX_DECLARED_BYTES, MAX_ENDPOINT_URL_BYTES, MAX_INVENTORY_MACHINES,
     MAX_PROFILE_BINDINGS,
+};
+pub use endpoint_configuration::{
+    ApplyEndpointConfiguration, EndpointConfiguration, EndpointConfigurationPlan,
+    PreviewEndpointConfiguration, ReadEndpointConfiguration, ENDPOINT_CONFIGURATION_PREVIEW_TTL_MS,
+    ENDPOINT_CONFIGURATION_VERSION, MAX_ENDPOINT_CONFIGURATION_BYTES,
 };
 pub use flight::{
     prompt_cohort_sha256, LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights,
@@ -221,7 +227,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
+    "af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3600,6 +3606,36 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "PromptFlightReadResult",
         ),
         endpoint(
+            "endpoint-configuration-read",
+            HttpMethod::Post,
+            "/v1/configuration/endpoints/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::EstateRead,
+            "ReadEndpointConfiguration",
+            "EndpointConfiguration",
+        ),
+        endpoint(
+            "endpoint-configuration-preview",
+            HttpMethod::Post,
+            "/v1/configuration/endpoints/preview",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::EstateAdmin,
+            "PreviewEndpointConfiguration",
+            "EndpointConfigurationPlan",
+        ),
+        endpoint(
+            "endpoint-configuration-apply",
+            HttpMethod::Post,
+            "/v1/configuration/endpoints/apply",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::EstateAdmin,
+            "ApplyEndpointConfiguration",
+            "EndpointConfiguration",
+        ),
+        endpoint(
             "estate-read",
             HttpMethod::Post,
             "/v1/estates/{estate}/read",
@@ -4214,6 +4250,13 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "CreateInstanceBackup" => schema_json::<RequestEnvelope<CreateInstanceBackup>>(),
         "CreateSession" => schema_json::<RequestEnvelope<CreateSession>>(),
         "ExecuteQuery" => schema_json::<RequestEnvelope<ExecuteQuery>>(),
+        "ReadEndpointConfiguration" => schema_json::<RequestEnvelope<ReadEndpointConfiguration>>(),
+        "PreviewEndpointConfiguration" => {
+            schema_json::<RequestEnvelope<PreviewEndpointConfiguration>>()
+        }
+        "ApplyEndpointConfiguration" => {
+            schema_json::<RequestEnvelope<ApplyEndpointConfiguration>>()
+        }
         "ExportQuery" => schema_json::<RequestEnvelope<ExportQuery>>(),
         "ExportAudit" => schema_json::<RequestEnvelope<ExportAudit>>(),
         "EnsureQueryIndex" => schema_json::<RequestEnvelope<EnsureQueryIndex>>(),
@@ -4282,6 +4325,8 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "OpenApiDocument" => schema_json::<ResponseEnvelope<serde_json::Value>>(),
         "OpenSubscriptionResult" => schema_json::<ResponseEnvelope<OpenSubscriptionResult>>(),
         "QueryResult" => schema_json::<ResponseEnvelope<QueryResult>>(),
+        "EndpointConfiguration" => schema_json::<ResponseEnvelope<EndpointConfiguration>>(),
+        "EndpointConfigurationPlan" => schema_json::<ResponseEnvelope<EndpointConfigurationPlan>>(),
         "QueryExport" => schema_json::<ResponseEnvelope<QueryExport>>(),
         "EnsureQueryIndexResult" => schema_json::<ResponseEnvelope<EnsureQueryIndexResult>>(),
         "EnsureVectorCollectionResult" => {

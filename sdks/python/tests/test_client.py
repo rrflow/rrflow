@@ -277,7 +277,7 @@ def test_remote_cleartext_expired_deadlines_and_typed_api_errors_are_rejected() 
 
 
 def test_generated_catalogue_covers_the_frozen_contract() -> None:
-    assert len(ENDPOINTS) == 44
+    assert len(ENDPOINTS) == 47
     assert ENDPOINTS["capabilities-read"] == {
         "method": "GET",
         "path": "/v1/capabilities",

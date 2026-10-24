@@ -103,6 +103,7 @@ mod core;
 mod data;
 mod diagnostic;
 mod distributed;
+mod endpoint_configuration;
 mod error;
 mod estate;
 mod estate_control;

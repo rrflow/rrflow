@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+// OpenAPI SHA-256: af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -17,6 +17,9 @@ public enum OperationId
     DiagnosticsStorageCursor,
     DiagnosticsStorageRead,
     EndpointCatalogue,
+    EndpointConfigurationApply,
+    EndpointConfigurationPreview,
+    EndpointConfigurationRead,
     EstateRead,
     FlightLaunch,
     FlightList,
@@ -66,8 +69,8 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const string OpenApiDocumentSha256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
-    public const int Count = 44;
+    public const string OpenApiDocumentSha256 = "af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100";
+    public const int Count = 47;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -84,6 +87,9 @@ public static class EndpointCatalog
         OperationId.DiagnosticsStorageCursor => new("diagnostics-storage-cursor", "POST", "/v1/diagnostics/storage/cursor", Authentication.SessionBearer, false),
         OperationId.DiagnosticsStorageRead => new("diagnostics-storage-read", "POST", "/v1/diagnostics/storage/read", Authentication.SessionBearer, false),
         OperationId.EndpointCatalogue => new("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.Public, false),
+        OperationId.EndpointConfigurationApply => new("endpoint-configuration-apply", "POST", "/v1/configuration/endpoints/apply", Authentication.SessionBearer, true),
+        OperationId.EndpointConfigurationPreview => new("endpoint-configuration-preview", "POST", "/v1/configuration/endpoints/preview", Authentication.SessionBearer, false),
+        OperationId.EndpointConfigurationRead => new("endpoint-configuration-read", "POST", "/v1/configuration/endpoints/read", Authentication.SessionBearer, false),
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),
         OperationId.FlightLaunch => new("flight-launch", "POST", "/v1/flights", Authentication.SessionBearer, true),
         OperationId.FlightList => new("flight-list", "POST", "/v1/flights/list", Authentication.SessionBearer, false),

@@ -14,6 +14,38 @@ graph families and project links. The
 schema generation and validation. D-06 owns activation, D-05 owns ingestion,
 H-09 owns family formation, H-10 owns project links, and H-04 owns client parity.
 
+## Project endpoint configuration
+
+The engine exposes three authenticated operations under
+`/v1/configuration/endpoints/`: `read`, `preview`, and `apply`. The executable
+endpoint catalogue generates their OpenAPI and SDK projections. Read requires
+`EstateRead`; preview and apply require `EstateAdmin`. Preview is non-mutating
+and does not require a mutation idempotency key. Apply is a mutation and requires
+both the normal request key and the exact approved plan digest.
+
+`EndpointConfiguration` binds the installed project, estate, and instance to
+one current `EndpointProfile`. The initial revision is zero. Preview accepts an
+expected revision and the desired profile, assigns the next revision, and binds
+the prior configuration digest and a five-minute expiry. Apply validates the
+whole plan and publishes through the engine's existing control compare-and-swap
+and bounded transaction admission. It does not rewrite the immutable installed
+estate resource configuration or installation locator.
+
+To remove the saved configuration, preview `profile: null` and apply that plan.
+The resulting tombstone retains the next revision. Retrying the current applied
+plan returns the same head, including after restart. Once another revision is
+published, the older plan conflicts; it cannot restore a removed binding. The
+current head is bounded to 1 MiB, with the existing per-profile binding and field
+limits. Historical audit/control retention follows the existing store policy.
+
+A saved profile is configuration only: no credential is resolved, remote endpoint
+contacted, source read, runtime loaded, or background ingestion started. Placement
+fit, supported adapters, credential availability, explicit egress authorization,
+health observations and ingestion remain separate D-06/D-05 obligations. A URL
+or model name in this response is not an availability or compatibility claim.
+The [configuration journal](../../evidence/change-journals/gate-d/endpoint-profile-configuration.md)
+records the implementation candidate and its exact verification.
+
 ## AI-readable requirements and availability
 
 Extend the existing executable operation/capability catalogue and

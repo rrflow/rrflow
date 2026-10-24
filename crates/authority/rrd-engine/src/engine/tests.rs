@@ -84,6 +84,7 @@ mod catalogue;
 mod context;
 mod data_crud;
 mod deployment_conformance;
+mod endpoint_configuration;
 mod estate_control;
 mod flight;
 mod function;

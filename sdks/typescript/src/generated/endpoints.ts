@@ -1,6 +1,6 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
-export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee" as const;
+// OpenAPI SHA-256: af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100" as const;
 
 export const endpoints = {
   "audit-export": {
@@ -42,6 +42,24 @@ export const endpoints = {
   "changefeed-read": {
     "method": "POST",
     "path": "/v1/changes/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "endpoint-configuration-apply": {
+    "method": "POST",
+    "path": "/v1/configuration/endpoints/apply",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "endpoint-configuration-preview": {
+    "method": "POST",
+    "path": "/v1/configuration/endpoints/preview",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "endpoint-configuration-read": {
+    "method": "POST",
+    "path": "/v1/configuration/endpoints/read",
     "authentication": "session_bearer",
     "mutation": false
   },

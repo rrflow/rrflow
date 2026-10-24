@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+// OpenAPI SHA-256: af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -113,6 +113,57 @@ export interface paths {
         put?: never;
         /** RRD changefeed-read */
         post: operations["changefeed-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/configuration/endpoints/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD endpoint-configuration-apply */
+        post: operations["endpoint-configuration-apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/configuration/endpoints/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD endpoint-configuration-preview */
+        post: operations["endpoint-configuration-preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/configuration/endpoints/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD endpoint-configuration-read */
+        post: operations["endpoint-configuration-read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7890,6 +7941,1470 @@ export interface operations {
                                     /** Format: uint16 */
                                     proof_nodes: number;
                                 };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "endpoint-configuration-apply": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        approved_plan_sha256: string;
+                        plan: {
+                            expected_configuration_sha256: string;
+                            /** Format: uint64 */
+                            expected_revision: number;
+                            /** Format: uint64 */
+                            expires_at_unix_ms: number;
+                            /** Format: uint16 */
+                            format_version: number;
+                            /**
+                             * @description Stable project-local identity. Organization is deliberately absent: a
+                             *     local installation must not fabricate a tenant merely to address itself.
+                             */
+                            identity: {
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                estate_id: string;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                instance_id: string;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                project_id: string;
+                            };
+                            /** Format: uint64 */
+                            issued_at_unix_ms: number;
+                            plan_sha256: string;
+                            /**
+                             * @description Effective, revisioned profile. Mutating it is a governed configuration
+                             *     change that produces the next revision.
+                             */
+                            profile?: {
+                                bindings: {
+                                    /**
+                                     * @description The eight workload classes. Code depends on a class contract; a profile
+                                     *     decides which endpoint serves it.
+                                     */
+                                    class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                    /** @description Required for subscription and API bindings. Never a value. */
+                                    credential?: {
+                                        name: string;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        provider: string;
+                                    } | null;
+                                    /**
+                                     * @description Where a binding is reached. In-process execution is the narrow local
+                                     *     exception; everything else is a URL.
+                                     */
+                                    endpoint: {
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        component: string;
+                                        /** @constant */
+                                        kind: "in_process";
+                                    } | {
+                                        /** @constant */
+                                        kind: "url";
+                                        url: string;
+                                    };
+                                    /**
+                                     * @description Memory a binding declares it consumes on its placement machine. Declared
+                                     *     values are replaced by measured ones once observation exists.
+                                     */
+                                    footprint: {
+                                        /** @description GPU memory a binding declares it needs on its placement machine. */
+                                        gpu: {
+                                            /** @constant */
+                                            kind: "none";
+                                        } | {
+                                            /** @constant */
+                                            kind: "required";
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /** Format: uint64 */
+                                        memory_bytes: number;
+                                    };
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    id: string;
+                                    /**
+                                     * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                     *     the class contract.
+                                     */
+                                    kind: "local" | "self_hosted" | "subscription" | "api";
+                                    /**
+                                     * @description Generic admission limits for one binding. Class-specific limits stay with
+                                     *     their class contracts.
+                                     */
+                                    limits: {
+                                        /** Format: uint32 */
+                                        max_concurrency: number;
+                                        /** Format: uint64 */
+                                        max_input_bytes: number;
+                                        /** Format: uint64 */
+                                        timeout_ms: number;
+                                    };
+                                    /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                    manifest_sha256?: string | null;
+                                    /**
+                                     * @description The inventory machine this binding runs on. Required for local and
+                                     *     self-hosted bindings, absent for subscription and API bindings.
+                                     */
+                                    placement?: string | null;
+                                    /**
+                                     * @description The model or service this binding reaches: a router model manifest id,
+                                     *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                     */
+                                    service_id: string;
+                                }[];
+                                /** Format: uint16 */
+                                contract_version: number;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                name: string;
+                                profile_sha256: string;
+                                /** Format: uint64 */
+                                revision: number;
+                            } | null;
+                        };
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint16 */
+                                format_version: number;
+                                /**
+                                 * @description Stable project-local identity. Organization is deliberately absent: a
+                                 *     local installation must not fabricate a tenant merely to address itself.
+                                 */
+                                identity: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    estate_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                };
+                                last_applied_plan_sha256?: string | null;
+                                /**
+                                 * @description Effective, revisioned profile. Mutating it is a governed configuration
+                                 *     change that produces the next revision.
+                                 */
+                                profile?: {
+                                    bindings: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    }[];
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    name: string;
+                                    profile_sha256: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                } | null;
+                                /**
+                                 * Format: uint64
+                                 * @description Zero means never configured; revocation retains a nonzero revision.
+                                 */
+                                revision: number;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint16 */
+                                format_version: number;
+                                /**
+                                 * @description Stable project-local identity. Organization is deliberately absent: a
+                                 *     local installation must not fabricate a tenant merely to address itself.
+                                 */
+                                identity: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    estate_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                };
+                                last_applied_plan_sha256?: string | null;
+                                /**
+                                 * @description Effective, revisioned profile. Mutating it is a governed configuration
+                                 *     change that produces the next revision.
+                                 */
+                                profile?: {
+                                    bindings: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    }[];
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    name: string;
+                                    profile_sha256: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                } | null;
+                                /**
+                                 * Format: uint64
+                                 * @description Zero means never configured; revocation retains a nonzero revision.
+                                 */
+                                revision: number;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "endpoint-configuration-preview": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /** Format: uint64 */
+                        expected_revision: number;
+                        /** @description None previews revocation. This neither deletes history nor contacts a provider. */
+                        profile?: {
+                            /**
+                             * @description Bindings in declaration order. Within one class, the order is the
+                             *     fallback order: the first binding is primary.
+                             */
+                            bindings: {
+                                /**
+                                 * @description The eight workload classes. Code depends on a class contract; a profile
+                                 *     decides which endpoint serves it.
+                                 */
+                                class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                /** @description Required for subscription and API bindings. Never a value. */
+                                credential?: {
+                                    name: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    provider: string;
+                                } | null;
+                                /**
+                                 * @description Where a binding is reached. In-process execution is the narrow local
+                                 *     exception; everything else is a URL.
+                                 */
+                                endpoint: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    component: string;
+                                    /** @constant */
+                                    kind: "in_process";
+                                } | {
+                                    /** @constant */
+                                    kind: "url";
+                                    url: string;
+                                };
+                                /**
+                                 * @description Memory a binding declares it consumes on its placement machine. Declared
+                                 *     values are replaced by measured ones once observation exists.
+                                 */
+                                footprint: {
+                                    /** @description GPU memory a binding declares it needs on its placement machine. */
+                                    gpu: {
+                                        /** @constant */
+                                        kind: "none";
+                                    } | {
+                                        /** @constant */
+                                        kind: "required";
+                                        /** Format: uint64 */
+                                        memory_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    memory_bytes: number;
+                                };
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                id: string;
+                                /**
+                                 * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                 *     the class contract.
+                                 */
+                                kind: "local" | "self_hosted" | "subscription" | "api";
+                                /**
+                                 * @description Generic admission limits for one binding. Class-specific limits stay with
+                                 *     their class contracts.
+                                 */
+                                limits: {
+                                    /** Format: uint32 */
+                                    max_concurrency: number;
+                                    /** Format: uint64 */
+                                    max_input_bytes: number;
+                                    /** Format: uint64 */
+                                    timeout_ms: number;
+                                };
+                                /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                manifest_sha256?: string | null;
+                                /**
+                                 * @description The inventory machine this binding runs on. Required for local and
+                                 *     self-hosted bindings, absent for subscription and API bindings.
+                                 */
+                                placement?: string | null;
+                                /**
+                                 * @description The model or service this binding reaches: a router model manifest id,
+                                 *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                 */
+                                service_id: string;
+                            }[];
+                            /** Format: uint16 */
+                            contract_version: number;
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            name: string;
+                        } | null;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                expected_configuration_sha256: string;
+                                /** Format: uint64 */
+                                expected_revision: number;
+                                /** Format: uint64 */
+                                expires_at_unix_ms: number;
+                                /** Format: uint16 */
+                                format_version: number;
+                                /**
+                                 * @description Stable project-local identity. Organization is deliberately absent: a
+                                 *     local installation must not fabricate a tenant merely to address itself.
+                                 */
+                                identity: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    estate_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                };
+                                /** Format: uint64 */
+                                issued_at_unix_ms: number;
+                                plan_sha256: string;
+                                /**
+                                 * @description Effective, revisioned profile. Mutating it is a governed configuration
+                                 *     change that produces the next revision.
+                                 */
+                                profile?: {
+                                    bindings: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    }[];
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    name: string;
+                                    profile_sha256: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                expected_configuration_sha256: string;
+                                /** Format: uint64 */
+                                expected_revision: number;
+                                /** Format: uint64 */
+                                expires_at_unix_ms: number;
+                                /** Format: uint16 */
+                                format_version: number;
+                                /**
+                                 * @description Stable project-local identity. Organization is deliberately absent: a
+                                 *     local installation must not fabricate a tenant merely to address itself.
+                                 */
+                                identity: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    estate_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                };
+                                /** Format: uint64 */
+                                issued_at_unix_ms: number;
+                                plan_sha256: string;
+                                /**
+                                 * @description Effective, revisioned profile. Mutating it is a governed configuration
+                                 *     change that produces the next revision.
+                                 */
+                                profile?: {
+                                    bindings: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    }[];
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    name: string;
+                                    profile_sha256: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "endpoint-configuration-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: Record<string, never>;
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint16 */
+                                format_version: number;
+                                /**
+                                 * @description Stable project-local identity. Organization is deliberately absent: a
+                                 *     local installation must not fabricate a tenant merely to address itself.
+                                 */
+                                identity: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    estate_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                };
+                                last_applied_plan_sha256?: string | null;
+                                /**
+                                 * @description Effective, revisioned profile. Mutating it is a governed configuration
+                                 *     change that produces the next revision.
+                                 */
+                                profile?: {
+                                    bindings: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    }[];
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    name: string;
+                                    profile_sha256: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                } | null;
+                                /**
+                                 * Format: uint64
+                                 * @description Zero means never configured; revocation retains a nonzero revision.
+                                 */
+                                revision: number;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint16 */
+                                format_version: number;
+                                /**
+                                 * @description Stable project-local identity. Organization is deliberately absent: a
+                                 *     local installation must not fabricate a tenant merely to address itself.
+                                 */
+                                identity: {
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    estate_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    instance_id: string;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    project_id: string;
+                                };
+                                last_applied_plan_sha256?: string | null;
+                                /**
+                                 * @description Effective, revisioned profile. Mutating it is a governed configuration
+                                 *     change that produces the next revision.
+                                 */
+                                profile?: {
+                                    bindings: {
+                                        /**
+                                         * @description The eight workload classes. Code depends on a class contract; a profile
+                                         *     decides which endpoint serves it.
+                                         */
+                                        class: "large_model_serving" | "always_warm_small_models" | "embedding_and_reranking" | "vector_store" | "canonical_store" | "weight_updates" | "behavior_updates" | "control_plane";
+                                        /** @description Required for subscription and API bindings. Never a value. */
+                                        credential?: {
+                                            name: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            provider: string;
+                                        } | null;
+                                        /**
+                                         * @description Where a binding is reached. In-process execution is the narrow local
+                                         *     exception; everything else is a URL.
+                                         */
+                                        endpoint: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            component: string;
+                                            /** @constant */
+                                            kind: "in_process";
+                                        } | {
+                                            /** @constant */
+                                            kind: "url";
+                                            url: string;
+                                        };
+                                        /**
+                                         * @description Memory a binding declares it consumes on its placement machine. Declared
+                                         *     values are replaced by measured ones once observation exists.
+                                         */
+                                        footprint: {
+                                            /** @description GPU memory a binding declares it needs on its placement machine. */
+                                            gpu: {
+                                                /** @constant */
+                                                kind: "none";
+                                            } | {
+                                                /** @constant */
+                                                kind: "required";
+                                                /** Format: uint64 */
+                                                memory_bytes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            memory_bytes: number;
+                                        };
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        id: string;
+                                        /**
+                                         * @description How an endpoint is reached and paid for. The kind changes nothing about
+                                         *     the class contract.
+                                         */
+                                        kind: "local" | "self_hosted" | "subscription" | "api";
+                                        /**
+                                         * @description Generic admission limits for one binding. Class-specific limits stay with
+                                         *     their class contracts.
+                                         */
+                                        limits: {
+                                            /** Format: uint32 */
+                                            max_concurrency: number;
+                                            /** Format: uint64 */
+                                            max_input_bytes: number;
+                                            /** Format: uint64 */
+                                            timeout_ms: number;
+                                        };
+                                        /** @description Optional pin to the exact manifest or artifact the service must present. */
+                                        manifest_sha256?: string | null;
+                                        /**
+                                         * @description The inventory machine this binding runs on. Required for local and
+                                         *     self-hosted bindings, absent for subscription and API bindings.
+                                         */
+                                        placement?: string | null;
+                                        /**
+                                         * @description The model or service this binding reaches: a router model manifest id,
+                                         *     an embedding backend id, a store, or a vendor model name as a canonical id.
+                                         */
+                                        service_id: string;
+                                    }[];
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    name: string;
+                                    profile_sha256: string;
+                                    /** Format: uint64 */
+                                    revision: number;
+                                } | null;
+                                /**
+                                 * Format: uint64
+                                 * @description Zero means never configured; revocation retains a nonzero revision.
+                                 */
+                                revision: number;
                             };
                             /** @constant */
                             status: "ok";

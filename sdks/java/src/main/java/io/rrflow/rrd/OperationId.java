@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+// OpenAPI SHA-256: af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -16,6 +16,9 @@ public enum OperationId {
     DIAGNOSTICS_STORAGE_CURSOR("diagnostics-storage-cursor", "POST", "/v1/diagnostics/storage/cursor", Authentication.SESSION_BEARER, false),
     DIAGNOSTICS_STORAGE_READ("diagnostics-storage-read", "POST", "/v1/diagnostics/storage/read", Authentication.SESSION_BEARER, false),
     ENDPOINT_CATALOGUE("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.PUBLIC, false),
+    ENDPOINT_CONFIGURATION_APPLY("endpoint-configuration-apply", "POST", "/v1/configuration/endpoints/apply", Authentication.SESSION_BEARER, true),
+    ENDPOINT_CONFIGURATION_PREVIEW("endpoint-configuration-preview", "POST", "/v1/configuration/endpoints/preview", Authentication.SESSION_BEARER, false),
+    ENDPOINT_CONFIGURATION_READ("endpoint-configuration-read", "POST", "/v1/configuration/endpoints/read", Authentication.SESSION_BEARER, false),
     ESTATE_READ("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SESSION_BEARER, false),
     FLIGHT_LAUNCH("flight-launch", "POST", "/v1/flights", Authentication.SESSION_BEARER, true),
     FLIGHT_LIST("flight-list", "POST", "/v1/flights/list", Authentication.SESSION_BEARER, false),
@@ -48,7 +51,7 @@ public enum OperationId {
     VECTOR_POINT_SCROLL("vector-point-scroll", "POST", "/v1/vector/points/scroll", Authentication.SESSION_BEARER, false),
     VECTOR_SEARCH("vector-search", "POST", "/v1/vector/search", Authentication.SESSION_BEARER, false);
 
-    static final String OPENAPI_DOCUMENT_SHA256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
+    static final String OPENAPI_DOCUMENT_SHA256 = "af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100";
 
     public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }
 

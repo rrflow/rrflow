@@ -1,9 +1,9 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+# OpenAPI SHA-256: af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100
 from typing import Final, Literal, TypedDict
 
 ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = (
-    "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee"
+    "af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100"
 )
 
 OperationId = Literal[
@@ -20,6 +20,9 @@ OperationId = Literal[
     "diagnostics-storage-cursor",
     "diagnostics-storage-read",
     "endpoint-catalogue",
+    "endpoint-configuration-apply",
+    "endpoint-configuration-preview",
+    "endpoint-configuration-read",
     "estate-read",
     "flight-launch",
     "flight-list",
@@ -139,6 +142,24 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "GET",
         "mutation": False,
         "path": "/v1/schema/endpoints",
+    },
+    "endpoint-configuration-apply": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/configuration/endpoints/apply",
+    },
+    "endpoint-configuration-preview": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/configuration/endpoints/preview",
+    },
+    "endpoint-configuration-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/configuration/endpoints/read",
     },
     "estate-read": {
         "authentication": "session_bearer",
