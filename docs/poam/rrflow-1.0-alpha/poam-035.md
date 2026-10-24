@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [nominal Desktop qualification launch](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-launch.md)
+starts the existing installed driver in the isolated eight-GiB guest with
+three seeds, 100 forced reopens and 24-hour soak phases. Its first seed is
+still ingesting; a running campaign is not a completed result. Full readback,
+lifecycle, sustained phases, offline reconciliation and remaining profile
+points stay required. The separate WSL preflight remains characterization.
+
 The [isolated Desktop host preparation](../../evidence/change-journals/gate-c/c-07g-desktop-vm-preparation.md)
 provides an owned four-vCPU/eight-GiB KVM guest, verified image provenance,
 ordinary-primary compatibility and writable delegated resource limits. This
