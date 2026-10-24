@@ -6,6 +6,34 @@
 
 ## Observed deficiency
 
+The [session retention regression and repair](../../evidence/change-journals/gate-c/c-07g-session-transaction-retention.md)
+reproduced 52280 bytes of hot session state after 32 completed transactions on
+both rrflowMX and rrflowKV. Historical transaction accumulation could exhaust
+the one-MiB control value limit. Bounded atomic terminal-record placement now
+preserves replay without retaining the full history in each session update.
+Complete C-07 qualification remains open; the bounded comparison follows.
+
+The subsequent [Linux23 installed comparison](../../evidence/change-journals/gate-c/c-07g-session-retention-native.md)
+completed the unchanged 1000-record characterization: 22 segments, complete
+readback, two reopens, reader interference, backup under writes, burst, drain
+and a two-minute soak, with no failed/unresolved operations or latency-budget
+violations. Backup creation and verification took 5.179 seconds within the
+unchanged 30-second deadline. This resolves that short operating point only;
+full profiles, three seeds, native acceptance and 24-hour qualification remain
+open. No alpha or gate completion follows.
+
+The [session reader fence](../../evidence/change-journals/gate-c/c-07g-session-retention-fence.md)
+also persists a terminal-record format marker so an earlier strict session
+reader rejects state whose retained receipts it cannot discover. The current
+decoder accepts existing inline state and rejects unknown marker versions;
+its focused replay/format and owning engine suites pass. Final-candidate
+native evidence is supplied by the
+[final Linux24 comparison](../../evidence/change-journals/gate-c/c-07g-session-retention-final-native.md):
+all 22 short-characterization segments pass on the fenced source, with complete
+1000-record readback, two reopens and backup plus verification in 4.910 seconds.
+Complete native acceptance, capacity profiles and 24-hour qualification remain
+open; the short point does not close this deficiency.
+
 Linux21 again stopped at corpus ordinal 608 after 609 acknowledgements,
 now classified as a storage-substrate error. The
 [control-size attribution record](../../evidence/change-journals/gate-c/c-07g-control-size-attribution.md)
