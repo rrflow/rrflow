@@ -653,3 +653,9 @@ the original rejection and failed campaign. It changes no storage policy or
 qualification threshold. Successful diagnostic capture and a causal repair
 still need installed evidence; neither preceding local suite resolves this
 capacity failure.
+
+The [allocation-sync candidate failure](../../evidence/change-journals/gate-c/c-07f-allocation-sync-candidate.md)
+retains PR112's macOS WAL case: actual filler ENOSPC and public
+ResourceExhausted did not produce the required selected native-I/O receipt.
+The test remains failed; this result is neither OOM attribution nor native
+storage-full qualification. Exact syscall attribution remains open.
