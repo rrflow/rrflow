@@ -35,7 +35,16 @@ endpoints, account federation or available service APIs:
 | rrflow.ai | The hosted reasoning engine: optional managed access to hosted project engines, explicitly selected synchronization including access from another authorized device, and the evidence views below. | H-07 account, instance, transfer and real-service acceptance; remote access is not proof of two-way synchronization. |
 | rroflow.ai | The learning service: optional supervised, unsupervised and recursive learning over authorized datasets, experiments and qualified improvement artifacts, exposed through Connectome with the learning-results view. | G-06/I-03/I-07 learning acceptance plus H-07 transfer/account controls for selected data. Upload and artifact activation require distinct authorization. |
 | shippin.cloud | Optional private development space that consumes RRFlow and can run project toolchains, containers/VMs and private UI previews. | H-07e/f/g project-runtime, file/environment and real-service acceptance. A synchronized database is not a working devspace. |
-| Operator-controlled homelab | Self-hosted engine and optional development/learning capabilities under the same admitted public profiles. | Independent identity, recovery and transfer qualification with managed services unavailable. |
+| Operator-controlled homelab | Self-hosted engine and optional development/learning capabilities under the same admitted public profiles, including self-hosted rrflow.ai and rroflow.ai service software. | Independent identity, recovery and transfer qualification with managed services unavailable. |
+
+By the repository owner's direction of 2026-10-24, the rrflow.ai and rroflow.ai
+service software is open source and self-hostable, like the engine and
+Connectome. An operator can run the same service software on their own
+infrastructure and receive the same evidence views and learning capabilities
+without a managed account. The managed offering adds operation by the service
+owner; it does not add proprietary engine, learning, or evidence behavior.
+The licensing approach and the source location of the service software are not
+yet decided.
 
 Use configured endpoint profiles, trust and credential references rather than
 hardcoded domains in engine or client dispatch. Show the actual service,

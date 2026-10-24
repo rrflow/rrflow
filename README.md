@@ -45,7 +45,8 @@ owns checkout instructions and the UI's public-engine boundary.
 Planned **rrflow.ai** and **rroflow.ai** services are optional. rrflow.ai is
 the hosted reasoning engine, offering remote access, synchronization and
 evidence views. rroflow.ai is the learning service, offering governed
-supervised, unsupervised and recursive learning. Their
+supervised, unsupervised and recursive learning. Like the engine and
+Connectome, their service software is open source and self-hostable. Their
 [service roles and opt-in boundaries](docs/reference/client/devpulse-cloud.md#optional-managed-service-roles)
 are targets, not deployed-service claims. **shippin.cloud** extends this
 experience with a private devspace. The initial friends-and-family experience will
