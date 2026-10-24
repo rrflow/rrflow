@@ -6,6 +6,12 @@
 
 ## Observed deficiency
 
+The [metadata-pressure fixture record](../../evidence/change-journals/gate-c/c-07f-metadata-pressure.md)
+retains a later macOS count-limit failure: metadata creation consumed the
+8192-entry allowance without a native capacity error. Bounded data refills
+between metadata intervals are implemented for native validation; this is not
+accepted APFS exhaustion or a completed C-07 qualification.
+
 The [conflict-probe repair and execution reset](../../evidence/change-journals/gate-c/c-07g-conflict-spine-and-execution.md)
 removes reproduced unnecessary value-page reads during native write-conflict
 validation. The existing C-07 owner now separates implemented paths, native

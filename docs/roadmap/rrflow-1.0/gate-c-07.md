@@ -13,6 +13,12 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [metadata-pressure fixture record](../../evidence/change-journals/gate-c/c-07f-metadata-pressure.md)
+retains a later macOS count-limit failure: metadata creation consumed the
+8192-entry allowance without a native capacity error. Bounded data refills
+between metadata intervals are implemented for native validation; this is not
+accepted APFS exhaustion or a completed C-07 qualification.
+
 One installed native engine must preserve every acknowledged authoritative
 commit, publish atomic batches, reject uncertain or corrupt state safely, and
 keep admission, maintenance, recovery and retained buffers within explicit
