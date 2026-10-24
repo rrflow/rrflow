@@ -165,6 +165,73 @@ fn sync_filler_host(file: &File) -> std::io::Result<()> {
     }
 }
 
+// A capacity error before synchronization can leave pending allocation. Probe
+// again after the barrier; only a filler unchanged since that attempt followed by
+// a native one-byte failure is ready for the selected engine operation.
+fn fill_data<W: Write>(
+    file: &mut W,
+    max_bytes: u64,
+    started: Instant,
+    mut synchronize: impl FnMut(&W) -> std::io::Result<()>,
+) -> std::io::Result<(u64, i32)> {
+    let buffer = [0xa5u8; 64 * 1024];
+    let mut bytes = 0;
+    let mut bytes_at_barrier = 0;
+    let mut barrier_since_write = false;
+    let mut write_size = buffer.len();
+    loop {
+        assert!(
+            started.elapsed() < Duration::from_secs(25),
+            "bounded owned-volume fill"
+        );
+        assert!(
+            bytes < max_bytes,
+            "owned filesystem did not enforce its capacity"
+        );
+        let attempt = write_size.min((max_bytes - bytes) as usize);
+        match file.write(&buffer[..attempt]) {
+            Ok(0) => panic!("zero-length filler write"),
+            Ok(n) => {
+                bytes += n as u64;
+                barrier_since_write = false;
+            }
+            Err(error) => {
+                let Some(code) = error.raw_os_error().filter(|code| capacity_code(*code)) else {
+                    return Err(error);
+                };
+                if attempt > 1 {
+                    write_size = (attempt / 16).max(1);
+                    continue;
+                }
+                if barrier_since_write {
+                    return Ok((bytes, code));
+                }
+                // Settle the final partial synchronization interval, then fill
+                // any allocation made available by that barrier. No new clock.
+                if let Err(error) = synchronize(file) {
+                    if !error.raw_os_error().is_some_and(capacity_code) {
+                        return Err(error);
+                    }
+                }
+                bytes_at_barrier = bytes;
+                barrier_since_write = true;
+                write_size = buffer.len();
+                continue;
+            }
+        }
+        // Partial writes need not land on an exact multiple of the interval.
+        if bytes - bytes_at_barrier >= 4 * 1024 * 1024 {
+            if let Err(error) = synchronize(file) {
+                if !error.raw_os_error().is_some_and(capacity_code) {
+                    return Err(error);
+                }
+            }
+            bytes_at_barrier = bytes;
+            barrier_since_write = true;
+        }
+    }
+}
+
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
         let directory = metadata_directory.map(|path| {
@@ -197,7 +264,6 @@ impl Filler {
         };
         // Nonzero data prevents sparse/zero-block optimizations. Allocation and
         // sync failures are actual OS results, never injected StorageFull.
-        let buffer = [0xa5u8; 64 * 1024];
         let started = Instant::now();
         // A full NTFS directory index does not prove that free MFT records are
         // exhausted: a small CURRENT file may still be resident. Reserve a
@@ -234,44 +300,9 @@ impl Filler {
             );
             filler.free_inodes = Some(state.f_ffree);
         }
-        let mut write_size = buffer.len();
-        let error = loop {
-            assert!(
-                started.elapsed() < Duration::from_secs(25),
-                "bounded owned-volume fill"
-            );
-            assert!(
-                filler.bytes < volume.max_bytes,
-                "owned filesystem did not enforce its capacity"
-            );
-            match file.write(&buffer[..write_size]) {
-                Ok(0) => panic!("zero-length filler write"),
-                Ok(n) => filler.bytes += n as u64,
-                Err(error) => {
-                    let code = error.raw_os_error().expect("native capacity code");
-                    assert!(capacity_code(code), "unexpected fill error: {error}");
-                    if write_size == 1 {
-                        break error;
-                    }
-                    // An all-or-nothing large write may leave smaller free
-                    // allocations. Consume those too before declaring full.
-                    write_size = (write_size / 16).max(1);
-                    continue;
-                }
-            }
-            // Force delayed allocation while the error still belongs to this
-            // owned volume. A sync failure is retained as native evidence.
-            if filler.bytes.is_multiple_of(4 * 1024 * 1024) {
-                if let Err(error) = sync_filler_allocation(&file) {
-                    break error;
-                }
-            }
-        };
-        filler.native_code = error.raw_os_error().expect("native capacity code");
-        assert!(
-            capacity_code(filler.native_code),
-            "filler failed for another reason: {error}"
-        );
+        (filler.bytes, filler.native_code) =
+            fill_data(&mut file, volume.max_bytes, started, sync_filler_allocation)
+                .expect("native filler allocation");
         filler.file = Some(file);
         // Resident metadata on APFS/NTFS is exhausted after data allocation.
         if !cfg!(target_os = "linux") {
@@ -360,6 +391,107 @@ fn filler_host_sync_preserves_native_noncapacity_errors() {
     let error = sync_filler_host(&file).unwrap_err();
     assert_eq!(error.raw_os_error(), Some(libc::EINVAL));
     assert!(!capacity_code(error.raw_os_error().unwrap()));
+}
+
+mod filler_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    struct DelayedAllocation {
+        remaining: Cell<usize>,
+        syncs: Cell<usize>,
+        write_error: i32,
+    }
+    impl DelayedAllocation {
+        fn new() -> Self {
+            Self {
+                remaining: Cell::new(8),
+                syncs: Cell::new(0),
+                write_error: if cfg!(windows) { 112 } else { 28 },
+            }
+        }
+    }
+    impl Write for DelayedAllocation {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let n = bytes.len().min(self.remaining.get());
+            if n == 0 {
+                return Err(std::io::Error::from_raw_os_error(self.write_error));
+            }
+            self.remaining.set(self.remaining.get() - n);
+            Ok(n)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn settles_pending_allocation_before_declaring_full() {
+        // Both a successful barrier and delayed allocation failure can change
+        // what the next write observes. Neither alone proves settled capacity.
+        for delayed_error in [false, true] {
+            let mut file = DelayedAllocation::new();
+            let (bytes, code) = fill_data(&mut file, 1024, Instant::now(), |file| {
+                let first = file.syncs.get() == 0;
+                if first {
+                    file.remaining.set(16);
+                }
+                file.syncs.set(file.syncs.get() + 1);
+                if first && delayed_error {
+                    Err(std::io::Error::from_raw_os_error(file.write_error))
+                } else {
+                    Ok(())
+                }
+            })
+            .unwrap();
+            assert_eq!(
+                bytes, 24,
+                "must consume allocation made available by the final sync"
+            );
+            assert_eq!(file.remaining.get(), 0);
+            assert_eq!(file.syncs.get(), 2);
+            assert!(capacity_code(code));
+        }
+    }
+
+    #[test]
+    fn preserves_noncapacity_write_and_sync_errors() {
+        for fail_write in [false, true] {
+            let mut file = DelayedAllocation::new();
+            if fail_write {
+                file.write_error = 5;
+            }
+            let error = fill_data(&mut file, 1024, Instant::now(), |_| {
+                assert!(
+                    !fail_write,
+                    "unexpected write error must not trigger sync/retry"
+                );
+                Err(std::io::Error::from_raw_os_error(5))
+            })
+            .unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(5));
+            assert!(!capacity_code(5));
+        }
+    }
+
+    #[test]
+    fn cannot_exceed_byte_cap_or_restart_expired_deadline() {
+        let mut sink = Vec::new();
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = fill_data(&mut sink, 13, Instant::now(), |_| Ok(()));
+        }))
+        .is_err());
+        assert_eq!(sink.len(), 13);
+        let expired = Instant::now() - Duration::from_secs(25);
+        let mut file = DelayedAllocation::new();
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = fill_data(&mut file, 1024, expired, |_| {
+                panic!("expired fill synchronized")
+            });
+        }))
+        .is_err());
+        assert_eq!(file.remaining.get(), 8, "expired fill wrote data");
+    }
 }
 
 impl Drop for Filler {

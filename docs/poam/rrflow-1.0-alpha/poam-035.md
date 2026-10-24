@@ -6,6 +6,12 @@
 
 ## Observed deficiency
 
+The [post-synchronization filler probe](../../evidence/change-journals/gate-c/c-07f-settled-filler.md)
+repairs a reproduced fixture gap: allocation available after the final barrier
+was not consumed before resume. Local control-flow evidence retains native
+failure/recovery requirements and all existing bounds; the missing selected
+macOS I/O event and complete native capacity matrix remain unqualified.
+
 The [filler allocation-sync correction](../../evidence/change-journals/gate-c/c-07f-filler-allocation-sync.md)
 removes Apple hardware-cache flush requests from disposable capacity filler
 files while preserving native allocation errors, existing limits and every
