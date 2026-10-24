@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+Linux21 again stopped at corpus ordinal 608 after 609 acknowledgements,
+now classified as a storage-substrate error. The
+[control-size attribution record](../../evidence/change-journals/gate-c/c-07g-control-size-attribution.md)
+adds a closed diagnostic for the one-MiB control-state limit. Historical
+transaction growth in the session is a source-grounded hypothesis until the
+native campaign confirms that exact label; no capacity qualification follows.
+
 At `b6052feef8df2aa86e5a866ff0c8da196bc8f2ab`, accepted C-06 supplies the
 physical reader/format/cache and D-01 supplies native installed lifecycle
 evidence. The [C-07 planning baseline](../../evidence/change-journals/gate-c/c-07-planning-baseline.md)
@@ -302,6 +309,23 @@ under unchanged limits, with zero observed L0 debt after setup. It then failed
 the unchanged 30-second backup-interference deadline. The earlier setup blocker
 is cleared in this characterization; the operating point remains failed and
 backup timing, full profiles and soak qualification remain open.
+
+The [projected-read frontier repair](../../evidence/change-journals/gate-c/c-07g-projected-frontier.md)
+reduces a reproduced first-row read from twelve disjoint row groups to one,
+while preserving admission, snapshots, overlap merging and retained buffers.
+Its owning storage suite passes; native backup benefit is not yet established.
+Linux19's diagnostic repeat on the preceding binary failed earlier at corpus
+ordinal 608 with an unclassified internal API rejection, despite resident memory
+below its cap and no failed flush/compaction counters. Its cause remains open;
+Linux18's successful setup does not establish repeatability.
+The [Linux20 candidate comparison](../../evidence/change-journals/gate-c/c-07g-projected-frontier-native.md)
+also stopped at ordinal 608 with an internal API rejection before backup, while
+remaining below the resident cap. The read-work repair is locally proved but
+does not resolve this rejection; precise error attribution remains required.
+The [safe read-pressure attribution](../../evidence/change-journals/gate-c/c-07g-read-pressure-attribution.md)
+extends the installed driver's closed diagnostic labels without changing
+Internal classification, durable-outcome proof or disclosure boundaries.
+Actual native attribution remains pending; no causal repair is inferred.
 
 Native run 39979675928 failed the macOS existing/WAL capacity case after a
 real filler ENOSPC: the client returned resource denial without a selected
