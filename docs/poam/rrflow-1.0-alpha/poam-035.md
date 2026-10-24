@@ -691,3 +691,33 @@ retains PR112's macOS WAL case: actual filler ENOSPC and public
 ResourceExhausted did not produce the required selected native-I/O receipt.
 The test remains failed; this result is neither OOM attribution nor native
 storage-full qualification. Exact syscall attribution remains open.
+
+
+### Pre-soak admission and current native result
+
+[PR115](https://github.com/rrflow/rrflow-development/pull/115) merged at
+`0273f11bc9784681f9532ca06d912b7f0e11ddb7` after candidate
+`3c13f4558e93315b12206f658eaf08b8a4995aea` passed pipeline
+`40107347790`. Its 24 native capacity cases passed across Linux/ext4,
+macOS/APFS and Windows/NTFS, including fresh/existing WAL, segment, manifest
+and CURRENT failures and exact recovery. This supersedes the earlier macOS
+candidate failure for that exact candidate, not the remaining full-profile gate.
+
+The same candidate's 1,000-record characterization completed at four clients /
+25 RPS but rejected 312 offers at the driver concurrency limit and nine at
+storage conflicts; 50 scheduled latencies exceeded budget. Zero unresolved
+writes/readback mismatches did not make this a passing operating point.
+Final 1,050-slot readback took 123.634 seconds. The subsequently started
+10,000-record attempt was interrupted and retained after this result was read.
+No 24-hour soak ran. The [admission/timing journal](../../evidence/change-journals/gate-c/c-07g-soak-admission.md)
+records the repair: reject invalid qualification preflight before soak and
+measure independent readback completion separately from response completion.
+This does not diagnose all growth cost or close POAM-035/C-07.
+
+
+The PR116 macOS candidate passed five capacity cases then failed owned-image
+cleanup with exit 16. The [bounded detachment repair](../../evidence/change-journals/gate-c/c-07f-owned-image-detachment.md)
+rechecks ownership on EBUSY retries within one deadline and preserves failure
+retention. Thirteen orchestration checks pass; native candidate rerun remains
+required. This new observed cleanup deficiency does not erase PR115 evidence
+or qualify PR116, and C-07 remains open.
