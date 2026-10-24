@@ -6,6 +6,12 @@
 
 ## Observed deficiency
 
+The [isolated Desktop host preparation](../../evidence/change-journals/gate-c/c-07g-desktop-vm-preparation.md)
+provides an owned four-vCPU/eight-GiB KVM guest, verified image provenance,
+ordinary-primary compatibility and writable delegated resource limits. This
+removes a host-preparation prerequisite; no guest installed workload or
+24-hour result is claimed. The larger WSL preflight continues separately.
+
 The [Desktop-corpus preflight launch](../../evidence/change-journals/gate-c/c-07g-desktop-preflight-launch.md)
 advances to the actual 100000-record/500000-edge/100000-vector corpus under
 the two-GiB engine cap. Its launch is not a completed result: ingestion,
