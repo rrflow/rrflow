@@ -497,6 +497,10 @@ pub struct LoadAttempt {
     pub scheduled_ns: u64,
     pub started_ns: u64,
     pub finished_ns: u64,
+    /// End of independent readback while the admitted client slot is still held.
+    /// Absent in historical evidence; never infer zero verification cost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification_finished_ns: Option<u64>,
     pub outcome: LoadOutcome,
     pub logical_id: Id,
     pub request_sha256: Digest,
@@ -928,6 +932,36 @@ impl CampaignWriter {
         )?;
         Ok(hash)
     }
+    /// Do not spend a qualification soak on an already failed operating point.
+    /// Characterization intentionally retains unsuccessful operating points.
+    pub fn admit_soak(&self, point: &Id, seed: u64) -> Result<()> {
+        if self.campaign.purpose != CampaignPurpose::Qualification {
+            return Ok(());
+        }
+        require(self.failed.is_none(), "failed segment cannot admit soak")?;
+        let point = self
+            .campaign
+            .points
+            .iter()
+            .find(|p| &p.id == point)
+            .ok_or("soak point is not in frozen campaign")?;
+        require(
+            self.campaign.seeds.contains(&seed),
+            "soak seed is not in frozen campaign",
+        )?;
+        require(
+            satisfies_point_requirements(
+                &self.campaign,
+                point,
+                seed,
+                self.totals.values(),
+                &phases()[..4],
+            )?,
+            "soak denied: prerequisite phases do not satisfy the frozen operating requirements",
+        )?;
+        self.verify_drain(&point.id, seed)
+    }
+
     pub fn verify_drain(&self, point: &Id, seed: u64) -> Result<()> {
         super::drain::check(
             &self.campaign,
@@ -1266,6 +1300,12 @@ pub fn validate_segment(
                 && attempt.finished_ns <= segment.finished_ns,
             "attempt mix, sequence or monotonic interval differs",
         )?;
+        if let Some(verified) = attempt.verification_finished_ns {
+            require(
+                verified >= attempt.finished_ns && verified <= segment.finished_ns,
+                "verification completion is outside the response/segment interval",
+            )?;
+        }
         match attempt.write {
             Some(write) => {
                 require(
@@ -1586,53 +1626,71 @@ pub(super) fn satisfies_operating_requirements(
         return Ok(false);
     }
     for point in &campaign.points {
-        for seed in &campaign.seeds {
-            let mut lanes = BTreeSet::new();
-            let mut reopens = 0u64;
-            let mut transitions = [false; 4];
-            for phase in phases() {
-                let Some(row) = result
-                    .operating_points
-                    .iter()
-                    .find(|r| r.point == point.id && r.seed == *seed && r.phase == phase)
-                else {
-                    return Ok(false);
-                };
-                if row.elapsed_ns < campaign.schedule.duration_ms(phase) * NANOSECONDS_PER_MS
-                    || (phase == LoadPhase::Warmup && row.corpus.is_none())
-                    || row.unresolved != 0
-                    || !row.missing_metrics.is_empty()
-                    || (phase != LoadPhase::Drain && row.attempts == 0)
-                    || row.latency_over_budget as u128 * 100 > row.attempts as u128
-                    || (phase != LoadPhase::Drain
-                        && (row.attempts as u128)
-                            < (campaign.schedule.duration_ms(phase) as u128
-                                * point.requests_per_second.get() as u128
-                                * if phase == LoadPhase::Burst { 2 } else { 1 })
-                            .div_ceil(1000))
-                    || row.failures as u128 * 10_000
-                        > row.attempts as u128 * point.maximum_error_basis_points as u128
-                {
-                    return Ok(false);
-                }
-                for (seen, count) in transitions.iter_mut().zip(row.acknowledged_transitions) {
-                    *seen |= count > 0;
-                }
-                lanes.extend(row.lanes.iter().copied());
-                reopens = reopens
-                    .checked_add(row.forced_reopens)
-                    .ok_or("reopen count overflow")?;
-            }
-            if !campaign
-                .required_lanes
-                .iter()
-                .all(|lane| lanes.contains(lane))
-                || reopens < campaign.schedule.forced_reopens.get()
-                || transitions.iter().any(|seen| !seen)
-            {
+        for &seed in &campaign.seeds {
+            if !satisfies_point_requirements(
+                campaign,
+                point,
+                seed,
+                result.operating_points.iter(),
+                &phases(),
+            )? {
                 return Ok(false);
             }
         }
+    }
+    Ok(true)
+}
+
+fn satisfies_point_requirements<'a>(
+    campaign: &StorageCampaign,
+    point: &OperatingPoint,
+    seed: u64,
+    rows: impl Iterator<Item = &'a OperatingPointResult> + Clone,
+    required_phases: &[LoadPhase],
+) -> Result<bool> {
+    let mut lanes = BTreeSet::new();
+    let mut reopens = 0u64;
+    let mut transitions = [false; 4];
+    for &phase in required_phases {
+        let Some(row) = rows
+            .clone()
+            .find(|r| r.point == point.id && r.seed == seed && r.phase == phase)
+        else {
+            return Ok(false);
+        };
+        if row.elapsed_ns < campaign.schedule.duration_ms(phase) * NANOSECONDS_PER_MS
+            || (phase == LoadPhase::Warmup && row.corpus.is_none())
+            || row.unresolved != 0
+            || !row.missing_metrics.is_empty()
+            || (phase != LoadPhase::Drain && row.attempts == 0)
+            || row.latency_over_budget as u128 * 100 > row.attempts as u128
+            || (phase != LoadPhase::Drain
+                && (row.attempts as u128)
+                    < (campaign.schedule.duration_ms(phase) as u128
+                        * point.requests_per_second.get() as u128
+                        * if phase == LoadPhase::Burst { 2 } else { 1 })
+                    .div_ceil(1000))
+            || row.failures as u128 * 10_000
+                > row.attempts as u128 * point.maximum_error_basis_points as u128
+        {
+            return Ok(false);
+        }
+        for (seen, count) in transitions.iter_mut().zip(row.acknowledged_transitions) {
+            *seen |= count > 0;
+        }
+        lanes.extend(row.lanes.iter().copied());
+        reopens = reopens
+            .checked_add(row.forced_reopens)
+            .ok_or("reopen count overflow")?;
+    }
+    if !campaign
+        .required_lanes
+        .iter()
+        .all(|lane| lanes.contains(lane))
+        || reopens < campaign.schedule.forced_reopens.get()
+        || transitions.iter().any(|seen| !seen)
+    {
+        return Ok(false);
     }
     Ok(true)
 }
@@ -1951,6 +2009,7 @@ pub(super) mod tests {
                 kind: StorageLoadKind::PointRead,
                 scheduled_ns: 0,
                 started_ns: recorded.started_ns,
+                verification_finished_ns: None,
                 finished_ns: recorded.finished_ns,
                 outcome: LoadOutcome::Acknowledged,
                 logical_id: recorded.logical_id,
@@ -1962,6 +2021,28 @@ pub(super) mod tests {
         };
         (campaign, segment)
     }
+    #[test]
+    fn verification_timing_is_optional_but_cannot_precede_response_or_escape_segment() {
+        let (campaign, mut segment) = fixture();
+        let original = encode_bounded(&segment, MAX_DOCUMENT_BYTES).unwrap();
+        assert!(!String::from_utf8(original.clone())
+            .unwrap()
+            .contains("verification_finished_ns"));
+        let historical: SustainedSegment = decode(&original).unwrap();
+        assert!(historical.attempts[0].verification_finished_ns.is_none());
+        validate_segment(&campaign, &historical).unwrap();
+        segment.attempts[0].verification_finished_ns = Some(segment.attempts[0].finished_ns);
+        validate_segment(&campaign, &segment).unwrap();
+        segment.attempts[0].verification_finished_ns = Some(segment.finished_ns);
+        validate_segment(&campaign, &segment).unwrap();
+        for invalid in [segment.attempts[0].finished_ns - 1, segment.finished_ns + 1] {
+            segment.attempts[0].verification_finished_ns = Some(invalid);
+            assert!(validate_segment(&campaign, &segment)
+                .unwrap_err()
+                .contains("verification completion"));
+        }
+    }
+
     #[test]
     fn short_run_is_characterization_and_failed_measurement_survives() {
         let (campaign, mut segment) = fixture();
@@ -2537,6 +2618,82 @@ pub(super) mod tests {
             }
         }
         assert!(qualifies(&campaign, &result).unwrap());
+        let before_soak = result
+            .operating_points
+            .iter()
+            .filter(|row| row.phase != LoadPhase::Soak)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(satisfies_point_requirements(
+            &campaign,
+            &campaign.points[0],
+            1,
+            before_soak.iter(),
+            &phases()[..4]
+        )
+        .unwrap());
+        let mut incomplete = result.clone();
+        incomplete.operating_points = before_soak.clone();
+        assert!(
+            !qualifies(&campaign, &incomplete).unwrap(),
+            "admitted preflight is not a completed soak"
+        );
+        for mutation in 0..9 {
+            let mut rows = before_soak.clone();
+            match mutation {
+                0 => {
+                    rows.remove(0);
+                }
+                1 => rows[0].elapsed_ns -= 1,
+                2 => rows[0].failures = 1,
+                3 => rows[0].latency_over_budget = rows[0].attempts / 100 + 1,
+                4 => rows[0].unresolved = 1,
+                5 => rows[0].missing_metrics.push(
+                    "native-allocation-enforcement"
+                        .to_owned()
+                        .try_into()
+                        .unwrap(),
+                ),
+                6 => rows[0].corpus = None,
+                7 => {
+                    for row in &mut rows {
+                        row.acknowledged_transitions = [0; 4];
+                    }
+                }
+                _ => {
+                    for row in &mut rows {
+                        row.lanes.clear();
+                    }
+                }
+            }
+            assert!(
+                !satisfies_point_requirements(
+                    &campaign,
+                    &campaign.points[0],
+                    1,
+                    rows.iter(),
+                    &phases()[..4]
+                )
+                .unwrap(),
+                "accepted invalid preflight {mutation}"
+            );
+        }
+        let temporary = tempfile::tempdir().unwrap();
+        let writer =
+            CampaignWriter::create(&temporary.path().join("qualification"), campaign.clone())
+                .unwrap();
+        assert!(writer
+            .admit_soak(&campaign.points[0].id, 1)
+            .unwrap_err()
+            .contains("prerequisite"));
+        assert!(writer
+            .admit_soak(&campaign.points[0].id, 999)
+            .unwrap_err()
+            .contains("seed"));
+        let diagnostic =
+            CampaignWriter::create(&temporary.path().join("characterization"), fixture().0)
+                .unwrap();
+        assert!(diagnostic.admit_soak(&campaign.points[0].id, 1).is_ok());
         result.operating_points[0].attempts = 1;
         assert!(!qualifies(&campaign, &result).unwrap());
         result.operating_points[0].attempts = 1500;
