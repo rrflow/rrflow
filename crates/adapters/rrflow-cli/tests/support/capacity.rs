@@ -869,7 +869,8 @@ fn capacity_case(point: &str, mode: &str) {
         // tail yields a plan; any other failure remains fatal on serve/re-read.
         let mut command = estate.command();
         command.args(["repair","plan","--project"]).arg(&estate.project);
-        let output = process::Process::start(&mut command,Duration::from_secs(120),8*LIMIT,None).unwrap().finish().unwrap();
+        let output = installed_command(&mut command,CommandPhase::RepairPlan,Duration::from_secs(120),8*LIMIT)
+            .unwrap_or_else(|error| panic!("{error}"));
         let repair_receipt = if output.status.success() {
             let plan:Value = serde_json::from_slice(&output.stdout).unwrap();
             let path = estate.temp.path().join("repair.json");
