@@ -142,6 +142,39 @@ reasoning. Profile provenance and sharing stay under the
 [project-preferences owner](../../client/devpulse-cloud.md#project-preferences-sharing-and-isolation).
 Local use remains independent of shippin.cloud and training hardware.
 
+## Staged learning and feedback
+
+RROFLOW is layered on qualified project state, source provenance, retained
+run evidence and reproducible comparisons. It is not enabled by installing
+RRFlow or recording more prompts. The
+[graph/retrieval baseline contract](../../data/knowledge-connectors.md#graph-and-retrieval-baselines)
+and [Connectome inspection contract](../../client/connectome.md#guided-project-knowledge-and-session-journey)
+define the inputs to the eventual user-facing loop. Offline G-06 experiments
+may start earlier against independently authorized fixed fixtures; they cannot
+claim installed attunement, user adaptation or production benefit.
+
+| Stage | Candidate input and output | Required evidence before the next effect |
+|---|---|---|
+| Observe and establish a baseline | Authorized outcomes, explicit corrections and retained task/context/configuration identities; versioned evaluation corpus. | Current consent, source validity, secret exclusions and project/time-separated holdout; unknown quality remains unknown. No training consent inferred from inspection or telemetry. |
+| Supervised improvement | Independently checked labels or human preferences suggest rules, exemplars or a model candidate. | Dataset/split provenance, label quality and held-out comparison against deterministic/simple baselines. A user correction does not itself activate weights. |
+| Unsupervised discovery | Authorized clustering or representation analysis proposes recurring task/failure families and candidate relationships. | Source-grounded review and downstream evaluation; clusters are hypotheses, not verified facts or permissions. Derived graph changes use the same baseline/promotion boundary. |
+| Recursive improvement | A bounded I-03 routine proposes, evaluates and optionally shadows a revision using verified outcomes from prior revisions. | Maximum iterations/elapsed time/spend, cancellation, deduplication, restart and uncertain-effect reconciliation. Self-generated evaluations cannot be their sole correctness oracle; preserve independent holdouts and evaluator identities. |
+| Promote and monitor | Qualified candidate and exact scope become a proposed configuration/artifact revision. | G-06 qualification where models are involved, I-03 receipt/CAS, explicit policy, regression checks and compatible rollback. No deployment-wide automatic learning by default. |
+
+Reusing a held-out set to tune successive candidates contaminates it. Version
+evaluation splits, reserve a final untouched acceptance set and report when
+the available evidence cannot support another independent comparison. Track
+changes per project/task family, including regressions hidden by aggregate
+scores, drift, cost and prohibited access. Candidate history and negative
+results remain inspectable subject to retention and current authorization.
+
+The user may accept a preference or verified exemplar without consenting to
+training, share context without exporting datasets, or synchronize a project
+without activating RROFLOW. Connectome projects those separate engine-owned
+states. Optional rrflow.ai/rroflow.ai access and shippin.cloud integration use
+the [managed-service boundary](../../client/devpulse-cloud.md#optional-managed-service-roles);
+none becomes a second learning scheduler, canonical log or mandatory login.
+
 ## Research decisions
 
 Sources were reviewed on 2026-10-20; applicability must be rechecked when an
