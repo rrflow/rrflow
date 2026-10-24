@@ -541,6 +541,7 @@ impl PointRun<'_> {
                         scheduled(sequence),
                         at,
                         at,
+                        at,
                         operation,
                         Err("driver-concurrency-limit".into()),
                         None,
@@ -580,6 +581,7 @@ impl PointRun<'_> {
                         at,
                         began,
                         finished,
+                        ns(clock),
                         operation,
                         result,
                         verification,
@@ -822,13 +824,24 @@ type Completion = (
     u64,
     u64,
     u64,
+    u64,
     Prepared,
     DriverResult<workload::Completed>,
     Option<DriverResult<()>>,
     bool,
 );
 fn collect(
-    (sequence, scheduled_ns, started_ns, finished_ns, operation, result, verification, rejected): Completion,
+    (
+        sequence,
+        scheduled_ns,
+        started_ns,
+        finished_ns,
+        verification_finished_ns,
+        operation,
+        result,
+        verification,
+        rejected,
+    ): Completion,
     segment_start: u64,
     attempts: &mut Vec<LoadAttempt>,
     ledger: &mut AcknowledgementLedger,
@@ -903,6 +916,7 @@ fn collect(
         scheduled_ns,
         started_ns,
         finished_ns,
+        verification_finished_ns: Some(verification_finished_ns),
         outcome,
         logical_id: evidence_id(operation.id),
         request_sha256: operation.request_sha256,
@@ -1310,6 +1324,9 @@ async fn run_estate(
                 LoadPhase::Drain,
                 LoadPhase::Soak,
             ] {
+                if phase == LoadPhase::Soak {
+                    writer.admit_soak(&point.id, *seed)?;
+                }
                 let mut phase_origin = if let Some(fleet) = fleet {
                     rotate_session(
                         &estate,

@@ -35,6 +35,16 @@ records the bounded evidence. Full H-05a and this deficiency remain open:
 storage/distribution identity, remote discovery, runtime levels and executed
 release/diagnostic parity are not established by the build helper.
 
+The requested [local-evidence/model-usage demonstration](../../architecture/engine-data-flow.md#project-evidence-model-usage-and-reasoning-efficiency)
+also lacks complete accounting. Code inspection at `0273f11b` found the legacy
+`crates/evaluation/rrflow-eval/src/main.rs::metrics` parser returns an input sum
+of zero when a Claude/Gemini `usage` object exists but contains no recognized
+counts; it also chooses only the first Gemini model statistics entry. This is
+not proof of zero usage or complete multi-model totals. H-05/G-06 must normalize
+provider semantics with missing/partial/multiple-model fixtures before those
+values support savings claims. Local/remote, cached and reported reasoning
+breakdowns and source-quality joins remain unqualified; no status is closed.
+
 ## Impact
 
 Local logs or scattered elapsed counters can be mistaken for system proof; regressions,
