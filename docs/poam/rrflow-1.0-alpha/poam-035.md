@@ -792,3 +792,10 @@ creation plus 1.606 s verification), while later endurance also fails without
 that barrier. Fix scheduling at its existing driver owner and attribute native
 read/maintenance costs separately, preserving offered time, audit, transaction
 and resource boundaries. No actual 24-hour soak ran.
+The [immutable point-read selection repair](../../evidence/change-journals/gate-c/c-07g-point-read-selection.md)
+records a reproduced growth cost: a six-byte winner read 131219 bytes because
+superseded values were hydrated before sequence selection. Winner-only reads
+reduce that fixture to 113 bytes; bounded batch traversal preserves both
+metadata and payload locality. Exact snapshot, deletion, compaction and reopen
+checks accompany the repair. This component evidence does not establish the
+installed operating point or close the scheduling, growth or 24-hour soak gap.
