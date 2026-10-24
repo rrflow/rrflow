@@ -707,3 +707,10 @@ and read back, then restart failed with `multiply linked file denied`. The
 failed estate was removed during harness unwinding, preventing file/link-count
 inspection. Preserve owned failure state and identify that admission before
 repairing its canonical owner; no link guard or capacity threshold is waived.
+
+The [startup admission evidence](../../evidence/change-journals/gate-c/c-07g-reopen-admission.md)
+adds bounded relative file/link-count diagnostics and retention of original
+owned startup-failure bytes after child cleanup. Admission remains strict;
+actual native cause and repair remain pending. The same record retains a new
+macOS CI failure: metadata fill reached its 8192-file bound before obtaining
+capacity denial. That C-07f fixture gap also blocks candidate acceptance.

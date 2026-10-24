@@ -1,5 +1,7 @@
 //! C-07c ordinary-primary ACK/kill/reopen corpus. Explicitly run by native CI.
 //! This fixed correctness workload is not a capacity profile or a soak.
+#[path = "support/owned_directory.rs"]
+mod owned_directory;
 #[path = "support/process.rs"]
 mod process;
 #[path = "support/sustained.rs"]
@@ -31,7 +33,7 @@ const STREAM_LIMIT: usize = 1024 * 1024;
 const CORPUS_SECONDS: u64 = 3600;
 
 struct Estate {
-    temp: tempfile::TempDir,
+    temp: owned_directory::OwnedDirectory,
     binary: PathBuf,
     project: PathBuf,
     build: Value,
@@ -121,7 +123,7 @@ impl Estate {
             std::fs::write(project.join("README.md"), "project-owned\n").unwrap();
         }
         let mut estate = Self {
-            temp,
+            temp: owned_directory::OwnedDirectory::new(temp),
             binary,
             project,
             build: Value::Null,
@@ -211,6 +213,12 @@ impl Estate {
                     )
                 ),
             };
+            // Child termination and stream collection precede retention. Keep
+            // the original private bytes, without copying or uploading them.
+            eprintln!(
+                "native_startup_failure_estate={}",
+                serde_json::json!({"path": self.temp.retain(), "private_state": true})
+            );
             panic!("bounded ordinary startup: {error}; {diagnosis}");
         });
         let announcement: Value = serde_json::from_slice(&readiness).unwrap();

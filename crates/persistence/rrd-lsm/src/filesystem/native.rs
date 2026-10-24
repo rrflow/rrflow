@@ -42,15 +42,27 @@ pub(super) fn validate_file(file: &File) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        if file.metadata()?.nlink() != 1 {
-            return Err(denied("multiply linked file denied"));
+        let links = file.metadata()?.nlink();
+        if links != 1 {
+            return Err(invalid_links(links));
         }
     }
     #[cfg(windows)]
-    if information(file)?.nNumberOfLinks != 1 {
-        return Err(denied("multiply linked file denied"));
+    {
+        let links = u64::from(information(file)?.nNumberOfLinks);
+        if links != 1 {
+            return Err(invalid_links(links));
+        }
     }
     Ok(())
+}
+
+#[cfg(any(unix, windows))]
+fn invalid_links(links: u64) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        format!("file link count denied: expected=1 observed={links}"),
+    )
 }
 
 pub(super) fn validate_object(file: &File) -> io::Result<()> {
