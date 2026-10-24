@@ -6,6 +6,34 @@
 
 ## Observed deficiency
 
+### Native capacity timeout attribution (2026-10-24)
+
+Two further failures are retained in the [command-attribution record](../../evidence/change-journals/gate-c/c-07f-command-attribution.md).
+[PR118 run 40121463373](https://github.com/rrflow/rrflow-development/actions/runs/40121463373/job/120953725578)
+reached the macOS `wal_before_write` pause in fresh mode, filled 254607360
+bytes to native ENOSPC (28), and returned `api-ResourceExhausted` without the
+required selected native-I/O receipt. The controller expired after 60 seconds.
+This establishes missing native attribution, not that the WAL pause was missed
+or that the failure necessarily preceded the WAL write. The existing APFS
+metadata-refill change does not execute on this WAL case.
+
+[PR23 run 40121518000](https://github.com/rrflow/rrflow-development/actions/runs/40121518000)
+filled 242651136 bytes on ext4 and returned `api-Internal`, then exceeded the
+120-second `Estate::invoke` limit. Its stack identifies the `capacity_case`
+async closure; the only invocation in that closure is `repair apply`.
+The old log lacks the command label, elapsed phase timings and resource trace
+needed to distinguish replay/hashing/copy/publication costs or a stalled repair.
+These are failed native cases, even though neither log reports a lost ACK or
+readback mismatch. API error classes alone do not identify a native syscall.
+
+C-07f owns reproduction and causal repair. PR124 adds static command phases
+and bounded timing to the existing monitor while preserving both deadlines,
+output limits, selected native-error requirements and recovery oracles. This
+closes the missing command-label diagnostic only; the two intermittent causes
+remain open until exact-candidate native evidence and attribution support a
+repair. No timeout increase, retries or C-07 status change is authorized by
+this record.
+
 The [conflict-probe repair and execution reset](../../evidence/change-journals/gate-c/c-07g-conflict-spine-and-execution.md)
 removes reproduced unnecessary value-page reads during native write-conflict
 validation. The existing C-07 owner now separates implemented paths, native

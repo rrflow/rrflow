@@ -13,6 +13,12 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [native capacity command-attribution record](../../evidence/change-journals/gate-c/c-07f-command-attribution.md)
+and POAM-035 retain the macOS selected-WAL-event timeout and Ubuntu
+`repair apply` command timeout. Static phase/timing diagnostics preserve the
+original deadlines and native failure oracle. These intermittent causes remain
+open; diagnostic implementation is not a causal repair or native acceptance.
+
 One installed native engine must preserve every acknowledged authoritative
 commit, publish atomic batches, reject uncertain or corrupt state safely, and
 keep admission, maintenance, recovery and retained buffers within explicit
