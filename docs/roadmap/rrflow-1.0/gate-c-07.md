@@ -40,8 +40,8 @@ packages as if their implementation were absent.
 | c | `installed_crash.rs`, `installed_reopen.rs`, response-loss/history support and diagnostic-only native pause protocol. | Join fresh/existing domain/publication/compound-recovery and 100-cycle native results for the final candidate. A different PR's green job cannot be rebound to it. |
 | d | `TransactionGate` count/byte/deadline admission; installed storage configuration; native mutable/retention, maintenance, reclamation, recovery and disk-reserve limits. | Demonstrate aggregate process limits and sustained progress under the declared profiles. Logical reservations alone are not RSS or proof that a large estate progresses. |
 | e | Native source-page and retained-output pools, read-view lifetime registry, projected/interleaved lifetime and native memory fixtures. | Complete the required physical/lifetime/native matrix and retained-owner drain evidence on the final candidate. |
-| f | Owned ext4/APFS/NTFS runner, selected native-error/recovery ledger and damaged-state tests. | macOS capacity qualification is failing. PR112 repairs filler synchronization; only actual selected native failure plus recovery can qualify it. |
-| g | `installed_reopen.rs::sustained` driver, bounded corpus generator/independent readback, `run_sustained_capacity.py`, frozen profiles and progress/result receipts. | Desktop corpus ingestion failed at 50,685 acknowledgements; no completed corpus or 24-hour soak. Repair/attribute growth before repeating long campaigns. |
+| f | Owned ext4/APFS/NTFS runner, selected native-error/recovery ledger and damaged-state tests. | PR115 candidate `3c13f455` passed all 24 selected native capacity cases across Linux, macOS and Windows. Bind these exact results to the accepted candidate; full profile/soak qualification remains separate. |
+| g | `installed_reopen.rs::sustained` driver, bounded corpus generator/independent readback, `run_sustained_capacity.py`, frozen profiles and progress/result receipts. | Desktop corpus ingestion failed at 50,685 acknowledgements. The subsequent 1,000-record characterization completed but failed the 25-RPS operating point. No 24-hour soak has started; measure scheduling/readback and repair growth before full qualification. |
 | h | `collect_storage_acceptance.py` and canonical Rust receipt validation. | No complete joined accepted candidate/profile/native/soak evidence. Collection tooling is implemented; accepted evidence is missing. |
 
 ### Execution reset after the failed Desktop corpus
@@ -53,8 +53,9 @@ reported 1,981,981,149,033 cumulative segment bytes read for 1,414,786,770 bytes
 of segments, one failed compaction and a corpus-operation deadline. Those are
 attribution leads, not a diagnosed root cause, an OOM result or a completed soak.
 
-1. **Finish two blocking tracks:** qualify native capacity through PR112 and
-   repair demonstrated engine growth costs through PR115. Use current public
+1. **Preserve the native result and finish engine growth:** PR115 merged PR112
+   and passed candidate CI, including all three native capacity platforms. Its
+   conflict-probe optimization is implemented; sustained growth is still open. Use current public
    main as the source baseline and preserve each failed campaign. Do not start
    new UI/provider/configuration packages while these storage blockers remain.
 2. **Attribute and remove growth costs at their owner.** First measure native
@@ -79,6 +80,17 @@ attribution leads, not a diagnosed root cause, an OOM result or a completed soak
    must bind all required native and sustained cases to the candidate. Merge
    only passing candidate PRs and update Gate C/POAM035 only when their named
    exits pass. Then resume dependent indexing/retrieval, knowledge paths and UI.
+
+The [pre-soak admission and readback record](../../evidence/change-journals/gate-c/c-07g-soak-admission.md)
+binds the merged native result, retained failed characterization and the next
+implementation. Qualification must satisfy the existing warmup, measured,
+burst and drain requirements before starting soak, including settled ownership.
+The final qualification still requires the actual soak. Keep response,
+scheduling delay and independent readback time distinct; a completed harness
+with invalid operating results is not a passing capacity result. A separately
+frozen 5-RPS characterization is allowed by the profile matrix; it cannot erase
+or qualify the failed 25-RPS point. Preserve transaction, backup and readback
+oracles throughout this investigation.
 
 Execution discipline: describe progress as implemented behavior, reproduced
 failure, measured improvement, or completed acceptance. Keep outstanding work

@@ -112,3 +112,9 @@ Every selected model-backed profile needs its real pinned artifact/provider
 evidence; deterministic LFG does not require a trained model. Routing must
 steer a persisted tree without storage or planner authority, with qualified
 budgets, explicit fallbacks and scoped cache behavior.
+
+G-06's installed comparison also consumes the [project evidence and model-usage
+contract](../../architecture/engine-data-flow.md#project-evidence-model-usage-and-reasoning-efficiency):
+prove task quality and supported citations alongside local/remote model usage,
+web/tool work and adaptive escalation. Deterministic retrieval work has no
+model-token count. Missing provider usage cannot become zero or a savings claim.
