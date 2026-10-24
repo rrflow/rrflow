@@ -10,6 +10,8 @@ description = "RRFlow kernel: bi-temporal claims, key encoding, supersession. No
 # It must never depend on a concrete storage engine, transport, or tier policy.
 [dependencies]
 serde = { workspace = true }
+# Pure cryptographic primitive only; no storage, transport or platform service.
+sha2 = { version = "=0.11.0", default-features = false }
 
 [dev-dependencies]
 serde_json = { workspace = true }

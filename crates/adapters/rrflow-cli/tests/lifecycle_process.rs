@@ -159,6 +159,35 @@ fn readiness_without_a_bounded_complete_line_is_rejected() {
 }
 
 #[test]
+fn failed_startup_retains_bounded_stderr_and_reaps_the_child() {
+    let diagnostic = format!("discarded-prefix{}retained-startup-cause", "x".repeat(3000));
+    #[cfg(windows)]
+    let mut command = {
+        let shell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+            .join("System32/cmd.exe");
+        let mut command = Command::new(shell);
+        command.args(["/d", "/c", &format!("echo {diagnostic} 1>&2 & exit /b 17")]);
+        command
+    };
+    #[cfg(unix)]
+    let mut command = {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", &format!("printf '{diagnostic}\\n' >&2; exit 17")]);
+        command
+    };
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    let mut child =
+        process::Process::start(&mut command, Duration::from_secs(10), 4096, Some(send)).unwrap();
+    assert!(receive.recv_timeout(Duration::from_secs(5)).is_err());
+    let failure = child.finish().unwrap_err();
+    assert!(failure.contains("announcement"), "{failure}");
+    assert!(failure.contains("retained-startup-cause"), "{failure}");
+    assert!(!failure.contains("discarded-prefix"));
+    assert!(failure.len() < 2300);
+    assert!(!child.running());
+}
+
+#[test]
 fn finite_output_preserves_both_streams_and_status() {
     let mut child = fixture("exit", Duration::from_secs(10), 4096);
     let output = child.finish().unwrap();
