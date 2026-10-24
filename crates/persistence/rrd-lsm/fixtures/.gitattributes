@@ -1,0 +1,2 @@
+# Canonical serializer bytes are identical on every native platform.
+manifest-v3.json text eol=lf

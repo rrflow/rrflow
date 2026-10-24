@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "platform": "darwin",
+  "os_release": "25.6.0",
+  "architecture": "arm64",
+  "sha256": {
+    "rrflow": "5c15ddf6e8cb87b91e1379bc92c1c7baafd7df817be2243dc1f992514bacab5b",
+    "installed_lifecycle": "4d0cfe5e4b4a7e5fce02281a9102781e2540b2ad83f31f04934ec2c3332bcea3"
+  },
+  "passed_cases": [
+    "fresh_installed_engine_survives_restart_and_restore",
+    "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
+    "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
+    "primary_help_exposes_only_the_installed_product_lifecycle",
+    "raw_database_and_development_commands_fail_during_argument_parsing"
+  ],
+  "filesystem": {
+    "type": "apfs",
+    "device": 16777229
+  },
+  "durable_receipts": [
+    {
+      "mode": "existing",
+      "build": {
+        "executable_sha256": "5c15ddf6e8cb87b91e1379bc92c1c7baafd7df817be2243dc1f992514bacab5b",
+        "metadata_sha256": "6a5453d6de322c29e2049754757fa53c1f75832a81a934571da9c635168905a4",
+        "public_contract_sha256": "37f9550c2a8e385b4e82ee3d35ec0c653373015c452f59623d308281dbd89afb",
+        "signal_catalogue_sha256": "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
+      },
+      "installation_plan_sha256": "c450aa7ac30a4ca4399e27a6feea0ffad37d730c70e8cfd647127c650f4b0ee2",
+      "restore_plan_sha256": "c9b40aec8b9d1e8f8f7417436d5be160a6dbf33b7c6c91642dbe4f1698509c74",
+      "backup_sha256": "b6612f81438c1b1f44e4a2b49ce434990157337ca2b94e47dc0af98811b3d406",
+      "installed_runtime_cursor": 2,
+      "reopened_runtime_cursor": 4,
+      "restored_runtime_cursor": 3,
+      "committed_claim_sequence": 1,
+      "restored_read_manifest_sha256": "4af9cce5ed112a328c8456c0db24566a4b8eb5ad3bae150bc2040fc0c1b9d33c",
+      "captured_output_bytes": 16854154,
+      "stream_limit_bytes": 16777216
+    },
+    {
+      "mode": "fresh",
+      "build": {
+        "executable_sha256": "5c15ddf6e8cb87b91e1379bc92c1c7baafd7df817be2243dc1f992514bacab5b",
+        "metadata_sha256": "6a5453d6de322c29e2049754757fa53c1f75832a81a934571da9c635168905a4",
+        "public_contract_sha256": "37f9550c2a8e385b4e82ee3d35ec0c653373015c452f59623d308281dbd89afb",
+        "signal_catalogue_sha256": "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
+      },
+      "installation_plan_sha256": "89ce85833a1b874fc60d3073a1e159ad2a3c8f6a3d3f99a99328ee00cbb5b95d",
+      "restore_plan_sha256": "8fce83832ce9e9c2c90b86cde4d5d04653061b78f9cb6a5fbd970593307909a3",
+      "backup_sha256": "ae6937260517d99806f5d8c367adabafbca2eaf9874f8deee94433230d11305c",
+      "installed_runtime_cursor": 2,
+      "reopened_runtime_cursor": 4,
+      "restored_runtime_cursor": 3,
+      "committed_claim_sequence": 1,
+      "restored_read_manifest_sha256": "f49844de97e457c088956396ac939fc325785acfd7ea7b369ec8b4850ad6b5ab",
+      "captured_output_bytes": 16854148,
+      "stream_limit_bytes": 16777216
+    }
+  ],
+  "failed": 0,
+  "ignored": 0,
+  "outbound_denials": [
+    "ipv4",
+    "ipv6"
+  ],
+  "masked_roots": [
+    "/Users/runner/.cargo",
+    "/Users/runner/.rustup",
+    "/Users/runner/work/rrflow-development"
+  ],
+  "isolation": "macos-inherited-seatbelt"
+}

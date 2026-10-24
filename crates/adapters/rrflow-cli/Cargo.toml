@@ -6,6 +6,9 @@ license.workspace = true
 publish.workspace = true
 description = "RRFlow installed reasoning and recall engine command-line product surface."
 
+[features]
+crash-test = ["rrd-engine/crash-test"]
+
 [dependencies]
 rrd-engine = { path = "../../authority/rrd-engine" }
 rrd-contract = { path = "../../transport/rrd-contract" }
@@ -22,12 +25,27 @@ sysinfo = "0.39.6"
 tokio = { version = "1", features = ["rt-multi-thread", "signal", "time"] }
 
 [dev-dependencies]
+rrflow-eval = { path = "../../evaluation/rrflow-eval" }
+bytes = "1"
+parquet = { version = "=59.2.0", default-features = false, features = ["arrow"] }
+rrd-query = { path = "../../compute/rrd-query" }
 tempfile = "3"
 rrd-core = { path = "../../kernel/rrd-core" }
 rrd-store = { path = "../../persistence/rrd-store" }
 rrd-security = { path = "../../authority/rrd-security" }
 rrd-estate = { path = "../../authority/rrd-estate" }
 
+[build-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dev-dependencies]
+libc = "0.2"
+
 [[bin]]
 name = "rrflow"
 path = "src/main.rs"
+
+[[test]]
+name = "installed_crash"
+required-features = ["crash-test"]

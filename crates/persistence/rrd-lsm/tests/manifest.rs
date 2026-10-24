@@ -1,5 +1,141 @@
 use rrd_lsm::{Error, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION};
 
+#[test]
+fn restarted_writer_preserves_interrupted_temporary_files_and_can_publish() {
+    struct OwnedChild(std::process::Child);
+    impl Drop for OwnedChild {
+        fn drop(&mut self) {
+            if !matches!(self.0.try_wait(), Ok(Some(_))) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+    }
+    for family in ["manifest", "current", "checkpoint"] {
+        let root = tempfile::tempdir().unwrap();
+        let first = Manifest::new(1, None, 100, 0, 1, vec![]).unwrap();
+        let next = Manifest::new(2, Some(first.digest.clone()), 101, 0, 1, vec![]).unwrap();
+        let store = ManifestStore::open(root.path()).unwrap();
+        store.publish(&first, None).unwrap();
+        drop(store);
+        let orphan = match family {
+            "manifest" => root
+                .path()
+                .join("manifests")
+                .join(format!(".{}.1.tmp", next.digest)),
+            "current" => {
+                // The immutable manifest already reached disk before CURRENT.
+                std::fs::write(
+                    root.path()
+                        .join("manifests")
+                        .join(format!("{}.json", next.digest)),
+                    serde_json::to_vec(&next).unwrap(),
+                )
+                .unwrap();
+                root.path().join(".CURRENT.1.tmp")
+            }
+            _ => root.path().join("checkpoints/.held.1.tmp"),
+        };
+        std::fs::write(&orphan, b"interrupted publication must remain unchanged").unwrap();
+        let mut child = OwnedChild(
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "restarted_manifest_writer_child",
+                    "--ignored",
+                    "--nocapture",
+                ])
+                .env("RRFLOW_MANIFEST_RESTART_ROOT", root.path())
+                .env("RRFLOW_MANIFEST_RESTART_FAMILY", family)
+                .stdout(std::process::Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break status;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "bounded {family} restart helper"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        };
+        assert!(status.success(), "restarted {family} writer failed");
+        assert_eq!(
+            std::fs::read(&orphan).unwrap(),
+            b"interrupted publication must remain unchanged"
+        );
+        let store = ManifestStore::open_existing(root.path()).unwrap();
+        if family == "checkpoint" {
+            assert_eq!(store.checkpoints().unwrap().len(), 1);
+        } else {
+            assert_eq!(store.current().unwrap().unwrap().1, next);
+        }
+    }
+}
+
+#[test]
+#[ignore = "owned subprocess helper; parent supplies its disposable manifest root"]
+fn restarted_manifest_writer_child() {
+    let root = std::env::var_os("RRFLOW_MANIFEST_RESTART_ROOT").unwrap();
+    let family = std::env::var("RRFLOW_MANIFEST_RESTART_FAMILY").unwrap();
+    assert!(["manifest", "current", "checkpoint"].contains(&family.as_str()));
+    let store = ManifestStore::open_existing(std::path::Path::new(&root)).unwrap();
+    let first = store.current().unwrap().unwrap().1;
+    if family == "checkpoint" {
+        store.checkpoint("held", &first.digest, 101).unwrap();
+    } else {
+        let next = Manifest::new(2, Some(first.digest.clone()), 101, 0, 1, vec![]).unwrap();
+        store.publish(&next, Some(&first.digest)).unwrap();
+    }
+}
+
+#[test]
+#[cfg(any(unix, windows))]
+fn retained_root_rejects_replaced_manifest_directory() {
+    let fixture = tempfile::tempdir().unwrap();
+    let root = fixture.path().join("estate");
+    let outside = fixture.path().join("outside");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::create_dir(&outside).unwrap();
+    std::fs::write(outside.join("sentinel"), b"outside must remain unchanged").unwrap();
+    let store = ManifestStore::open(&root).unwrap();
+    let directory = root.join("manifests");
+    std::fs::rename(&directory, root.join("original-manifests")).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&outside, &directory).unwrap();
+    #[cfg(windows)]
+    {
+        let output = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile", "-NonInteractive", "-Command",
+                "New-Item -ItemType Junction -Path $env:RRFLOW_TEST_LINK -Target $env:RRFLOW_TEST_TARGET -ErrorAction Stop | Out-Null",
+            ])
+            .env("RRFLOW_TEST_LINK", &directory)
+            .env("RRFLOW_TEST_TARGET", &outside)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "junction fixture: {:?}", output);
+    }
+    let manifest = Manifest::new(1, None, 100, 0, 1, Vec::new()).unwrap();
+    let result = store.publish(&manifest, None);
+    assert_eq!(
+        std::fs::read_dir(&outside).unwrap().count(),
+        1,
+        "publication escaped into the outside directory: {result:?}"
+    );
+    assert_eq!(
+        std::fs::read(outside.join("sentinel")).unwrap(),
+        b"outside must remain unchanged"
+    );
+    assert!(
+        result.is_err(),
+        "a substituted manifest directory must be denied"
+    );
+}
+
 fn segment(id: &str, first: &[u8], last: &[u8], minimum: u64, maximum: u64) -> SegmentDescriptor {
     SegmentDescriptor {
         id: id.into(),
@@ -246,4 +382,108 @@ fn named_checkpoints_pin_historical_manifests_until_explicit_release() {
     assert!(!store.release_checkpoint("before-migration").unwrap());
     assert!(store.checkpoints().unwrap().is_empty());
     assert!(store.checkpoint("../escape", &second.digest, 103).is_err());
+}
+
+#[test]
+fn checkpoint_admission_is_atomic_idempotent_and_reusable_after_release() {
+    use std::sync::Arc;
+    let root = tempfile::tempdir().unwrap();
+    let store = ManifestStore::open(root.path())
+        .unwrap()
+        .with_checkpoint_limits(2, rrd_lsm::ReclamationLimits::default())
+        .unwrap();
+    let manifest = Manifest::new(1, None, 100, 0, 1, vec![]).unwrap();
+    store.publish(&manifest, None).unwrap();
+    let first = store.checkpoint("first", &manifest.digest, 100).unwrap();
+    let store = Arc::new(store);
+    let outcomes = std::thread::scope(|threads| {
+        let handles = (0..8)
+            .map(|i| {
+                let store = store.clone();
+                let digest = &manifest.digest;
+                threads.spawn(move || store.checkpoint(&format!("contender-{i}"), digest, 100))
+            })
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(outcomes.iter().filter(|r| r.is_ok()).count(), 1);
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|r| matches!(
+                r,
+                Err(Error::CheckpointLimit {
+                    limit: 2,
+                    observed: 3
+                })
+            ))
+            .count(),
+        7
+    );
+    assert_eq!(store.checkpoint_ownership().unwrap(), (2, 2));
+    assert_eq!(
+        std::fs::read_dir(root.path().join("checkpoints"))
+            .unwrap()
+            .count(),
+        2
+    );
+    assert_eq!(
+        store.checkpoint("first", &manifest.digest, 100).unwrap(),
+        first
+    );
+    assert!(store.release_checkpoint("first").unwrap());
+    store
+        .checkpoint("replacement", &manifest.digest, 101)
+        .unwrap();
+    let before = store.checkpoints().unwrap();
+    drop(store);
+    let reopened = ManifestStore::open_existing(root.path())
+        .unwrap()
+        .with_checkpoint_limits(2, rrd_lsm::ReclamationLimits::default())
+        .unwrap();
+    assert_eq!(reopened.checkpoints().unwrap(), before);
+    assert!(matches!(
+        reopened.checkpoint("over", &manifest.digest, 102),
+        Err(Error::CheckpointLimit { .. })
+    ));
+}
+
+#[test]
+fn checkpoint_inventory_and_metadata_are_bounded_without_deleting_pins() {
+    let root = tempfile::tempdir().unwrap();
+    let store = ManifestStore::open(root.path())
+        .unwrap()
+        .with_checkpoint_limits(
+            1,
+            rrd_lsm::ReclamationLimits {
+                metadata_bytes: 1024,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let manifest = Manifest::new(1, None, 100, 0, 1, vec![]).unwrap();
+    store.publish(&manifest, None).unwrap();
+    store.checkpoint("kept", &manifest.digest, 100).unwrap();
+    let checkpoint = root.path().join("checkpoints/kept.json");
+    let original = std::fs::read(&checkpoint).unwrap();
+    let excess = root.path().join("checkpoints/.interrupted.tmp");
+    std::fs::write(&excess, b"retained interrupted publication").unwrap();
+    assert!(matches!(
+        store.checkpoints(),
+        Err(Error::CheckpointLimit { .. })
+    ));
+    assert_eq!(std::fs::read(&checkpoint).unwrap(), original);
+    std::fs::remove_file(&excess).unwrap();
+    std::fs::write(&checkpoint, vec![b' '; 1025]).unwrap();
+    assert!(matches!(
+        store.checkpoints(),
+        Err(Error::ReclamationLimit {
+            resource: rrd_lsm::ReclamationResource::MetadataBytes,
+            ..
+        })
+    ));
+    assert_eq!(std::fs::metadata(&checkpoint).unwrap().len(), 1025);
 }

@@ -1,10 +1,9 @@
 use super::format::{ArchiveHeader, PrefixInventory};
+use crate::filesystem::AnchoredPath;
 use crate::{Error, Result};
 use rrd_core::digest;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
+
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const RECEIPT_VERSION: u16 = 1;
@@ -33,7 +32,7 @@ pub(super) struct ExportReceipt {
 
 impl ExportReceipt {
     pub fn from_prefix(
-        destination: &Path,
+        destination: &AnchoredPath,
         expected_runtime_audit_sha256: Option<String>,
         prefix: &PrefixInventory,
     ) -> Result<Self> {
@@ -59,7 +58,7 @@ impl ExportReceipt {
 
     pub fn validate_fixed(
         &self,
-        destination: &Path,
+        destination: &AnchoredPath,
         header: ArchiveHeader,
         expected_runtime_audit_sha256: Option<&str>,
     ) -> Result<()> {
@@ -118,7 +117,7 @@ pub(super) struct RestoreReceipt {
 
 impl RestoreReceipt {
     pub fn new(
-        target: &Path,
+        target: &AnchoredPath,
         archive_sha256: String,
         action_count: u64,
         prefix: &PrefixInventory,
@@ -137,7 +136,7 @@ impl RestoreReceipt {
 
     pub fn validate_fixed(
         &self,
-        target: &Path,
+        target: &AnchoredPath,
         archive_sha256: &str,
         action_count: u64,
     ) -> Result<()> {
@@ -162,11 +161,14 @@ struct StoredReceipt<T> {
     payload_sha256: String,
 }
 
-pub(super) fn export_paths(destination: &Path) -> Result<(PathBuf, PathBuf)> {
+pub(super) fn export_paths(destination: &AnchoredPath) -> Result<(AnchoredPath, AnchoredPath)> {
     sibling_paths(destination, "rrd-export.partial", "rrd-export.receipt.json")
 }
 
-pub(super) fn restore_paths(target: &Path, archive_sha256: &str) -> Result<(PathBuf, PathBuf)> {
+pub(super) fn restore_paths(
+    target: &AnchoredPath,
+    archive_sha256: &str,
+) -> Result<(AnchoredPath, AnchoredPath)> {
     let suffix = archive_sha256
         .get(..16)
         .ok_or_else(|| Error::Archive("archive identity is not a SHA-256 digest".into()))?;
@@ -177,11 +179,11 @@ pub(super) fn restore_paths(target: &Path, archive_sha256: &str) -> Result<(Path
     )
 }
 
-pub(super) fn load_receipt<T>(path: &Path) -> Result<T>
+pub(super) fn load_receipt<T>(path: &AnchoredPath) -> Result<T>
 where
     T: DeserializeOwned + Serialize,
 {
-    let bytes = fs::read(path).map_err(receipt_io)?;
+    let bytes = path.read().map_err(receipt_io)?;
     let stored: StoredReceipt<T> = serde_json::from_slice(&bytes)?;
     let actual = digest::sha256_hex(&serde_json::to_vec(&stored.payload)?);
     if actual != stored.payload_sha256 {
@@ -192,12 +194,14 @@ where
     Ok(stored.payload)
 }
 
-pub(super) fn write_receipt<T>(path: &Path, payload: &T) -> Result<()>
+pub(super) fn write_receipt<T>(path: &AnchoredPath, payload: &T) -> Result<()>
 where
     T: Serialize + Clone,
 {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    fs::create_dir_all(parent).map_err(receipt_io)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| Error::Archive("filesystem root has no parent".into()))?;
+    parent.create_dir_all().map_err(receipt_io)?;
     let stored = StoredReceipt {
         payload: payload.clone(),
         payload_sha256: digest::sha256_hex(&serde_json::to_vec(payload)?),
@@ -208,51 +212,42 @@ where
         ".rrd-archive-receipt-{}-{id}.tmp",
         std::process::id()
     ));
-    let result = (|| {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(receipt_io)?;
-        file.write_all(&bytes).map_err(receipt_io)?;
-        file.sync_all().map_err(receipt_io)?;
-        drop(file);
-        rrd_lsm::publish_rename(parent, &temporary, path).map_err(receipt_io)
-    })();
-    if result.is_err() && temporary.exists() {
-        fs::remove_file(&temporary).map_err(receipt_io)?;
-    }
-    result
+    crate::filesystem::persist_rename(&temporary, path, &bytes).map_err(receipt_io)
 }
 
-pub(super) fn remove_receipt(path: &Path) -> Result<()> {
-    if path.exists() {
-        fs::remove_file(path).map_err(receipt_io)?;
+pub(super) fn remove_receipt(path: &AnchoredPath) -> Result<()> {
+    if path.try_exists().map_err(receipt_io)? {
+        path.remove_file().map_err(receipt_io)?;
         if let Some(parent) = path.parent() {
-            rrd_lsm::sync_directory(parent).map_err(receipt_io)?;
+            parent.sync_directory().map_err(receipt_io)?;
         }
     }
     Ok(())
 }
 
-pub(super) fn remove_export_artifacts(partial: &Path, receipt: &Path) -> Result<()> {
+pub(super) fn remove_export_artifacts(
+    partial: &AnchoredPath,
+    receipt: &AnchoredPath,
+) -> Result<()> {
     for path in [partial, receipt] {
-        if path.exists() {
-            fs::remove_file(path).map_err(receipt_io)?;
+        if path.try_exists().map_err(receipt_io)? {
+            path.remove_file().map_err(receipt_io)?;
         }
     }
     if let Some(parent) = partial.parent() {
-        rrd_lsm::sync_directory(parent).map_err(receipt_io)?;
+        parent.sync_directory().map_err(receipt_io)?;
     }
     Ok(())
 }
 
 fn sibling_paths(
-    target: &Path,
+    target: &AnchoredPath,
     work_suffix: &str,
     receipt_suffix: &str,
-) -> Result<(PathBuf, PathBuf)> {
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+) -> Result<(AnchoredPath, AnchoredPath)> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| Error::Archive("filesystem root has no parent".into()))?;
     let name = file_name(target)?;
     Ok((
         parent.join(format!(".{name}.{work_suffix}")),
@@ -260,8 +255,9 @@ fn sibling_paths(
     ))
 }
 
-fn file_name(path: &Path) -> Result<String> {
-    path.file_name()
+fn file_name(path: &AnchoredPath) -> Result<String> {
+    path.relative_path()
+        .file_name()
         .and_then(|value| value.to_str())
         .filter(|value| !value.is_empty())
         .map(str::to_owned)

@@ -14,6 +14,7 @@ mod fusion;
 mod graphql;
 mod index;
 mod live;
+mod parquet;
 /// Native physical access operators. The module root file is planned for F-03.
 mod physical {
     pub(crate) mod graph;
@@ -46,6 +47,7 @@ pub use index::{
     INDEX_ARTIFACT_CONTRACT_VERSION, INDEX_CATALOGUE_CONTRACT_VERSION,
 };
 pub use live::{poll_live_query, LiveQueryBudget, LiveQueryDelta, LiveRowChange};
+pub use parquet::{export_parquet, ParquetExport, ParquetExportLimits};
 pub use pipeline::{StampedQueryExecution, StampedQueryPipeline};
 pub use plan::{
     bind, plan, BoundFilter, BoundIndexCandidate, BoundQuery, CandidatePath, ExecutionContract,

@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
+// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -14,6 +14,8 @@ public enum OperationId
     ContextAssemble,
     DataSchemaRead,
     DiagnosticsRead,
+    DiagnosticsStorageCursor,
+    DiagnosticsStorageRead,
     EndpointCatalogue,
     EstateRead,
     FlightLaunch,
@@ -23,6 +25,7 @@ public enum OperationId
     HealthReady,
     OpenapiRead,
     QueryExecute,
+    QueryExport,
     QueryIndexEnsure,
     QueryIndexList,
     QueryLivePoll,
@@ -63,7 +66,8 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const int Count = 41;
+    public const string OpenApiDocumentSha256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
+    public const int Count = 44;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -77,6 +81,8 @@ public static class EndpointCatalog
         OperationId.ContextAssemble => new("context-assemble", "POST", "/v1/context/assemble", Authentication.SessionBearer, false),
         OperationId.DataSchemaRead => new("data-schema-read", "POST", "/v1/data/schema", Authentication.SessionBearer, false),
         OperationId.DiagnosticsRead => new("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SessionBearer, false),
+        OperationId.DiagnosticsStorageCursor => new("diagnostics-storage-cursor", "POST", "/v1/diagnostics/storage/cursor", Authentication.SessionBearer, false),
+        OperationId.DiagnosticsStorageRead => new("diagnostics-storage-read", "POST", "/v1/diagnostics/storage/read", Authentication.SessionBearer, false),
         OperationId.EndpointCatalogue => new("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.Public, false),
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),
         OperationId.FlightLaunch => new("flight-launch", "POST", "/v1/flights", Authentication.SessionBearer, true),
@@ -86,6 +92,7 @@ public static class EndpointCatalog
         OperationId.HealthReady => new("health-ready", "GET", "/v1/health/ready", Authentication.Public, false),
         OperationId.OpenapiRead => new("openapi-read", "GET", "/v1/schema/openapi", Authentication.Public, false),
         OperationId.QueryExecute => new("query-execute", "POST", "/v1/query", Authentication.SessionBearer, false),
+        OperationId.QueryExport => new("query-export", "POST", "/v1/query/export", Authentication.SessionBearer, false),
         OperationId.QueryIndexEnsure => new("query-index-ensure", "POST", "/v1/query/indexes/ensure", Authentication.SessionBearer, true),
         OperationId.QueryIndexList => new("query-index-list", "POST", "/v1/query/indexes/list", Authentication.SessionBearer, false),
         OperationId.QueryLivePoll => new("query-live-poll", "POST", "/v1/query/live/poll", Authentication.SessionBearer, false),

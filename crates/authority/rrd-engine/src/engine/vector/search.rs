@@ -86,7 +86,7 @@ impl RrdEngine {
                     rrd_vector::VectorMemoryTier::Cached,
                 )
             };
-        let direct = read_vector_versions(self, &read, request.max_storage_keys)?;
+        let direct = read_vector_search_versions(self, &read, request.max_storage_keys)?;
         let candidates = rrd_vector::candidates_from_changes(&direct.changes, &scope)
             .into_iter()
             .filter(|candidate| {
@@ -105,7 +105,6 @@ impl RrdEngine {
             .map(|candidate| candidate.source_cursor)
             .max()
             .unwrap_or(0);
-        let data = rrd_store::DataRuntimeRef::new(&self.storage, &self.objects);
         let query = internal_vector_query(&request.query);
         let (mode, ef_search) = match request.mode {
             VectorSearchMode::Exact => (rrd_vector::SearchMode::Exact, 1),
@@ -154,8 +153,12 @@ impl RrdEngine {
         let crate::VectorRuntimeManifest {
             mut runtime,
             bindings,
-        } = crate::reopen_vector_runtime_metadata(&data, &scope, candidates)
-            .map_err(|error| ServiceError::Vector(error.to_string()))?;
+        } = crate::runtime::vector_catalog::vector_runtime_metadata_from_changes(
+            &direct.changes,
+            &scope,
+            candidates,
+        )
+        .map_err(|error| ServiceError::Vector(error.to_string()))?;
         let active = bindings
             .values()
             .map(crate::VectorArtifactBinding::key)

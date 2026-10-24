@@ -17,6 +17,7 @@ fn install(project: &Path, executable: &Path) {
     let preview = RrdEngine::plan_installation(
         project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         executable,
@@ -27,13 +28,14 @@ fn install(project: &Path, executable: &Path) {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1_700_000_000_000,
         executable,
     )
     .unwrap();
 }
 
 fn make_private(path: &Path) {
+    #[cfg(not(unix))]
+    let _ = path;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;

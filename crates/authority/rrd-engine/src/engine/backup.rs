@@ -1,4 +1,5 @@
 use super::*;
+use rrd_store::filesystem::AnchoredPath;
 
 const BACKUP_OPERATION_FORMAT: u16 = 1;
 
@@ -229,13 +230,19 @@ impl RrdEngine {
             .find(|entry| entry.backup_id == request.backup_sha256)
             .ok_or_else(|| ServiceError::Backup("backup is not catalogued".into()))?;
         let target = self.restore_root()?.join(request.restore_id.as_str());
-        let (inventory, reopened, recovered) = if target.exists() {
+        let (inventory, reopened, recovered) = if target
+            .try_exists()
+            .map_err(|e| ServiceError::Storage(e.to_string()))?
+        {
             // An existing target is a root an earlier attempt staged and
             // published before its result was recorded. It is opened as an
             // existing store, so an empty or foreign directory fails closed
             // instead of becoming a new database, and the handle is released
             // before object verification reopens the root.
-            let restored = rrd_store::RrflowKvStore::open_existing(&target)?;
+            let restored = rrd_store::RrflowKvStore::open_existing_anchored(
+                &target,
+                super::core::installed_storage_options(&self.estate_configuration.storage)?,
+            )?;
             if restored.claims().sequence()? != backup.archive.claim_sequence
                 || restored.runtime().cursor()? != backup.archive.runtime_cursor
             {
@@ -244,18 +251,20 @@ impl RrdEngine {
                 ));
             }
             drop(restored);
-            rrd_store::verify_restored_backup_objects(
+            rrd_store::verify_restored_backup_objects_with_options(
                 &backup_root,
                 &request.backup_sha256,
                 &target,
+                super::core::installed_storage_options(&self.estate_configuration.storage)?,
             )?;
             (backup.archive.clone(), true, true)
         } else {
-            let report = rrd_store::restore_catalogued_backup(
+            let report = rrd_store::restore_catalogued_backup_with_options(
                 &backup_root,
                 &request.backup_sha256,
                 &target,
                 request.restored_at_unix_ms,
+                super::core::installed_storage_options(&self.estate_configuration.storage)?,
             )?;
             (report.inventory, report.reopened, false)
         };
@@ -290,23 +299,26 @@ impl RrdEngine {
     /// `roots/` holds only storage roots the locator can select, and install
     /// recovery rejects anything else there. A component or test root opened
     /// outside an installation keeps the sibling `rrd-service/<instance>` tree.
-    fn operation_root(&self, kind: &str) -> Result<PathBuf> {
-        let storage = self.require_persistent_root("backup and restore")?;
+    fn operation_root(&self, kind: &str) -> Result<AnchoredPath> {
+        self.require_persistent_root("backup and restore")?;
         if let Some(container) = &self.installed_storage_container {
             return Ok(container.join(kind).join(self.instance.as_str()));
         }
-        let parent = storage.parent().unwrap_or_else(|| Path::new("."));
+        let parent = self
+            .component_operation_parent
+            .as_ref()
+            .ok_or(ServiceError::ProjectBindingMismatch)?;
         Ok(parent
             .join("rrd-service")
             .join(self.instance.as_str())
             .join(kind))
     }
 
-    pub(super) fn backup_root(&self) -> Result<PathBuf> {
+    pub(super) fn backup_root(&self) -> Result<AnchoredPath> {
         self.operation_root(super::estate_layout::BACKUPS_DIRECTORY_NAME)
     }
 
-    fn restore_root(&self) -> Result<PathBuf> {
+    fn restore_root(&self) -> Result<AnchoredPath> {
         self.operation_root(super::estate_layout::RESTORES_DIRECTORY_NAME)
     }
 }

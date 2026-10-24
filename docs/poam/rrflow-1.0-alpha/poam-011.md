@@ -81,7 +81,33 @@ negative, authorization, budget and reopen tests; H-06 then consumes that
 qualified public behavior. A strict-schema positive fixture is not proof that
 the schemaless gap is fixed.
 
+The owner's complete delivery target also requires DevPulse project VM/container
+provisioning, independent project-file/environment transfer and bidirectional
+native data synchronization with an operator-controlled homelab, without a
+hosted account. The earlier cloud-only framing was incomplete. The
+[H-07 package sequence](../../roadmap/rrflow-1.0/gate-h.md#h-07-devpulse-managed-cloud-and-homelab-packages)
+now identifies those implementation and real-service acceptance dependencies.
+Current RRFlow transaction idempotency derives its transaction identity from
+the session plus request key; it supplies no admitted cross-instance import
+binding or source-origin deduplication. Native import/export coverage, durable
+origin receipts and snapshot-to-changefeed handoff must be qualified before a
+client may claim bidirectional sync. Existing DevPulse/Shippin application
+code must be integrated at its actual canonical boundary, not replaced with a
+new scaffold. The Windows development bundle does not close these gaps or
+J-04's competitive parity requirement.
+
 ## Current-detail owners
+
+The [knowledge connector contract](../../reference/data/knowledge-connectors.md)
+and [project sharing/isolation requirements](../../reference/client/devpulse-cloud.md#project-preferences-sharing-and-isolation)
+now specify additional missing integration behavior: generated credential/
+capability requirements and live availability, source-provenance/ACL fidelity,
+governed Parquet exchange, and independent sharing/placement controls.
+Inspection of `rrd-query/Cargo.toml` at `3a8828b42a11899d03fd45db0b2d2fd694dc8ce9`
+shows DataFusion default features disabled; it does not establish an admitted
+Parquet operation. D-05/D-06 and H-04/H-07/H-09/H-10 own implementation and
+real-adapter/UI evidence. A configured endpoint or successful local query is
+not proof of these behaviors, provider support, login, cloud sync or isolation.
 
 - [rrflowDB identity and compatibility boundary](../../architecture/system-overview.md#persistence-and-memory-boundary)
 - [PostgreSQL compatibility and independent database contract](../../reference/protocol/postgresql.md)

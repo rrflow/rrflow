@@ -333,6 +333,16 @@ impl ReadPath {
                         [RuntimeVersionedSource::Identity { .. }]
                     ) {
                         "versioned_identity_read"
+                    } else if matches!(
+                        sources.as_slice(),
+                        [RuntimeVersionedSource::IdentityRange { .. }]
+                    ) {
+                        "versioned_identity_range_read"
+                    } else if matches!(
+                        sources.as_slice(),
+                        [RuntimeVersionedSource::Adjacency { .. }]
+                    ) {
+                        "versioned_adjacency_read"
                     } else {
                         "versioned_source_read"
                     } =>
@@ -472,7 +482,48 @@ impl ReadPath {
         }
         let selected = match self {
             Self::Versioned { sources } => {
-                engine.runtime().read_versioned(stamp, sources, budget)?
+                if matches!(
+                    sources.as_slice(),
+                    [RuntimeVersionedSource::Adjacency { .. }]
+                ) {
+                    let mut expanded = false;
+                    engine.runtime().read_versioned_expanding(
+                        stamp,
+                        sources,
+                        budget,
+                        &mut |changes| {
+                            if std::mem::replace(&mut expanded, true) {
+                                return Vec::new();
+                            }
+                            // An adjacency entry names an identity, not its final
+                            // temporal state. Later endpoint moves and retirements
+                            // outside this adjacency must still govern visibility.
+                            changes
+                                .iter()
+                                .filter_map(|change| match &change.mutation {
+                                    RuntimeMutation::Relation { relation } => {
+                                        Some(relation.reference.clone())
+                                    }
+                                    RuntimeMutation::Retire { retirement }
+                                        if retirement.model
+                                            == rrd_core::RuntimeLogicalModel::GraphRelation =>
+                                    {
+                                        Some(retirement.reference.clone())
+                                    }
+                                    _ => None,
+                                })
+                                .collect::<std::collections::BTreeSet<_>>()
+                                .into_iter()
+                                .map(|reference| RuntimeVersionedSource::Identity {
+                                    model: rrd_core::RuntimeLogicalModel::GraphRelation,
+                                    reference,
+                                })
+                                .collect()
+                        },
+                    )?
+                } else {
+                    engine.runtime().read_versioned(stamp, sources, budget)?
+                }
             }
             Self::Adjacency {
                 sources,
@@ -866,36 +917,12 @@ pub(crate) fn active_graph_values<'a>(
     BTreeMap<rrd_core::RuntimeRef, RuntimeRecord>,
     BTreeMap<rrd_core::RuntimeRef, RuntimeRelation>,
 ) {
-    let mut records = BTreeMap::new();
-    let mut relations = BTreeMap::new();
-    for change in changes
-        .into_iter()
-        .filter(|change| change.cursor <= known_at_cursor && &change.scope == scope)
-    {
-        match &change.mutation {
-            RuntimeMutation::Record { record } if record.valid_from <= valid_at => {
-                records.insert(record.reference.clone(), record.clone());
-            }
-            RuntimeMutation::Relation { relation } if relation.valid_from <= valid_at => {
-                relations.insert(relation.reference.clone(), relation.clone());
-            }
-            RuntimeMutation::Retire { retirement } if retirement.effective_at <= valid_at => {
-                if retirement.model.is_record_like() {
-                    records.remove(&retirement.reference);
-                } else if retirement.model == rrd_core::RuntimeLogicalModel::GraphRelation {
-                    relations.remove(&retirement.reference);
-                }
-            }
-            _ => {}
-        }
+    let mut state =
+        crate::physical::graph::state::GraphState::new(scope, valid_at, known_at_cursor);
+    for change in changes {
+        state.apply(change);
     }
-    records.retain(|_, record| {
-        record.valid_from <= valid_at && record.valid_to.is_none_or(|end| valid_at < end)
-    });
-    relations.retain(|_, relation| {
-        relation.valid_from <= valid_at && relation.valid_to.is_none_or(|end| valid_at < end)
-    });
-    (records, relations)
+    state.into_values()
 }
 
 fn geo_rows(

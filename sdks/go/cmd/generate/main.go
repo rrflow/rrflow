@@ -111,6 +111,7 @@ func render(raw []byte) ([]byte, error) {
 	source.WriteString("// Code generated from rrd-contract; DO NOT EDIT.\n\npackage rrd\n\n")
 	digest := sha256.Sum256(raw)
 	fmt.Fprintf(&source, "// OpenAPI SHA-256: %x\n\n", digest)
+	fmt.Fprintf(&source, "const EndpointOpenAPIDocumentSHA256 = %q\n\n", fmt.Sprintf("%x", digest))
 	source.WriteString("type OperationID string\n\nconst (\n")
 	for _, item := range endpoints {
 		fmt.Fprintf(&source, "\tOperation%s OperationID = %q\n", exportedName(item.Operation), item.Operation)

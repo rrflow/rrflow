@@ -6,11 +6,15 @@ license.workspace = true
 publish.workspace = true
 description = "RRFlow storage semantics for persistent rrflowKV and volatile rrflowMX."
 
+[features]
+crash-test = ["rrd-lsm/crash-test"]
+
 [dependencies]
 rrd-core = { path = "../../kernel/rrd-core" }
 rrd-lsm = { path = "../rrd-lsm" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.11"
 tracing = { workspace = true }
 
 [dev-dependencies]

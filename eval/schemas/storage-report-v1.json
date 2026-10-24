@@ -1,0 +1,277 @@
+{
+  "$defs": {
+    "CaseReport": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "ledger": {
+          "$ref": "#/$defs/LedgerReport"
+        },
+        "status": {
+          "$ref": "#/$defs/CaseStatus"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "ledger"
+      ],
+      "type": "object"
+    },
+    "CaseStatus": {
+      "enum": [
+        "executed",
+        "failed",
+        "skipped",
+        "unimplemented"
+      ],
+      "type": "string"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "DurabilityClass": {
+      "enum": [
+        "authoritative",
+        "buffered"
+      ],
+      "type": "string"
+    },
+    "EffectiveSetting": {
+      "additionalProperties": false,
+      "description": "Read-only projection from the public DiagnosticStorageSnapshot owner.",
+      "properties": {
+        "change_rule": {
+          "$ref": "#/$defs/PolicyChangeRule"
+        },
+        "kind": {
+          "$ref": "#/$defs/PolicyKind"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/PolicyScope"
+        },
+        "source": {
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/PolicyUnit"
+        },
+        "value": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source",
+        "owner",
+        "value",
+        "unit",
+        "kind",
+        "scope",
+        "change_rule"
+      ],
+      "type": "object"
+    },
+    "EvidenceClass": {
+      "enum": [
+        "synthetic",
+        "io_model",
+        "native_process",
+        "native_capacity"
+      ],
+      "type": "string"
+    },
+    "Id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+      "type": "string"
+    },
+    "LedgerReport": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "attempts": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "logical_calls": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rejected": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resolved_absent": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resolved_present": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "uncertain": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unresolved": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "logical_calls",
+        "attempts",
+        "acknowledged",
+        "rejected",
+        "uncertain",
+        "resolved_present",
+        "resolved_absent",
+        "unresolved",
+        "violations"
+      ],
+      "type": "object"
+    },
+    "PolicyChangeRule": {
+      "enum": [
+        "no_installed_storage_reconfiguration_capability"
+      ],
+      "type": "string"
+    },
+    "PolicyKind": {
+      "enum": [
+        "soft_flush_target",
+        "cache_capacity",
+        "io_request_bound",
+        "compaction_trigger",
+        "output_target"
+      ],
+      "type": "string"
+    },
+    "PolicyScope": {
+      "enum": [
+        "estate_process"
+      ],
+      "type": "string"
+    },
+    "PolicyUnit": {
+      "enum": [
+        "bytes",
+        "versions",
+        "segments"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/CaseReport"
+      },
+      "type": "array"
+    },
+    "contract_passed": {
+      "description": "Structural + coverage + independent oracle success, NOT gate closure.",
+      "type": "boolean"
+    },
+    "durability": {
+      "$ref": "#/$defs/DurabilityClass"
+    },
+    "effective_settings": {
+      "items": {
+        "$ref": "#/$defs/EffectiveSetting"
+      },
+      "type": "array"
+    },
+    "evidence_class": {
+      "$ref": "#/$defs/EvidenceClass"
+    },
+    "failed": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "manifest_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "passed": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "required": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "result_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "skipped": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "unimplemented": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "format_version",
+    "manifest_sha256",
+    "result_sha256",
+    "evidence_class",
+    "durability",
+    "contract_passed",
+    "required",
+    "passed",
+    "failed",
+    "skipped",
+    "unimplemented",
+    "attempts",
+    "cases",
+    "effective_settings"
+  ],
+  "title": "ValidationReport",
+  "type": "object"
+}

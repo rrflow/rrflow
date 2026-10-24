@@ -1,4 +1,5 @@
 use super::*;
+use crate::engine::clock::FixedClock;
 use crate::engine::estate_layout::EstateLayout;
 use crate::engine::installation::recovery::InstallApplyStage;
 use crate::engine::token_key::{read_api_key_document, read_token_key};
@@ -26,6 +27,7 @@ fn plan(project: &Path, executable: &Path) -> InstallationPreview {
     RrdEngine::plan_installation(
         project,
         InstallationTargetKind::ExistingProject,
+        &"1".repeat(64),
         "default",
         None,
         executable,
@@ -108,7 +110,9 @@ fn intent_evidence(path: &Path) -> (String, String, u64) {
     (
         value["token_key_sha256"].as_str().unwrap().to_owned(),
         value["credential_sha256"].as_str().unwrap().to_owned(),
-        value["applied_at_unix_ms"].as_u64().unwrap(),
+        value["clock_anchor"]["observed_at_unix_ms"]
+            .as_u64()
+            .unwrap(),
     )
 }
 
@@ -132,10 +136,56 @@ fn materialized_secret_evidence(project: &Path, preview: &InstallationPreview) -
 }
 
 #[test]
+fn interrupted_installation_cannot_resume_at_a_different_root() {
+    let container = tempfile::tempdir().unwrap();
+    let original = container.path().join("original");
+    let moved = container.path().join("moved");
+    std::fs::create_dir(&original).unwrap();
+    let executable = test_executable();
+    let preview = plan(&original, &executable);
+    assert!(RrdEngine::apply_installation_with_failure(
+        &original,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS,
+        &executable,
+        InstallApplyStage::IntentPublished,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("test installation failpoint"));
+    std::fs::rename(&original, &moved).unwrap();
+    let before = file_inventory(&moved);
+    assert!(RrdEngine::apply_installation_at(
+        &moved,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 1,
+        &executable,
+    )
+    .is_err());
+    assert_eq!(file_inventory(&moved), before);
+    std::fs::rename(&moved, &original).unwrap();
+    RrdEngine::apply_installation_at(
+        &original,
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 2,
+        &executable,
+    )
+    .unwrap();
+}
+
+#[test]
 fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority() {
     let stages = [
         InstallApplyStage::IntentPublished,
         InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
         InstallApplyStage::StorageReady,
         InstallApplyStage::TokenReady,
         InstallApplyStage::CredentialReady,
@@ -170,7 +220,7 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
             (token, credential, FIRST_APPLY_MS)
         };
 
-        let recovered = RrdEngine::apply_installation(
+        let recovered = RrdEngine::apply_installation_at(
             project.path(),
             InstallationTargetKind::ExistingProject,
             &preview,
@@ -205,7 +255,12 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
             .unwrap();
         assert_eq!(count_named_files(project.path(), credential_name), 1);
 
-        let report = RrdEngine::inspect_installed(project.path(), &executable).unwrap();
+        let report = RrdEngine::inspect_installed_with_clock(
+            project.path(),
+            &executable,
+            &FixedClock::at(FIRST_APPLY_MS + 88),
+        )
+        .unwrap();
         assert_eq!(report.runtime_cursor, recovered.runtime_cursor);
         assert_eq!(
             report.control_journal_sequence,
@@ -214,7 +269,7 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
         assert!(report.attunement_source_current);
 
         let before_replay = file_inventory(project.path());
-        let replay = RrdEngine::apply_installation(
+        let replay = RrdEngine::apply_installation_at(
             project.path(),
             InstallationTargetKind::ExistingProject,
             &preview,
@@ -234,6 +289,106 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
         );
         assert_eq!(file_inventory(project.path()), before_replay);
     }
+}
+
+#[test]
+fn aliased_secret_intent_cannot_advance_interrupted_installation() {
+    let project = project_fixture();
+    let outside = tempfile::tempdir().unwrap();
+    let executable = test_executable();
+    let preview = plan(project.path(), &executable);
+    RrdEngine::apply_installation_with_failure(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS,
+        &executable,
+        InstallApplyStage::IntentPublished,
+    )
+    .unwrap_err();
+    let intent = project.path().join(layout(&preview).install_intent);
+    let before = file_inventory(project.path());
+    let alias = outside.path().join("intent-alias");
+    std::fs::hard_link(&intent, &alias).unwrap();
+    assert!(RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 1,
+        &executable,
+    )
+    .is_err());
+    assert_eq!(file_inventory(project.path()), before);
+    assert!(!project.path().join(".rrflow").exists());
+    assert_eq!(
+        std::fs::read(&alias).unwrap(),
+        std::fs::read(&intent).unwrap()
+    );
+    std::fs::remove_file(&alias).unwrap();
+    let recovered = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 2,
+        &executable,
+    )
+    .unwrap();
+    assert_eq!(recovered.applied_at_unix_ms, FIRST_APPLY_MS);
+    assert_eq!(recovered.runtime_cursor, 2);
+    assert_eq!(recovered.control_journal_sequence, 8);
+    assert!(!intent.exists());
+}
+
+#[test]
+fn interrupted_recovery_rejects_clock_rollback_without_changing_owned_state() {
+    let project = project_fixture();
+    let executable = test_executable();
+    let preview = plan(project.path(), &executable);
+
+    RrdEngine::apply_installation_with_failure(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS,
+        &executable,
+        InstallApplyStage::IntentPublished,
+    )
+    .unwrap_err();
+    let owned_state = file_inventory(project.path());
+
+    let error = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS - 1,
+        &executable,
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        ServiceError::ClockRollback {
+            observed_at_unix_ms,
+            anchor_unix_ms,
+            maximum_rollback_ms: 0
+        } if observed_at_unix_ms == FIRST_APPLY_MS - 1 && anchor_unix_ms == FIRST_APPLY_MS
+    ));
+    assert_eq!(file_inventory(project.path()), owned_state);
+
+    let recovered = RrdEngine::apply_installation_at(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &preview,
+        &preview.installation.plan_sha256,
+        FIRST_APPLY_MS + 1,
+        &executable,
+    )
+    .unwrap();
+    assert_eq!(recovered.applied_at_unix_ms, FIRST_APPLY_MS);
 }
 
 #[test]
@@ -260,6 +415,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
     assert!(RrdEngine::plan_installation(
         project.path(),
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -269,7 +425,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
 
     std::fs::write(&executable, b"distribution-v2").unwrap();
     let before_executable_rejection = file_inventory(project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -283,7 +439,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
 
     std::fs::write(project.path().join("README.md"), "project drift\n").unwrap();
     let before_project_rejection = file_inventory(project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -297,7 +453,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
     assert!(project.path().join(&estate.install_intent).is_file());
 
     std::fs::write(project.path().join("README.md"), "walking product\n").unwrap();
-    let recovered = RrdEngine::apply_installation(
+    let recovered = RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -318,21 +474,12 @@ fn malformed_or_foreign_recovery_state_is_preserved_and_rejected() {
     let malformed_intent = malformed_project
         .path()
         .join(layout(&malformed_preview).install_intent);
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.mode(0o600);
-    }
-    use std::io::Write as _;
-    options
-        .open(&malformed_intent)
-        .unwrap()
-        .write_all(b"not-an-install-intent")
+    // Keep permissions valid so this remains a malformed-content oracle on
+    // every platform, rather than stopping earlier at the native ACL check.
+    crate::engine::token_key::write_private_new(&malformed_intent, b"not-an-install-intent")
         .unwrap();
     let malformed_before = file_inventory(malformed_project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         malformed_project.path(),
         InstallationTargetKind::ExistingProject,
         &malformed_preview,
@@ -363,7 +510,7 @@ fn malformed_or_foreign_recovery_state_is_preserved_and_rejected() {
     )
     .unwrap();
     let unknown_before = file_inventory(unknown_project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         unknown_project.path(),
         InstallationTargetKind::ExistingProject,
         &unknown_preview,
@@ -424,7 +571,7 @@ fn partial_control_state_and_missing_committed_secret_fail_closed() {
         .unwrap();
     drop(engine);
     let partial_before = file_inventory(partial_project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         partial_project.path(),
         InstallationTargetKind::ExistingProject,
         &partial_preview,
@@ -454,7 +601,7 @@ fn partial_control_state_and_missing_committed_secret_fail_closed() {
     );
     std::fs::remove_file(&credential_path).unwrap();
     let missing_before = file_inventory(missing_project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         missing_project.path(),
         InstallationTargetKind::ExistingProject,
         &missing_preview,
@@ -487,7 +634,7 @@ fn published_locator_recovers_only_its_exact_pending_link() {
     let locator = std::fs::read(exact_project.path().join(".rrflow/config.toml")).unwrap();
     let pending = exact_project.path().join(&exact_layout.locator_pending);
     std::fs::write(&pending, &locator).unwrap();
-    let recovered = RrdEngine::apply_installation(
+    let recovered = RrdEngine::apply_installation_at(
         exact_project.path(),
         InstallationTargetKind::ExistingProject,
         &exact_preview,
@@ -526,7 +673,7 @@ fn published_locator_recovers_only_its_exact_pending_link() {
     )
     .unwrap();
     let before = file_inventory(foreign_project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         foreign_project.path(),
         InstallationTargetKind::ExistingProject,
         &foreign_preview,
@@ -551,7 +698,7 @@ fn symbolic_intent_collision_is_preserved_and_rejected() {
     let intent = project.path().join(layout(&preview).install_intent);
     symlink(&target, &intent).unwrap();
     let before = file_inventory(project.path());
-    assert!(RrdEngine::apply_installation(
+    assert!(RrdEngine::apply_installation_at(
         project.path(),
         InstallationTargetKind::ExistingProject,
         &preview,
@@ -561,4 +708,73 @@ fn symbolic_intent_collision_is_preserved_and_rejected() {
     )
     .is_err());
     assert_eq!(file_inventory(project.path()), before);
+}
+
+/// Replacement is injected after admission, at real durable boundaries. Unix
+/// retains the admitted directory; Windows rejects renaming an open authority.
+#[test]
+fn anchored_installation_preserves_outside_state_at_durable_boundaries() {
+    for stage in [
+        InstallApplyStage::IntentPublished,
+        InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
+        InstallApplyStage::LocatorPublished,
+    ] {
+        let fixture = tempfile::tempdir().unwrap();
+        let project = fixture.path().join("project");
+        let retained = fixture.path().join("retained");
+        let outside = fixture.path().join("outside");
+        std::fs::create_dir(&project).unwrap();
+        std::fs::create_dir(&outside).unwrap();
+        std::fs::write(project.join("README.md"), b"authorized project").unwrap();
+        std::fs::write(
+            outside.join("sentinel"),
+            b"outside may not be read as authority or mutated",
+        )
+        .unwrap();
+        let outside_before = file_inventory(&outside);
+        let executable = test_executable();
+        let preview = plan(&project, &executable);
+        let mut reached = false;
+        let mut moved = false;
+        let result = RrdEngine::apply_installation_with_test_observer(
+            &project,
+            &preview,
+            &executable,
+            &mut |observed, _| {
+                if observed == stage {
+                    reached = true;
+                    match std::fs::rename(&project, &retained) {
+                        Ok(()) => {
+                            moved = true;
+                            #[cfg(unix)]
+                            std::os::unix::fs::symlink(&outside, &project).unwrap();
+                            #[cfg(windows)]
+                            panic!(
+                                "retained Windows project authority allowed ancestor replacement"
+                            );
+                        }
+                        Err(error) => {
+                            #[cfg(not(windows))]
+                            panic!("unexpected native denial: {error}");
+                            #[cfg(windows)]
+                            assert!(matches!(error.raw_os_error(), Some(5 | 32)));
+                        }
+                    }
+                }
+                Ok(())
+            },
+        );
+        assert!(reached, "test boundary was not reached: {result:?}");
+        result.expect("effects remain bound to the original authority");
+        assert_eq!(file_inventory(&outside), outside_before);
+        let installed = if moved { &retained } else { &project };
+        assert!(!installed.join(layout(&preview).install_intent).exists());
+        assert_eq!(
+            std::fs::read(installed.join("README.md")).unwrap(),
+            b"authorized project"
+        );
+        assert!(RrdEngine::read_project_locator(installed).is_ok());
+    }
 }

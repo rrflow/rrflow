@@ -8,6 +8,7 @@ description = "Native RRD storage engine: versioned WAL, MVCC, segments, and man
 
 [features]
 default = []
+crash-test = []
 physical-policy-lab = ["dep:zstd"]
 
 [dependencies]
@@ -18,12 +19,16 @@ crc32c = "=0.6.8"
 ring = "=0.17.14"
 memmap2 = "=0.9.11"
 tracing = { workspace = true }
+cap-primitives = "=4.0.3"
+cap-fs-ext = { version = "=4.0.3", default-features = false }
 arrow-buffer = "=59.2.0"
 lz4_flex = { version = "=0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 zstd = { version = "=0.13.3", default-features = false, optional = true }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(unix)'.dependencies]
 libc = "=0.2.189"
+
+[target.'cfg(target_os = "linux")'.dependencies]
 io-uring = "=0.7.14"
 
 [target.'cfg(windows)'.dependencies]

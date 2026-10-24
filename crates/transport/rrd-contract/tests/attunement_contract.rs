@@ -6,10 +6,13 @@ use rrd_contract::{
     AttunementVerification, AttunementVerificationCheck, AttunementVerificationStatus,
     CancelAttunement, CanonicalId, DeploymentForm, DeploymentProfile, EndpointPresentation,
     EstateConfiguration, InstallationActionDisposition, InstallationActionKind,
-    InstallationActionResult, InstallationManagedPath, InstallationManagedPathKind,
-    InstallationPlan, InstallationPlanAction, InstallationRemovalRule, InstallationResult,
-    InstallationTargetKind, InstalledEstateIdentity, MemorySeatDefinition, ResumeAttunement,
-    SecurityAction, StorageProfileKind, ATTUNEMENT_PHASES, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+    InstallationActionResult, InstallationBootstrap, InstallationBootstrapPolicy,
+    InstallationManagedPath, InstallationManagedPathKind, InstallationPlan, InstallationPlanAction,
+    InstallationRecordKind, InstallationRemovalRule, InstallationResult,
+    InstallationSpecialization, InstallationStorageGeneration, InstallationTargetKind,
+    InstalledEstateIdentity, MemorySeatDefinition, ResumeAttunement, SecurityAction,
+    StorageProfileKind, ATTUNEMENT_PHASES, INSTALLATION_PLAN_CONTRACT_VERSION,
+    INSTALL_ATTUNEMENT_CONTRACT_VERSION,
 };
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -88,9 +91,70 @@ fn attunement_plan() -> AttunementPlan {
     plan
 }
 
+fn bootstrap() -> InstallationBootstrap {
+    let specialization = InstallationSpecialization {
+        format_version: 1,
+        id: canonical_id("generic"),
+        revision: 1,
+        seat: MemorySeatDefinition {
+            id: canonical_id("rrflow-local-seat"),
+            display_name: "Local RRFlow".into(),
+            purpose: "Provider-neutral reasoning and recall for this project.".into(),
+        },
+        instructions: "Use explicitly authorized public capabilities.".into(),
+        endpoint_profile: None,
+    };
+    let mut result = InstallationBootstrap {
+        format_version: 1,
+        template_id: canonical_id("generic-project"),
+        template_revision: 1,
+        template_text: "# Project instructions\n".into(),
+        template_sha256: rrd_core::digest::sha256_hex(b"# Project instructions\n"),
+        specialization_sha256: specialization.digest().unwrap(),
+        specialization,
+        instructions_sha256: digest(0),
+        project_policy: InstallationBootstrapPolicy::PreserveProjectOwnedState,
+        initial_records: InstallationRecordKind::INITIAL.to_vec(),
+        max_record_bytes: 1_048_576,
+        storage_generation: InstallationStorageGeneration {
+            application_format: 1,
+            manifest_format: 3,
+            wal_format: 1,
+            batch_format: 2,
+            max_initial_transaction_bytes: 4_194_304,
+        },
+        token_key_bytes: 32,
+        credential_entropy_bytes: 32,
+        private_directories: [
+            ".rrflow",
+            ".rrflow/credentials",
+            ".rrflow/rrd",
+            ".rrflow/rrd/roots",
+        ]
+        .map(String::from)
+        .to_vec(),
+        private_files: [
+            ".rrflow-install-install-01.json",
+            ".rrflow-install.lock",
+            ".rrflow/credentials/local-operator.json",
+            ".rrflow/rrd/roots/install-01/RRD.TOKEN",
+        ]
+        .map(String::from)
+        .to_vec(),
+        process_invocations: Vec::new(),
+        network_endpoints: Vec::new(),
+        activated_provider_bindings: Vec::new(),
+    };
+    result.instructions_sha256 =
+        rrd_core::digest::sha256_hex(result.rendered_instructions().as_bytes());
+    result
+}
+
 fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
     let mut plan = InstallationPlan {
-        contract_version: INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+        contract_version: INSTALLATION_PLAN_CONTRACT_VERSION,
+        installation_identity: digest(46),
+        project_root_sha256: digest(47),
         id: canonical_id("install-01"),
         target: target(),
         target_kind: InstallationTargetKind::ExistingProject,
@@ -107,6 +171,7 @@ fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
         project_precondition_sha256: digest(42),
         storage_root_id: canonical_id("install-01"),
         configuration: EstateConfiguration::default(),
+        bootstrap: bootstrap(),
         initial_seat: MemorySeatDefinition {
             id: canonical_id("rrflow-local-seat"),
             display_name: "Local RRFlow".into(),
@@ -173,6 +238,38 @@ fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
                 precondition_sha256: digest(50),
                 removal_rule: InstallationRemovalRule::RemoveIfOwnedDigestMatches,
             },
+            InstallationManagedPath {
+                kind: InstallationManagedPathKind::InstallationLease,
+                relative_path: rrd_contract::INSTALLATION_LEASE_PATH.into(),
+                precondition_sha256: rrd_core::digest::sha256_hex(
+                    rrd_contract::INSTALLATION_LEASE_PRECONDITION.as_bytes(),
+                ),
+                removal_rule: InstallationRemovalRule::RetainForExclusion,
+            },
+            InstallationManagedPath {
+                kind: InstallationManagedPathKind::InstallationIntent,
+                relative_path: ".rrflow-install-install-01.json".into(),
+                precondition_sha256: digest(43),
+                removal_rule: InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            },
+            InstallationManagedPath {
+                kind: InstallationManagedPathKind::LocatorPending,
+                relative_path: ".rrflow/.config.install-01.pending".into(),
+                precondition_sha256: digest(43),
+                removal_rule: InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            },
+            InstallationManagedPath {
+                kind: InstallationManagedPathKind::ProjectBootstrap,
+                relative_path: ".rrflow/bootstrap.md".into(),
+                precondition_sha256: digest(43),
+                removal_rule: InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            },
+            InstallationManagedPath {
+                kind: InstallationManagedPathKind::BootstrapPending,
+                relative_path: ".rrflow/.bootstrap.install-01.pending".into(),
+                precondition_sha256: digest(43),
+                removal_rule: InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            },
         ],
         attunement_plan_id: attunement.id.clone(),
         attunement_plan_sha256: attunement.plan_sha256.clone(),
@@ -184,10 +281,28 @@ fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
                 estimated_write_bytes: 0,
             },
             InstallationPlanAction {
+                kind: InstallationActionKind::AcquireInstallationLease,
+                disposition: InstallationActionDisposition::Create,
+                input_sha256: digest(51),
+                estimated_write_bytes: 0,
+            },
+            InstallationPlanAction {
+                kind: InstallationActionKind::PrepareCredentials,
+                disposition: InstallationActionDisposition::Create,
+                input_sha256: digest(52),
+                estimated_write_bytes: 65_536,
+            },
+            InstallationPlanAction {
                 kind: InstallationActionKind::CreateEstateDirectories,
                 disposition: InstallationActionDisposition::Create,
                 input_sha256: digest(4),
                 estimated_write_bytes: 0,
+            },
+            InstallationPlanAction {
+                kind: InstallationActionKind::MaterializeBootstrap,
+                disposition: InstallationActionDisposition::Create,
+                input_sha256: digest(52),
+                estimated_write_bytes: 65_536,
             },
             InstallationPlanAction {
                 kind: InstallationActionKind::CreateStorageRoot,
@@ -196,7 +311,7 @@ fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan {
                 estimated_write_bytes: 4_096,
             },
             InstallationPlanAction {
-                kind: InstallationActionKind::PrepareCredentials,
+                kind: InstallationActionKind::DeliverCredentials,
                 disposition: InstallationActionDisposition::Create,
                 input_sha256: digest(6),
                 estimated_write_bytes: 96,
@@ -537,6 +652,56 @@ fn install_and_attunement_contract_matches_golden_json() {
 }
 
 #[test]
+fn installation_plan_requires_versioned_identity_and_root_binding() {
+    let plan = installation_plan(&attunement_plan());
+    for field in ["installation_identity", "project_root_sha256"] {
+        let mut value = serde_json::to_value(&plan).unwrap();
+        value.as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<InstallationPlan>(value).is_err());
+    }
+    let mut old = plan.clone();
+    old.contract_version = 1;
+    old.plan_sha256 = installation_plan_sha256(&old).unwrap();
+    assert!(old.validate().is_err());
+    for identity in [true, false] {
+        let mut changed = plan.clone();
+        if identity {
+            changed.installation_identity = digest(999);
+        } else {
+            changed.project_root_sha256 = digest(999);
+        }
+        assert_ne!(
+            installation_plan_sha256(&changed).unwrap(),
+            plan.plan_sha256
+        );
+        assert!(changed.validate().is_err());
+    }
+}
+
+#[test]
+fn installation_lease_cannot_change_path_precondition_or_retention_rule() {
+    for mutation in ["path", "precondition", "retention", "missing"] {
+        let mut plan = installation_plan(&attunement_plan());
+        let lease = plan
+            .managed_paths
+            .iter_mut()
+            .find(|path| path.kind == InstallationManagedPathKind::InstallationLease)
+            .unwrap();
+        match mutation {
+            "path" => lease.relative_path = ".rrflow/other.lock".into(),
+            "precondition" => lease.precondition_sha256 = digest(999),
+            "retention" => lease.removal_rule = InstallationRemovalRule::RemoveIfOwnedDigestMatches,
+            _ => {
+                plan.managed_paths
+                    .retain(|path| path.kind != InstallationManagedPathKind::InstallationLease);
+            }
+        }
+        plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();
+        assert!(plan.validate().is_err(), "{mutation}");
+    }
+}
+
+#[test]
 fn generated_schema_is_closed_and_contains_every_envelope() {
     let schema = serde_json::to_value(schema_for!(GoldenAttunementContract)).unwrap();
     assert_eq!(schema["additionalProperties"], serde_json::json!(false));
@@ -798,4 +963,46 @@ fn failed_verification_binds_the_verify_phase_without_committing_it() {
     verification(&failed, AttunementVerificationStatus::Failed)
         .validate_for(&failed, &plan)
         .unwrap();
+}
+
+#[test]
+fn bootstrap_rejects_unknown_effects_versions_and_unbounded_generation() {
+    for case in 0..10 {
+        let mut plan = installation_plan(&attunement_plan());
+        match case {
+            0 => plan.bootstrap.format_version += 1,
+            1 => plan.bootstrap.specialization.format_version += 1,
+            2 => plan.bootstrap.initial_records.pop().map(|_| ()).unwrap(),
+            3 => plan
+                .bootstrap
+                .process_invocations
+                .push(canonical_id("command")),
+            4 => plan
+                .bootstrap
+                .network_endpoints
+                .push("https://example.invalid".into()),
+            5 => plan
+                .bootstrap
+                .activated_provider_bindings
+                .push(canonical_id("provider")),
+            6 => plan.bootstrap.private_files.clear(),
+            7 => plan.bootstrap.token_key_bytes = 0,
+            8 => plan.bootstrap.max_record_bytes = 1_048_577,
+            9 => {
+                plan.bootstrap
+                    .storage_generation
+                    .max_initial_transaction_bytes = u64::MAX
+            }
+            _ => unreachable!(),
+        }
+        plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();
+        assert!(plan.validate().is_err(), "case {case}");
+    }
+    let plan = installation_plan(&attunement_plan());
+    let mut json = serde_json::to_value(&plan).unwrap();
+    json["bootstrap"]["undeclared_effect"] = serde_json::json!("execute");
+    assert!(serde_json::from_value::<InstallationPlan>(json).is_err());
+    let mut json = serde_json::to_value(&plan).unwrap();
+    json["bootstrap"]["initial_records"][0] = serde_json::json!("unknown_record");
+    assert!(serde_json::from_value::<InstallationPlan>(json).is_err());
 }

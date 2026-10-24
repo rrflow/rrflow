@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
+// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -170,6 +170,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/diagnostics/storage/cursor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD diagnostics-storage-cursor */
+        post: operations["diagnostics-storage-cursor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/diagnostics/storage/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD diagnostics-storage-read */
+        post: operations["diagnostics-storage-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/estates/{estate}/read": {
         parameters: {
             query?: never;
@@ -283,6 +317,23 @@ export interface paths {
         put?: never;
         /** RRD query-execute */
         post: operations["query-execute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/query/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD query-export */
+        post: operations["query-export"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3241,6 +3292,17 @@ export interface operations {
                                  *     configure-plan/configure-apply operation.
                                  */
                                 configuration: {
+                                    /**
+                                     * @description Policy for wall-clock observations at governed durable-effect boundaries.
+                                     *
+                                     *     A value of zero is strict: any observed rollback from a persisted anchor is
+                                     *     rejected. A nonzero value is an explicit operator-selected allowance, not
+                                     *     evidence that the host clock is synchronized or trustworthy.
+                                     */
+                                    clock: {
+                                        /** Format: uint64 */
+                                        maximum_rollback_ms: number;
+                                    };
                                     configuration_sha256: string;
                                     /** Format: uint16 */
                                     format_version: number;
@@ -3293,6 +3355,98 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Aggregate live physical read owners and charged pinned bytes; restart required.
+                                         */
+                                        active_read_views: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Named checkpoint-directory entry ceiling; restart required.
+                                         */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Native transaction owner count and logical buffer capacity; restart required.
+                                         */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Bytes to keep available beyond each native WAL/immutable allocation.
+                                         *     Requires restart; racy admission cannot replace actual I/O error handling.
+                                         */
+                                        recovery_reserve_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one
@@ -3432,6 +3586,17 @@ export interface operations {
                                  *     configure-plan/configure-apply operation.
                                  */
                                 configuration: {
+                                    /**
+                                     * @description Policy for wall-clock observations at governed durable-effect boundaries.
+                                     *
+                                     *     A value of zero is strict: any observed rollback from a persisted anchor is
+                                     *     rejected. A nonzero value is an explicit operator-selected allowance, not
+                                     *     evidence that the host clock is synchronized or trustworthy.
+                                     */
+                                    clock: {
+                                        /** Format: uint64 */
+                                        maximum_rollback_ms: number;
+                                    };
                                     configuration_sha256: string;
                                     /** Format: uint16 */
                                     format_version: number;
@@ -3484,6 +3649,98 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Aggregate live physical read owners and charged pinned bytes; restart required.
+                                         */
+                                        active_read_views: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Named checkpoint-directory entry ceiling; restart required.
+                                         */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Native transaction owner count and logical buffer capacity; restart required.
+                                         */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Bytes to keep available beyond each native WAL/immutable allocation.
+                                         *     Requires restart; racy admission cannot replace actual I/O error handling.
+                                         */
+                                        recovery_reserve_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one
@@ -10908,13 +11165,57 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
-                                /**
-                                 * @description Process-local physical storage observation for the instance's storage
-                                 *     profile. It carries `observation` authority: counters are measured at
-                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
-                                 *     process reopens its store.
-                                 */
                                 storage: {
+                                    /**
+                                     * @description Process-local physical storage observation for the instance's storage
+                                     *     profile. It carries `observation` authority: counters are measured at
+                                     *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                     *     process reopens its store.
+                                     */
+                                    admission?: {
+                                        active: boolean;
+                                        /**
+                                         * Format: uint64
+                                         * @description Actual live physical read views and conservative aggregate pin charge.
+                                         */
+                                        active_read_views: number;
+                                        /** Format: uint64 */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
+                                        fenced: boolean;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /** Format: uint64 */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        outstanding_logical_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Includes the active request plus admitted waiters, matching admission.
+                                         */
+                                        outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        queued_requests: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                         */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
+                                    } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
                                     /** Format: uint64 */
@@ -13456,13 +13757,57 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
-                                /**
-                                 * @description Process-local physical storage observation for the instance's storage
-                                 *     profile. It carries `observation` authority: counters are measured at
-                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
-                                 *     process reopens its store.
-                                 */
                                 storage: {
+                                    /**
+                                     * @description Process-local physical storage observation for the instance's storage
+                                     *     profile. It carries `observation` authority: counters are measured at
+                                     *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                     *     process reopens its store.
+                                     */
+                                    admission?: {
+                                        active: boolean;
+                                        /**
+                                         * Format: uint64
+                                         * @description Actual live physical read views and conservative aggregate pin charge.
+                                         */
+                                        active_read_views: number;
+                                        /** Format: uint64 */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
+                                        fenced: boolean;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /** Format: uint64 */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        outstanding_logical_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Includes the active request plus admitted waiters, matching admission.
+                                         */
+                                        outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        queued_requests: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                         */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
+                                    } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
                                     /** Format: uint64 */
@@ -13733,6 +14078,707 @@ export interface operations {
                                     revision: number;
                                     scope: string;
                                 };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "diagnostics-storage-cursor": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        action: {
+                            /** Format: uint32 */
+                            batch_bytes: number;
+                            /** Format: uint16 */
+                            batch_rows: number;
+                            /** @constant */
+                            kind: "open";
+                            /** Format: uint32 */
+                            lifetime_ms: number;
+                        } | {
+                            /** @constant */
+                            kind: "observe";
+                        } | {
+                            /** Format: uint64 */
+                            expected_ordinal: number;
+                            /** @constant */
+                            kind: "advance";
+                        } | {
+                            /** @constant */
+                            kind: "cancel_source";
+                        } | {
+                            /** @constant */
+                            kind: "release";
+                        };
+                        cursor_id: string;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint64 */
+                                allocated_bytes: number;
+                                cursor_id: string;
+                                /** Format: uint64 */
+                                page_ordinal: number;
+                                page_sha256: string;
+                                released: boolean;
+                                /** Format: uint64 */
+                                rows: number;
+                                /** Format: uint64 */
+                                snapshot_sequence: number;
+                                source_open: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint64 */
+                                allocated_bytes: number;
+                                cursor_id: string;
+                                /** Format: uint64 */
+                                page_ordinal: number;
+                                page_sha256: string;
+                                released: boolean;
+                                /** Format: uint64 */
+                                rows: number;
+                                /** Format: uint64 */
+                                snapshot_sequence: number;
+                                source_open: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "diagnostics-storage-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /**
+                     * @description Physical process-local counters only; no graph/history assembly or claim
+                     *     that independently sampled counters form an authoritative read stamp.
+                     */
+                    payload: {
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                admission?: {
+                                    active: boolean;
+                                    /**
+                                     * Format: uint64
+                                     * @description Actual live physical read views and conservative aggregate pin charge.
+                                     */
+                                    active_read_views: number;
+                                    /** Format: uint64 */
+                                    checkpoint_entries: number;
+                                    /** Format: uint64 */
+                                    checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
+                                    fenced: boolean;
+                                    /** Format: uint64 */
+                                    native_transaction_bytes: number;
+                                    /** Format: uint64 */
+                                    native_transactions: number;
+                                    /** Format: uint64 */
+                                    outstanding_logical_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Includes the active request plus admitted waiters, matching admission.
+                                     */
+                                    outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
+                                    pinned_read_bytes: number;
+                                    /** Format: uint64 */
+                                    queued_requests: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                     */
+                                    retained_mutable_bytes: number;
+                                    /** Format: uint64 */
+                                    retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
+                                } | null;
+                                /** @description How much physical evidence the instance's storage profile reports. */
+                                evidence_level: "logical_only" | "rrflow_kv_counters";
+                                /** Format: uint64 */
+                                observed_at_unix_ms: number;
+                                /** @enum {string} */
+                                profile: "rrflow_mx" | "rrflow_kv";
+                                /** @description rrflowKV physical state and counters. */
+                                rrflow_kv?: {
+                                    /** Format: uint64 */
+                                    durable_sequence: number;
+                                    /** @description Cumulative flush and compaction work since the process opened the store. */
+                                    maintenance: {
+                                        /** Format: uint64 */
+                                        automatic_compactions: number;
+                                        /** Format: uint64 */
+                                        automatic_flushes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_output_bytes: number;
+                                        /** Format: uint64 */
+                                        failed_compactions: number;
+                                        /** Format: uint64 */
+                                        failed_flushes: number;
+                                        /** Format: uint64 */
+                                        oversized_batches: number;
+                                        /** Format: uint64 */
+                                        peak_compaction_buffer_bytes: number;
+                                        /** Format: uint64 */
+                                        write_stalls: number;
+                                    };
+                                    /** Format: uint64 */
+                                    manifest_generation: number;
+                                    /** @description The rrflowKV mutable write buffer. */
+                                    memtable: {
+                                        /** Format: uint64 */
+                                        approximate_bytes: number;
+                                        /** Format: uint64 */
+                                        key_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        keys: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Version count that triggers an automatic flush.
+                                         */
+                                        max_versions: number;
+                                        /** Format: uint64 */
+                                        owned_bytes_lower_bound: number;
+                                        /** Format: uint64 */
+                                        spilled_chains: number;
+                                        /** Format: uint64 */
+                                        spilled_version_capacity: number;
+                                        /** Format: uint64 */
+                                        tombstones: number;
+                                        /** Format: uint64 */
+                                        value_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        version_record_bytes: number;
+                                        /** Format: uint64 */
+                                        versions: number;
+                                    };
+                                    /**
+                                     * @description The bounded decoded-page cache and the page reads it served or missed.
+                                     *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                     *     the process opened the store.
+                                     */
+                                    page_cache: {
+                                        /** Format: uint64 */
+                                        bytes_allocated: number;
+                                        /** Format: uint64 */
+                                        bytes_borrowed: number;
+                                        /** Format: uint64 */
+                                        bytes_copied: number;
+                                        /** Format: uint64 */
+                                        bytes_decoded: number;
+                                        /** Format: uint64 */
+                                        bytes_decompressed: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        capacity_bytes: number;
+                                        /** Format: uint64 */
+                                        entries: number;
+                                        /** Format: uint64 */
+                                        evictions: number;
+                                        /** Format: uint64 */
+                                        filter_checks: number;
+                                        /** Format: uint64 */
+                                        filter_negatives: number;
+                                        /** Format: uint64 */
+                                        hits: number;
+                                        /** Format: uint64 */
+                                        misses: number;
+                                        /** Format: uint64 */
+                                        page_loads: number;
+                                        /** Format: uint64 */
+                                        resident_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    physical_sequence: number;
+                                    /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                    segment_io: {
+                                        /** Format: uint64 */
+                                        bounded_reads: number;
+                                        /** Format: uint64 */
+                                        bounded_segments: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        fallbacks: number;
+                                        /** Format: uint64 */
+                                        io_uring_reads: number;
+                                        /** Format: uint64 */
+                                        io_uring_segments: number;
+                                        last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_request_bytes: number;
+                                        /** Format: uint64 */
+                                        mmap_reads: number;
+                                        /** Format: uint64 */
+                                        mmap_segments: number;
+                                        /** Format: uint64 */
+                                        peak_request_bytes: number;
+                                        /** Format: uint64 */
+                                        read_operations: number;
+                                        /**
+                                         * @description The segment read path rrflowKV requested.
+                                         * @enum {string}
+                                         */
+                                        requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                    };
+                                    /** @description The persisted segment set named by the current manifest. */
+                                    segment_set: {
+                                        /** Format: uint64 */
+                                        compaction_debt_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_target_segment_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description L0 segment count that triggers compaction.
+                                         */
+                                        l0_compaction_trigger: number;
+                                        /** Format: uint64 */
+                                        l0_segments: number;
+                                        /** Format: uint64 */
+                                        segment_bytes: number;
+                                        /** Format: uint64 */
+                                        segments: number;
+                                    };
+                                    /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                    write_ahead_log: {
+                                        /** Format: uint64 */
+                                        payload_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Payload size that triggers an automatic flush.
+                                         */
+                                        payload_max_bytes: number;
+                                    };
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                admission?: {
+                                    active: boolean;
+                                    /**
+                                     * Format: uint64
+                                     * @description Actual live physical read views and conservative aggregate pin charge.
+                                     */
+                                    active_read_views: number;
+                                    /** Format: uint64 */
+                                    checkpoint_entries: number;
+                                    /** Format: uint64 */
+                                    checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
+                                    fenced: boolean;
+                                    /** Format: uint64 */
+                                    native_transaction_bytes: number;
+                                    /** Format: uint64 */
+                                    native_transactions: number;
+                                    /** Format: uint64 */
+                                    outstanding_logical_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Includes the active request plus admitted waiters, matching admission.
+                                     */
+                                    outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
+                                    pinned_read_bytes: number;
+                                    /** Format: uint64 */
+                                    queued_requests: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                     */
+                                    retained_mutable_bytes: number;
+                                    /** Format: uint64 */
+                                    retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
+                                } | null;
+                                /** @description How much physical evidence the instance's storage profile reports. */
+                                evidence_level: "logical_only" | "rrflow_kv_counters";
+                                /** Format: uint64 */
+                                observed_at_unix_ms: number;
+                                /** @enum {string} */
+                                profile: "rrflow_mx" | "rrflow_kv";
+                                /** @description rrflowKV physical state and counters. */
+                                rrflow_kv?: {
+                                    /** Format: uint64 */
+                                    durable_sequence: number;
+                                    /** @description Cumulative flush and compaction work since the process opened the store. */
+                                    maintenance: {
+                                        /** Format: uint64 */
+                                        automatic_compactions: number;
+                                        /** Format: uint64 */
+                                        automatic_flushes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_output_bytes: number;
+                                        /** Format: uint64 */
+                                        failed_compactions: number;
+                                        /** Format: uint64 */
+                                        failed_flushes: number;
+                                        /** Format: uint64 */
+                                        oversized_batches: number;
+                                        /** Format: uint64 */
+                                        peak_compaction_buffer_bytes: number;
+                                        /** Format: uint64 */
+                                        write_stalls: number;
+                                    };
+                                    /** Format: uint64 */
+                                    manifest_generation: number;
+                                    /** @description The rrflowKV mutable write buffer. */
+                                    memtable: {
+                                        /** Format: uint64 */
+                                        approximate_bytes: number;
+                                        /** Format: uint64 */
+                                        key_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        keys: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Version count that triggers an automatic flush.
+                                         */
+                                        max_versions: number;
+                                        /** Format: uint64 */
+                                        owned_bytes_lower_bound: number;
+                                        /** Format: uint64 */
+                                        spilled_chains: number;
+                                        /** Format: uint64 */
+                                        spilled_version_capacity: number;
+                                        /** Format: uint64 */
+                                        tombstones: number;
+                                        /** Format: uint64 */
+                                        value_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        version_record_bytes: number;
+                                        /** Format: uint64 */
+                                        versions: number;
+                                    };
+                                    /**
+                                     * @description The bounded decoded-page cache and the page reads it served or missed.
+                                     *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                     *     the process opened the store.
+                                     */
+                                    page_cache: {
+                                        /** Format: uint64 */
+                                        bytes_allocated: number;
+                                        /** Format: uint64 */
+                                        bytes_borrowed: number;
+                                        /** Format: uint64 */
+                                        bytes_copied: number;
+                                        /** Format: uint64 */
+                                        bytes_decoded: number;
+                                        /** Format: uint64 */
+                                        bytes_decompressed: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        capacity_bytes: number;
+                                        /** Format: uint64 */
+                                        entries: number;
+                                        /** Format: uint64 */
+                                        evictions: number;
+                                        /** Format: uint64 */
+                                        filter_checks: number;
+                                        /** Format: uint64 */
+                                        filter_negatives: number;
+                                        /** Format: uint64 */
+                                        hits: number;
+                                        /** Format: uint64 */
+                                        misses: number;
+                                        /** Format: uint64 */
+                                        page_loads: number;
+                                        /** Format: uint64 */
+                                        resident_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    physical_sequence: number;
+                                    /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                    segment_io: {
+                                        /** Format: uint64 */
+                                        bounded_reads: number;
+                                        /** Format: uint64 */
+                                        bounded_segments: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        fallbacks: number;
+                                        /** Format: uint64 */
+                                        io_uring_reads: number;
+                                        /** Format: uint64 */
+                                        io_uring_segments: number;
+                                        last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_request_bytes: number;
+                                        /** Format: uint64 */
+                                        mmap_reads: number;
+                                        /** Format: uint64 */
+                                        mmap_segments: number;
+                                        /** Format: uint64 */
+                                        peak_request_bytes: number;
+                                        /** Format: uint64 */
+                                        read_operations: number;
+                                        /**
+                                         * @description The segment read path rrflowKV requested.
+                                         * @enum {string}
+                                         */
+                                        requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                    };
+                                    /** @description The persisted segment set named by the current manifest. */
+                                    segment_set: {
+                                        /** Format: uint64 */
+                                        compaction_debt_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_target_segment_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description L0 segment count that triggers compaction.
+                                         */
+                                        l0_compaction_trigger: number;
+                                        /** Format: uint64 */
+                                        l0_segments: number;
+                                        /** Format: uint64 */
+                                        segment_bytes: number;
+                                        /** Format: uint64 */
+                                        segments: number;
+                                    };
+                                    /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                    write_ahead_log: {
+                                        /** Format: uint64 */
+                                        payload_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Payload size that triggers an automatic flush.
+                                         */
+                                        payload_max_bytes: number;
+                                    };
+                                } | null;
                             };
                             /** @constant */
                             status: "ok";
@@ -16868,6 +17914,467 @@ export interface operations {
                                 /** Format: uint64 */
                                 schema_revision: number;
                                 scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "query-export": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /** Format: uint64 */
+                        max_output_bytes: number;
+                        query: {
+                            /**
+                             * @default {
+                             *       "max_batch_rows": 256,
+                             *       "max_elapsed_ms": 30000,
+                             *       "max_memory_bytes": 67108864,
+                             *       "max_output_bytes": 524288,
+                             *       "max_rows": 10000,
+                             *       "max_spill_bytes": 268435456,
+                             *       "max_storage_keys": 100000
+                             *     }
+                             */
+                            budget?: {
+                                /** Format: uint64 */
+                                max_batch_rows: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 30000
+                                 */
+                                max_elapsed_ms?: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 67108864
+                                 */
+                                max_memory_bytes?: number;
+                                /** Format: uint64 */
+                                max_output_bytes: number;
+                                /** Format: uint64 */
+                                max_rows: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 268435456
+                                 */
+                                max_spill_bytes?: number;
+                                /** Format: uint64 */
+                                max_storage_keys: number;
+                            };
+                            parameters?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "null";
+                                } | {
+                                    /** @constant */
+                                    type: "bool";
+                                    value: boolean;
+                                } | {
+                                    /** @constant */
+                                    type: "integer";
+                                    /** Format: int64 */
+                                    value: number;
+                                } | {
+                                    /** @constant */
+                                    type: "unsigned";
+                                    /** Format: uint64 */
+                                    value: number;
+                                } | {
+                                    /** @constant */
+                                    type: "decimal";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "string";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "digest";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "list";
+                                    value: components["schemas"]["QueryValue"][];
+                                } | {
+                                    /** @constant */
+                                    type: "map";
+                                    value: {
+                                        [key: string]: components["schemas"]["QueryValue"];
+                                    };
+                                };
+                            };
+                            query: string;
+                            scope: string;
+                        };
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                artifact_base64: string;
+                                /** Format: uint64 */
+                                artifact_bytes: number;
+                                artifact_sha256: string;
+                                /** Format: uint64 */
+                                columns: number;
+                                /** Format: uint64 */
+                                elapsed_micros: number;
+                                /** Format: uint64 */
+                                input_bytes: number;
+                                media_type: string;
+                                /** Format: uint64 */
+                                observed_writer_bytes: number;
+                                profile: string;
+                                /** Format: uint64 */
+                                reserved_working_bytes: number;
+                                /** Format: uint64 */
+                                row_groups: number;
+                                source: {
+                                    canonical_query: string;
+                                    execution: {
+                                        analysis?: {
+                                            /** Format: uint64 */
+                                            elapsed_micros: number;
+                                            engine: string;
+                                            filter_pushdown: string;
+                                            /** Format: uint64 */
+                                            input_batches: number;
+                                            /** Format: uint64 */
+                                            input_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            input_rows: number;
+                                            limit_pushdown: string;
+                                            /** Format: uint64 */
+                                            output_batches: number;
+                                            /** Format: uint64 */
+                                            peak_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            physical_operators: number;
+                                            projection_pushdown: string;
+                                            /** Format: uint64 */
+                                            provider_scans: number;
+                                            /** Format: uint64 */
+                                            spill_count: number;
+                                            /** Format: uint64 */
+                                            spilled_bytes: number;
+                                            /** Format: uint64 */
+                                            spilled_rows: number;
+                                        } | null;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                        read_evidence: {
+                                            /** Format: uint16 */
+                                            contract_version: number;
+                                            /** Format: uint64 */
+                                            decoded_bytes: number;
+                                            /** Format: uint64 */
+                                            key_budget: number;
+                                            /** Format: uint64 */
+                                            keys_examined: number;
+                                            paths: {
+                                                /** Format: uint64 */
+                                                decoded_bytes: number;
+                                                /** Format: uint64 */
+                                                keys_examined: number;
+                                                /**
+                                                 * @description The semantic physical path charged during a normal state read.
+                                                 * @enum {string}
+                                                 */
+                                                path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                                /** Format: uint64 */
+                                                point_reads: number;
+                                                /** Format: uint64 */
+                                                range_scans: number;
+                                                /** Format: uint64 */
+                                                values_decoded: number;
+                                            }[];
+                                            /** Format: uint64 */
+                                            point_reads: number;
+                                            /** Format: uint64 */
+                                            range_scans: number;
+                                            stamp_validation: {
+                                                /**
+                                                 * Format: uint64
+                                                 * @description Authenticated log-head/schema changes needed only to prove a retained
+                                                 *     historical stamp. This is not the source of normal query rows.
+                                                 */
+                                                change_reads: number;
+                                                /**
+                                                 * @description The authentication strategy applied to the requested read stamp.
+                                                 * @enum {string}
+                                                 */
+                                                method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                                /** Format: uint16 */
+                                                proof_nodes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            values_decoded: number;
+                                        };
+                                        /** Format: uint64 */
+                                        returned_rows: number;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    };
+                                    /** Format: uint64 */
+                                    known_at_cursor: number;
+                                    plan: {
+                                        authorization_boundary: string;
+                                        authorization_sha256: string;
+                                        candidates: {
+                                            exact: boolean;
+                                            name: string;
+                                            reason: string;
+                                            selected: boolean;
+                                        }[];
+                                        deterministic_order: string;
+                                        exact: boolean;
+                                        plan_sha256: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Revision of the security authority compiled before query binding. Zero
+                                         *     denotes an explicitly unsecured loopback development engine.
+                                         */
+                                        security_policy_revision: number;
+                                    };
+                                    read_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision: number;
+                                    scope: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                artifact_base64: string;
+                                /** Format: uint64 */
+                                artifact_bytes: number;
+                                artifact_sha256: string;
+                                /** Format: uint64 */
+                                columns: number;
+                                /** Format: uint64 */
+                                elapsed_micros: number;
+                                /** Format: uint64 */
+                                input_bytes: number;
+                                media_type: string;
+                                /** Format: uint64 */
+                                observed_writer_bytes: number;
+                                profile: string;
+                                /** Format: uint64 */
+                                reserved_working_bytes: number;
+                                /** Format: uint64 */
+                                row_groups: number;
+                                source: {
+                                    canonical_query: string;
+                                    execution: {
+                                        analysis?: {
+                                            /** Format: uint64 */
+                                            elapsed_micros: number;
+                                            engine: string;
+                                            filter_pushdown: string;
+                                            /** Format: uint64 */
+                                            input_batches: number;
+                                            /** Format: uint64 */
+                                            input_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            input_rows: number;
+                                            limit_pushdown: string;
+                                            /** Format: uint64 */
+                                            output_batches: number;
+                                            /** Format: uint64 */
+                                            peak_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            physical_operators: number;
+                                            projection_pushdown: string;
+                                            /** Format: uint64 */
+                                            provider_scans: number;
+                                            /** Format: uint64 */
+                                            spill_count: number;
+                                            /** Format: uint64 */
+                                            spilled_bytes: number;
+                                            /** Format: uint64 */
+                                            spilled_rows: number;
+                                        } | null;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                        read_evidence: {
+                                            /** Format: uint16 */
+                                            contract_version: number;
+                                            /** Format: uint64 */
+                                            decoded_bytes: number;
+                                            /** Format: uint64 */
+                                            key_budget: number;
+                                            /** Format: uint64 */
+                                            keys_examined: number;
+                                            paths: {
+                                                /** Format: uint64 */
+                                                decoded_bytes: number;
+                                                /** Format: uint64 */
+                                                keys_examined: number;
+                                                /**
+                                                 * @description The semantic physical path charged during a normal state read.
+                                                 * @enum {string}
+                                                 */
+                                                path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                                /** Format: uint64 */
+                                                point_reads: number;
+                                                /** Format: uint64 */
+                                                range_scans: number;
+                                                /** Format: uint64 */
+                                                values_decoded: number;
+                                            }[];
+                                            /** Format: uint64 */
+                                            point_reads: number;
+                                            /** Format: uint64 */
+                                            range_scans: number;
+                                            stamp_validation: {
+                                                /**
+                                                 * Format: uint64
+                                                 * @description Authenticated log-head/schema changes needed only to prove a retained
+                                                 *     historical stamp. This is not the source of normal query rows.
+                                                 */
+                                                change_reads: number;
+                                                /**
+                                                 * @description The authentication strategy applied to the requested read stamp.
+                                                 * @enum {string}
+                                                 */
+                                                method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                                /** Format: uint16 */
+                                                proof_nodes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            values_decoded: number;
+                                        };
+                                        /** Format: uint64 */
+                                        returned_rows: number;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    };
+                                    /** Format: uint64 */
+                                    known_at_cursor: number;
+                                    plan: {
+                                        authorization_boundary: string;
+                                        authorization_sha256: string;
+                                        candidates: {
+                                            exact: boolean;
+                                            name: string;
+                                            reason: string;
+                                            selected: boolean;
+                                        }[];
+                                        deterministic_order: string;
+                                        exact: boolean;
+                                        plan_sha256: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Revision of the security authority compiled before query binding. Zero
+                                         *     denotes an explicitly unsecured loopback development engine.
+                                         */
+                                        security_policy_revision: number;
+                                    };
+                                    read_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision: number;
+                                    scope: string;
+                                };
                             };
                             /** @constant */
                             status: "ok";

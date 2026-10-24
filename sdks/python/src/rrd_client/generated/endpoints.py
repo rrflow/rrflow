@@ -1,6 +1,10 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
+# OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
 from typing import Final, Literal, TypedDict
+
+ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = (
+    "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee"
+)
 
 OperationId = Literal[
     "audit-export",
@@ -13,6 +17,8 @@ OperationId = Literal[
     "context-assemble",
     "data-schema-read",
     "diagnostics-read",
+    "diagnostics-storage-cursor",
+    "diagnostics-storage-read",
     "endpoint-catalogue",
     "estate-read",
     "flight-launch",
@@ -22,6 +28,7 @@ OperationId = Literal[
     "health-ready",
     "openapi-read",
     "query-execute",
+    "query-export",
     "query-index-ensure",
     "query-index-list",
     "query-live-poll",
@@ -115,6 +122,18 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": False,
         "path": "/v1/diagnostics/read",
     },
+    "diagnostics-storage-cursor": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/diagnostics/storage/cursor",
+    },
+    "diagnostics-storage-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/diagnostics/storage/read",
+    },
     "endpoint-catalogue": {
         "authentication": "public",
         "method": "GET",
@@ -168,6 +187,12 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/query",
+    },
+    "query-export": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/query/export",
     },
     "query-index-ensure": {
         "authentication": "session_bearer",

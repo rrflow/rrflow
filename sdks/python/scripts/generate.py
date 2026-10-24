@@ -55,6 +55,7 @@ def render() -> str:
         "# Generated from rrd-contract; do not edit.\n"
         f"# OpenAPI SHA-256: {openapi_digest}\n"
         "from typing import Final, Literal, TypedDict\n\n"
+        f'ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = "{openapi_digest}"\n\n'
         "OperationId = Literal[" + operations + "]\n\n"
         "class Endpoint(TypedDict):\n"
         "    method: str\n"
@@ -82,7 +83,7 @@ def main() -> None:
             )
         return
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(generated)
+    OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

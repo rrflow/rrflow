@@ -250,12 +250,9 @@ fn registry_batches_exact_models_and_rejects_duplicate_or_corrupt_input() {
         embedding_request("batch-b", b"beta source"),
     ];
     let result = registry
-        .embed_batch(
-            &descriptor.id,
-            &descriptor.model,
-            NetworkPolicy::Deny,
-            &requests,
-        )
+        .try_acquire(&descriptor.id)
+        .unwrap()
+        .embed_batch(&descriptor.model, NetworkPolicy::Deny, &requests)
         .unwrap();
     assert_eq!(result.registry_revision, 1);
     assert_eq!(result.backend, descriptor);
@@ -269,12 +266,9 @@ fn registry_batches_exact_models_and_rejects_duplicate_or_corrupt_input() {
     let mut corrupt = embedding_request("corrupt", b"original");
     corrupt.bytes = b"changed".to_vec();
     assert!(registry
-        .embed_batch(
-            &result.backend.id,
-            &result.backend.model,
-            NetworkPolicy::Deny,
-            &[corrupt],
-        )
+        .try_acquire(&result.backend.id)
+        .unwrap()
+        .embed_batch(&result.backend.model, NetworkPolicy::Deny, &[corrupt],)
         .unwrap_err()
         .to_string()
         .contains("source digest"));
@@ -302,14 +296,18 @@ fn registry_enforces_provider_trust_and_resource_limits_before_dispatch() {
         .unwrap();
     let requests = vec![embedding_request("provider-a", b"provider input")];
     assert!(registry
-        .embed_batch(&remote.id, &remote.model, NetworkPolicy::Deny, &requests,)
+        .try_acquire(&remote.id)
+        .unwrap()
+        .embed_batch(&remote.model, NetworkPolicy::Deny, &requests,)
         .unwrap_err()
         .to_string()
         .contains("denies the network"));
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(
         registry
-            .embed_batch(&remote.id, &remote.model, NetworkPolicy::Allow, &requests,)
+            .try_acquire(&remote.id)
+            .unwrap()
+            .embed_batch(&remote.model, NetworkPolicy::Allow, &requests,)
             .unwrap()
             .vectors
             .len(),
@@ -328,8 +326,9 @@ fn registry_enforces_provider_trust_and_resource_limits_before_dispatch() {
         }))
         .unwrap();
     assert!(registry
+        .try_acquire(&bounded.id)
+        .unwrap()
         .embed_batch(
-            &bounded.id,
             &bounded.model,
             NetworkPolicy::Deny,
             &[

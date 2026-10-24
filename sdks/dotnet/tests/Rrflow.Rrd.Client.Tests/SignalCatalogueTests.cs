@@ -6,8 +6,6 @@ namespace Rrflow.Rrd.Client.Tests;
 
 public sealed class SignalCatalogueTests
 {
-    private const string ExpectedOpenApiSha256 =
-        "97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11";
     private const string ExpectedSignalSha256 =
         "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07";
 
@@ -18,7 +16,7 @@ public sealed class SignalCatalogueTests
         JsonElement catalogue = document.RootElement;
 
         Assert.Equal(ExpectedSignalSha256, SignalCatalogue.SignalCatalogueSha256);
-        Assert.Equal(ExpectedOpenApiSha256, SignalCatalogue.OpenApiDocumentSha256);
+        Assert.Equal(EndpointCatalog.OpenApiDocumentSha256, SignalCatalogue.OpenApiDocumentSha256);
         Assert.Equal(1, catalogue.GetProperty("contract_version").GetInt32());
         Assert.Equal(4, catalogue.GetProperty("diagnostic_levels").GetArrayLength());
         Assert.Equal(9, catalogue.GetProperty("metric_attributes").GetArrayLength());
