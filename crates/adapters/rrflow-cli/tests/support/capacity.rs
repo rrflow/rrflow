@@ -137,6 +137,34 @@ struct Filler {
     metadata_native_code: Option<i32>,
     free_inodes: Option<u64>,
 }
+
+// Filler files only need OS allocation, not survival of a power failure.
+// Rust's sync_all AND sync_data request F_FULLFSYNC on Apple targets: using
+// either for every empty filler file flushes the device's hardware cache.
+// Keep that stronger barrier on authoritative engine files, never here.
+fn sync_filler_allocation(file: &File) -> std::io::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        sync_filler_host(file)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        file.sync_data()
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn sync_filler_host(file: &File) -> std::io::Result<()> {
+    use std::os::fd::AsRawFd;
+    // SAFETY: the borrowed File owns this live descriptor for the whole call.
+    // No retry/fallback can turn a native allocation or I/O error into success.
+    if unsafe { libc::fsync(file.as_raw_fd()) } == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}
+
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
         let directory = metadata_directory.map(|path| {
@@ -234,7 +262,7 @@ impl Filler {
             // Force delayed allocation while the error still belongs to this
             // owned volume. A sync failure is retained as native evidence.
             if filler.bytes.is_multiple_of(4 * 1024 * 1024) {
-                if let Err(error) = file.sync_data() {
+                if let Err(error) = sync_filler_allocation(&file) {
                     break error;
                 }
             }
@@ -263,7 +291,10 @@ impl Filler {
             assert!(self.metadata_paths.len() < 8192, "metadata entry bound");
             assert!(
                 started.elapsed() < Duration::from_secs(25),
-                "bounded metadata fill"
+                "bounded metadata fill: files={} data_bytes={} elapsed_ms={}",
+                self.metadata_paths.len(),
+                self.bytes,
+                started.elapsed().as_millis()
             );
             let path = directory.join(format!("c{}-{index:04x}", &volume.nonce[..8]));
             let created = OpenOptions::new()
@@ -275,7 +306,7 @@ impl Filler {
                     // up this exact owned entry. Drop ignores close errors.
                     self.metadata_paths.push(path);
                     if cfg!(target_os = "macos") {
-                        file.sync_all()?;
+                        sync_filler_allocation(&file)?;
                     }
                     drop(file);
                     Ok(())
@@ -299,6 +330,38 @@ impl Filler {
         );
     }
 }
+
+#[test]
+fn filler_allocation_sync_preserves_regular_file_contents() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("allocation");
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .unwrap();
+    let payload = [0xa5; 8192];
+    file.write_all(&payload).unwrap();
+    sync_filler_allocation(&file).unwrap();
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    sync_filler_host(&file).unwrap();
+    drop(file);
+    assert_eq!(std::fs::read(path).unwrap(), payload);
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[test]
+fn filler_host_sync_preserves_native_noncapacity_errors() {
+    // A live socket descriptor is valid but cannot synchronize file
+    // allocation. Exercise the actual syscall, not an injected capacity error.
+    let (socket, _peer) = std::os::unix::net::UnixStream::pair().unwrap();
+    let descriptor: std::os::fd::OwnedFd = socket.into();
+    let file = File::from(descriptor);
+    let error = sync_filler_host(&file).unwrap_err();
+    assert_eq!(error.raw_os_error(), Some(libc::EINVAL));
+    assert!(!capacity_code(error.raw_os_error().unwrap()));
+}
+
 impl Drop for Filler {
     fn drop(&mut self) {
         self.file.take();
