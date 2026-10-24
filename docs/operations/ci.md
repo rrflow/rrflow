@@ -672,7 +672,7 @@ Public visibility exposes this control on the current hosting tier. `main`
 is protected with these invariants:
 
 - pull requests and the stable `pipeline / ci-gate` check are required;
-- merge queue or an up-to-date branch is required;
+- the merge queue is required;
 - force pushes and deletion are denied; and
 - Actions must require immutable full-SHA references (enforced in this
   checkout by `scripts/ci/check_workflow.py`; the hosted repository setting is
@@ -689,13 +689,18 @@ candidate CI") was created on 2026-10-19 and is `active` on the default branch
 | Rule | Configuration |
 |---|---|
 | `pull_request` | required; 0 approving reviews (a sole maintainer cannot approve their own pull request); stale approvals dismissed; review threads must be resolved; merge, squash, and rebase allowed |
-| `required_status_checks` | `pipeline / ci-gate` from GitHub Actions (integration `15368`), with the branch up to date before merge |
+| `required_status_checks` | `pipeline / ci-gate` from GitHub Actions (integration `15368`); since 2026-10-24 the branch need not be up to date, because the merge queue tests the merged result |
+| `merge_queue` | added 2026-10-24; merge commits; a queued group merges only when all its entries pass (`ALLGREEN`); up to 5 entries are built and merged at once; at least 1 entry, with a 5-minute wait; 180-minute check timeout, above the observed 64–92-minute candidate runs |
 | `non_fast_forward` | force pushes denied |
 | `deletion` | branch deletion denied |
 | bypass | repository administrators, `pull_request` mode only: an administrator may override a rule while merging a pull request, but cannot push directly to `main` |
 
-`GET /repos/rrflow/rrflow-development/rules/branches/main` reports all four
-rules from that ruleset. A direct push of an empty probe commit to `main` with
+`GET /repos/rrflow/rrflow-development/rules/branches/main` reports all five
+rules from that ruleset, and the GraphQL `mergeQueue(branch: "main")` query
+returns the active queue with that configuration. A merge-queue candidate runs
+the same caller through its `merge_group` trigger on a
+`gh-readonly-queue/main/...` ref, which has its own concurrency group, and
+reports the same `pipeline / ci-gate` check. A direct push of an empty probe commit to `main` with
 administrator credentials was rejected with "Changes must be made through a
 pull request" and "Required status check `pipeline / ci-gate` is expected",
 and `main` was unchanged. Switching the bypass to `always` is one ruleset

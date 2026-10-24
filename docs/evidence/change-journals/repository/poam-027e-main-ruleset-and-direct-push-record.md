@@ -18,9 +18,9 @@ implementation/evidence paths created, changed, moved, or deleted: changed docs/
 research decision and primary-source/adaptation record: GitHub repository rulesets REST API and rule types (pull_request, required_status_checks, non_fast_forward, deletion) with a RepositoryRole administrator bypass in pull_request mode; the required check is bound to the GitHub Actions app (integration 15368) so another status source cannot satisfy it.
 trace/resource/debug decision (add/preserve/not applicable, with reason): not applicable to RRFlow runtime; the API responses and the rejected probe below are the debugging evidence.
 first-failure or characterization oracle and result: before the ruleset, `git push -u development policy/pinned-git-submodules` with push.default=upstream and a branch tracking development/main fast-forwarded main 0bdc400a..b298fa96 with no pull request and no candidate CI run (ci.yml triggers only on pull_request, merge_group, and workflow_dispatch). After the ruleset, a direct push of empty probe commit ffafbddc6cf204e5d661a87be21879127a1bff92 (parent 9bcc6154, same tree) to refs/heads/main with administrator credentials was rejected — "Changes must be made through a pull request." and "Required status check \"pipeline / ci-gate\" is expected." — and main remained 9bcc6154.
-acceptance commands and exact results: `gh api -X POST repos/rrflow/rrflow-development/rulesets --input main-ruleset.json` — created ruleset 25439032, enforcement active, target ~DEFAULT_BRANCH, created 2026-10-19T18:36:20-04:00; `gh api repos/rrflow/rrflow-development/rules/branches/main` — deletion, non_fast_forward, pull_request, and required_status_checks all from ruleset 25439032; `gh api repos/rrflow/rrflow-development/rulesets/25439032` — bypass RepositoryRole 5 in pull_request mode, current_user_can_bypass pull_requests_only; `gh api repos/rrflow/rrflow-development/actions/permissions` — sha_pinning_required false. Candidate CI for b298fa96: pull request #17 head 5be3705d contains b298fa96 and its pipeline / ci-gate succeeded in run 39309982937; workflow_dispatch run 39335982331 on main 9bcc6154 (which contains b298fa96) concluded success at 2026-10-19T22:47:34Z with all 17 jobs passing, including verify, all five engine suites, six optional-feature jobs, installed RRFlow lifecycle, Windows and macOS estate process, supported SDK conformance, and pipeline / ci-gate.
+acceptance commands and exact results: `gh api -X POST repos/rrflow/rrflow-development/rulesets --input main-ruleset.json` — created ruleset 25439032, enforcement active, target ~DEFAULT_BRANCH, created 2026-10-19T18:36:20-04:00; `gh api repos/rrflow/rrflow-development/rules/branches/main` — deletion, non_fast_forward, pull_request, and required_status_checks all from ruleset 25439032; `gh api repos/rrflow/rrflow-development/rulesets/25439032` — bypass RepositoryRole 5 in pull_request mode, current_user_can_bypass pull_requests_only; `gh api repos/rrflow/rrflow-development/actions/permissions` — sha_pinning_required false. Candidate CI for b298fa96: pull request #17 head 5be3705d contains b298fa96 and its pipeline / ci-gate succeeded in run 39309982937; workflow_dispatch run 39335982331 on main 9bcc6154 (which contains b298fa96) concluded success at 2026-10-19T22:47:34Z with all 17 jobs passing, including verify, all five engine suites, six optional-feature jobs, installed RRFlow lifecycle, Windows and macOS estate process, supported SDK conformance, and pipeline / ci-gate. Amendment of 2026-10-24, by the repository owner's instruction to turn on the merge queue: `gh api -X PUT repos/rrflow/rrflow-development/rulesets/25439032` added a merge_queue rule (MERGE, ALLGREEN, at most 5 entries built and 5 merged, minimum 1 entry with a 5-minute wait, 180-minute check timeout against observed 64–92-minute candidate runs 40107347790, 40118525639 and 40121637610) and set strict_required_status_checks_policy to false because the queue tests each merged result against current main; the ruleset reported updated_at 2026-10-24T17:55:18-04:00; `gh api repos/rrflow/rrflow-development/rules/branches/main` — deletion, non_fast_forward, pull_request, required_status_checks, merge_queue; the GraphQL `mergeQueue(branch: "main")` query returned https://github.com/rrflow/rrflow-development/queue/main with mergeMethod MERGE, maximumEntriesToBuild 5, checkResponseTimeout 10800 seconds, mergingStrategy ALLGREEN and 0 entries.
 surfaced failures and corrections: the direct push to main is the surfaced failure; the first documentation-policy run failed with "POAM-027: missing current boundary 'written policy, not enforced'" because the checker hard-coded the superseded gap, so the checker now requires the enforced boundary; the authoring branch's upstream was removed and later pushes use an explicit `HEAD:refs/heads/<branch>` refspec. No force push or history rewrite was used; b298fa96 remains on main by the repository owner's decision, with the CI evidence above.
-checks not run and reason: the hosted full-SHA Actions setting was not enabled because nested third-party actions could reference unpinned actions and break candidate CI; it needs its own verified change. No merge queue was configured.
+checks not run and reason: the hosted full-SHA Actions setting was not enabled because nested third-party actions could reference unpinned actions and break candidate CI; it needs its own verified change. The merge queue was configured on 2026-10-24 (above); no merge-group candidate had run when this record was written.
 remaining known errors and owner: POAM-027 closure is the repository owner's decision; this record supplies the closure evidence named by POAM-027 (ruleset requiring pull requests and the stable check, deletion and force-push denial, repository, ref, rule identity, API evidence, and an attempted bypass). The administrator bypass and the disabled hosted SHA-pinning setting remain recorded limits.
 full-file reread and diff review: complete — both changed records and this journal were reread and the full diff reviewed.
 change checklist: complete — ruleset created and verified through the API, bypass attempt rejected, breach recorded with cause and CI evidence, documentation updated, journal linked and indexed
@@ -64,6 +64,24 @@ pull request, CI run, and merge evidence: recorded on the pull request for branc
       }
     }
   ]
+}
+```
+
+The 2026-10-24 amendment changes `strict_required_status_checks_policy` to
+`false` and appends this rule:
+
+```json
+{
+  "type": "merge_queue",
+  "parameters": {
+    "merge_method": "MERGE",
+    "grouping_strategy": "ALLGREEN",
+    "max_entries_to_build": 5,
+    "max_entries_to_merge": 5,
+    "min_entries_to_merge": 1,
+    "min_entries_to_merge_wait_minutes": 5,
+    "check_response_timeout_minutes": 180
+  }
 }
 ```
 
