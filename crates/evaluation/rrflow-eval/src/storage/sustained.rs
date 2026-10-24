@@ -1,6 +1,7 @@
 //! Bounded sustained evidence built on the existing storage manifest/ledger.
 //! These records describe qualification; they never configure the engine.
 use super::progress::ProgressJournal;
+use super::sustained_backup::BackupTracker;
 use super::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -698,6 +699,9 @@ pub struct SustainedSegment {
     pub corpus: Option<CorpusEvidence>,
     pub cold_start: Option<ColdStartEvidence>,
     pub reopens: Option<ReopenEvidence>,
+    /// Launch time for the one bounded backup, possibly completed in a later segment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup_started_ns: Option<u64>,
     pub backup: Option<BackupEvidence>,
     pub reader: Option<ReaderInterferenceEvidence>,
     /// Frozen before this segment's operations; full candidate/environment and
@@ -789,6 +793,7 @@ pub struct CampaignWriter {
     totals: BTreeMap<(Id, u64, LoadPhase), OperatingPointResult>,
     failed: Option<FailedSegment>,
     progress: Mutex<ProgressJournal>,
+    backups: BackupTracker,
 }
 
 impl CampaignWriter {
@@ -817,6 +822,7 @@ impl CampaignWriter {
             totals: BTreeMap::new(),
             failed: None,
             progress,
+            backups: BackupTracker::default(),
         })
     }
     pub fn next_index(&self) -> u64 {
@@ -902,8 +908,9 @@ impl CampaignWriter {
             &self.previous,
             self.last_finished_ns,
             &self.totals,
+            &self.backups,
         );
-        let summary = match validation {
+        let (summary, backups) = match validation {
             Ok(summary) => summary,
             Err(reason) => {
                 write_new(&self.directory.join("failed-segment.json"), &bytes)?;
@@ -925,6 +932,7 @@ impl CampaignWriter {
         self.count += 1;
         self.previous = Some(hash.clone());
         self.last_finished_ns = segment.finished_ns;
+        self.backups = backups;
         merge_summary(
             &mut self.totals,
             summary,
@@ -1008,6 +1016,8 @@ impl CampaignWriter {
             qualification_passed: false,
         };
         if status == CampaignStatus::Completed {
+            self.backups.require_settled()?;
+            progress_audit.check_backup_starts(self.backups.start_markers())?;
             super::drain::check_completed(&self.campaign, &result.operating_points)?;
         }
         result.qualification_passed = qualifies(&self.campaign, &result)?;
@@ -1026,6 +1036,14 @@ impl CampaignWriter {
 pub fn validate_segment(
     campaign: &StorageCampaign,
     segment: &SustainedSegment,
+) -> Result<OperatingPointResult> {
+    validate_segment_with_backups(campaign, segment, &mut BackupTracker::default())
+}
+
+fn validate_segment_with_backups(
+    campaign: &StorageCampaign,
+    segment: &SustainedSegment,
+    backups: &mut BackupTracker,
 ) -> Result<OperatingPointResult> {
     require(
         segment.format_version == 1 && segment.campaign_sha256 == campaign.sha256()?,
@@ -1225,36 +1243,6 @@ pub fn validate_segment(
                 && lane.repetitions.get() == 1
                 && digest("c07g.reader-interference", reader)? == lane.receipt_sha256,
             "reader lane lacks overlapping ACK, maintenance or matching receipt",
-        )?;
-    }
-    if let Some(backup) = &segment.backup {
-        require(
-            backup.started_ns >= segment.started_ns
-                && backup.started_ns <= backup.finished_ns
-                && backup.finished_ns <= backup.verified_ns
-                && backup.verified_ns <= segment.finished_ns
-                && backup.receipt.backup.application_complete
-                && segment.attempts.iter().any(|attempt| {
-                    attempt.kind == StorageLoadKind::MixedWrite
-                        && attempt.outcome == LoadOutcome::Acknowledged
-                        && attempt.started_ns < backup.finished_ns
-                        && attempt.finished_ns > backup.started_ns
-                })
-                && segment.lanes.iter().any(|lane| {
-                    lane.lane == CapacityLane::BackupUnderWrite
-                        && lane.repetitions.get() == 1
-                        && digest("c07g.backup-evidence", backup).as_ref()
-                            == Ok(&lane.receipt_sha256)
-                }),
-            "backup lane lacks a complete archive, overlapping ACK or matching raw receipt",
-        )?;
-    } else {
-        require(
-            !segment
-                .lanes
-                .iter()
-                .any(|lane| lane.lane == CapacityLane::BackupUnderWrite),
-            "backup lane omitted its raw receipt",
         )?;
     }
     for lane in &segment.lanes {
@@ -1498,6 +1486,7 @@ pub fn validate_segment(
         }
     }
     summary.lanes = lanes.into_iter().collect();
+    backups.observe(campaign, segment)?;
     Ok(summary)
 }
 
@@ -1588,14 +1577,16 @@ fn validate_next(
     previous: &Option<Digest>,
     last_finished: u64,
     totals: &BTreeMap<(Id, u64, LoadPhase), OperatingPointResult>,
-) -> Result<OperatingPointResult> {
+    backups: &BackupTracker,
+) -> Result<(OperatingPointResult, BackupTracker)> {
     require(
         segment.index == index
             && &segment.previous_sha256 == previous
             && segment.finished_ns >= last_finished,
         "segment chain reordered or changed",
     )?;
-    let summary = validate_segment(campaign, segment)?;
+    let mut next_backups = backups.clone();
+    let summary = validate_segment_with_backups(campaign, segment, &mut next_backups)?;
     // Fixed-count aggregates, bounded to 32 points * 32 seeds * five phases.
     // Validate on a copy before publishing evidence or mutating totals.
     merge_summary(
@@ -1603,7 +1594,7 @@ fn validate_next(
         summary.clone(),
         campaign.drain.stable_samples.get() as usize,
     )?;
-    Ok(summary)
+    Ok((summary, next_backups))
 }
 
 fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool> {
@@ -1771,6 +1762,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
     let mut previous = None;
     let mut last_finished = 0;
     let mut totals = BTreeMap::new();
+    let mut backups = BackupTracker::default();
     let mut bytes = std::fs::metadata(directory.join("campaign.json"))
         .map_err(|e| e.to_string())?
         .len()
@@ -1790,14 +1782,16 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
         )?;
         let segment: SustainedSegment = decode(&raw)?;
         progress_audit.bind_segment(&segment)?;
-        let summary = validate_next(
+        let (summary, next_backups) = validate_next(
             &campaign,
             &segment,
             index,
             &previous,
             last_finished,
             &totals,
+            &backups,
         )?;
+        backups = next_backups;
         merge_summary(
             &mut totals,
             summary,
@@ -1834,6 +1828,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
             &previous,
             last_finished,
             &totals,
+            &backups,
         )
         .err()
         .ok_or("failed segment no longer fails validation")?;
@@ -1867,6 +1862,7 @@ pub fn verify_campaign(directory: &Path) -> Result<CampaignResult> {
         "result aggregates or segment digest differ",
     )?;
     if result.status == CampaignStatus::Completed {
+        backups.require_settled()?;
         super::drain::check_completed(&campaign, &result.operating_points)?;
     }
     require(
@@ -1999,6 +1995,7 @@ pub(super) mod tests {
             corpus: None,
             cold_start: None,
             reopens: None,
+            backup_started_ns: None,
             backup: None,
             reader: None,
             manifest,
@@ -2840,3 +2837,7 @@ pub(super) mod tests {
         assert!(validate_segment(&campaign, &segment).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "sustained_backup_tests.rs"]
+mod backup_tests;

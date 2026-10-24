@@ -684,6 +684,7 @@ raising thresholds, omitting independent readback, or silently changing the
 frozen profile. The prior intermittent startup exit still needs diagnosis;
 one successful reproduction does not close it. C-07 and actual 24-hour
 qualification remain open.
+
 The [immutable point-read selection repair](../../evidence/change-journals/gate-c/c-07g-point-read-selection.md)
 records a reproduced growth cost: a six-byte winner read 131219 bytes because
 superseded values were hydrated before sequence selection. Winner-only reads
@@ -691,3 +692,11 @@ reduce that fixture to 113 bytes; bounded batch traversal preserves both
 metadata and payload locality. Exact snapshot, deletion, compaction and reopen
 checks accompany the repair. This component evidence does not establish the
 installed operating point or close the scheduling, growth or 24-hour soak gap.
+
+The [bounded backup scheduling repair](../../evidence/change-journals/gate-c/c-07g-backup-scheduling.md)
+removes the per-segment management join from offered-load dispatch. One task
+keeps its original deadline across segments; stream validation reconstructs
+its start, acknowledged-write overlap and verified completion without retaining
+old ledgers. Missing or unfinished evidence fails. Native smoke and contract
+checks support the implementation; integrated growth, profile repetitions and
+the actual 24-hour soak remain required before C-07 can close.
