@@ -6,6 +6,12 @@
 
 ## Observed deficiency
 
+The [conflict-probe repair and execution reset](../../evidence/change-journals/gate-c/c-07g-conflict-spine-and-execution.md)
+removes reproduced unnecessary value-page reads during native write-conflict
+validation. The existing C-07 owner now separates implemented paths, native
+capacity failures and the failed Desktop growth campaign. This narrow physical
+improvement does not diagnose all campaign traffic or complete qualification.
+
 The [retained nominal Desktop failure](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-failure.md)
 records a corpus-write deadline after 50685 acknowledgements, zero accepted
 segments and confirmed cleanup. The 24-hour phase never began. The next repair

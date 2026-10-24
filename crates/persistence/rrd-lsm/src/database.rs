@@ -962,14 +962,16 @@ impl Database {
 
     fn latest_sequence_for_key(&self, key: &[u8]) -> Result<Option<u64>> {
         let read_sequence = self.snapshot().sequence;
-        let mut latest = self
-            .memtable
-            .get_version(key, read_sequence)
-            .map(|version| version.sequence);
+        // As in get(), every active-memtable version is newer than all
+        // published segments. A tombstone is still an authoritative version.
+        if let Some(version) = self.memtable.get_version(key, read_sequence) {
+            return Ok(Some(version.sequence));
+        }
+        let mut latest = None;
         for segment in &self.segments {
-            if let Some(version) = segment.get_version(key, read_sequence)? {
-                if latest.is_none_or(|sequence| version.sequence > sequence) {
-                    latest = Some(version.sequence);
+            if let Some(sequence) = segment.get_sequence(key, read_sequence)? {
+                if latest.is_none_or(|latest| sequence > latest) {
+                    latest = Some(sequence);
                 }
             }
         }

@@ -1058,6 +1058,28 @@ impl Segment {
         key: &[u8],
         read_sequence: u64,
     ) -> Result<Option<SegmentVersion>> {
+        let Some((index, row, sequence)) = self.select_version(key, read_sequence)? else {
+            return Ok(None);
+        };
+        Ok(Some(SegmentVersion {
+            sequence,
+            value: self.value_at(index, row)?.map(Box::<[u8]>::from),
+        }))
+    }
+
+    // Conflict validation needs presence and sequence, including tombstones,
+    // but must not load/copy payload columns simply to discard their values.
+    pub(crate) fn get_sequence(&self, key: &[u8], read_sequence: u64) -> Result<Option<u64>> {
+        Ok(self
+            .select_version(key, read_sequence)?
+            .map(|(_, _, sequence)| sequence))
+    }
+
+    fn select_version(
+        &self,
+        key: &[u8],
+        read_sequence: u64,
+    ) -> Result<Option<(usize, usize, u64)>> {
         if key < self.descriptor.first_key.as_slice()
             || key > self.descriptor.last_key.as_slice()
             || read_sequence < self.descriptor.minimum_sequence
@@ -1092,13 +1114,7 @@ impl Segment {
             }
             row += 1;
         }
-        let Some((row, sequence)) = selected else {
-            return Ok(None);
-        };
-        Ok(Some(SegmentVersion {
-            sequence,
-            value: self.value_at(index, row)?.map(Box::<[u8]>::from),
-        }))
+        Ok(selected.map(|(row, sequence)| (index, row, sequence)))
     }
 
     pub(crate) fn get_versions(
