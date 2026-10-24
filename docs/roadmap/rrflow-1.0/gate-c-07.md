@@ -660,3 +660,12 @@ Stop on any lost ACK, partial batch, stale authority, cap violation,
 unexplained growing live owner, unknown effect or changed format/authority.
 Retain failures; repair at the canonical boundary before advancing. Neither
 this plan nor a successful component suite marks C-07 or alpha complete.
+
+
+The [bounded backup-checkpoint repair](../../evidence/change-journals/gate-c/c-07g-backup-checkpoint-cost.md)
+addresses another measured cost before full growth: default logical export
+synced each action and receipt, extending backup beyond the offered segment.
+Bounded checkpoints preserve final durability, byte identity and explicit
+per-action callback semantics. The digest-only 1k/5RPS point completed but
+still failed; the 10k run was explicitly interrupted after all corpus writes
+and partial independent readback. These are retained limitations, not closure.

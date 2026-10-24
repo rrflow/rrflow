@@ -740,3 +740,11 @@ rechecks ownership on EBUSY retries within one deadline and preserves failure
 retention. Thirteen orchestration checks pass; native candidate rerun remains
 required. This new observed cleanup deficiency does not erase PR115 evidence
 or qualify PR116, and C-07 remains open.
+
+
+The [backup checkpoint cost record](../../evidence/change-journals/gate-c/c-07g-backup-checkpoint-cost.md)
+retains the digest-only candidate's completed but failed 1k/5RPS point and
+incomplete 10k characterization. Bounded default export checkpoints reduce
+per-action sync overhead while preserving final publication and public progress
+semantics. Owning storage and installed smoke checks pass; native sustained
+acceptance remains pending and POAM035 stays open.
