@@ -272,28 +272,55 @@ impl Process {
             monitor.join().map_err(|_| "child monitor panicked")?;
         }
         let mut streams = Vec::new();
+        let mut capture_failure = None;
         for (receive, reader) in self.capture.drain(..) {
             // A leaked descendant pipe cannot hang cleanup or allocate forever.
-            let bytes = receive
-                .recv_timeout(Duration::from_secs(2))
-                .map_err(|_| "child output did not close within its deadline")?
-                .map_err(|error| format!("child output capture failed: {error}"))?;
-            reader.join().map_err(|_| "child capture panicked")?;
-            streams.push(bytes);
-        }
-        if let Some(failure) = *self.failure.lock().unwrap() {
-            return Err(failure.into());
+            match receive.recv_timeout(Duration::from_secs(2)) {
+                Ok(result) => {
+                    if reader.join().is_err() {
+                        capture_failure.get_or_insert("child capture panicked".to_owned());
+                    }
+                    match result {
+                        Ok(bytes) => streams.push(bytes),
+                        Err(error) => {
+                            capture_failure.get_or_insert_with(|| {
+                                format!("child output capture failed: {error}")
+                            });
+                            streams.push(Vec::new());
+                        }
+                    }
+                }
+                Err(_) => {
+                    capture_failure
+                        .get_or_insert("child output did not close within its deadline".to_owned());
+                    streams.push(Vec::new());
+                }
+            }
         }
         if streams.len() != 2 {
             return Err("child output already consumed".into());
         }
+        let status = self
+            .child
+            .lock()
+            .unwrap()
+            .wait()
+            .map_err(|_| "reap child")?;
+        if let Some(failure) =
+            capture_failure.or_else(|| self.failure.lock().unwrap().map(str::to_owned))
+        {
+            // A missing readiness line must not discard the bounded stderr
+            // explaining why startup exited. Never include captured stdout:
+            // successful announcements can carry client bootstrap material.
+            let stderr = &streams[1];
+            let tail = &stderr[stderr.len().saturating_sub(2048)..];
+            return Err(format!(
+                "{failure}; status={status}; stderr_tail={:?}",
+                String::from_utf8_lossy(tail)
+            ));
+        }
         Ok(Output {
-            status: self
-                .child
-                .lock()
-                .unwrap()
-                .wait()
-                .map_err(|_| "reap child")?,
+            status,
             stderr: streams.pop().unwrap(),
             stdout: streams.pop().unwrap(),
         })
