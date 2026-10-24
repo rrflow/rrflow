@@ -30,4 +30,36 @@ This bounded parent package advances the optional source input only, preserves
 client reference. Existing UI source was reviewed/tested in its own PR; no
 engine code is copied into the UI or sourced from it. No new upstream research,
 source adaptation, tracing or performance measurement is needed for this pin.
-Parent integration checks and exact changed paths follow before publication.
+
+## Parent integration evidence
+
+[PR114](https://github.com/rrflow/rrflow-development/pull/114) was opened before
+the gitlink mutation. Baseline tree:
+`8c1289def013f36b2732ef7a6103deff711fe41f`.
+The parent gitlink changed from `03b716b4dfe5623e6c82408c6f4df367c9795388`
+to the reviewed merge above. `git ls-files --stage connectome` confirms mode
+160000 and the exact target. Both tested head and merge have tree
+`33452248add3f12c4144095330231d78289d05ab`.
+
+`GIT_TERMINAL_PROMPT=0 git -c credential.helper= -c core.askPass= submodule
+update --init -- connectome` acquired the public source successfully. The child
+checkout reports the exact target revision/tree and credential-free HTTPS
+origin. No escaping checkout or install-time fetch was introduced. The changed
+client reference documents the actual project/UI bounds and remaining features.
+
+Read the root README planning/checkout boundary, complete Connectome checkout
+owner sections, child README/project workspace implementation, prior sprint012
+validation and merged review/check results. No engine implementation was
+rewritten or moved. The exact changes are the gitlink, client owner, this journal,
+its generated nearest index and execution inventory. Existing child code and
+its pinned engine remain untouched. The entire authored diff and gitlink were
+reviewed; generated inventory is a projection, not another lifecycle authority.
+
+Validation: exact mode/revision/tree and public acquisition checks passed.
+Documentation, generated navigation, execution inventory and whitespace checks
+passed before publication. No unchanged Rust/build/browser suite was rerun for
+this pin; the child candidate already passed all its owning lanes and the parent
+candidate must pass its source policy/CI before merge. No surfaced integration
+error was suppressed. The first journal commit only enables a reviewable PR;
+the final source pin is the implementation effect. No gate/POA&M completion,
+latest-engine bundle qualification, training or cloud service is claimed.

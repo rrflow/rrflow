@@ -77,6 +77,22 @@ the reviewed UI revision independently. The
 [workbench guide](https://github.com/rrflow/connectome-development/blob/main/docs/native-workbench.md)
 owns build and desktop-use instructions.
 
+[Connectome PR13](https://github.com/rrflow/connectome-development/pull/13)
+adds selected-project workspaces with nested Overview, Knowledge, Activity,
+Learning and Services sections. Basic descriptions lead to advanced engine
+identity and evidence; native model, record/relationship, vector and storage
+views remain bounded public-operation projections. Manage project engines owns
+at most four local processes, and authenticated native connections are keyed by
+project profile (at most eight), so opening or stopping one does not replace
+another project's session. Context sharing is not implied by parallel execution.
+
+The [project workspaces pin receipt](../../evidence/change-journals/gate-h/h-06-project-workspaces-pin.md)
+binds the merged UI to its Windows/Linux/macOS, frontend and real-engine process
+CI. Knowledge-path activation, replay, supervised/unsupervised learning and
+cloud sync remain visibly unavailable. This UI revision retains the same older
+engine/SDK pair named above; neither source association nor parallel process
+control is proof of those downstream capabilities or full H-06 acceptance.
+
 Newer RRFlow installation-plan contract v2 requires an explicit identity from
 `rrflow install identity`, retained across preview regeneration and supplied
 with `install plan --identity`. The pinned workbench above uses its named older
