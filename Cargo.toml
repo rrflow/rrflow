@@ -48,3 +48,15 @@ unicode-normalization = "0.1"
 # Thin LTO keeps codegen parallel; symbols and panic unwinding are unchanged.
 [profile.release]
 lto = "thin"
+
+# Native debug lifecycle fixtures still hash the entire actual executable.
+# Optimize the pinned compression implementation without disabling development
+# assertions, overflow checks, identity verification or application debugging.
+[profile.dev.package.sha2]
+opt-level = 3
+
+# Observation symbols only: semantic settings inherit release unchanged.
+[profile.diagnostic]
+inherits = "release"
+debug = "line-tables-only"
+strip = "none"

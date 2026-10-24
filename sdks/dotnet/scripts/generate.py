@@ -87,6 +87,7 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {{
+    public const string OpenApiDocumentSha256 = "{openapi_digest}";
     public const int Count = {len(endpoints)};
 
     public static Endpoint Get(OperationId operation) => operation switch
@@ -106,7 +107,7 @@ def main() -> None:
             raise SystemExit("generated .NET RRD endpoint map is stale; run python scripts/generate.py")
         return
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(generated)
+    OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

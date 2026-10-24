@@ -631,7 +631,32 @@ fn traversal_evidence_follows_visited_edges_not_estate_size() {
         .unwrap()
         .range_scans;
     assert_eq!(adjacency_scans, 4);
-    assert!(large_run.read_evidence.keys_examined < 100);
+    // Keep the original executor bound. A complete pipeline now additionally
+    // reports its authenticated schema-capture work instead of hiding it.
+    let pipeline = StampedQueryPipeline::new(&large, large_read.clone()).unwrap();
+    let bound = pipeline
+        .bind(
+            &parse(text).unwrap(),
+            &Parameters::new(),
+            &ExecutionBudget::default(),
+        )
+        .unwrap();
+    let physical = pipeline.plan(&bound).unwrap();
+    let direct = pipeline
+        .execute(&physical, &ExecutionBudget::default())
+        .unwrap();
+    assert!(direct.read_evidence.keys_examined < 100);
+    let metadata = rrd_query::Catalog::capture_for_sources_at(
+        &large,
+        large_read.clone(),
+        &[],
+        RuntimeReadBudget::new(100_000).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        large_run.read_evidence.keys_examined,
+        direct.read_evidence.keys_examined + metadata.read_evidence.keys_examined
+    );
 
     // The family ranges the reader replaced grow with the estate.
     let family = large
@@ -648,4 +673,46 @@ fn traversal_evidence_follows_visited_edges_not_estate_size() {
         )
         .unwrap();
     assert!(family.evidence.keys_examined > 2 * NOISE as u64);
+}
+
+#[test]
+fn temporal_traversal_preserves_exact_rows_after_durable_reopen() {
+    let directory = tempfile::tempdir().unwrap();
+    let engine = RrflowKvStore::open(directory.path()).unwrap();
+    let cursors = commit_random_graph(&engine, 11);
+    let head = engine.runtime().read_stamp(&scope()).unwrap();
+    let log = engine
+        .runtime()
+        .read_changes(&head, 0, usize::MAX)
+        .unwrap()
+        .changes;
+    let mut cases = Vec::new();
+    for direction in ["OUTGOING", "INCOMING", "BOTH"] {
+        for valid_at in [120, 260, 500] {
+            for known_at in [cursors[cursors.len() / 2], head.commit_cursor] {
+                let text = format!("FROM traverse:link START node:n0 DIRECTION {direction} DEPTH 4 AT VALID {valid_at} KNOWN {known_at} PROJECT *");
+                let expected = oracle_rows(
+                    &log,
+                    &kind("link"),
+                    &node("n0"),
+                    direction,
+                    4,
+                    valid_at,
+                    known_at,
+                );
+                let execution = run(&engine, &head, &text);
+                assert_eq!(rows(&execution), expected, "before reopen: {text}");
+                cases.push((text, expected, execution.selected_versions));
+            }
+        }
+    }
+    assert!(cases.iter().any(|(_, expected, _)| !expected.is_empty()));
+    drop(engine);
+    let reopened = RrflowKvStore::open(directory.path()).unwrap();
+    let read = reopened.runtime().read_stamp(&scope()).unwrap();
+    for (text, expected, versions) in cases {
+        let execution = run(&reopened, &read, &text);
+        assert_eq!(rows(&execution), expected, "after reopen: {text}");
+        assert_eq!(execution.selected_versions, versions);
+    }
 }

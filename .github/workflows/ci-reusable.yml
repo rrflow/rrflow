@@ -23,7 +23,10 @@ jobs:
   topology-smoke:
     name: installed RRFlow lifecycle
     runs-on: ${{ fromJSON(inputs.linux-standard-runner) }}
-    timeout-minutes: 15
+    timeout-minutes: 25
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,13 +37,79 @@ jobs:
         with:
           shared-key: linux-topology
           cache-on-failure: true
+      - name: Test native filesystem containment and publication
+        run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test encoded admission accounting boundaries
+        run: cargo test -p rrd-lsm --lib admission_tests --locked
+      - name: Test native staged write admission
+        run: cargo test -p rrd-lsm --test write_admission --locked
+      - name: Test composed store admission and semantic atomicity
+        run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
+      - name: Test engine rejected-commit recovery and reuse
+        run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
+      - name: Test projected read admission and mixed generations
+        run: cargo test -p rrd-lsm --test projected_lifetime --locked
+      - name: Test terminal projected source ownership
+        run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
+
+      - name: Test overlapping reader checkpoint and reclamation histories
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture
+      - name: Test honest bounded native write diagnostics
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test write_diagnostics --locked
+      - name: Test store diagnostic timing and durable readback
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test rrflow_kv_operator --locked
+      - name: Test bounded storage I/O model and compound recovery
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
+      - name: Qualify bind-mount denial in a private native namespace
+        run: python3 scripts/ci/run_filesystem_containment.py
       - name: Test the real install, serve, authenticate, stop, reopen lifecycle
         run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Test bounded native lifecycle capture
+        run: cargo test -p rrflow-cli --test lifecycle_process --locked
+      - name: Require native foreign-owner denial
+        run: python3 scripts/ci/run_private_owner.py
+      - name: Qualify the staged binary without checkout, toolchain sources or outbound network
+        run: python3 scripts/ci/run_offline_lifecycle.py --receipt "${{ runner.temp }}/rrflow-offline.json"
+      - name: Retain sanitized native qualification receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: offline-linux
+          path: ${{ runner.temp }}/rrflow-offline.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Capture clean primary build provenance
+        run: python3 scripts/build_rrflow.py --profile dev --output "$RUNNER_TEMP/rrflow-build-receipt.json"
 
   estate-portability:
     name: estate process (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 35
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     strategy:
       fail-fast: false
       matrix:
@@ -63,6 +132,76 @@ jobs:
         run: cargo test -p rrd-estate --all-targets --locked
       - name: Test RRD daemon process contract
         run: cargo test -p rrd-server --bin rrd-server --locked
+      - name: Test native secret file permissions and handle identity
+        run: cargo test -p rrd-engine --lib engine::token_key --locked
+      - name: Test native filesystem containment and publication
+        run: cargo test -p rrd-lsm --test filesystem --test manifest --locked
+      - name: Test encoded admission accounting boundaries
+        run: cargo test -p rrd-lsm --lib admission_tests --locked
+      - name: Test native staged write admission
+        run: cargo test -p rrd-lsm --test write_admission --locked
+      - name: Test composed store admission and semantic atomicity
+        run: cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked
+      - name: Test engine rejected-commit recovery and reuse
+        run: cargo test -p rrd-engine --lib engine::tests::write_admission --locked
+      - name: Test typed mutable rejection and read-only replay admission
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test mutable_admission --locked
+      - name: Require configured restore admission and exact resume
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked
+      - name: Test hard mutable admission and bounded WAL materialization
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test mutable_limits --locked
+      - name: Test projected read admission and mixed generations
+        run: cargo test -p rrd-lsm --test projected_lifetime --locked
+      - name: Test terminal projected source ownership
+        run: cargo test -p rrd-lsm --lib reader::lifetime_tests --locked
+      - name: Test retained projected output admission and release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_output_limits --locked
+      - name: Test retained native store inspection cursors
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test storage_inspection --locked
+      - name: Test output reservation arithmetic and partial release
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib segment::output::tests --locked
+
+      - name: Test overlapping reader checkpoint and reclamation histories
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture
+      - name: Test honest bounded native write diagnostics
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --test write_diagnostics --locked
+      - name: Test store diagnostic timing and durable readback
+        timeout-minutes: 5
+        run: cargo test -p rrd-store --test rrflow_kv_operator --locked
+      - name: Test bounded storage I/O model and compound recovery
+        timeout-minutes: 5
+        run: cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture
+      - name: Test native installation, bootstrap, ancestor replacement and process recovery
+        run: cargo test -p rrd-engine --lib installation --locked -- --nocapture
+      - name: Qualify native macOS mounted-volume denial
+        if: runner.os == 'macOS'
+        run: python3 scripts/ci/run_filesystem_containment.py
+      - name: Require native foreign-owner denial
+        run: python scripts/ci/run_private_owner.py
+      - name: Test bounded native lifecycle capture
+        run: cargo test -p rrflow-cli --test lifecycle_process --locked
+      - name: Qualify native staged binary without source or outbound access
+        run: python scripts/ci/run_offline_lifecycle.py --receipt "${{ runner.temp }}/rrflow-offline.json"
+      - name: Retain sanitized native qualification receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: offline-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-offline.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Test native installed primary lifecycle
+        run: cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture
+      - name: Deny installed lifecycle test warnings
+        run: cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings
       - name: Build cross-package controller fixture
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test process fault injection (not product-readiness evidence)
@@ -97,8 +236,12 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Enforce owner-controlled release version
         run: python3 scripts/check_version.py
+      - name: Test build provenance and diagnostic profile policy
+        run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
         run: python3 scripts/ci/check_workflow.py
+      - name: Test offline qualification input and artifact policy
+        run: python3 scripts/ci/test_offline_lifecycle.py
       - name: Enforce documentation authority and local links
         run: python3 scripts/ci/check_documentation.py
       - name: Enforce knowledge-package drift and reproducibility
@@ -115,6 +258,10 @@ jobs:
         run: |
           python3 scripts/ci/test_execution_inventory.py
           python3 scripts/ci/build_execution_inventory.py --check
+          python3 scripts/knowledge/render_capacity_profiles.py --check
+          python3 scripts/knowledge/test_capacity_profiles.py
+          python3 scripts/ci/test_collect_storage_acceptance.py
+          python3 scripts/ci/test_sustained_launch.py
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Enforce RRFlow engine ownership
@@ -178,7 +325,7 @@ jobs:
         if: ${{ matrix.name == 'service-protocol' }}
         run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
       - name: Test cohesive engine subsystem
-        run: cargo test $PACKAGE_SELECTION --all-targets --locked
+        run: cargo test $PACKAGE_SELECTION --all-targets --locked --no-fail-fast
       - name: Deny cohesive engine subsystem warnings
         run: cargo clippy $PACKAGE_SELECTION --all-targets --locked -- -D warnings
 
@@ -282,7 +429,7 @@ jobs:
           shared-key: linux-feature-${{ matrix.package }}-test-debug0-lld1
           cache-on-failure: false
       - name: Test package optional features
-        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked
+        run: cargo test -p ${{ matrix.package }} --all-targets --all-features --locked --no-fail-fast
       - name: Deny package optional-feature warnings
         run: cargo clippy -p ${{ matrix.package }} --all-targets --all-features --locked -- -D warnings
 
@@ -328,6 +475,200 @@ jobs:
       - name: Deny PostgreSQL operator-knowledge warnings
         run: cargo clippy -p rrd-operator-knowledge --all-targets --all-features --locked -- -D warnings
 
+  installed-reopen:
+    name: installed 100-cycle reopen (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    env:
+      CARGO_BUILD_JOBS: "1"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: installed-reopen-${{ matrix.os }}
+          cache-on-failure: false
+      - name: Build ordinary primary and fixed reopen corpus
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
+      - name: Exercise installed capacity workload and backup readback
+        timeout-minutes: 10
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
+      - name: Independent installed estates under concurrent load
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture
+      - name: Require fresh and existing installed damage denial
+        timeout-minutes: 10
+        run: >-
+          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2
+      - name: Require fresh and existing 100-cycle histories
+        timeout-minutes: 65
+        env:
+          RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2
+      - name: Require both complete ordinary-primary receipts
+        shell: bash
+        env:
+          RRFLOW_REOPEN_RECEIPT_DIR: ${{ runner.temp }}/rrflow-reopen
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RRFLOW_REOPEN_RECEIPT_DIR'])
+          assert sorted(p.name for p in root.iterdir()) == ['existing.json', 'fresh.json']
+          builds = []
+          for mode in ['fresh', 'existing']:
+              path = root / (mode + '.json')
+              assert 0 < path.stat().st_size <= 8 * 1024 * 1024
+              receipt = json.loads(path.read_bytes())
+              assert receipt['mode'] == mode and receipt['instrumentation'] == 'none'
+              assert receipt['build']['compiler']['root_profile'] == 'release'
+              assert receipt['build']['compiler']['opt_level'] == '3'
+              assert receipt['build']['compiler']['debug_assertions'] is False
+              assert receipt['forced_reopens'] == 100 and len(receipt['cycles']) == 100
+              assert receipt['report'] == {'logical_calls': 100, 'attempts': 5150, 'acknowledged': 5150, 'rejected': 0, 'uncertain': 0, 'resolved_present': 100, 'resolved_absent': 0, 'unresolved': 0, 'violations': []}
+              assert len(receipt['ledger']['expected']) == len(receipt['ledger']['readback']) == 100
+              assert len(receipt['ledger']['attempts']) == 5150
+              previous = None
+              for index, cycle in enumerate(receipt['cycles']):
+                  assert cycle['cycle'] == index and cycle['checked_operations'] == index + 1
+                  assert cycle['runtime_cursor'] == 2 * (index + 1) + 2
+                  assert cycle['prior']['pid'] == cycle['termination']['pid']
+                  assert cycle['prior']['ready_ns'] <= cycle['termination']['killed_ns'] <= cycle['termination']['reaped_ns'] <= cycle['reopened']['started_ns'] <= cycle['reopened']['ready_ns']
+                  assert previous is None or cycle['prior'] == previous
+                  previous = cycle['reopened']
+              assert receipt['cleanup']['pid'] == previous['pid']
+              assert previous['ready_ns'] <= receipt['cleanup']['killed_ns'] <= receipt['cleanup']['reaped_ns']
+              builds.append(receipt['build'])
+          assert builds[0] == builds[1]
+          print('ordinary reopen evidence: 200 cycles, 10300 reconciled attempts, both estates cleaned up')
+          PY
+      - name: Retain sanitized ordinary reopen receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-reopen-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-reopen/*.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Deny reopen corpus warnings
+        run: cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings
+
+  installed-crash:
+    name: installed domain crash (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: installed-crash-${{ matrix.os }}
+          cache-on-failure: false
+      - name: Build ordinary primary before diagnostic feature activation
+        run: cargo build -p rrflow-cli --bin rrflow --locked
+      - name: Verify diagnostic protocol is absent from ordinary artifact
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          path = Path('target/debug/rrflow' + ('.exe' if os.name == 'nt' else ''))
+          markers = [b'C07C_NATIVE_PAUSE_V1=', b'C07F_NATIVE_IO_V1=']
+          digest, tail = hashlib.sha256(), b''
+          with path.open('rb') as source:
+              while block := source.read(1024 * 1024):
+                  if any(marker in tail + block for marker in markers):
+                      raise SystemExit('diagnostic protocol leaked into ordinary artifact')
+                  digest.update(block)
+                  tail = block[-max(map(len, markers)):]
+          print('crash_distribution_receipt=' + json.dumps({'sha256': digest.hexdigest(), 'bytes': path.stat().st_size, 'protocol_absent': True}))
+          PY
+      - name: Build explicit diagnostic primary and installed oracle
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run
+      - name: Test bounded diagnostic process control
+        run: cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+      - name: Test native capacity ownership and WAL observation
+        run: |
+          python scripts/ci/test_native_capacity.py
+          cargo test -p rrd-lsm --test installed_wal_selection --features crash-test --locked
+      - name: Test exact installed domain boundaries and compound recovery
+        timeout-minutes: 20
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2 --skip publication_and_reclamation
+      - name: Test installed publication and reclamation with compound recovery
+        timeout-minutes: 20
+        env:
+          RRFLOW_PUBLICATION_RECEIPT_DIR: ${{ runner.temp }}/rrflow-publication
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- publication_and_reclamation --nocapture --test-threads=2
+      - name: Require both complete installed publication receipts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'rrflow-publication'
+          points = ['segment_synced', 'successor_wal_synced', 'current_before_rename', 'current_renamed', 'reclaim_before_remove', 'reclaim_removed']
+          builds = []
+          for mode in ['fresh', 'existing']:
+              path = root / (mode + '.json')
+              assert path.is_file() and not path.is_symlink() and path.stat().st_size <= 4 * 1024 * 1024
+              receipt = json.loads(path.read_text())
+              assert receipt['mode'] == mode and receipt['publication'] is True
+              assert receipt['instrumentation'] == 'crash-test-primary'
+              assert receipt['report'] == {'logical_calls': 7, 'attempts': 25, 'acknowledged': 19, 'rejected': 0, 'uncertain': 6, 'resolved_present': 7, 'resolved_absent': 0, 'unresolved': 0, 'violations': []}
+              assert len(receipt['ledger']['expected']) == len(receipt['ledger']['readback']) == 7
+              assert len(receipt['ledger']['attempts']) == 25 and len(receipt['hits']) == 12
+              for index, point in enumerate(points):
+                  effect, recovery = receipt['hits'][2*index:2*index+2]
+                  for event, selected in [(effect, point), (recovery, 'recovery_manifest')]:
+                      assert event['hit']['point'] == selected and event['hit']['id'] == index + 1
+                      assert event['hit']['pid'] > 0 and event['hit_ns'] <= event['reaped_ns']
+                  assert effect['hit']['nonce'] != recovery['hit']['nonce']
+              builds.append(receipt['build'])
+          assert builds[0] == builds[1]
+          print('installed publication: both native histories and all 12 compound kills verified')
+          PY
+      - name: Retain installed publication evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-publication-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-publication/*.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Qualify installed native capacity failure and recovery
+        timeout-minutes: 30
+        run: python3 scripts/ci/run_native_capacity.py
+      - name: Deny diagnostic-primary and oracle warnings
+        run: cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
+
   ci-gate:
     name: ci-gate
     if: ${{ always() }}
@@ -339,6 +680,8 @@ jobs:
       - sdk-conformance
       - optional-features
       - pgvector-feature
+      - installed-crash
+      - installed-reopen
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -351,6 +694,8 @@ jobs:
           SDK_CONFORMANCE_RESULT: ${{ needs.sdk-conformance.result }}
           OPTIONAL_FEATURES_RESULT: ${{ needs.optional-features.result }}
           PGVECTOR_FEATURE_RESULT: ${{ needs.pgvector-feature.result }}
+          INSTALLED_CRASH_RESULT: ${{ needs.installed-crash.result }}
+          INSTALLED_REOPEN_RESULT: ${{ needs.installed-reopen.result }}
         run: |
           test "$TOPOLOGY_RESULT" = success
           test "$PORTABILITY_RESULT" = success
@@ -359,3 +704,5 @@ jobs:
           test "$SDK_CONFORMANCE_RESULT" = success
           test "$OPTIONAL_FEATURES_RESULT" = success
           test "$PGVECTOR_FEATURE_RESULT" = success
+          test "$INSTALLED_CRASH_RESULT" = success
+          test "$INSTALLED_REOPEN_RESULT" = success

@@ -1,5 +1,7 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11
+// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee" as const;
+
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -61,6 +63,18 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": false
   },
+  "diagnostics-storage-cursor": {
+    "method": "POST",
+    "path": "/v1/diagnostics/storage/cursor",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "diagnostics-storage-read": {
+    "method": "POST",
+    "path": "/v1/diagnostics/storage/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
   "estate-read": {
     "method": "POST",
     "path": "/v1/estates/{estate}/read",
@@ -100,6 +114,12 @@ export const endpoints = {
   "query-execute": {
     "method": "POST",
     "path": "/v1/query",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "query-export": {
+    "method": "POST",
+    "path": "/v1/query/export",
     "authentication": "session_bearer",
     "mutation": false
   },

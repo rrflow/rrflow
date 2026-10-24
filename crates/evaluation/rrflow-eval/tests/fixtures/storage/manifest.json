@@ -1,0 +1,210 @@
+{
+  "bindings": [
+    {
+      "availability": "available",
+      "driver_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "operation": "transaction-commit"
+    }
+  ],
+  "budgets": {
+    "atomic_batch_bytes": 1048576,
+    "atomic_mutations": 1024,
+    "attempts": 100,
+    "cache_bytes": 1048576,
+    "decoded_bytes": 1048576,
+    "disk_bytes": 1073741824,
+    "estates": 2,
+    "host_bytes": 536870912,
+    "maintenance_bytes": 16777216,
+    "maintenance_workers": 1,
+    "mutable_bytes": 134217728,
+    "mutable_versions": 1048576,
+    "process_bytes": 268435456,
+    "queue_bytes": 4194304,
+    "queue_requests": 8,
+    "queue_wait_ms": 1000,
+    "recovery_frames": 10000,
+    "recovery_memory_bytes": 1048576,
+    "recovery_ms": 10000,
+    "recovery_replay_bytes": 16777216,
+    "recovery_reserve_bytes": 16777216,
+    "retained_bytes": 1048576,
+    "run_ms": 60000,
+    "temporary_disk_bytes": 16777216
+  },
+  "candidate": {
+    "clean": true,
+    "commit": "1111111111111111111111111111111111111111",
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
+    "executable_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "public_catalogue_sha256": "5c9e8e6f9586649da1297e4dcd0b220e4fdbc37c930b4f38fbffd933757e1b3c",
+    "tree": "2222222222222222222222222222222222222222"
+  },
+  "corpus_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "durability": "authoritative",
+  "environment": {
+    "cpu": "synthetic-cpu",
+    "filesystem_device": "synthetic-ext4-device",
+    "flush_primitive": "synthetic-sync-data",
+    "measurement_tool": "synthetic-contract-v1",
+    "mount_options": "synthetic-default",
+    "os_version": "synthetic-linux",
+    "platform": "linux_ext4",
+    "target": "x86_64-unknown-linux-gnu",
+    "toolchain": "synthetic-rust"
+  },
+  "evidence_class": "synthetic",
+  "format_version": 1,
+  "installed_configuration": {
+    "clock": {
+      "maximum_rollback_ms": 0
+    },
+    "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
+    "format_version": 3,
+    "query": {
+      "max_batch_rows": 256,
+      "max_elapsed_ms": 30000,
+      "max_memory_bytes": 67108864,
+      "max_output_bytes": 524288,
+      "max_rows": 10000,
+      "max_spill_bytes": 268435456,
+      "max_storage_keys": 100000
+    },
+    "reasoning": {
+      "max_run_elapsed_ms": 900000,
+      "max_step_elapsed_ms": 60000,
+      "max_steps": 256
+    },
+    "recall": {
+      "max_graph_depth": 4,
+      "max_items": 128,
+      "max_output_bytes": 524288,
+      "max_storage_keys": 100000
+    },
+    "revision": 1,
+    "storage": {
+      "active_read_views": 1024,
+      "checkpoint_entries": 1024,
+      "compaction_elapsed_ms": 30000,
+      "compaction_input_bytes": 1073741824,
+      "compaction_input_logical_bytes": 268435456,
+      "compaction_input_versions": 4194304,
+      "compaction_l0_segments": 64,
+      "compaction_output_segments": 256,
+      "memtable_flush_target_versions": 524288,
+      "mutable_accounted_bytes": 134217728,
+      "mutable_versions": 1048576,
+      "native_transaction_bytes": 67108864,
+      "native_transactions": 64,
+      "page_cache_bytes": 4194304,
+      "pinned_read_bytes": 4294967296,
+      "projected_output_bytes": 134217728,
+      "reclamation_delete_bytes": 1073741824,
+      "reclamation_delete_files": 1024,
+      "reclamation_elapsed_ms": 30000,
+      "reclamation_inventory_entries": 262144,
+      "reclamation_metadata_bytes": 67108864,
+      "recovery_elapsed_ms": 120000,
+      "recovery_files": 262144,
+      "recovery_metadata_bytes": 67108864,
+      "recovery_read_bytes": 1099511627776,
+      "recovery_reserve_bytes": 16777216,
+      "recovery_wal_bytes": 268435456,
+      "recovery_wal_frames": 1048576,
+      "retained_mutable_bytes": 536870912,
+      "retained_mutable_generations": 64,
+      "retained_mutable_versions": 4194304,
+      "source_page_bytes": 268435456,
+      "transaction_admission_bytes": 67108864,
+      "transaction_admission_requests": 64,
+      "transaction_admission_wait_ms": 30000,
+      "wal_flush_target_bytes": 67108864
+    }
+  },
+  "profile": "synthetic-contract-oracle",
+  "required_cases": [
+    {
+      "expected_ledger_sha256": "e396fd4b47ea551f500913f3449c959f7cb0478a78840536fe3ae882dc1a25bc",
+      "id": "ack-history",
+      "operation": "transaction-commit",
+      "seed": 7
+    }
+  ],
+  "storage_observation": {
+    "evidence_level": "rrflow_kv_counters",
+    "observed_at_unix_ms": 1,
+    "profile": "rrflow_kv",
+    "rrflow_kv": {
+      "durable_sequence": 0,
+      "maintenance": {
+        "automatic_compactions": 0,
+        "automatic_flushes": 0,
+        "compaction_input_bytes": 0,
+        "compaction_output_bytes": 0,
+        "failed_compactions": 0,
+        "failed_flushes": 0,
+        "oversized_batches": 0,
+        "peak_compaction_buffer_bytes": 0,
+        "write_stalls": 0
+      },
+      "manifest_generation": 1,
+      "memtable": {
+        "approximate_bytes": 0,
+        "key_payload_bytes": 0,
+        "keys": 0,
+        "max_versions": 524288,
+        "owned_bytes_lower_bound": 0,
+        "spilled_chains": 0,
+        "spilled_version_capacity": 0,
+        "tombstones": 0,
+        "value_payload_bytes": 0,
+        "version_record_bytes": 0,
+        "versions": 0
+      },
+      "page_cache": {
+        "bytes_allocated": 0,
+        "bytes_borrowed": 0,
+        "bytes_copied": 0,
+        "bytes_decoded": 0,
+        "bytes_decompressed": 0,
+        "bytes_read": 0,
+        "capacity_bytes": 1048576,
+        "entries": 0,
+        "evictions": 0,
+        "filter_checks": 0,
+        "filter_negatives": 0,
+        "hits": 0,
+        "misses": 0,
+        "page_loads": 0,
+        "resident_bytes": 0
+      },
+      "physical_sequence": 0,
+      "segment_io": {
+        "bounded_reads": 0,
+        "bounded_segments": 0,
+        "bytes_read": 0,
+        "fallbacks": 0,
+        "io_uring_reads": 0,
+        "io_uring_segments": 0,
+        "max_request_bytes": 65536,
+        "mmap_reads": 0,
+        "mmap_segments": 0,
+        "peak_request_bytes": 0,
+        "read_operations": 0,
+        "requested_mode": "bounded"
+      },
+      "segment_set": {
+        "compaction_debt_segments": 0,
+        "compaction_target_segment_bytes": 8388608,
+        "l0_compaction_trigger": 8,
+        "l0_segments": 0,
+        "segment_bytes": 0,
+        "segments": 0
+      },
+      "write_ahead_log": {
+        "payload_bytes": 0,
+        "payload_max_bytes": 67108864
+      }
+    }
+  }
+}

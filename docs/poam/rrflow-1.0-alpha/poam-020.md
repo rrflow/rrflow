@@ -24,6 +24,27 @@ rrflowKV.
 
 ## Impact
 
+### Baseline collision between distinct empty projects
+
+The D-01 offline-qualification inspection reproduced two different empty
+project directories receiving exactly the same installation plan digest and
+project/estate/instance IDs from `rrflow install plan --mode fresh`. The
+observed executable SHA-256 was
+`6853715de7b816f7e9c1e921ceb670f6350bc2fb0d088e0d5cb30df6fb7d0623`.
+`installation_identity_seed` binds mode, inventory, profile, executable and
+configuration digests, but no independently selected installation identity.
+Identical existing-project content has the same structural risk. Separate
+credential generation does not correct the duplicated logical identity.
+
+D-01 must bind an independent, previewed installation identity while retaining
+deterministic planning, exact apply/recovery and portable installed locators.
+Changing a live root path cannot redefine an installed estate. Qualification
+must include two identical-content projects, foreign-plan/locator/credential
+denials and unchanged identity through relocation and reopen. This is an open
+deficiency in that baseline, not repaired by the offline harness. The bounded
+identity repair and its evidence are recorded below; broader topology closure
+still requires the complete acceptance matrix.
+
 Product startup can no longer manufacture its own installation authority, but resource
 authorization can still depend on historical word order, an estate can be mistaken for a
 multi-project fleet, physical placement can diverge from semantic scope, and unfinished
@@ -41,6 +62,16 @@ Roadmap owners: [Gate A](../../roadmap/rrflow-1.0/gate-a.md),
 [Gate J](../../roadmap/rrflow-1.0/gate-j.md).
 
 ## Closure evidence
+
+The [independent installation identity package](../../evidence/change-journals/gate-d/d-01-independent-installation-identities.md)
+adds an explicit OS-random identity input, deterministic version-2 plans and
+an initial-root digest checked before new apply or interrupted recovery.
+The same content no longer implicitly allocates one estate for distinct
+projects. Its tests cover foreign-plan/credential rejection, independent
+installed identities, relocation and eight-stage recovery. Caller reuse of an
+identity input is not authorized project sharing; a new independent project
+must allocate a new value. This repair does not close the topology vocabulary,
+fleet, cross-surface or synchronization deficiencies above.
 
 Freeze one project ↔ estate ↔ instance relationship graph and operation-specific resource
 grammar; retain only the implemented D-01 locator and engine-persisted installed-estate

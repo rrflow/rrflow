@@ -63,7 +63,7 @@ version, which remains frozen at `1.0.0` by the
 [version policy](../release/version-policy.md).
 
 The deterministic OpenAPI projection is currently bound to SHA-256
-`97156c7cbc21414e918825ea3e777795ed007552e2c091d6a38f18911b951b11`.
+`adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against
@@ -120,6 +120,14 @@ its `deployment_mode` field and its mixed `rrflow_mx`, `embedded`,
 projects the optional installed project/estate/instance identity and complete
 effective `EstateConfiguration` revision/digest.
 
+The sole accepted estate-configuration input is format `2`. It adds the closed
+`clock.maximum_rollback_ms` policy to reasoning, recall, and query ceilings.
+The engine assigns revision and the v2 domain-separated digest; the strict
+default is zero and the compiled maximum is one hour. This field governs
+relative rollback against an installed engine observation. It does not state
+that the host clock is synchronized or trusted, and clients cannot use it as a
+clock-correction grant.
+
 The installed composition root supplies identity, storage, and configuration;
 the server supplies endpoint presentation from the actual bound address.
 Neither engine nor server infers a database kind from TLS, address, caller
@@ -148,12 +156,12 @@ The boundary is intentionally explicit:
 |---|---|---|
 | HTTP | 40 catalogued operations with method, path, authentication mode, mutation flag, security action, and request/response type names. | H-04 cross-surface semantic equivalence and Gate J release qualification. |
 | WebSocket | One generic authenticated descriptor and one closed frame envelope for request/response, cancellation, subscription/delivery, ACK, heartbeat, unsubscribe, error, backpressure, and exact reconnect resume. The server intentionally rejects generic operation execution until H-04. | H-03 commit-impact delivery, H-04 shared operation dispatch and cancellation, generated-SDK carriage, and Gate J qualification. |
-| Rust client | Uses `rrd-contract` as its only normal RRFlow dependency, implements 36 of 41 catalogued HTTP operations, and implements the bounded multiplexed WebSocket over loopback HTTP or explicit mutual TLS. | The [Rust SDK reference](../sdk/rust.md) records the five missing HTTP operations and the exact H-03/H-04/H-07/J convergence boundary. |
-| TypeScript client | Generates compile-time types and a generic call over all 41 HTTP descriptors, but has no complete runtime payload validation, WebSocket, remote transport, or installable JavaScript/declaration artifact. | The [TypeScript SDK reference](../sdk/typescript.md) records the exact request/response, credential, retry/cancellation, Node/browser, packaging, and conformance boundary. |
-| Python client | Generates an operation literal and generic synchronous call over all 41 HTTP descriptors, but has no complete runtime payload validation, async/WebSocket client, remote transport, opaque credential, or typed-package/interpreter qualification. | The [Python SDK reference](../sdk/python.md) records the exact request/response, credential, retry/cancellation, sync/async, packaging, and conformance boundary. |
-| Go client | Generates constants and a generic context-aware synchronous call over all 41 HTTP descriptors, but has no concrete operation payload validation, WebSocket, remote transport, opaque credential, or module/toolchain qualification. | The [Go SDK reference](../sdk/go.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, module, and conformance boundary. |
-| Java client | Generates an enum and a generic synchronous call over all 41 HTTP descriptors, but has no concrete operation payload validation, async/WebSocket or remote transport, opaque credential, or reproducible offline Maven/JAR qualification. | The [Java SDK reference](../sdk/java.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, JDK/toolchain, and conformance boundary. |
-| .NET client | Generates an enum and a generic asynchronous call over all 41 HTTP descriptors, but has no concrete operation payload validation, WebSocket or remote transport, opaque credential, or reproducible signed NuGet/toolchain qualification. | The [.NET SDK reference](../sdk/dotnet.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, trimming/AOT, SDK/runtime, and conformance boundary. |
+| Rust client | Uses `rrd-contract` as its only normal RRFlow dependency, implements 37 of 42 catalogued HTTP operations, and implements the bounded multiplexed WebSocket over loopback HTTP or explicit mutual TLS. | The [Rust SDK reference](../sdk/rust.md) records the five missing HTTP operations and the exact H-03/H-04/H-07/J convergence boundary. |
+| TypeScript client | Generates compile-time types and a generic call over all 44 HTTP descriptors, but has no complete runtime payload validation, WebSocket, remote transport, or installable JavaScript/declaration artifact. | The [TypeScript SDK reference](../sdk/typescript.md) records the exact request/response, credential, retry/cancellation, Node/browser, packaging, and conformance boundary. |
+| Python client | Generates an operation literal and generic synchronous call over all 44 HTTP descriptors, but has no complete runtime payload validation, async/WebSocket client, remote transport, opaque credential, or typed-package/interpreter qualification. | The [Python SDK reference](../sdk/python.md) records the exact request/response, credential, retry/cancellation, sync/async, packaging, and conformance boundary. |
+| Go client | Generates constants and a generic context-aware synchronous call over all 44 HTTP descriptors, but has no concrete operation payload validation, WebSocket, remote transport, opaque credential, or module/toolchain qualification. | The [Go SDK reference](../sdk/go.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, module, and conformance boundary. |
+| Java client | Generates an enum and a generic synchronous call over all 44 HTTP descriptors, but has no concrete operation payload validation, async/WebSocket or remote transport, opaque credential, or reproducible offline Maven/JAR qualification. | The [Java SDK reference](../sdk/java.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, JDK/toolchain, and conformance boundary. |
+| .NET client | Generates an enum and a generic asynchronous call over all 44 HTTP descriptors, but has no concrete operation payload validation, WebSocket or remote transport, opaque credential, or reproducible signed NuGet/toolchain qualification. | The [.NET SDK reference](../sdk/dotnet.md) records the exact request/response, credential, retry/cancellation, concurrency, transport, artifact, trimming/AOT, SDK/runtime, and conformance boundary. |
 | Generated signal discovery | OpenAPI, a coordinated reference, and TypeScript, Python, Go, Java, and .NET expose the exact kernel catalogue JSON, signal fingerprint, and OpenAPI fingerprint from one renderer. | H-05 still requires build identity, runtime levels, correlated emission, exporters, captures, parity, overhead, and release evidence. |
 | Shared generated-SDK corpus | OpenAPI and one shared semantic corpus exist as generation/conformance inputs. | Every supported language must run the same real-daemon corpus; schema generation alone is not qualification. |
 | GraphQL | B-05 supplies bounded, schema-derived query lowering into the same `Query`, `Parameters`, and `BoundQuery` path as rrflowQL. No public GraphQL operation, resolver, or second executor is established. | H-04 outward HTTP carriage and cross-surface authorization/semantic equivalence. |
@@ -178,7 +186,7 @@ prove that engine by itself:
 | rrflowQL query | Query text, typed parameters, read coordinates, plan evidence, rows, and scan/memory/spill/time/output budgets have public forms. | Accepted C-04 evidence proves bounded authenticated direct reads at one `ReadStamp`. F-01 through F-05 still must prove bounded streaming Arrow/DataFusion execution and remove eager `Vec<QueryRow>` materialization. |
 | Graph, BM25, vector, and retrieval | Typed graph mutations, scalar/BM25 catalogue kinds, named dense/sparse/multi-dense vectors, HNSW index configuration, explicit scalar/product/binary/TurboQuant lifecycle operations, filters, exact/approximate search, recursive retrieval, and RRF evidence can be represented. | E-01 through E-05 and F-03 must prove transactional native access paths, exact fallbacks, deterministic fusion, recall, update/delete, and reopen behavior. |
 | Context and reasoning | Bounded context packets, reasoning trees, route requests/decisions, and B-03 model-manifest pre-load admission have provider-neutral contracts. | G/H must prove executable routing, persisted CAS tree execution, engine-selected fast or analytical paths, authorized same-stamp context, feedback, and replay. |
-| Installation and knowledge | Provider-neutral installation/attunement jobs and content-addressed knowledge packages have contracts. The bounded D-01 slice proves deterministic plan/apply, one canonical project-local estate, sealed effective configuration, portable locator, installed close/open, capability discovery, and real-process ceiling denial. | D-01 still owns interruption-safe resume/cleanup, native pathname/ACL qualification, lifecycle convergence, and release-contained install/start/verify assets; later D and KB-06 through KB-08 own complete attunement, project inventory, authorized import, readback, and warp resolution. |
+| Installation and knowledge | Provider-neutral installation/attunement jobs and content-addressed knowledge packages have contracts. The bounded D-01 slices prove deterministic plan/apply, one canonical project-local estate, sealed format-2 configuration, portable locator, installed close/open, capability discovery, real-process ceiling denial, and engine-owned unverified clock anchoring with rollback diagnosis/enforcement. | D-01 still owns trusted-time/platform qualification, native pathname/ACL qualification, remaining lifecycle operations, and release-contained install/start/verify assets; later D and KB-06 through KB-08 own complete attunement, project inventory, authorized import, readback, and warp resolution. |
 | Delivery and clients | Changefeeds, durable subscriptions, endpoint discovery, OpenAPI, the B-04 closed multiplexed WebSocket protocol, its Rust client/server implementation, B-05 GraphQL-to-bound-query lowering, and SDK corpus types exist. | H-03/H-04 and J must prove commit-impact delivery, operation execution/cancellation, public GraphQL carriage, cross-surface equivalence, correlated traces, and a clean self-contained deployment. |
 
 Passing a row's serialization test cannot satisfy the behavioral proof in the
@@ -212,8 +220,8 @@ D-01 estate/configuration slice.
 
 | Evidence | What it establishes | What it does not establish |
 |---|---|---|
-| `cargo test -p rrd-contract --test deployment_configuration_contract --locked` | Strict project/estate/instance identity, valid deployment combinations, configuration maxima/digest, and rejection of unknown or old scalar fields. | Installation, runtime enforcement, reasoning execution, or profile equivalence. |
-| `cargo test -p rrd-contract --test public_contract --locked` | Strict selected wire shapes, bounds, 40-operation catalogue, one generic WebSocket descriptor, OpenAPI digest, deployment/SDK corpus validation, and selected cross-language digest vectors. | Server dispatch, storage semantics, DataFusion streaming, native indexes, reasoning execution, or all-language SDK conformance. |
+| `cargo test -p rrd-contract --test deployment_configuration_contract --locked` | Strict project/estate/instance identity, valid deployment combinations, format-2 clock/AI workload ceilings, configuration digest binding, a valid zero-as-strict clock policy, and rejection of unknown/old shapes or invalid workload bounds. | Installation, runtime enforcement, clock synchronization/correction, reasoning execution, or profile equivalence. |
+| `cargo test -p rrd-contract --test public_contract --locked` | Strict selected wire shapes, bounds, 42-operation catalogue, one generic WebSocket descriptor, OpenAPI digest, deployment/SDK corpus validation, and selected cross-language digest vectors. | Server dispatch, storage semantics, DataFusion streaming, native indexes, reasoning execution, or all-language SDK conformance. |
 | `cargo test -p rrd-contract --test signal_catalogue_projection --locked` | Exact kernel-to-OpenAPI catalogue/fingerprint equality, 4/9/22 closure, and a discovery-only field boundary. | Signal emission, level activation, propagation, export, diagnostic parity, overhead, or engine behavior. |
 | `cargo test -p rrd-contract --test websocket_contract --locked` | The B-04 golden frame contract, sender directions, sequence and connection integrity, exact correlations/resume coordinates, negotiated/hard resource limits, and malformed/unknown representation rejection. | H-04 operation execution, generated-language carriage, or release qualification. |
 | `cargo test -p rrd-query --test graphql_equivalence --locked` | B-05 schema-derived GraphQL parsing, lowering, bound-query/digest equality with rrflowQL, historical-schema binding, typed variables, and fail-closed unsupported shapes. | A public GraphQL route, transport authentication, engine execution, storage/index behavior, or cross-surface qualification. |
@@ -268,3 +276,53 @@ python3 scripts/ci/check_generated_surfaces.py --check
 
 Full engine, client, cross-language, crash/reopen, resource, and deployment
 suites are run only where their owning gate names them as acceptance evidence.
+
+Default installation-policy fixture regeneration uses the typed owning contract:
+`cargo run --locked -p rrd-contract --example refresh_installation_contract`.
+After a sealed default configuration or bootstrap change, derive the shared
+SDK corpus identities with
+`cargo run --locked -p rrd-engine --example refresh_sdk_installation_identity`.
+Its read-only installation planner uses the checked binary identity anchor;
+`-- --check` verifies drift without changing the corpus.
+This offline projection refresh performs no engine workload and produces no
+native qualification evidence. Review the resulting policy and digest changes.
+
+
+`diagnostics-storage-read` (`POST /v1/diagnostics/storage/read`) requires the
+existing diagnostics permission and exact instance scope. It returns the
+existing physical storage observation without graph, audit, catalogue or
+history assembly. Counters are process-local observations, not a cross-model
+consistent snapshot; the full diagnostic operation retains its existing
+consistency requirements. This permits storage monitoring independent of
+project-history size without creating another storage authority.
+
+
+## Bounded storage inspection cursors
+
+`POST /v1/diagnostics/storage/cursor` is an authenticated `DiagnosticsRead`
+operation scoped to the exact instance. It retains an ephemeral native physical
+snapshot for inspection; it is not a semantic query result, durable transaction
+or resumable cross-restart cursor. No physical key or value is returned.
+
+The request supplies a session-local `cursor_id` and an action. `open` declares
+`batch_rows` (1?4,096), `batch_bytes` (1?4 MiB) and `lifetime_ms` (1?60,000).
+Native installed view/pin/output ceilings also apply; the metadata registry
+admits at most the smaller of 64 or the installed active-view ceiling. Open
+retries with different parameters conflict; matching retries observe the
+current retained page. Cursor IDs may be reused after release or expiry.
+
+`observe` hashes the current retained page without advancing. `advance`
+supplies `expected_ordinal`; replaying the immediately previous advance returns
+the existing page. Older/future ordinals fail. `cancel_source` releases physical
+source leases but retains the copied page; `release` drops both and is safe to
+repeat. Session closure and monotonic lifetime expiry also drop owned data.
+The installed server sweeps expiry once per second; embedded hosts call
+`RrdEngine::reap_storage_cursors`, and cursor operations also sweep. No renewal
+extends a captured cursor's deadline. Process restart discards every cursor.
+
+The snapshot reports physical sequence, page ordinal, row count, actual batch
+allocation, source state and `page_sha256`. The hash frames the domain
+`rrflow-storage-inspection-page-v1`, big-endian u64 sequence, ordinal and row
+count, then length-prefixed key/value bytes in native order. It proves observed
+page identity only. Cursor state is not a provider's private reasoning trace,
+and process counters remain observations rather than an authoritative read stamp.

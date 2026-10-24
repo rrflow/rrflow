@@ -51,7 +51,6 @@ DEVCONTAINER_LIFECYCLE_COMMANDS = {
 }
 
 
-
 class PolicyError(RuntimeError):
     pass
 
@@ -83,12 +82,21 @@ def workspace_packages() -> set[str]:
 
 def optional_feature_packages() -> set[str]:
     packages = set()
+    diagnostic_packages = set()
     for manifest in (ROOT / "crates").rglob("Cargo.toml"):
         with manifest.open("rb") as source:
             document = tomllib.load(source)
         features = set(document.get("features", {})) - {"default"}
+        # This explicit diagnostic feature changes the primary's private stdin
+        # contract. Its separate native job owns the diagnostic corpus; ordinary
+        # installed suites continue to qualify the default artifact.
+        if "crash-test" in features:
+            diagnostic_packages.add(document["package"]["name"])
+            features.remove("crash-test")
         if features:
             packages.add(document["package"]["name"])
+    require(diagnostic_packages == {"rrd-lsm", "rrd-store", "rrd-engine", "rrflow-cli"},
+            "diagnostic feature must remain within its four-crate composition")
     return packages
 
 
@@ -136,6 +144,11 @@ def verify_workflow_security(workflows: dict[Path, str]) -> None:
         )
 
         for line_number, body in checkout_steps(workflow):
+            if path == REUSABLE:
+                require(
+                    not any(re.match(r"(?:ref|repository|path)\s*:", entry) for entry in body),
+                    f"candidate checkout must use its triggering source revision: {relative}:{line_number}",
+                )
             require(
                 "persist-credentials: false" in body,
                 f"checkout credentials must not persist: {relative}:{line_number}",
@@ -515,8 +528,17 @@ def main() -> None:
         reusable.count("python3 scripts/ci/build_execution_inventory.py --check") == 1,
         "the exhaustive execution inventory must be checked exactly once",
     )
+    require(
+        reusable.count("python3 scripts/knowledge/render_capacity_profiles.py --check") == 1
+        and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1
+        and reusable.count("python3 scripts/ci/test_collect_storage_acceptance.py") == 1
+        and reusable.count("python3 scripts/ci/test_sustained_launch.py") == 1,
+        "the owning J-04 capacity projection must be checked exactly once",
+    )
 
     expected_jobs = {
+        "installed-reopen",
+        "installed-crash",
         "topology-smoke",
         "estate-portability",
         "verify",
@@ -534,6 +556,88 @@ def main() -> None:
         require(
             "timeout-minutes:" in block, f"CI job {job} must have an explicit timeout"
         )
+
+    for job in ["topology-smoke", "estate-portability"]:
+        for command in [
+            "cargo test -p rrd-lsm --lib admission_tests --locked",
+            "cargo test -p rrd-lsm --test write_admission --locked",
+            "cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked",
+            "cargo test -p rrd-engine --lib engine::tests::write_admission --locked",
+        ]:
+            require(jobs[job].count(command) == 1,
+                    f"{job} must require encoded staging and rejection recovery: {command}")
+        require(
+            "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
+            in jobs[job],
+            f"{job} must exercise the installed primary executable lifecycle",
+        )
+        for command in [
+            "cargo test -p rrd-lsm --test mutable_limits --locked",
+            "cargo test -p rrd-store --test mutable_admission --locked",
+            "cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked",
+            "cargo test -p rrd-lsm --test write_diagnostics --locked",
+            "cargo test -p rrd-store --test rrflow_kv_operator --locked",
+            "cargo test -p rrd-lsm --test projected_lifetime --locked",
+            "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
+            "cargo test -p rrd-lsm --test projected_output_limits --locked",
+            "cargo test -p rrd-lsm --lib segment::output::tests --locked",
+            "cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture",
+        ]:
+            require(jobs[job].count(command) == 1, f"{job} must qualify native storage ownership and admission once: {command}")
+    reopen = jobs["installed-reopen"]
+    for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
+        require(f"- {platform}" in reopen, f"ordinary reopen corpus must qualify {platform}")
+    for command in [
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
+        "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
+        "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
+        "RRFLOW_REOPEN_RECEIPT_DIR:",
+        "'attempts': 5150",
+        "actions/upload-artifact@",
+    ]:
+        require(command in reopen, f"ordinary reopen qualification missing: {command}")
+    require("--features" not in reopen and "--all-features" not in reopen,
+            "ordinary reopen corpus must not activate diagnostic features")
+    diagnostic = jobs["installed-crash"]
+    for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
+        require(f"- {platform}" in diagnostic, f"diagnostic primary must qualify {platform}")
+    for command in [
+        "cargo build -p rrflow-cli --bin rrflow --locked",
+        "cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run",
+        "cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2",
+        "cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked",
+        "cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings",
+        "C07C_NATIVE_PAUSE_V1=",
+        "--skip publication_and_reclamation",
+        "publication_and_reclamation --nocapture --test-threads=2",
+        "Require both complete installed publication receipts",
+        "RRFLOW_PUBLICATION_RECEIPT_DIR:",
+    ]:
+        require(command in diagnostic, f"installed diagnostic qualification missing: {command}")
+    require(diagnostic.index("Verify diagnostic protocol") < diagnostic.index("Build explicit diagnostic"),
+            "ordinary artifact exclusion must precede diagnostic compilation")
+    require(
+        "cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings"
+        in jobs["estate-portability"],
+        "native installed lifecycle tests must not hide platform warnings",
+    )
+    require(
+        jobs["topology-smoke"].count("python3 scripts/ci/run_offline_lifecycle.py") == 1
+        and "python3 scripts/ci/test_offline_lifecycle.py" in jobs["verify"],
+        "installed lifecycle must enforce offline isolation and test its artifact/mount policy",
+    )
+
+    for native in ["topology-smoke", "estate-portability"]:
+        require("scripts/ci/run_filesystem_containment.py" in jobs[native],
+                f"{native} must execute native mount containment qualification")
+        require("scripts/ci/run_private_owner.py" in jobs[native]
+                and "scripts/ci/run_offline_lifecycle.py --receipt" in jobs[native]
+                and "cargo test -p rrflow-cli --test lifecycle_process --locked" in jobs[native]
+                and "actions/upload-artifact@" in jobs[native],
+                f"{native} must execute required native denials and bounded capture and retain sanitized receipts")
 
     gate = jobs["ci-gate"]
     needs_match = re.search(
@@ -596,6 +700,22 @@ def main() -> None:
     require(
         "python3 scripts/ci/check_generated_surfaces.py" in jobs["verify"],
         "repository policy must reject generated product-surface drift",
+    )
+    installed_lifecycle = (
+        "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
+    )
+    require(
+        jobs["topology-smoke"].count(installed_lifecycle) == 1,
+        "Linux topology smoke must run the primary installed lifecycle exactly once",
+    )
+    require(
+        jobs["estate-portability"].count(installed_lifecycle) == 1,
+        "macOS/Windows portability must run the same primary installed lifecycle exactly once",
+    )
+    require(
+        "- windows-latest" in jobs["estate-portability"]
+        and "- macos-latest" in jobs["estate-portability"],
+        "estate portability must retain Windows and macOS development runners",
     )
 
     suite_count, package_count = verify_engine_suites(jobs["engine-suites"])

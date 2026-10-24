@@ -45,10 +45,7 @@ impl RrdEngine {
             request_id,
             operation_id,
         )?;
-        let _transaction_guard = self
-            .transaction_gate
-            .lock()
-            .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         let catalogue = self.load_current_function_catalogue()?;
         let definition = catalogue
             .functions

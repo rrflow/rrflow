@@ -4,25 +4,28 @@ use super::format::{
     LogicalArchiveProgress, LogicalRestoreReport, PrefixInventory,
 };
 use super::receipt::{load_receipt, remove_receipt, restore_paths, write_receipt, RestoreReceipt};
+use crate::filesystem::{AnchorInput, AnchoredPath};
 use crate::{Error, Result, RrflowKvStore, StorageEngine};
 use rrd_core::{RuntimeCommitOutcome, RuntimeMutation};
-use std::fs;
-use std::path::Path;
 
 pub fn restore_logical_archive_to_new_root(
-    archive: &Path,
-    target: &Path,
+    archive: &(impl AnchorInput + ?Sized),
+    target: &(impl AnchorInput + ?Sized),
     at: u64,
 ) -> Result<LogicalRestoreReport> {
+    let archive = &archive.anchor().map_err(archive_io)?;
+    let target = &target.anchor().map_err(archive_io)?;
     restore_logical_archive_to_new_root_with_progress(archive, target, at, |_| Ok(()), |_| Ok(()))
 }
 
 pub fn restore_logical_archive_to_new_root_with(
-    archive: &Path,
-    target: &Path,
+    archive: &(impl AnchorInput + ?Sized),
+    target: &(impl AnchorInput + ?Sized),
     at: u64,
-    populate_staging: impl FnOnce(&Path) -> Result<()>,
+    populate_staging: impl FnOnce(&AnchoredPath) -> Result<()>,
 ) -> Result<LogicalRestoreReport> {
+    let archive = &archive.anchor().map_err(archive_io)?;
+    let target = &target.anchor().map_err(archive_io)?;
     restore_logical_archive_to_new_root_with_progress(archive, target, at, populate_staging, |_| {
         Ok(())
     })
@@ -33,31 +36,58 @@ pub fn restore_logical_archive_to_new_root_with(
 /// receipt is durable. An interruption at either boundary is reconciled by
 /// inspecting the staging database on the next invocation.
 pub fn restore_logical_archive_to_new_root_with_progress(
-    archive: &Path,
-    target: &Path,
+    archive: &(impl AnchorInput + ?Sized),
+    target: &(impl AnchorInput + ?Sized),
     at: u64,
-    populate_staging: impl FnOnce(&Path) -> Result<()>,
+    populate_staging: impl FnOnce(&AnchoredPath) -> Result<()>,
+    progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
+) -> Result<LogicalRestoreReport> {
+    restore_logical_archive_to_new_root_with_options(
+        archive,
+        target,
+        at,
+        crate::DatabaseOptions::default(),
+        populate_staging,
+        progress,
+    )
+}
+
+/// Restores with one process-local native policy for staging creation, replay,
+/// resume and every verification reopen. Callbacks retain their existing
+/// responsibility for any additional state they populate in private staging.
+pub fn restore_logical_archive_to_new_root_with_options(
+    archive: &(impl AnchorInput + ?Sized),
+    target: &(impl AnchorInput + ?Sized),
+    at: u64,
+    options: crate::DatabaseOptions,
+    populate_staging: impl FnOnce(&AnchoredPath) -> Result<()>,
     mut progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
 ) -> Result<LogicalRestoreReport> {
+    let archive = &archive.anchor().map_err(archive_io)?;
+    let target = &target.anchor().map_err(archive_io)?;
     let expected = inspect_logical_archive(archive)?;
-    if target.exists() {
+    if target.try_exists().map_err(archive_io)? {
         return Err(Error::Archive(format!(
             "restore target already exists: {}",
             target.display()
         )));
     }
-    let parent = target.parent().unwrap_or_else(|| Path::new("."));
-    fs::create_dir_all(parent).map_err(archive_io)?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| Error::Archive("filesystem root has no parent".into()))?;
+    parent.create_dir_all().map_err(archive_io)?;
     let (staging, receipt_path) = restore_paths(target, &expected.archive_sha256)?;
-    if receipt_path.exists() && !staging.exists() {
+    if receipt_path.try_exists().map_err(archive_io)?
+        && !staging.try_exists().map_err(archive_io)?
+    {
         return Err(Error::Archive(
             "logical restore receipt exists without its staging database".into(),
         ));
     }
-    let resumed = staging.exists();
-    let engine = RrflowKvStore::open(&staging)?;
+    let resumed = staging.try_exists().map_err(archive_io)?;
+    let engine = RrflowKvStore::open_with_options(&staging, options)?;
     let mut prefix = reconcile_staging_prefix(archive, &expected, &engine)?;
-    if receipt_path.exists() {
+    if receipt_path.try_exists().map_err(archive_io)? {
         let receipt = load_receipt::<RestoreReceipt>(&receipt_path)?;
         receipt.validate_fixed(target, &expected.archive_sha256, expected.action_count)?;
         if receipt.completed_actions > prefix.completed_actions
@@ -131,14 +161,14 @@ pub fn restore_logical_archive_to_new_root_with_progress(
     engine.flush(at)?;
     drop(engine);
 
-    let reopened = RrflowKvStore::open(&staging)?;
+    let reopened = RrflowKvStore::open_with_options(&staging, options)?;
     verify_watermarks(&reopened, &expected)?;
     drop(reopened);
     populate_staging(&staging)?;
-    let reopened = RrflowKvStore::open(&staging)?;
+    let reopened = RrflowKvStore::open_with_options(&staging, options)?;
     verify_watermarks(&reopened, &expected)?;
     drop(reopened);
-    if target.exists() {
+    if target.try_exists().map_err(archive_io)? {
         return Err(Error::Archive(format!(
             "restore target appeared before publication: {}",
             target.display()
@@ -148,10 +178,10 @@ pub fn restore_logical_archive_to_new_root_with_progress(
     // Removing the receipt before rename is crash-safe because an extant
     // staging database can reconstruct its exact prefix from the archive.
     remove_receipt(&receipt_path)?;
-    rrd_lsm::publish_rename(parent, &staging, target).map_err(archive_io)?;
+    staging.rename_new_to(target).map_err(archive_io)?;
     Ok(LogicalRestoreReport {
-        archive: archive.to_owned(),
-        target: target.to_owned(),
+        archive: archive.diagnostic_path().to_owned(),
+        target: target.diagnostic_path().to_owned(),
         inventory: expected,
         reopened: true,
         resumed,
@@ -159,7 +189,7 @@ pub fn restore_logical_archive_to_new_root_with_progress(
 }
 
 fn reconcile_staging_prefix(
-    archive: &Path,
+    archive: &AnchoredPath,
     expected: &LogicalArchiveInventory,
     engine: &RrflowKvStore,
 ) -> Result<PrefixInventory> {

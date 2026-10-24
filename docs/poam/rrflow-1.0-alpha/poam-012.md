@@ -13,6 +13,15 @@ independently.
 There is no fixed-hardware end-to-end benchmark and failure corpus for the complete RRFlow
 workload.
 
+The current `rrflow-eval/src/main.rs::Trial` records paired provider trials;
+it does not implement the full typed engine workload manifest, offered-load
+schedule, physical resource series and capacity/failure protocol now specified
+under [J-04](../../roadmap/rrflow-1.0/gate-j.md#capacity-and-optimization-qualification).
+The proposed desktop/service/fleet/large-data envelopes are unmeasured.
+J-04a through J-04d must supply schema validation, installed execution,
+sustained interference/recovery and quality-matched optimization evidence.
+Documented targets are not benchmark results and leave this item sequenced.
+
 ## Impact
 
 Performance or competitive claims cannot be evaluated honestly.

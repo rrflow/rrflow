@@ -14,15 +14,16 @@ does not change the RRFlow identity.
 **Clyffy is this project's primary RRFlow seat specialization.** It is not a
 second product, kernel, repository, daemon, model provider, storage engine,
 query engine, or lifecycle authority. Generic RRFlow installation templates do
-not hardcode Clyffy; this repository's planned versioned specialization must
-select that seat identity explicitly. Another installed project may select a
+not hardcode Clyffy; the bundled versioned `clyffy` profile selects that seat
+identity explicitly. Another installed project may select a
 different seat without changing RRFlow semantics.
 
 The executable Clyffy path must remain first-party Rust inside this repository.
 `RrdEngine` owns authentication, authorization, routing orchestration,
 deterministic predicates, context intent, compare-and-swap, audit, and commit.
-LFG or any other `RouterBackend` may return only one of the three bounded router
-proposals. Go can be installed as an outward SDK, generator, harness, or other
+The SWAG-selected `RouterBackend` may return only one of the three bounded router
+proposals; [LFG supplies CPU observations](inference/lfg-swag.md).
+Go can be installed as an outward SDK, generator, harness, or other
 attuned capability; it is not a Clyffy or RRFlow routing, persistence, or
 orchestration authority.
 
@@ -110,17 +111,17 @@ product evidence.
 
 This is characterization of a useful persisted foundation, not proof of the
 complete installed Clyffy path. The current `MemoryEstate*` type and module
-names conflate seat identity with an estate; the bundled install profile
-supplies Clyffy-specific defaults instead of consuming a versioned installed
-specialization; callers still commit the returned mutation plan through the
+names conflate seat identity with an estate; callers still commit the returned mutation plan through the
 generic transaction API; resolution reconstructs a broad runtime
 snapshot; the older claim path accepts an arbitrary producer actor string; and
 the authenticated session, representation edge, authorization decision, route
 packet, router proposal, and resulting mutation are not yet bound at one read
 coordinate. No `RouterBackend` dispatch exists in the checkout.
 
-These are active convergence gaps, not compatibility promises. D-01 owns the
-installed specialization and initial seat binding; A-07/C-03 own canonical
+The [accepted D-01 foundation](../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+now binds bundled generic/Clyffy specialization and the initial seat through
+the versioned installed record. Full attuned specialization remains open.
+The other convergence gaps above are not compatibility promises. A-07/C-03 own canonical
 naming and effect-complete identity attribution; G-01 through G-05 own stamped
 routing and persisted tree execution; H-04/H-05 own cross-surface identity and
 causal evidence. The versioned specialization manifest, project attunement,

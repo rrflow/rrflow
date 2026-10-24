@@ -127,12 +127,14 @@ impl RrdEngine {
             request.valid_at,
         ))?;
         let mut visible_seed_count = 0_usize;
+        let mut graph_roots = Vec::<RuntimeRef>::new();
         for (ordinal, seed) in request.seeds.iter().enumerate() {
             let reference = runtime_ref(seed)?;
             let Some(record) = records.get(&reference) else {
                 continue;
             };
             visible_seed_count += 1;
+            graph_roots.push(reference.clone());
             let rank = u64::try_from(ordinal + 1)
                 .map_err(|_| ServiceError::Contract("context seed rank exceeds u64".into()))?;
             let evidence = ContextEvidence {
@@ -319,16 +321,25 @@ impl RrdEngine {
             },
         )?);
 
+        // Seed lookup and graph expansion share the same temporal visibility.
+        // An absent requested record must not regain influence through a live
+        // relation. Preserve caller/retrieval order while deduplicating roots.
+        let mut unique_roots = graph_roots.iter().cloned().collect::<BTreeSet<_>>();
+        for (reference, _) in &retrieval_roots {
+            if records.contains_key(reference) && unique_roots.insert(reference.clone()) {
+                graph_roots.push(reference.clone());
+            }
+        }
         let graph_selected = request.max_graph_depth > 0
             && !snapshot.relations.is_empty()
-            && (!request.seeds.is_empty() || !retrieval_roots.is_empty());
+            && !graph_roots.is_empty();
         if graph_selected {
             retrieval_truncated |= add_graph_context(
                 request,
                 &read,
                 &snapshot,
                 &records,
-                &retrieval_roots,
+                &graph_roots,
                 &mut candidates,
             )?;
         }
@@ -345,13 +356,13 @@ impl RrdEngine {
                 "request disabled graph expansion".into()
             } else if snapshot.relations.is_empty() {
                 "captured temporal snapshot contained no visible relations".into()
-            } else if request.seeds.is_empty() && retrieval_roots.is_empty() {
+            } else if graph_roots.is_empty() {
                 "no visible seed or retrieval result supplied a graph root".into()
             } else {
                 format!(
                     "traversed visible relations in both directions to depth {} from {} root(s)",
                     request.max_graph_depth,
-                    request.seeds.len().saturating_add(retrieval_roots.len())
+                    graph_roots.len()
                 )
             },
         )?);
@@ -668,7 +679,7 @@ fn add_graph_context(
     read: &ReadStamp,
     snapshot: &RuntimeDataSnapshot,
     records: &BTreeMap<RuntimeRef, RuntimeRecord>,
-    retrieval_roots: &[(RuntimeRef, u64)],
+    roots: &[RuntimeRef],
     candidates: &mut BTreeMap<String, ContextCandidate>,
 ) -> Result<bool> {
     let mut adjacency = BTreeMap::<RuntimeRef, Vec<GraphEdge>>::new();
@@ -699,19 +710,6 @@ fn add_graph_context(
         });
     }
 
-    let mut roots = Vec::<RuntimeRef>::new();
-    let mut unique_roots = BTreeSet::new();
-    for seed in &request.seeds {
-        let reference = runtime_ref(seed)?;
-        if unique_roots.insert(reference.clone()) {
-            roots.push(reference);
-        }
-    }
-    for (reference, _) in retrieval_roots {
-        if unique_roots.insert(reference.clone()) {
-            roots.push(reference.clone());
-        }
-    }
     let graph_plan = context_digest(&(
         "rrd-context-graph-bfs-v1",
         read.manifest_id.as_str(),

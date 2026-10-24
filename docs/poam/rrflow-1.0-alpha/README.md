@@ -44,4 +44,6 @@
 - [POAM-032 — prompt flights removed without engine absorption](poam-032.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-032`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-032) — active parent-owned POA&M detail
 - [POAM-033 — rejected native commits retain an unabortable intent](poam-033.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-033`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-033) — active parent-owned POA&M detail
 - [POAM-034 — commit-time schema constraints load the whole scope](poam-034.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-034`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-034) — active parent-owned POA&M detail
+- [POAM-035 — installed storage failure and growth qualification](poam-035.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-035`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-035) — active parent-owned POA&M detail
+- [POAM-036 — DuckDB analytical interoperability is absent](poam-036.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-036`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-036) — active parent-owned POA&M detail
 <!-- rrflow:generated-index:end -->

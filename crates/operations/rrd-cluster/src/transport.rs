@@ -789,15 +789,13 @@ impl RrdRaftNetworkClient {
             }
             let reference = object.clone();
             let source_store = source.objects.clone();
-            let path = tokio::task::spawn_blocking(move || source_store.verified_path(&reference))
+            let file = tokio::task::spawn_blocking(move || source_store.verified_file(&reference))
                 .await
                 .map_err(|error| {
                     ClusterError::Unavailable(format!("artifact source verify task: {error}"))
                 })?
                 .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
-            let mut file = tokio::fs::File::open(path)
-                .await
-                .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+            let mut file = tokio::fs::File::from_std(file);
             while !state.complete {
                 file.seek(std::io::SeekFrom::Start(state.next_offset))
                     .await

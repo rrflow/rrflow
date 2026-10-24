@@ -7,6 +7,9 @@
 #[cfg(feature = "full")]
 mod capabilities;
 pub mod edge;
+#[cfg(feature = "crash-test")]
+#[doc(hidden)]
+pub use rrd_store::crash_test;
 #[cfg(feature = "full")]
 mod engine;
 #[cfg(feature = "full")]
@@ -19,13 +22,16 @@ pub use capabilities::product_capability_catalogue;
 pub use edge::{OfflineDocument, OfflineEdgeConfig, OfflineEdgeIndex, OfflineQueryResult};
 #[cfg(feature = "full")]
 pub use engine::{
-    load_estate_configuration, AuthorizedInvocation, DefaultAttunementPhase, DefaultInstallProfile,
-    DistributedAuthorityRead, DistributedReadRoute, EstateAdminAction, EstateAdminResult,
-    EstateBackupReconcileOutcome, EstateReconcileOutcome, InstallationPreview,
-    InstallationVerificationCheck, InstallationVerificationReport, InstallationVerificationStatus,
-    InstalledEstateRecord, Invocation, InvocationCompletion, InvocationCredential,
+    load_estate_configuration, AuthorizedInvocation, ClockAssessment, ClockAssessmentStatus,
+    ClockObservation, ClockObservationFailure, ClockSourceKind, ClockTrustLevel,
+    DefaultAttunementPhase, DefaultInstallProfile, DistributedAuthorityRead, DistributedReadRoute,
+    EstateAdminAction, EstateAdminResult, EstateBackupReconcileOutcome, EstateReconcileOutcome,
+    InstallationPreview, InstallationVerificationCheck, InstallationVerificationReport,
+    InstallationVerificationStatus, InstalledEstateRecord, InstalledTailRepairPlan,
+    InstalledTailRepairReceipt, Invocation, InvocationCompletion, InvocationCredential,
     PreparedDistributedAuthority, ProjectLocator, Result, RrdEngine, RrdOperation, ServiceError,
-    ServiceErrorKind, MAX_AUDIT_PAGE_RECORDS, MAX_JWT_CREDENTIAL_BYTES, TOKEN_KEY_BYTES,
+    ServiceErrorKind, TransactionAdmissionSnapshot, CLOCK_OBSERVATION_FORMAT_VERSION,
+    MAX_AUDIT_PAGE_RECORDS, MAX_JWT_CREDENTIAL_BYTES, TOKEN_KEY_BYTES,
 };
 #[cfg(feature = "full")]
 pub use operator::{

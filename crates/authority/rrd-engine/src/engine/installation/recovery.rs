@@ -1,20 +1,21 @@
 use super::*;
-use crate::engine::estate_layout::{install_intent_path, EstateLayout};
+use crate::engine::estate_layout::{install_intent_path, EstateFilesystem, EstateLayout};
 use crate::engine::token_key::{
     decode_api_key_document, encode_api_key_document, generate_api_key_document,
-    generate_token_key, private_regular_file, write_private_new, ApiKeyDocument, TOKEN_KEY_BYTES,
+    generate_token_key, write_private_anchored, ApiKeyDocument, TOKEN_KEY_BYTES,
 };
-use std::fs::File;
-use std::io::Read;
 
-const INSTALL_INTENT_FORMAT: u16 = 1;
+const INSTALL_INTENT_FORMAT: u16 = 2;
 const MAX_INSTALL_INTENT_BYTES: u64 = 32 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(in crate::engine) enum InstallApplyStage {
+    LeaseAcquired,
     IntentPublished,
     EstateDirectoriesReady,
+    BootstrapStaged,
+    BootstrapReady,
     StorageReady,
     TokenReady,
     CredentialReady,
@@ -26,8 +27,11 @@ pub(in crate::engine) enum InstallApplyStage {
 impl InstallApplyStage {
     pub(super) const fn as_str(self) -> &'static str {
         match self {
+            Self::LeaseAcquired => "lease_acquired",
             Self::IntentPublished => "intent_published",
             Self::EstateDirectoriesReady => "estate_directories_ready",
+            Self::BootstrapStaged => "bootstrap_staged",
+            Self::BootstrapReady => "bootstrap_ready",
             Self::StorageReady => "storage_ready",
             Self::TokenReady => "token_ready",
             Self::CredentialReady => "credential_ready",
@@ -40,6 +44,7 @@ impl InstallApplyStage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::engine) enum InstallRecoveryState {
+    Admitted,
     NewIntent,
     OwnedIntent,
     EmptyStore,
@@ -51,6 +56,7 @@ pub(in crate::engine) enum InstallRecoveryState {
 impl InstallRecoveryState {
     pub(super) const fn as_str(self) -> &'static str {
         match self {
+            Self::Admitted => "admitted",
             Self::NewIntent => "new_intent",
             Self::OwnedIntent => "owned_intent",
             Self::EmptyStore => "empty_store",
@@ -63,7 +69,7 @@ impl InstallRecoveryState {
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct InstallIntentV1 {
+pub(super) struct InstallIntent {
     format_version: u16,
     stage: InstallApplyStage,
     plan_sha256: String,
@@ -74,7 +80,7 @@ pub(super) struct InstallIntentV1 {
     profile_sha256: String,
     executable_sha256: String,
     configuration_sha256: String,
-    applied_at_unix_ms: u64,
+    clock_anchor: ClockObservation,
     token_key_bytes: Vec<u8>,
     token_key_sha256: String,
     operator_credential_bytes: Vec<u8>,
@@ -82,10 +88,10 @@ pub(super) struct InstallIntentV1 {
     intent_sha256: String,
 }
 
-impl std::fmt::Debug for InstallIntentV1 {
+impl std::fmt::Debug for InstallIntent {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("InstallIntentV1")
+            .debug_struct("InstallIntent")
             .field("format_version", &self.format_version)
             .field("stage", &self.stage)
             .field("plan_sha256", &self.plan_sha256)
@@ -99,7 +105,7 @@ impl std::fmt::Debug for InstallIntentV1 {
             .field("profile_sha256", &self.profile_sha256)
             .field("executable_sha256", &self.executable_sha256)
             .field("configuration_sha256", &self.configuration_sha256)
-            .field("applied_at_unix_ms", &self.applied_at_unix_ms)
+            .field("clock_anchor", &self.clock_anchor)
             .field("token_key_bytes", &"[REDACTED]")
             .field("token_key_sha256", &self.token_key_sha256)
             .field("operator_credential_bytes", &"[REDACTED]")
@@ -109,8 +115,8 @@ impl std::fmt::Debug for InstallIntentV1 {
     }
 }
 
-impl InstallIntentV1 {
-    fn new(preview: &InstallationPreview, applied_at_unix_ms: u64) -> Result<Self> {
+impl InstallIntent {
+    fn new(preview: &InstallationPreview, clock_anchor: &ClockObservation) -> Result<Self> {
         let token_key = generate_token_key().map_err(storage_error)?;
         let credential = generate_api_key_document(
             &preview.installation.plan_sha256,
@@ -135,7 +141,7 @@ impl InstallIntentV1 {
                 .configuration
                 .configuration_sha256
                 .clone(),
-            applied_at_unix_ms,
+            clock_anchor: clock_anchor.clone(),
             token_key_bytes: token_key.to_vec(),
             token_key_sha256: digest::sha256_hex(&token_key),
             operator_credential_bytes,
@@ -158,7 +164,7 @@ impl InstallIntentV1 {
             &self.profile_sha256,
             &self.executable_sha256,
             &self.configuration_sha256,
-            self.applied_at_unix_ms,
+            &self.clock_anchor,
             &self.token_key_bytes,
             &self.token_key_sha256,
             &self.operator_credential_bytes,
@@ -184,7 +190,6 @@ impl InstallIntentV1 {
             || self.executable_sha256 != executable_sha256
             || self.executable_sha256 != preview.installation.executable_sha256
             || self.configuration_sha256 != preview.installation.configuration.configuration_sha256
-            || self.applied_at_unix_ms == 0
             || self.token_key_sha256 != digest::sha256_hex(&token_key)
             || credential.plan_sha256 != preview.installation.plan_sha256
             || credential.principal_id != preview.installation.initial_principal_id
@@ -194,11 +199,11 @@ impl InstallIntentV1 {
         {
             return Err(ServiceError::ProjectBindingMismatch);
         }
-        Ok(())
+        self.clock_anchor.validate()
     }
 
-    pub(super) fn applied_at_unix_ms(&self) -> u64 {
-        self.applied_at_unix_ms
+    pub(super) fn clock_anchor(&self) -> &ClockObservation {
+        &self.clock_anchor
     }
 
     pub(super) fn token_key(&self) -> Result<[u8; TOKEN_KEY_BYTES]> {
@@ -226,23 +231,23 @@ impl InstallIntentV1 {
 }
 
 pub(super) fn load_or_create_intent(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
     preview: &InstallationPreview,
-    at_unix_ms: u64,
+    clock_anchor: &ClockObservation,
     executable_sha256: &str,
-) -> Result<(InstallIntentV1, InstallRecoveryState)> {
+) -> Result<(InstallIntent, InstallRecoveryState)> {
     let path = install_intent_path(project, layout)?;
-    match std::fs::symlink_metadata(&path) {
+    match path.metadata() {
         Ok(_) => {
             let intent = read_intent(&path)?;
             intent.validate(preview, executable_sha256)?;
             Ok((intent, InstallRecoveryState::OwnedIntent))
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let intent = InstallIntentV1::new(preview, at_unix_ms)?;
+            let intent = InstallIntent::new(preview, clock_anchor)?;
             intent.validate(preview, executable_sha256)?;
-            write_private_new(&path, &intent.encoded()?).map_err(storage_error)?;
+            write_private_anchored(&path, &intent.encoded()?).map_err(storage_error)?;
             let readback = read_intent(&path)?;
             if readback != intent {
                 return Err(ServiceError::ProjectBindingMismatch);
@@ -254,13 +259,13 @@ pub(super) fn load_or_create_intent(
 }
 
 pub(super) fn read_existing_intent(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
     preview: &InstallationPreview,
     executable_sha256: &str,
-) -> Result<Option<InstallIntentV1>> {
+) -> Result<Option<InstallIntent>> {
     let path = install_intent_path(project, layout)?;
-    match std::fs::symlink_metadata(&path) {
+    match path.metadata() {
         Ok(_) => {
             let intent = read_intent(&path)?;
             intent.validate(preview, executable_sha256)?;
@@ -271,8 +276,12 @@ pub(super) fn read_existing_intent(
     }
 }
 
-pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: bool) -> Result<()> {
-    match std::fs::symlink_metadata(path) {
+pub(super) fn materialize_secret(
+    path: &AnchoredPath,
+    expected: &[u8],
+    allow_create: bool,
+) -> Result<()> {
+    match path.metadata() {
         Ok(_) => {
             let observed = read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)?;
             if observed != expected {
@@ -280,7 +289,7 @@ pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: boo
             }
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound && allow_create => {
-            write_private_new(path, expected).map_err(storage_error)?;
+            write_private_anchored(path, expected).map_err(storage_error)?;
             if read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)? != expected {
                 return Err(ServiceError::ProjectBindingMismatch);
             }
@@ -294,42 +303,29 @@ pub(super) fn materialize_secret(path: &Path, expected: &[u8], allow_create: boo
 }
 
 pub(super) fn acknowledge_intent(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
-    expected: &InstallIntentV1,
+    expected: &InstallIntent,
 ) -> Result<()> {
     let path = install_intent_path(project, layout)?;
     if read_intent(&path)? != *expected {
         return Err(ServiceError::ProjectBindingMismatch);
     }
-    std::fs::remove_file(&path).map_err(storage_error)?;
-    rrd_store::sync_directory_metadata(project).map_err(storage_error)
+    path.remove_file().map_err(storage_error)?;
+    project.project().sync_directory().map_err(storage_error)
 }
 
-fn read_intent(path: &Path) -> Result<InstallIntentV1> {
+fn read_intent(path: &AnchoredPath) -> Result<InstallIntent> {
     let bytes = read_private_bounded(path, MAX_INSTALL_INTENT_BYTES)?;
-    let intent: InstallIntentV1 = serde_json::from_slice(&bytes).map_err(contract_json)?;
+    let intent: InstallIntent = serde_json::from_slice(&bytes).map_err(contract_json)?;
     if intent.encoded()? != bytes {
         return Err(ServiceError::ProjectBindingMismatch);
     }
     Ok(intent)
 }
 
-fn read_private_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>> {
-    let metadata = private_regular_file(path).map_err(storage_error)?;
-    if metadata.len() > maximum {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    File::open(path)
-        .map_err(storage_error)?
-        .take(maximum + 1)
-        .read_to_end(&mut bytes)
-        .map_err(storage_error)?;
-    if bytes.len() as u64 > maximum {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    Ok(bytes)
+fn read_private_bounded(path: &AnchoredPath, maximum: u64) -> Result<Vec<u8>> {
+    crate::engine::token_key::read_private_anchored(path, maximum).map_err(storage_error)
 }
 
 fn storage_error(error: std::io::Error) -> ServiceError {

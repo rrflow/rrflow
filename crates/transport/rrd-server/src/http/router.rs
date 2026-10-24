@@ -57,6 +57,8 @@ http_dispatch_catalogue! {
     ContextAssemble => ("context-assemble", RrdOperation::MemoryContextRead),
     DataSchemaRead => ("data-schema-read", RrdOperation::DiagnosticsRead),
     DiagnosticsRead => ("diagnostics-read", RrdOperation::DiagnosticsRead),
+    DiagnosticsStorageCursor => ("diagnostics-storage-cursor", RrdOperation::DiagnosticsRead),
+    DiagnosticsStorageRead => ("diagnostics-storage-read", RrdOperation::DiagnosticsRead),
     FlightLaunch => ("flight-launch", RrdOperation::FlightLaunch),
     FlightList => ("flight-list", RrdOperation::FlightRead),
     FlightRead => ("flight-read", RrdOperation::FlightRead),
@@ -66,6 +68,7 @@ http_dispatch_catalogue! {
     HealthReady => ("health-ready", RrdOperation::ServiceInspect),
     OpenapiRead => ("openapi-read", RrdOperation::ServiceInspect),
     QueryExecute => ("query-execute", RrdOperation::QueryExecute),
+    QueryExport => ("query-export", RrdOperation::QueryExecute),
     QueryIndexEnsure => ("query-index-ensure", RrdOperation::QueryIndexEnsure),
     QueryIndexList => ("query-index-list", RrdOperation::QueryIndexList),
     QueryLivePoll => ("query-live-poll", RrdOperation::QueryLivePoll),
@@ -210,6 +213,7 @@ impl AppState {
             Some(HttpDispatch::SessionClose) => self.close_session(&headers, &body, &path, now),
             Some(HttpDispatch::TransactionBegin) => self.begin_transaction(&headers, &body, now),
             Some(HttpDispatch::QueryExecute) => self.execute_query(&headers, &body, now),
+            Some(HttpDispatch::QueryExport) => self.export_query(&headers, &body, now),
             Some(HttpDispatch::DataSchemaRead) => self.read_data_schema(&headers, &body, now),
             Some(HttpDispatch::QueryIndexEnsure) => self.ensure_query_index(&headers, &body, now),
             Some(HttpDispatch::QueryIndexList) => self.list_query_indexes(&headers, &body, now),
@@ -226,6 +230,12 @@ impl AppState {
             Some(HttpDispatch::SubscriptionClose) => self.close_subscription(&headers, &body, now),
             Some(HttpDispatch::DiagnosticsRead) => {
                 self.read_diagnostic_snapshot(&headers, &body, now)
+            }
+            Some(HttpDispatch::DiagnosticsStorageCursor) => {
+                self.inspect_storage_cursor(&headers, &body, now)
+            }
+            Some(HttpDispatch::DiagnosticsStorageRead) => {
+                self.read_storage_diagnostics(&headers, &body, now)
             }
             Some(HttpDispatch::FlightLaunch) => self.launch_prompt_flight(&headers, &body, now),
             Some(HttpDispatch::FlightList) => self.list_prompt_flights(&headers, &body, now),

@@ -22,6 +22,345 @@ fn delete(key: &str) -> Mutation {
 }
 
 #[test]
+fn blocked_oldest_source_does_not_hide_independent_budgeted_compaction() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("blocked-prefix");
+    let seed_options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            l0_compaction_trigger: 16,
+            target_segment_bytes: 512,
+            ..CompactionPolicy::default()
+        },
+        ..DatabaseOptions::default()
+    };
+    let mut database = Database::create_with_options(&root, seed_options).unwrap();
+    let expected = [
+        ("a", "x".repeat(8192)),
+        ("b", "y".repeat(256)),
+        ("c", "z".repeat(256)),
+    ];
+    let mut snapshots = Vec::new();
+    for (ordinal, (key, value)) in expected.iter().enumerate() {
+        database
+            .write(&batch(vec![put(key, value)]), Durability::Authoritative)
+            .unwrap();
+        snapshots.push(database.snapshot());
+        database.flush_memtable(ordinal as u64).unwrap();
+    }
+    assert_eq!(database.l0_segment_count(), 3);
+    drop(database);
+    let options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            l0_compaction_trigger: 2,
+            max_input_segments: 2,
+            ..seed_options.compaction
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            input_logical_bytes: 4096,
+            ..seed_options.compaction_limits
+        },
+        ..seed_options
+    };
+    let mut database = Database::open_with_options(&root, options).unwrap();
+    let before = database.snapshot();
+    let outcome = database
+        .compact_if_needed(4)
+        .unwrap()
+        .expect("later independent range fits the unchanged budget");
+    assert_eq!(outcome.source_level, 0);
+    assert_eq!(outcome.input_segments, 2);
+    assert_eq!(outcome.input_versions, 2);
+    assert!(!outcome.history_pruned);
+    assert_eq!(database.l0_segment_count(), 1);
+    assert_eq!(database.snapshot(), before);
+    for ((key, value), snapshot) in expected.iter().zip(&snapshots) {
+        assert_eq!(
+            database.get(key.as_bytes(), *snapshot).unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+    database
+        .write(&batch(vec![put("tail", "ack")]), Durability::Authoritative)
+        .unwrap();
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    for ((key, value), snapshot) in expected.iter().zip(&snapshots) {
+        assert_eq!(
+            reopened.get(key.as_bytes(), *snapshot).unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+    assert_eq!(
+        reopened.get(b"tail", reopened.snapshot()).unwrap(),
+        Some(b"ack".to_vec())
+    );
+}
+
+#[test]
+fn automatic_compaction_selects_a_budgeted_subset_before_rejecting_writes() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("database");
+    let options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            l0_compaction_trigger: 4,
+            target_segment_bytes: 512,
+            ..CompactionPolicy::default()
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            input_logical_bytes: 3000,
+            ..rrd_lsm::CompactionLimits::default()
+        },
+        ..DatabaseOptions::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    let value = "x".repeat(1024);
+    let mut acknowledged = Vec::new();
+    for ordinal in 0..4 {
+        let key = format!("key-{ordinal}");
+        database
+            .write(&batch(vec![put(&key, &value)]), Durability::Authoritative)
+            .unwrap();
+        acknowledged.push((key, database.snapshot()));
+        database.flush_memtable(ordinal).unwrap();
+    }
+    let outcome = database
+        .compact_if_needed(5)
+        .unwrap()
+        .expect("admitted subset");
+    assert_eq!(outcome.input_segments, 2);
+    assert!(!outcome.history_pruned);
+    for (key, snapshot) in &acknowledged {
+        assert_eq!(
+            database.get(key.as_bytes(), *snapshot).unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+    database
+        .write(
+            &batch(vec![put("later", "accepted")]),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    for (key, snapshot) in acknowledged {
+        assert_eq!(
+            reopened.get(key.as_bytes(), snapshot).unwrap(),
+            Some(value.as_bytes().to_vec())
+        );
+    }
+    assert_eq!(
+        reopened.get(b"later", reopened.snapshot()).unwrap(),
+        Some(b"accepted".to_vec())
+    );
+}
+
+#[test]
+fn blocked_l0_can_clear_lower_level_overlap_without_exceeding_input_budget() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("database");
+    let options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            l0_compaction_trigger: 4,
+            target_segment_bytes: 256,
+            ..CompactionPolicy::default()
+        },
+        compaction_limits: rrd_lsm::CompactionLimits {
+            input_logical_bytes: 2500,
+            ..rrd_lsm::CompactionLimits::default()
+        },
+        ..DatabaseOptions::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    let baseline = "b".repeat(1000);
+    for (ordinal, key) in ["a", "z"].into_iter().enumerate() {
+        database
+            .write(&batch(vec![put(key, &baseline)]), Durability::Authoritative)
+            .unwrap();
+        database.flush_memtable(ordinal as u64).unwrap();
+    }
+    database.compact(&[], 2).unwrap().unwrap();
+    let mut acknowledged = vec![(database.snapshot(), baseline)];
+    // Seed deliberately wide L0 inputs, then test compaction under the smaller
+    // target. Normal flushes now partition at that same immutable target.
+    drop(database);
+    let seed_options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            target_segment_bytes: 4096,
+            ..options.compaction
+        },
+        ..options
+    };
+    let mut database = Database::open_with_options(&root, seed_options).unwrap();
+    for ordinal in 0..4 {
+        let value = format!("{ordinal}").repeat(512);
+        database
+            .write(
+                &batch(vec![put("a", &value), put("z", &value)]),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        acknowledged.push((database.snapshot(), value));
+        database.flush_memtable(ordinal + 3).unwrap();
+    }
+    drop(database);
+    let mut database = Database::open_with_options(&root, options).unwrap();
+    let relief = database
+        .compact_if_needed(10)
+        .unwrap()
+        .expect("lower-level relief");
+    assert_eq!(relief.source_level, 1);
+    assert!(!relief.history_pruned);
+    let resumed = database
+        .compact_if_needed(11)
+        .unwrap()
+        .expect("L0 resumes after relief");
+    assert_eq!(resumed.source_level, 0);
+    assert!(!resumed.history_pruned);
+    for (snapshot, value) in &acknowledged {
+        for key in [b"a", b"z"] {
+            assert_eq!(
+                database.get(key, *snapshot).unwrap(),
+                Some(value.as_bytes().to_vec())
+            );
+        }
+    }
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    for (snapshot, value) in acknowledged {
+        for key in [b"a", b"z"] {
+            assert_eq!(
+                reopened.get(key, snapshot).unwrap(),
+                Some(value.as_bytes().to_vec())
+            );
+        }
+    }
+}
+
+#[test]
+fn hard_compaction_input_limits_preserve_every_protected_version() {
+    use rrd_lsm::{CompactionLimits, Error, MaintenanceResource};
+    for resource in [
+        MaintenanceResource::InputBytes,
+        MaintenanceResource::InputLogicalBytes,
+        MaintenanceResource::InputVersions,
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("database");
+        let mut limits = CompactionLimits::default();
+        match resource {
+            MaintenanceResource::InputBytes => limits.input_bytes = 1,
+            MaintenanceResource::InputLogicalBytes => limits.input_logical_bytes = 1,
+            MaintenanceResource::InputVersions => limits.input_versions = 1,
+            _ => unreachable!(),
+        }
+        let mut database = Database::create_with_options(
+            &root,
+            DatabaseOptions {
+                compaction_limits: limits,
+                ..DatabaseOptions::default()
+            },
+        )
+        .unwrap();
+        database
+            .write(&batch(vec![put("hot", "first")]), Durability::Authoritative)
+            .unwrap();
+        let first = database.snapshot();
+        database.flush_memtable(1).unwrap();
+        database
+            .write(
+                &batch(vec![put("hot", "second")]),
+                Durability::Authoritative,
+            )
+            .unwrap();
+        let second = database.snapshot();
+        database.flush_memtable(2).unwrap();
+        let before = database.manifest().digest.clone();
+        assert!(
+            matches!(database.compact(&[first], 3), Err(Error::MaintenanceLimit { resource: actual, .. }) if actual == resource)
+        );
+        assert_eq!(database.manifest().digest, before);
+        assert_eq!(
+            database.get(b"hot", first).unwrap(),
+            Some(b"first".to_vec())
+        );
+        assert_eq!(
+            database.get(b"hot", second).unwrap(),
+            Some(b"second".to_vec())
+        );
+        drop(database);
+        let mut reopened = Database::open(&root).unwrap();
+        reopened.compact(&[first], 4).unwrap().unwrap();
+        assert_eq!(
+            reopened.get(b"hot", first).unwrap(),
+            Some(b"first".to_vec())
+        );
+        assert_eq!(
+            reopened.get(b"hot", second).unwrap(),
+            Some(b"second".to_vec())
+        );
+    }
+}
+
+#[test]
+fn blocked_l0_maintenance_cannot_be_bypassed_by_repeating_a_write() {
+    use rrd_lsm::{CompactionLimits, Error};
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("database");
+    let mut database = Database::create_with_options(
+        &root,
+        DatabaseOptions {
+            compaction: CompactionPolicy {
+                l0_compaction_trigger: 2,
+                ..CompactionPolicy::default()
+            },
+            compaction_limits: CompactionLimits {
+                input_bytes: 1,
+                l0_segments: 2,
+                ..CompactionLimits::default()
+            },
+            ..DatabaseOptions::default()
+        },
+    )
+    .unwrap();
+    for (index, value) in ["first", "second"].into_iter().enumerate() {
+        database
+            .write(&batch(vec![put("hot", value)]), Durability::Authoritative)
+            .unwrap();
+        database.flush_memtable(index as u64).unwrap();
+    }
+    let sequence = database.snapshot().sequence;
+    for _ in 0..3 {
+        assert!(matches!(
+            database.write(
+                &batch(vec![put("new", "must-not-appear")]),
+                Durability::Authoritative
+            ),
+            Err(Error::MaintenanceLimit { .. })
+        ));
+        assert_eq!(database.snapshot().sequence, sequence);
+        assert_eq!(database.get(b"new", database.snapshot()).unwrap(), None);
+    }
+    drop(database);
+    let mut reopened = Database::open(&root).unwrap();
+    reopened.compact(&[], 3).unwrap().unwrap();
+    reopened
+        .write(
+            &batch(vec![put("new", "admitted")]),
+            Durability::Authoritative,
+        )
+        .unwrap();
+    assert_eq!(
+        reopened.get(b"hot", reopened.snapshot()).unwrap(),
+        Some(b"second".to_vec())
+    );
+    assert_eq!(
+        reopened.get(b"new", reopened.snapshot()).unwrap(),
+        Some(b"admitted".to_vec())
+    );
+}
+
+#[test]
 fn pinned_transaction_reads_survive_compaction_garbage_collect_cycles() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("database");
@@ -336,7 +675,14 @@ fn garbage_collection_preserves_current_and_checkpoint_reachability() {
         .join("segments")
         .join(format!("{current_segment}.seg"))
         .exists());
-    assert!(!first.removed_wals.is_empty());
+    // Normal pre-write maintenance may already have removed the first WAL.
+    // Prove physical reachability rather than which collector call did it.
+    assert!(!root.join("wal").join("00000000000000000001.wal").exists());
+    let physical_wals = std::fs::read_dir(root.join("wal"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(physical_wals, first.retained_wals.iter().cloned().collect());
 
     assert!(database.release_checkpoint("keep-first").unwrap());
     let second = database.garbage_collect().unwrap();
@@ -384,17 +730,15 @@ fn explicit_compaction_promotes_a_single_segment() {
 fn leveled_compaction_streams_into_key_partitioned_outputs() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().join("database");
-    let mut database = Database::create_with_options(
-        &root,
-        DatabaseOptions {
-            compaction: CompactionPolicy {
-                target_segment_bytes: 512,
-                ..CompactionPolicy::default()
-            },
-            ..DatabaseOptions::default()
+    let options = DatabaseOptions {
+        compaction: CompactionPolicy {
+            target_segment_bytes: 512,
+            ..CompactionPolicy::default()
         },
-    )
-    .unwrap();
+        ..DatabaseOptions::default()
+    };
+    // Build large input segments independently of the compaction output policy.
+    let mut database = Database::create(&root).unwrap();
     for phase in 0..3 {
         let operations = (0..32)
             .map(|index| {
@@ -410,6 +754,8 @@ fn leveled_compaction_streams_into_key_partitioned_outputs() {
         database.flush_memtable(phase + 1).unwrap();
     }
     let snapshot = database.snapshot();
+    drop(database);
+    let mut database = Database::open_with_options(&root, options).unwrap();
     let outcome = database.compact(&[], 10).unwrap().unwrap();
     assert_eq!(outcome.source_level, 0);
     assert_eq!(outcome.target_level, 1);

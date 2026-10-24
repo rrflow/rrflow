@@ -1,5 +1,11 @@
 #![allow(dead_code)]
 
+#[path = "projected_read_model/interleaved_lifetimes.rs"]
+mod interleaved_lifetimes;
+pub fn run_interleaved_lifetime_matrix(physical: &str) {
+    interleaved_lifetimes::run_interleaved_lifetime_matrix(physical);
+}
+
 use rrd_lsm::{
     CompactionBoundary, CompactionPolicy, Database, DatabaseOptions, Durability, Error,
     FailureMode, FlushBoundary, Mutation, ProjectedReadBudget, ProjectedReadEvidence,

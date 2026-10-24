@@ -277,6 +277,11 @@ impl TurboQuantSegment {
                 path.display()
             ))
         })?;
+        Self::open_mmap_file(file)
+    }
+
+    /// Maps the already admitted immutable file without reopening a pathname.
+    pub fn open_mmap_file(file: File) -> Result<Self> {
         let length = file
             .metadata()
             .map_err(|error| runtime_error(format!("cannot stat TurboQuant artifact: {error}")))?

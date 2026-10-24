@@ -14,6 +14,7 @@ use super::runtime_state::{
 };
 use super::{read_versioned, schema_at_read, RuntimeReadBudget, RuntimeVersionedSource};
 use crate::keyspaces::{self, Space};
+use crate::transaction::TransactionWriteSet;
 use crate::{Error, FunctionInvocationReceiptRecord, Result, StorageTransaction};
 use rrd_core::{
     projection_family, AuditEnvelope, ProjectionWork, ReadStamp, RuntimeChange, RuntimeCommit,
@@ -21,6 +22,12 @@ use rrd_core::{
     RuntimeRelation, RuntimeSchemaRegistry,
 };
 use std::collections::{BTreeMap, BTreeSet};
+
+mod constraints;
+
+#[cfg(test)]
+#[path = "semantic_commit/constraint_tests.rs"]
+mod constraint_tests;
 
 /// A validated semantic commit plan that has not been published.
 ///
@@ -32,7 +39,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug)]
 pub struct SemanticCommitPlan {
     outcome: RuntimeCommitOutcome,
-    writes: BTreeMap<Vec<u8>, Option<Vec<u8>>>,
+    writes: TransactionWriteSet,
 }
 
 impl SemanticCommitPlan {
@@ -45,7 +52,7 @@ impl SemanticCommitPlan {
         transaction: &mut dyn StorageTransaction,
     ) -> Result<RuntimeCommitOutcome> {
         let Self { outcome, writes } = self;
-        for (key, value) in writes {
+        for (key, value) in writes.into_mutations() {
             match value {
                 Some(value) => transaction.put(key, value)?,
                 None => transaction.delete(key)?,
@@ -57,12 +64,11 @@ impl SemanticCommitPlan {
     pub(crate) fn into_encoded_writes(
         self,
     ) -> (RuntimeCommitOutcome, BTreeMap<Vec<u8>, Option<Vec<u8>>>) {
-        (self.outcome, self.writes)
+        (self.outcome, self.writes.into_mutations())
     }
 
     pub(crate) fn put_bytes(&mut self, space: Space, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.writes.insert(checked_key(space, key)?, Some(value));
-        Ok(())
+        self.writes.put(checked_key(space, key)?, value)
     }
 
     pub(crate) fn put_json<T: serde::Serialize>(
@@ -79,8 +85,7 @@ impl SemanticCommitPlan {
     }
 
     pub(crate) fn delete(&mut self, space: Space, key: &[u8]) -> Result<()> {
-        self.writes.insert(checked_key(space, key)?, None);
-        Ok(())
+        self.writes.delete(checked_key(space, key)?)
     }
 }
 
@@ -158,7 +163,7 @@ pub(crate) fn prepare_semantic_commit(
             last_claim_sequence: None,
             outbox_count: 0,
         },
-        writes: BTreeMap::new(),
+        writes: TransactionWriteSet::default(),
     };
     let mut outbox_count = 0;
     let mut staged_relations = BTreeMap::<RuntimeRef, Option<RuntimeRelation>>::new();
@@ -362,22 +367,8 @@ fn validate_schema_and_objects(
         (Some(previous), None) => previous,
         (None, None) => return Err(Error::RuntimeSchemaMissing(commit.scope.to_string())),
     };
-    let existing_records = if effective_schema
-        .records
-        .values()
-        .any(|schema| !schema.unique_properties.is_empty())
-    {
-        values_for_scope::<RuntimeRecord>(reader, keyspaces::RUNTIME_RECORDS, &commit.scope)?
-    } else {
-        Vec::new()
-    };
-    let existing_relations = if effective_schema.relations.values().any(|schema| {
-        schema.unique_pair || schema.max_outgoing.is_some() || schema.max_incoming.is_some()
-    }) {
-        values_for_scope::<RuntimeRelation>(reader, keyspaces::RUNTIME_RELATIONS, &commit.scope)?
-    } else {
-        Vec::new()
-    };
+    let (existing_records, existing_relations) =
+        constraints::load(reader, commit, effective_schema, proposed_schema.is_some())?;
     effective_schema.validate_objects(&commit.mutations, &existing_records, &existing_relations)?;
     Ok(Some(effective_schema.clone()))
 }

@@ -60,7 +60,40 @@ func TestCapabilitiesRetryAndIdentity(t *testing.T) {
 					"storage_profile": "rrflow_kv", "endpoint_presentation": "loopback_http_websocket",
 				},
 				"configuration": map[string]any{
-					"format_version": 1, "revision": 1,
+					"format_version": 3, "revision": 1,
+					"clock": map[string]any{"maximum_rollback_ms": 0},
+					"storage": map[string]any{
+						"mutable_accounted_bytes":        134217728,
+						"mutable_versions":               1048576,
+						"projected_output_bytes":         134217728,
+						"source_page_bytes":              268435456,
+						"page_cache_bytes":               4194304,
+						"wal_flush_target_bytes":         67108864,
+						"memtable_flush_target_versions": 524288,
+						"compaction_input_bytes":         1073741824,
+						"compaction_input_logical_bytes": 268435456,
+						"compaction_input_versions":      4194304,
+						"compaction_output_segments":     256,
+						"compaction_elapsed_ms":          30000,
+						"compaction_l0_segments":         64,
+						"retained_mutable_bytes":         536870912,
+						"retained_mutable_versions":      4194304,
+						"retained_mutable_generations":   64,
+						"reclamation_inventory_entries":  262144,
+						"reclamation_metadata_bytes":     67108864,
+						"reclamation_delete_files":       1024,
+						"reclamation_delete_bytes":       1073741824,
+						"reclamation_elapsed_ms":         30000,
+						"transaction_admission_requests": 64,
+						"transaction_admission_bytes":    67108864,
+						"transaction_admission_wait_ms":  30000,
+						"recovery_metadata_bytes":        67108864,
+						"recovery_files":                 262144,
+						"recovery_read_bytes":            1099511627776,
+						"recovery_wal_bytes":             268435456,
+						"recovery_wal_frames":            1048576,
+						"recovery_elapsed_ms":            120000,
+					},
 					"reasoning": map[string]any{
 						"max_run_elapsed_ms": 900000, "max_steps": 256, "max_step_elapsed_ms": 60000,
 					},
@@ -72,7 +105,7 @@ func TestCapabilitiesRetryAndIdentity(t *testing.T) {
 						"max_batch_rows": 256, "max_memory_bytes": 67108864,
 						"max_spill_bytes": 268435456, "max_elapsed_ms": 30000,
 					},
-					"configuration_sha256": "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be",
+					"configuration_sha256": "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0",
 				},
 				"instance":     map[string]any{"kind": "instance", "id": "sdk-test"},
 				"capabilities": []any{},
@@ -191,7 +224,8 @@ func TestSecurityDeadlinesErrorsAndGeneratedCoverage(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "deadline has expired") {
 		t.Fatalf("unexpected deadline result: %v", err)
 	}
-	if len(endpoints) != 41 || !endpoints[OperationBackupCreate].Mutation ||
+	if len(endpoints) != 44 || !endpoints[OperationBackupCreate].Mutation ||
+		endpoints[OperationDiagnosticsStorageCursor].Authentication != "session_bearer" ||
 		!endpoints[OperationTransactionPreview].Mutation ||
 		endpoints[OperationCapabilitiesRead].Authentication != "public" {
 		t.Fatalf("generated endpoint catalogue is incomplete: %#v", endpoints)

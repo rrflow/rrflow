@@ -4,19 +4,21 @@
 //! storage, and verification remain engine-owned; the CLI only translates
 //! explicit operator arguments and renders typed results.
 
-use crate::command::{Command, Execution, InstallAction, InstallMode, RestoreAction, VerifyLevel};
+use crate::command::{
+    Command, Execution, InstallAction, InstallMode, RepairAction, RestoreAction, VerifyLevel,
+};
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
     CanonicalId, CloseSession, CreateSession, InstallationTargetKind, RestorePublicationPlan,
     SessionLimits, PROTOCOL, PROTOCOL_VERSION,
 };
-use rrd_engine::{digest, InstallationPreview, RrdEngine};
+use rrd_engine::{digest, InstallationPreview, InstallationVerificationStatus, RrdEngine};
 use rrd_server::RrdHttpServer;
 use serde::Serialize;
 use std::error::Error;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 const MAX_INSTALLATION_PLAN_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -28,7 +30,9 @@ struct VersionReport {
     product_version: &'static str,
     protocol: &'static str,
     protocol_version: u16,
+    installation_plan_contract_version: u16,
     release_stage: &'static str,
+    build: crate::build_identity::BuildReport,
 }
 
 #[derive(Debug, Serialize)]
@@ -38,6 +42,7 @@ struct ServeAnnouncement {
     project_root: String,
     instance_id: String,
     product_version: String,
+    build: crate::build_identity::BuildReport,
     readiness_path: &'static str,
     capability_path: &'static str,
     endpoint_catalogue_path: &'static str,
@@ -64,10 +69,10 @@ struct AuthenticatedReady {
     session_closed: bool,
 }
 
-pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, BoxError> {
+pub fn execute(command: &Command, json: bool) -> Result<Execution, BoxError> {
     match command {
         Command::Version => version(json),
-        Command::Install { action } => install(action, now, json),
+        Command::Install { action } => install(action, json),
         Command::Serve {
             project,
             bind,
@@ -78,7 +83,7 @@ pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, Box
             test_distribution_executable.as_deref(),
             json,
         ),
-        Command::Ready { project, address } => ready(project, *address, now, json),
+        Command::Ready { project, address } => ready(project, *address, json),
         Command::Verify {
             project,
             level,
@@ -89,11 +94,54 @@ pub fn execute(command: &Command, now: u64, json: bool) -> Result<Execution, Box
             test_distribution_executable.as_deref(),
             json,
         ),
-        Command::Restore { action } => restore(action, now, json),
+        Command::Restore { action } => restore(action, json),
+        Command::Repair { action } => repair(action),
     }
 }
 
-fn restore(action: &RestoreAction, now: u64, json: bool) -> Result<Execution, BoxError> {
+fn repair(action: &RepairAction) -> Result<Execution, BoxError> {
+    match action {
+        RepairAction::Plan {
+            project,
+            test_distribution_executable,
+        } => {
+            let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
+            let plan = RrdEngine::plan_installed_tail_repair(project, &executable)?;
+            Ok(serde_json::to_string_pretty(&plan)?.into())
+        }
+        RepairAction::Apply {
+            project,
+            plan,
+            expect,
+            test_distribution_executable,
+        } => {
+            let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
+            if std::fs::symlink_metadata(plan)?.file_type().is_symlink() {
+                return Err("repair plan must not be a symlink".into());
+            }
+            let file = std::fs::File::open(plan)?;
+            let metadata = file.metadata()?;
+            if !metadata.is_file() || metadata.len() > MAX_INSTALLATION_PLAN_BYTES {
+                return Err("repair plan must be a bounded regular file".into());
+            }
+            let mut bytes = Vec::with_capacity(metadata.len() as usize);
+            file.take(MAX_INSTALLATION_PLAN_BYTES + 1)
+                .read_to_end(&mut bytes)?;
+            if bytes.len() as u64 != metadata.len() {
+                return Err("repair plan changed while reading".into());
+            }
+            let plan: rrd_engine::InstalledTailRepairPlan = serde_json::from_slice(&bytes)?;
+            let result =
+                RrdEngine::apply_installed_tail_repair(project, &executable, &plan, expect)?;
+            tracing::info!(target: "rrflow::installed", operation = "repair.apply",
+                plan_sha256 = %result.plan_sha256, discarded_bytes = result.storage.discarded_bytes,
+                idempotent_replay = result.idempotent_replay, "installed tail repair completed");
+            Ok(serde_json::to_string_pretty(&result)?.into())
+        }
+    }
+}
+
+fn restore(action: &RestoreAction, json: bool) -> Result<Execution, BoxError> {
     match action {
         RestoreAction::Plan {
             project,
@@ -128,8 +176,13 @@ fn restore(action: &RestoreAction, now: u64, json: bool) -> Result<Execution, Bo
             let started = Instant::now();
             let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
             let plan = read_publication_plan(plan)?;
-            let result =
-                RrdEngine::apply_restore_publication(project, &plan, expect, now, &executable)?;
+            let result = RrdEngine::apply_restore_publication(
+                project,
+                &plan,
+                expect,
+                wall_clock_millis()?,
+                &executable,
+            )?;
             tracing::info!(
                 target: "rrflow::installed",
                 operation = "restore.apply",
@@ -167,7 +220,9 @@ fn version(json: bool) -> Result<Execution, BoxError> {
         product_version: env!("CARGO_PKG_VERSION"),
         protocol: PROTOCOL,
         protocol_version: PROTOCOL_VERSION,
+        installation_plan_contract_version: rrd_contract::INSTALLATION_PLAN_CONTRACT_VERSION,
         release_stage: "pre-release",
+        build: crate::build_identity::report()?,
     };
     Ok(render(
         &report,
@@ -180,11 +235,16 @@ fn version(json: bool) -> Result<Execution, BoxError> {
     .into())
 }
 
-fn install(action: &InstallAction, now: u64, json: bool) -> Result<Execution, BoxError> {
+fn install(action: &InstallAction, json: bool) -> Result<Execution, BoxError> {
     match action {
+        InstallAction::Identity => Ok(serde_json::to_string_pretty(&serde_json::json!({
+            "installation_identity": RrdEngine::generate_installation_identity()?,
+        }))?
+        .into()),
         InstallAction::Plan {
             project,
             mode,
+            identity,
             profile,
             configuration,
             test_distribution_executable,
@@ -194,6 +254,7 @@ fn install(action: &InstallAction, now: u64, json: bool) -> Result<Execution, Bo
             let preview = RrdEngine::plan_installation(
                 project,
                 target_kind(*mode),
+                identity,
                 profile,
                 configuration.as_deref(),
                 &executable,
@@ -228,7 +289,6 @@ fn install(action: &InstallAction, now: u64, json: bool) -> Result<Execution, Bo
                 target_kind(*mode),
                 &preview,
                 expect,
-                now,
                 &executable,
             )?;
             tracing::info!(
@@ -271,6 +331,8 @@ fn serve(
     let executable = distribution_executable_path(test_distribution_executable)?;
     let locator = RrdEngine::read_project_locator(project)?;
     let project_root = std::fs::canonicalize(project)?.display().to_string();
+    #[cfg(feature = "crash-test")]
+    rrd_engine::crash_test::configure_from_stdin(&project.join(&locator.storage_root))?;
     let engine = RrdEngine::open_installed(project, &executable)?;
     let server = RrdHttpServer::bind(engine, bind)?;
     let address = server.local_addr();
@@ -280,6 +342,7 @@ fn serve(
         project_root,
         instance_id: locator.identity.instance_id.to_string(),
         product_version: locator.product_version,
+        build: crate::build_identity::report()?,
         readiness_path: "/v1/health/ready",
         capability_path: "/v1/capabilities",
         endpoint_catalogue_path: "/v1/schema/endpoints",
@@ -323,13 +386,9 @@ fn serve(
     })
 }
 
-fn ready(
-    project: &Path,
-    address: std::net::SocketAddr,
-    now: u64,
-    json: bool,
-) -> Result<Execution, BoxError> {
+fn ready(project: &Path, address: std::net::SocketAddr, json: bool) -> Result<Execution, BoxError> {
     let started = Instant::now();
+    let now = wall_clock_millis()?;
     let invocation = format!("{now}-{}", std::process::id());
     let locator = RrdEngine::read_project_locator(project)?;
     let project_root = std::fs::canonicalize(project)?.display().to_string();
@@ -443,24 +502,52 @@ fn verify(
         runtime_cursor = report.runtime_cursor,
         control_journal_sequence = report.control_journal_sequence,
         attunement_source_current = report.attunement_source_current,
+        clock_status = ?report.clock.status,
+        clock_observed_at_unix_ms = report
+            .clock
+            .observation
+            .as_ref()
+            .map(|observation| observation.observed_at_unix_ms),
+        clock_anchor_unix_ms = report.clock.anchor.observed_at_unix_ms,
+        clock_rollback_ms = report.clock.rollback_ms,
+        clock_maximum_rollback_ms = report.clock.maximum_rollback_ms,
         physical_file_count = report.physical.physical.files.len(),
         physical_bytes = report.physical.physical.total_bytes,
         elapsed_ms = started.elapsed().as_millis() as u64,
         "installed lifecycle operation completed"
     );
+    let passed_checks = report.checks.iter().filter(|check| check.passed).count();
+    let success = report.status == InstallationVerificationStatus::Passed;
     let human = format!(
-        "RRFlow installation verified\ninstance: {}\nplan: {}\nattunement source current: {}\nruntime cursor: {}\ncontrol journal: {}\nchecks: {} passed",
+        "RRFlow installation verification: {:?}\ninstance: {}\nplan: {}\nattunement source current: {}\nclock: {:?}\nclock anchor: {}\nclock rollback: {:?} ms\nruntime cursor: {}\ncontrol journal: {}\nchecks: {}/{} passed",
+        report.status,
         report.instance_id,
         report.plan_sha256,
         report.attunement_source_current,
+        report.clock.status,
+        report.clock.anchor.observed_at_unix_ms,
+        report.clock.rollback_ms,
         report.runtime_cursor,
         report.control_journal_sequence,
+        passed_checks,
         report.checks.len(),
     );
     Ok(Execution {
         text: render(&report, json, human)?,
-        success: true,
+        success,
     })
+}
+
+fn wall_clock_millis() -> Result<u64, BoxError> {
+    let elapsed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| std::io::Error::other("host clock is before the Unix epoch"))?;
+    let millis = u64::try_from(elapsed.as_millis())
+        .map_err(|_| std::io::Error::other("host clock is outside RRFlow's range"))?;
+    if millis == 0 {
+        return Err(std::io::Error::other("host clock is at the Unix epoch").into());
+    }
+    Ok(millis)
 }
 
 fn read_installation_plan(path: &Path) -> Result<InstallationPreview, BoxError> {

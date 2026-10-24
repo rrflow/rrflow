@@ -176,23 +176,26 @@ impl RrdEngine {
         if read.scope != scope {
             return Err(ServiceError::WrongScope);
         }
-        let descriptor = self.embedding_descriptor(&request.backend_id)?;
-        let requests = request
-            .inputs
-            .iter()
-            .map(|input| embedding_request(&read, &descriptor, input))
-            .collect::<Result<Vec<_>>>()?;
-        let batch = self
+        let execution = self
             .embedding_backends
             .lock()
             .map_err(|_| ServiceError::Storage("embedding registry lock is poisoned".into()))?
+            .try_acquire(&request.backend_id)
+            .map_err(embedding_dispatch_error)?;
+        let descriptor = execution.descriptor();
+        let requests = request
+            .inputs
+            .iter()
+            .map(|input| embedding_request(&read, descriptor, input))
+            .collect::<Result<Vec<_>>>()?;
+        let model = descriptor.model.clone();
+        let batch = execution
             .embed_batch(
-                &request.backend_id,
-                &descriptor.model,
+                &model,
                 internal_network_policy(request.network_policy),
                 &requests,
             )
-            .map_err(inference_error)?;
+            .map_err(embedding_dispatch_error)?;
         let backend = public_embedding_backend(&batch.backend);
         let embeddings = request
             .inputs
@@ -404,4 +407,14 @@ fn trust_name(value: &rrd_inference::InferenceTrustBoundary) -> String {
 
 fn inference_error(error: rrd_core::Error) -> ServiceError {
     ServiceError::Inference(error.to_string())
+}
+
+fn embedding_dispatch_error(error: rrd_inference::EmbeddingDispatchError) -> ServiceError {
+    match error {
+        rrd_inference::EmbeddingDispatchError::Busy => ServiceError::InferenceBusy,
+        rrd_inference::EmbeddingDispatchError::UnhealthyBackend => {
+            ServiceError::Storage("embedding backend lock is poisoned".into())
+        }
+        rrd_inference::EmbeddingDispatchError::Rejected(error) => inference_error(error),
+    }
 }

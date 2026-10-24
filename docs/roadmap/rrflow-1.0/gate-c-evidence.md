@@ -179,6 +179,22 @@ either independently.
 - The package record is the
   [C-04d source-closure audit correction journal](../../evidence/change-journals/gate-c/c-04d-source-closure-audit-correction-journal.md).
 
+## C-04e vector catalogue repair evidence (2026-10-20)
+
+The [stamped catalogue journal](../../evidence/change-journals/gate-c/c-04e-stamped-vector-catalogues.md)
+records replacement of both vector catalogue log scans by typed direct reads.
+Search candidates, catalogue records and exact object bindings now share one
+request stamp and storage-key budget. A failing retained-generation regression
+now passes through rrflowKV reopen, alongside historical quantization lifecycle
+and aggregate-budget checks. Adding 1,024 unrelated records preserves four
+semantic keys and 5,467 semantic decoded bytes; accumulator authentication
+changes total work from 28 to 65 keys. No constant-total-cost claim is made.
+
+C-04 remains unchecked: the independent maintenance replay and final closure
+corpus remain open under POAM-028. E-04 still owns persistent incremental
+vector access and broader scale qualification. The current package neither
+implements project inventory nor proves filesystem freshness or SWAG execution.
+
 ## C-05 accepted convergence evidence and audit correction (2026-09-09):
 
 - C-05a at `b8f07c97775d4440df728bceb261a1128c4d816a` removes the

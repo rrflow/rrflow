@@ -25,9 +25,9 @@ use rrd_core::{
     digest::sha256_hex, ObjectReference, ReadStamp, RuntimeCommit, RuntimeCommitOutcome,
     RuntimeSchemaRegistry, ScopeId,
 };
+use rrd_lsm::filesystem::{AnchorInput, AnchoredPath, OpenOptions};
 use rrd_lsm::{
-    sync_directory, Database, Durability, Mutation, SnapshotBundleFile, WriteBatch,
-    SNAPSHOT_BUNDLE_MAX_BYTES,
+    Database, Durability, Mutation, SnapshotBundleFile, WriteBatch, SNAPSHOT_BUNDLE_MAX_BYTES,
 };
 use rrd_store::{
     create_rrflow_kv_database, is_rrflow_kv_database, prepare_rrflow_kv_commit,
@@ -76,50 +76,47 @@ pub struct RrdSnapshotData {
     file: tokio::fs::File,
     path: PathBuf,
     position: u64,
+    writable: bool,
     _cleanup: SnapshotCleanup,
 }
 
 #[derive(Debug)]
-struct SnapshotCleanup(Option<PathBuf>);
+struct SnapshotCleanup(Option<AnchoredPath>);
 
 impl Drop for SnapshotCleanup {
     fn drop(&mut self) {
         if let Some(path) = &self.0 {
-            let _ = std::fs::remove_file(path);
+            let _ = path.remove_file();
         }
     }
 }
 
 impl RrdSnapshotData {
-    pub async fn create_ephemeral(path: impl AsRef<Path>) -> io::Result<Self> {
-        let path = path.as_ref().to_path_buf();
-        let file = tokio::fs::OpenOptions::new()
+    fn from_file(file: std::fs::File, path: PathBuf, cleanup: Option<AnchoredPath>) -> Self {
+        Self {
+            file: tokio::fs::File::from_std(file),
+            _cleanup: SnapshotCleanup(cleanup),
+            path,
+            position: 0,
+            writable: false,
+        }
+    }
+
+    pub async fn create_ephemeral(path: impl AnchorInput) -> io::Result<Self> {
+        let path = path.anchor()?;
+        let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create_new(true)
-            .open(&path)
-            .await?;
-        Ok(Self {
-            file,
-            _cleanup: SnapshotCleanup(Some(path.clone())),
-            path,
-            position: 0,
-        })
+            .open(&path)?;
+        let mut snapshot = Self::from_file(file, path.diagnostic_path().to_owned(), Some(path));
+        snapshot.writable = true;
+        Ok(snapshot)
     }
 
-    async fn open(path: impl AsRef<Path>, delete_on_drop: bool) -> io::Result<Self> {
-        let path = path.as_ref().to_path_buf();
-        let file = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&path)
-            .await?;
-        Ok(Self {
-            file,
-            _cleanup: SnapshotCleanup(delete_on_drop.then(|| path.clone())),
-            path,
-            position: 0,
-        })
+    async fn independent_file(&self) -> io::Result<std::fs::File> {
+        let handle = self.file.try_clone().await?.into_std().await;
+        rrd_lsm::filesystem::reopen_read(&handle)
     }
 
     pub fn path(&self) -> &Path {
@@ -127,7 +124,14 @@ impl RrdSnapshotData {
     }
 
     async fn sync_all(&self) -> io::Result<()> {
-        self.file.sync_all().await
+        // Received spools must be flushed. Built and cached snapshots already
+        // crossed their durable publication boundary and carry read-only
+        // handles; Windows correctly refuses FlushFileBuffers on those.
+        if self.writable {
+            self.file.sync_all().await
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -154,6 +158,12 @@ impl AsyncWrite for RrdSnapshotData {
         context: &mut Context<'_>,
         buffer: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
+        if !self.writable {
+            return Poll::Ready(Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "published snapshot is read-only",
+            )));
+        }
         if self
             .position
             .checked_add(buffer.len() as u64)
@@ -504,7 +514,7 @@ pub struct RrdRaftStateMachine {
     local_database: SharedDatabase,
     snapshot_objects: LocalObjectStore,
     application_objects: LocalObjectStore,
-    snapshot_spool: PathBuf,
+    snapshot_spool: AnchoredPath,
     shard: ShardId,
 }
 
@@ -515,7 +525,9 @@ impl RrdRaftStore {
         root: &Path,
         shard: ShardId,
     ) -> ClusterResult<(RrdRaftLogStore, RrdRaftStateMachine)> {
-        let mut state_database = open_adapter_database(root, AdapterDomain::CanonicalState)?;
+        let root = AnchoredPath::from_path(root)
+            .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+        let mut state_database = open_adapter_database(&root, AdapterDomain::CanonicalState)?;
         ensure_adapter_database(
             &mut state_database,
             KEY_STATE_CONFIG,
@@ -527,6 +539,7 @@ impl RrdRaftStore {
             Some(put_json(KEY_STATE, &StateMachineData::default())?),
         )?;
 
+        let root = state_database.anchored_root().clone();
         let local_root = root.join(LOCAL_DATABASE_DIRECTORY);
         let mut local_database = open_adapter_database(&local_root, AdapterDomain::LocalRaft)?;
         ensure_adapter_database(
@@ -539,11 +552,18 @@ impl RrdRaftStore {
             },
             None,
         )?;
-        let snapshot_objects = LocalObjectStore::open(local_root.join(SNAPSHOT_OBJECT_DIRECTORY))
-            .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
-        let application_objects = LocalObjectStore::open(root.join(APPLICATION_OBJECT_DIRECTORY))
-            .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
-        let snapshot_spool = local_root.join(SNAPSHOT_SPOOL_DIRECTORY);
+        let snapshot_objects = LocalObjectStore::open_anchored(
+            &local_database
+                .anchored_root()
+                .join(SNAPSHOT_OBJECT_DIRECTORY),
+        )
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+        let application_objects =
+            LocalObjectStore::open_anchored(&root.join(APPLICATION_OBJECT_DIRECTORY))
+                .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+        let snapshot_spool = local_database
+            .anchored_root()
+            .join(SNAPSHOT_SPOOL_DIRECTORY);
         clean_snapshot_spool(&snapshot_spool)?;
 
         let database = Arc::new(Mutex::new(state_database));
@@ -567,10 +587,14 @@ impl RrdRaftStore {
 /// Canonical state is rrflowKV truth applied through rrd-store, so its
 /// database carries the rrflowKV application format; the local Raft log and
 /// vote database is adapter-private and has none.
-fn open_adapter_database(root: &Path, domain: AdapterDomain) -> ClusterResult<Database> {
-    if root.join("CURRENT").is_file() {
-        let database =
-            Database::open(root).map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+fn open_adapter_database(root: &AnchoredPath, domain: AdapterDomain) -> ClusterResult<Database> {
+    if root
+        .join("CURRENT")
+        .try_exists()
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))?
+    {
+        let database = Database::open_anchored(root, Default::default())
+            .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
         if domain == AdapterDomain::CanonicalState && !is_rrflow_kv_database(&database) {
             return Err(ClusterError::Denied(format!(
                 "canonical Raft state database {} is not in the rrflowKV application format",
@@ -579,8 +603,11 @@ fn open_adapter_database(root: &Path, domain: AdapterDomain) -> ClusterResult<Da
         }
         return Ok(database);
     }
-    if root.exists()
-        && std::fs::read_dir(root)
+    if root
+        .try_exists()
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))?
+        && root
+            .entries()
             .map_err(|error| ClusterError::Unavailable(error.to_string()))?
             .next()
             .is_some()
@@ -593,34 +620,37 @@ fn open_adapter_database(root: &Path, domain: AdapterDomain) -> ClusterResult<Da
     match domain {
         AdapterDomain::CanonicalState => create_rrflow_kv_database(root)
             .map_err(|error| ClusterError::Unavailable(error.to_string())),
-        AdapterDomain::LocalRaft => {
-            Database::create(root).map_err(|error| ClusterError::Unavailable(error.to_string()))
-        }
+        AdapterDomain::LocalRaft => Database::create_anchored(root, Default::default(), None)
+            .map_err(|error| ClusterError::Unavailable(error.to_string())),
     }
 }
 
-fn clean_snapshot_spool(path: &Path) -> ClusterResult<()> {
-    std::fs::create_dir_all(path).map_err(|error| ClusterError::Unavailable(error.to_string()))?;
-    for entry in
-        std::fs::read_dir(path).map_err(|error| ClusterError::Unavailable(error.to_string()))?
+fn clean_snapshot_spool(path: &AnchoredPath) -> ClusterResult<()> {
+    path.create_dir_all()
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+    for entry in path
+        .entries()
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))?
     {
         let entry = entry.map_err(|error| ClusterError::Unavailable(error.to_string()))?;
         let file_type = entry
-            .file_type()
+            .metadata()
             .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
         if !file_type.is_file() {
             return Err(ClusterError::Denied(format!(
                 "snapshot spool contains unexpected non-file entry {}",
-                entry.path().display()
+                entry.display()
             )));
         }
-        std::fs::remove_file(entry.path())
+        entry
+            .remove_file()
             .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
     }
-    sync_directory(path).map_err(|error| ClusterError::Unavailable(error.to_string()))
+    path.sync_directory()
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))
 }
 
-fn snapshot_spool_path(root: &Path, purpose: &str) -> PathBuf {
+fn snapshot_spool_path(root: &AnchoredPath, purpose: &str) -> AnchoredPath {
     root.join(format!(
         "{purpose}-{}-{}.spool",
         std::process::id(),
@@ -850,15 +880,14 @@ impl RaftSnapshotBuilder<RrdRaftTypeConfig> for RrdRaftStateMachine {
             snapshot_id,
         };
         publish_snapshot_file(&self.local_database, &self.snapshot_objects, &meta, &bundle)?;
-        let snapshot = RrdSnapshotData::open(bundle.path(), true)
-            .await
-            .map_err(|error| {
-                storage_error(
-                    ErrorSubject::Snapshot(Some(meta.signature())),
-                    ErrorVerb::Read,
-                    error.to_string(),
-                )
-            })?;
+        let file = bundle.independent_file().map_err(|error| {
+            storage_error(
+                ErrorSubject::Snapshot(Some(meta.signature())),
+                ErrorVerb::Read,
+                error.to_string(),
+            )
+        })?;
+        let snapshot = RrdSnapshotData::from_file(file, bundle.path().to_owned(), Some(spool));
         spool_cleanup.0.take();
         Ok(Snapshot {
             meta,
@@ -987,8 +1016,13 @@ impl RaftStateMachine<RrdRaftTypeConfig> for RrdRaftStateMachine {
             .sync_all()
             .await
             .map_err(|error| storage_error(subject.clone(), ErrorVerb::Write, error.to_string()))?;
-        let bundle = SnapshotBundleFile::open(snapshot.path())
-            .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
+        let bundle = SnapshotBundleFile::open_file(
+            snapshot.independent_file().await.map_err(|error| {
+                storage_error(subject.clone(), ErrorVerb::Read, error.to_string())
+            })?,
+            snapshot.path(),
+        )
+        .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
         let state = state_from_snapshot_file(&bundle, self.shard, subject.clone())?;
         if state.last_applied != meta.last_log_id || state.last_membership != meta.last_membership {
             return Err(storage_error(
@@ -1054,11 +1088,15 @@ impl RaftStateMachine<RrdRaftTypeConfig> for RrdRaftStateMachine {
             return Ok(None);
         };
         let subject = ErrorSubject::Snapshot(Some(snapshot.meta.signature()));
+        let file = self
+            .snapshot_objects
+            .verified_file(&snapshot.object)
+            .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
         let path = self
             .snapshot_objects
-            .verified_path(&snapshot.object)
-            .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
-        let bundle = SnapshotBundleFile::open(&path)
+            .root()
+            .join(&snapshot.object.receipt.key);
+        let bundle = SnapshotBundleFile::open_file(file, &path)
             .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
         let state = state_from_snapshot_file(&bundle, self.shard, subject.clone())?;
         if state.last_applied != snapshot.meta.last_log_id
@@ -1071,9 +1109,13 @@ impl RaftStateMachine<RrdRaftTypeConfig> for RrdRaftStateMachine {
                 "cached snapshot metadata does not match its authenticated bundle",
             ));
         }
-        let data = RrdSnapshotData::open(path, false)
-            .await
-            .map_err(|error| storage_error(subject, ErrorVerb::Read, error.to_string()))?;
+        let data = RrdSnapshotData::from_file(
+            bundle
+                .independent_file()
+                .map_err(|error| storage_error(subject, ErrorVerb::Read, error.to_string()))?,
+            path,
+            None,
+        );
         Ok(Some(Snapshot {
             meta: snapshot.meta,
             snapshot: Box::new(data),
@@ -1126,12 +1168,17 @@ impl RrdRaftStateMachine {
             return Ok(None);
         };
         let subject = ErrorSubject::Snapshot(Some(snapshot.meta.signature()));
-        let path = self
+        let file = self
             .snapshot_objects
-            .verified_path(&snapshot.object)
+            .verified_file(&snapshot.object)
             .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
-        let bundle = SnapshotBundleFile::open(path)
-            .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
+        let bundle = SnapshotBundleFile::open_file(
+            file,
+            self.snapshot_objects
+                .root()
+                .join(&snapshot.object.receipt.key),
+        )
+        .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
         let state = state_from_snapshot_file(&bundle, self.shard, subject)
             .map_err(|error| ClusterError::Unavailable(error.to_string()))?;
         if state.last_applied != snapshot.meta.last_log_id
@@ -1171,12 +1218,17 @@ impl RrdRaftStateMachine {
                 "cached snapshot metadata differs from the artifact transfer snapshot",
             ));
         }
-        let path = self
+        let file = self
             .snapshot_objects
-            .verified_path(&stored.object)
+            .verified_file(&stored.object)
             .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
-        let bundle = SnapshotBundleFile::open(path)
-            .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
+        let bundle = SnapshotBundleFile::open_file(
+            file,
+            self.snapshot_objects
+                .root()
+                .join(&stored.object.receipt.key),
+        )
+        .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
         let state = state_from_snapshot_file(&bundle, self.shard, subject.clone())?;
         if state.last_applied != meta.last_log_id
             || state.last_membership != meta.last_membership
@@ -1262,8 +1314,13 @@ impl RrdRaftStateMachine {
             .sync_all()
             .await
             .map_err(|error| storage_error(subject.clone(), ErrorVerb::Write, error.to_string()))?;
-        let bundle = SnapshotBundleFile::open(snapshot.path())
-            .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
+        let bundle = SnapshotBundleFile::open_file(
+            snapshot.independent_file().await.map_err(|error| {
+                storage_error(subject.clone(), ErrorVerb::Read, error.to_string())
+            })?,
+            snapshot.path(),
+        )
+        .map_err(|error| storage_error(subject.clone(), ErrorVerb::Read, error.to_string()))?;
         let state = state_from_snapshot_file(&bundle, self.shard, subject.clone())?;
         let snapshot_index = meta.last_log_id.map_or(0, |log_id| log_id.index);
         manifest
@@ -1386,9 +1443,12 @@ fn publish_snapshot_file(
     bundle: &SnapshotBundleFile,
 ) -> std::result::Result<(), StorageError<u64>> {
     let subject = ErrorSubject::Snapshot(Some(meta.signature()));
-    let verified = objects
-        .put_file(bundle.path())
-        .map_err(|error| storage_error(subject.clone(), ErrorVerb::Write, error.to_string()))?;
+    let verified =
+        objects
+            .put_reader(&mut bundle.independent_file().map_err(|error| {
+                storage_error(subject.clone(), ErrorVerb::Read, error.to_string())
+            })?)
+            .map_err(|error| storage_error(subject.clone(), ErrorVerb::Write, error.to_string()))?;
     if verified.length != bundle.length {
         return Err(storage_error(
             subject,

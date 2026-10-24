@@ -518,27 +518,39 @@ pub(super) fn encode(
     row_group_budget: SegmentRowGroupBudget,
     compression_policy: SegmentCompressionPolicy,
 ) -> Result<EncodedSegment> {
+    encode_versions(table.all_versions(), row_group_budget, compression_policy)
+}
+
+pub(super) fn encode_versions<'a>(
+    versions: impl Iterator<Item = (&'a [u8], &'a [VersionedValue])> + Clone,
+    row_group_budget: SegmentRowGroupBudget,
+    compression_policy: SegmentCompressionPolicy,
+) -> Result<EncodedSegment> {
     let row_group_budget = row_group_budget.validate()?;
     let compression_policy = compression_policy.validate()?;
-    if table.version_count() == 0 {
+    let (entries, minimum_sequence, maximum_sequence) = versions
+        .clone()
+        .flat_map(|(_, versions)| versions.iter())
+        .try_fold(
+            (0u64, u64::MAX, 0u64),
+            |(entries, minimum, maximum), version| {
+                let entries = entries
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidSegment("v6 entry count exceeds u64".into()))?;
+                Ok::<_, Error>((
+                    entries,
+                    minimum.min(version.sequence),
+                    maximum.max(version.sequence),
+                ))
+            },
+        )?;
+    if entries == 0 {
         return invalid("cannot write an empty segment");
     }
-    let entries = u64::try_from(table.version_count())
-        .map_err(|_| Error::InvalidSegment("v6 entry count exceeds u64".into()))?;
-    let minimum_sequence = table
-        .all_versions()
-        .flat_map(|(_, versions)| versions.iter().map(|version| version.sequence))
-        .min()
-        .expect("non-empty table has a minimum sequence");
-    let maximum_sequence = table
-        .all_versions()
-        .flat_map(|(_, versions)| versions.iter().map(|version| version.sequence))
-        .max()
-        .expect("non-empty table has a maximum sequence");
 
     let mut builders = Vec::new();
     let mut current = RowGroupBuilder::new(0);
-    for (key, versions) in table.all_versions() {
+    for (key, versions) in versions {
         let key_bytes = versions.iter().try_fold(0usize, |total, version| {
             let value = version.value.as_deref().unwrap_or_default();
             validate_key_value(key, value)?;

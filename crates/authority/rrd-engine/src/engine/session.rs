@@ -165,6 +165,7 @@ impl RrdEngine {
         };
         let state = SessionState {
             format_version: SESSION_STATE_FORMAT,
+            terminal_transaction_format: session_transactions::terminal_transaction_format(),
             session_id: session_id.clone(),
             principal_id,
             principal_credential_revision,
@@ -250,6 +251,7 @@ impl RrdEngine {
         request_id: &str,
         operation_id: &str,
     ) -> Result<SessionLease> {
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         let operation_sha256 = operation_digest(request)?;
         let key = session_key(&self.instance, session_id);
         let bytes = self
@@ -307,7 +309,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "session.renewed",
             request_id,
@@ -327,6 +329,7 @@ impl RrdEngine {
         request_id: &str,
         operation_id: &str,
     ) -> Result<SessionTermination> {
+        let _transaction_guard = self.admit_transaction(request, request_id, operation_id)?;
         let operation_sha256 = operation_digest(request)?;
         let key = session_key(&self.instance, session_id);
         let bytes = self
@@ -344,6 +347,7 @@ impl RrdEngine {
             {
                 return Err(ServiceError::IdempotencyConflict);
             }
+            self.release_session_storage_cursors(session_id)?;
             return Ok(termination(state.session_id, closure, true));
         }
         if state.token_sha256 != presented_sha256 {
@@ -381,12 +385,13 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "session.closed",
             request_id,
             operation_id,
         )?;
+        self.release_session_storage_cursors(session_id)?;
         Ok(termination(session_id.clone(), &closure, false))
     }
 
@@ -552,7 +557,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             expected,
-            state.clone(),
+            state,
             now,
             "session.expired",
             request_id,
@@ -614,31 +619,6 @@ impl RrdEngine {
         CorrelationId::new(format!("{prefix}-{}", lower_hex(bytes.as_slice())))
             .map_err(|error| ServiceError::Contract(error.to_string()))
     }
-
-    #[allow(clippy::too_many_arguments)]
-    pub(in crate::engine) fn replace_session(
-        &self,
-        session_id: &CorrelationId,
-        expected: Vec<u8>,
-        state: SessionState,
-        now: u64,
-        action: &str,
-        request_id: &str,
-        operation_id: &str,
-    ) -> Result<Vec<u8>> {
-        let replacement = serde_json::to_vec(&state).map_err(contract_json)?;
-        self.storage.control().commit(&ControlTransition {
-            key: session_key(&self.instance, session_id),
-            expected: Some(expected),
-            replacement: Some(replacement.clone()),
-            at: now,
-            actor: "rrd-engine".into(),
-            action: action.into(),
-            request_id: request_id.into(),
-            operation_id: operation_id.into(),
-        })?;
-        Ok(replacement)
-    }
 }
 
 pub(in crate::engine) fn touch_session(state: &mut SessionState, now: u64) {
@@ -654,6 +634,11 @@ pub(in crate::engine) fn decode_session(bytes: &[u8]) -> Result<SessionState> {
             "unsupported session-state format {}; expected {SESSION_STATE_FORMAT}",
             state.format_version
         )));
+    }
+    if state.terminal_transaction_format != session_transactions::terminal_transaction_format() {
+        return Err(ServiceError::Contract(
+            "unsupported session terminal-transaction format".into(),
+        ));
     }
     Ok(state)
 }
