@@ -92,6 +92,15 @@ frozen 5-RPS characterization is allowed by the profile matrix; it cannot erase
 or qualify the failed 25-RPS point. Preserve transaction, backup and readback
 oracles throughout this investigation.
 
+The [canonical digest optimization](../../evidence/change-journals/gate-c/c-07g-canonical-digest-throughput.md)
+records the next measured cost: native CPU samples identify scalar SHA-256 as a
+hot path. Reuse the pinned cryptographic primitive at the existing kernel
+boundary, require unchanged persisted/public digests and then rerun the installed
+flow. Primitive throughput and faster development checks do not qualify the
+sustained operating point. Retain the 25-RPS failures, the 5-RPS resource-sampling
+gap and the diagnostic restart failures; full profile/repetition and actual
+24-hour acceptance remain open.
+
 Execution discipline: describe progress as implemented behavior, reproduced
 failure, measured improvement, or completed acceptance. Keep outstanding work
 in this owner and POAM035; use one linked journal per source package. Run the

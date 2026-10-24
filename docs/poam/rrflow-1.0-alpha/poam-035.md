@@ -713,3 +713,22 @@ No 24-hour soak ran. The [admission/timing journal](../../evidence/change-journa
 records the repair: reject invalid qualification preflight before soak and
 measure independent readback completion separately from response completion.
 This does not diagnose all growth cost or close POAM-035/C-07.
+
+
+### Measured digest cost and retained operating failures
+
+The [canonical digest optimization](../../evidence/change-journals/gate-c/c-07g-canonical-digest-throughput.md)
+replaces the first-party scalar SHA-256 primitive behind the existing kernel
+interface with pinned RustCrypto, preserving all content identities. Native
+profiling attributed 24.14% of 348 CPU samples to scalar compression; a bounded
+512-MiB release micro-measurement changed from 1.269 seconds to 0.123 seconds.
+This is a primitive result, not an engine-wide or capacity qualification claim.
+The existing contract/storage/evaluation goldens remain unchanged.
+
+The prerequisite candidate's repeated 25-RPS point still rejected 207 scheduled
+requests; a separately frozen evidence-segment configuration rejected 111.
+At 5 RPS, all 300 preflight requests acknowledged within latency budgets, but
+sampling failed on a 2.230-second interval around automatic maintenance. A
+profiled repeat later failed restart startup; profiling is not qualification.
+No full 24-hour soak started. Complete the new installed comparison and diagnose
+remaining scheduling, maintenance, startup and full-profile gaps before closure.
