@@ -669,3 +669,18 @@ Bounded checkpoints preserve final durability, byte identity and explicit
 per-action callback semantics. The digest-only 1k/5RPS point completed but
 still failed; the 10k run was explicitly interrupted after all corpus writes
 and partial independent readback. These are retained limitations, not closure.
+
+
+The [startup capture and completed 10k reproduction](../../evidence/change-journals/gate-c/c-07g-startup-failure-capture.md)
+records PR116's accepted 23-check prerequisite and PR117's remaining growth
+blockers. The full 10k data/restart/readback flow completed, but 110/600 offers
+were rejected and 95 exceeded latency budget; final readback cost 431.358 s.
+Separate the backup join's artificial dispatch delay from the later native
+response/readback/maintenance cost. The next bounded driver repair must keep
+management work within explicit resource/deadline ownership while continuing
+offers on the original schedule, preserve reader lifetime bounds and prove
+write/backup overlap from receipts. Do not hide delay by resetting clocks,
+raising thresholds, omitting independent readback, or silently changing the
+frozen profile. The prior intermittent startup exit still needs diagnosis;
+one successful reproduction does not close it. C-07 and actual 24-hour
+qualification remain open.

@@ -68,3 +68,12 @@ candidate; earlier failed run stays failed. No C-07 completion or soak claim.
 Documentation initially rejected an unclassified status label; changed it to the required active evidence status without changing qualification. Re-run results follow.
 
 Corrected documentation policy, generated navigation, execution inventory (1,592 records), and staged whitespace checks passed. Native acceptance remains pending at commit.
+
+
+Candidate acceptance: exact repair head 88fbc5b41128371eabff21928b48d84255372e90
+passed all 23 checks in run 40118525639 and merged in PR116 as
+94d0567fb865fb49a90aaeeef4b5861707c9f8a7. All eight APFS capacity cases passed,
+including owned-image cleanup, alongside eight ext4 and eight NTFS cases.
+Every native capacity ledger had zero unresolved effects and violations. The
+earlier busy-device failure remains retained. This closes this candidate's
+cleanup rerun requirement; full C-07 profile and 24-hour acceptance remain open.

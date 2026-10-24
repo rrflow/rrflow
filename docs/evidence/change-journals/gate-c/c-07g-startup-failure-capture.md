@@ -74,3 +74,68 @@ changes here are qualification support; no alpha or complete-engine claim.
 - [ ] Pass exact native candidate CI before landing.
 
 Roadmap and POAM lifecycle status: unchanged, open. No new version or release.
+
+
+### Prerequisite acceptance and normal integration
+
+PR116 exact head `88fbc5b41128371eabff21928b48d84255372e90` passed all
+23 checks in run 40118525639 and merged as
+`94d0567fb865fb49a90aaeeef4b5861707c9f8a7` on 2026-10-24 at 19:02:36 UTC.
+Retained native receipts show eight cases each on ext4, APFS and NTFS, covering
+fresh/existing WAL, segment, manifest and CURRENT failures; every ledger has
+zero unresolved effects and violations. All three 100-cycle reopen jobs passed.
+Logs and parsed receipts: operator-local `target/c07-pr116-native-evidence`.
+This accepts that prerequisite candidate, not PR117's changed runtime.
+
+PR117 incorporated current public main by an ordinary, conflict-free merge
+`d88d9e5cf69ecf5d458c327ce1323800ac24f901`. No source files changed in the merge.
+The optimized Linux reproduction remains bound to its original clean
+779b3341 revision and must not be relabeled as the later integration revision.
+
+
+### Completed 10k reproduction: correctness flow, failed operating point
+
+Clean source 779b33412a2c1fca7451e0aca9894652c92b0119 built optimized Linux
+in 331.1 seconds. Ordinary executable SHA-256:
+`5846173ff28f044e9a6b518869db6fdbff6ff3908cc51d2ec6a045d45d15fb5c`;
+harness SHA-256:
+`ea0c473ade62eb4a0d43f221c6742b6891c1ff54e8921831366f4b0747accda5`.
+`wsl -d Ubuntu -- python3 /mnt/d/localdev/devlabs/rrflow/target/run_c07_capture64_5rps.py 10000`
+completed in 1,101.71 seconds including preparation. Campaign digest:
+`b21fef7d8b3e0945fd7063dca97ccb213b670b77750e93791ae8394877512cc7`.
+The same 10k records / 50k edges / 10k 384-dimensional vectors, four clients,
+5 RPS, four CPUs, 2-GiB aggregate limit and 64-MiB cache were retained.
+No profiler attached to this reproduction. The shipped default is unchanged.
+
+All corpus writes and independent readbacks completed. Both forced setup
+reopens and exact receipt replays passed; final post-load restart/readback
+verified all 10,000 seeded records plus 40 changed working slots. Final readback
+took 431.358 seconds. Launcher cleanup is confirmed. The previous startup exit
+was not reproduced; its cause remains unknown and is not declared repaired.
+
+The operating point failed: 490 of 600 offers acknowledged, 110 rejected
+(105 driver-concurrency-limit and five storage conflicts), 95 scheduled-latency
+overruns, zero unresolved effects and no missing metrics. Warmup passed all 50;
+measured had 40 failures / 41 overruns; burst had one failure / no overrun;
+short endurance had 69 failures / 54 overruns. Maximum scheduled latency was
+8,680.165 ms measured and 1,523.309 ms in endurance. Maximum sampled engine RSS
+was 403,984,384 bytes. Native counters showed two successful compactions, no
+failed maintenance and zero final compaction debt. Correct readback does not
+qualify these response/error results.
+
+Backup creation took 14,219.578 ms and verification another 1,606.331 ms for
+10,014 actions / 82,095,210 payload bytes. `PointRun::segment` joins the backup
+before returning; the driver caps reader-interference segments to ten seconds.
+This wait delays later offers on their unchanged absolute schedule. It explains
+a measured scheduling contribution, not all failures: the later endurance
+phase fails without that backup barrier. Retain both problems separately.
+Do not reset the offered clock, increase error/latency limits, disable audit,
+weaken durability or raise the default cache to call this a pass.
+
+Raw receipts are retained under
+`/home/devcontainers/rrflow-c07-native-79663cdd/capture64-5rps-growth-10000-779b3341`.
+Small copies and derived timing/resource summaries:
+`target/c07-pr117-capture-evidence/10000`. The exact `analyze_c07_capture64_5rps.py`
+and `retain_c07_capture_results.py` commands completed. Qualification is false;
+no full Desktop profile or actual 24-hour soak ran. This diagnostic completion
+keeps C-07/POAM035 open and supplies the next code-grounded failure oracles.

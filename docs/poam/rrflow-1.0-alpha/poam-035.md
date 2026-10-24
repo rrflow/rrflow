@@ -773,3 +773,22 @@ hid the engine's stderr behind a readiness-channel disconnection. The
 keeps both stream limits and failure semantics while retaining the terminal
 cause. The engine restart defect remains undiagnosed; native reproduction is
 required and no soak is running.
+
+
+PR116 repair head 88fbc5b4 passed all 23 candidate checks and merged as
+94d0567f. Its retained 24 native capacity receipts have zero unresolved effects
+or violations; macOS owned-image cleanup now passes all eight cases. The three
+100-cycle reopen jobs passed. This accepts that prerequisite only; PR117's
+changed runtime and full profile/soak evidence remain separate and open.
+
+
+The capture-repaired 779b3341 10k reproduction completed ingestion, all corpus
+checks, two setup reopens and final post-load restart/readback of 10,000 seeded
+records plus 40 working slots. The prior startup exit was not reproduced and
+remains unexplained. The operating point still failed: 110/600 rejected,
+95 latency overruns, zero unresolved effects; final readback cost 431.358 s.
+Backup completion blocks the driver's ten-second reader segment (14.220 s
+creation plus 1.606 s verification), while later endurance also fails without
+that barrier. Fix scheduling at its existing driver owner and attribute native
+read/maintenance costs separately, preserving offered time, audit, transaction
+and resource boundaries. No actual 24-hour soak ran.
