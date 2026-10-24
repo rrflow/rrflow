@@ -53,6 +53,21 @@ becomes RRFlow runtime authority.
 
 ## Remediation evidence
 
+### Candidate scheduling and handoff gap
+
+At main `94d0567f`, `ci.yml` launches the full candidate pipeline on draft PR
+creation and updates, including empty package-opening commits. It does not
+subscribe to `ready_for_review` or `converted_to_draft`. There is no repository
+PR template to expose package ownership, dependencies and handoff consistently.
+This consumes candidate capacity before a package is ready and obscures the
+integration order. It is a delivery gap, not a native C-07 failure diagnosis.
+
+The [candidate-readiness package](../../evidence/change-journals/repository/candidate-readiness-and-team-handoff.md)
+adds explicit draft/ready scheduling, preserves full ready/merge/manual checks,
+and provides the existing change brief as a PR template. Candidate CI and
+hosted transition observation remain required; this does not close POAM-027
+or replace the separate external-ruleset evidence.
+
 - [POAM-027a change-plan enforcement implementation](../../evidence/change-journals/repository/poam-027a-change-plan-enforcement-implementation-journal.md)
 - [POAM-027b canonical package-identity correction](../../evidence/change-journals/repository/poam-027b-canonical-package-identity-correction-journal.md)
 - [POAM-027c linked execution records and generated navigation](../../evidence/change-journals/repository/poam-027c-linked-execution-records-and-generated-navigation.md)
