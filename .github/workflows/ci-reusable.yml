@@ -239,7 +239,9 @@ jobs:
       - name: Test build provenance and diagnostic profile policy
         run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
-        run: python3 scripts/ci/check_workflow.py
+        run: |
+          python3 scripts/ci/test_candidate_admission.py
+          python3 scripts/ci/check_workflow.py
       - name: Test offline qualification input and artifact policy
         run: python3 scripts/ci/test_offline_lifecycle.py
       - name: Enforce documentation authority and local links
