@@ -6,6 +6,17 @@
 
 ## Observed deficiency
 
+The [integrated growth failure and repair](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md)
+records preflight `7b6e56a5` failing at 55,047 acknowledged records with a
+30-second corpus-write deadline, one failed compaction and confirmed cleanup.
+It never entered soak. PR123's native crash and 100-reopen jobs passed on all
+three platforms, while an installation-recovery lease conflict failed its
+optional-engine job and final gate. PR126 consolidates the current candidate,
+removes irrelevant per-key compaction shadow scans, explicitly releases the
+installation lease and retains private setup-failure estates. Causal repair
+and acceptance require the final candidate suites and full-corpus rerun;
+existing deadlines and resource limits remain unchanged.
+
 The [metadata-pressure fixture record](../../evidence/change-journals/gate-c/c-07f-metadata-pressure.md)
 retains a later macOS count-limit failure: metadata creation consumed the
 8192-entry allowance without a native capacity error. Bounded data refills

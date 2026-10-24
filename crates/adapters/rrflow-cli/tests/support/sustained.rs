@@ -1260,8 +1260,8 @@ async fn run_estate(
             )
             .await;
             if seeded.is_err() {
-                // Preserve a single supplemental observation before owned
-                // cleanup removes the failed estate. This is not a workload
+                // Preserve a single supplemental observation before stopping
+                // the owned server. This is not a workload
                 // segment and cannot qualify the campaign or hide its error.
                 let status = if let Some(child) = &child {
                     match tokio::time::timeout(
@@ -1291,6 +1291,18 @@ async fn run_estate(
                     "unavailable"
                 };
                 eprintln!("native_setup_failure_observation={status}");
+                if let Some(mut stopped) = child.take() {
+                    stopped.terminate();
+                    // finish joins the monitor and reaps the child even when
+                    // bounded output capture reports a failure. Drop remains
+                    // the process guard for an early monitor error.
+                    let _ = stopped.finish();
+                    drop(stopped);
+                }
+                eprintln!(
+                    "native_setup_failure_estate={}",
+                    serde_json::json!({"path": estate.temp.retain(), "private_state": true})
+                );
             }
             let mut corpus = Some(seeded?);
             // Fresh session for the bounded lifecycle lane, avoiding inherited

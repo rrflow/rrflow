@@ -2219,15 +2219,13 @@ impl Database {
                     .map(|(sequence, value)| VersionedValue { sequence, value })
                     .collect::<Vec<_>>()
             };
-            let tombstone_only = retained.iter().all(|version| version.value.is_none());
-            let shadows_unselected = self.segments.iter().enumerate().any(|(index, segment)| {
-                !selected.contains(&index)
-                    && key >= segment.descriptor.first_key
-                    && key <= segment.descriptor.last_key
-            });
-            if retained.is_empty()
-                || (!retain_all_versions && tombstone_only && !shadows_unselected)
-            {
+            if !retain_compacted_key(&retained, retain_all_versions, || {
+                self.segments.iter().enumerate().any(|(index, segment)| {
+                    !selected.contains(&index)
+                        && key >= segment.descriptor.first_key
+                        && key <= segment.descriptor.last_key
+                })
+            }) {
                 continue;
             }
             let group_bytes = version_group_bytes(&key, &retained);
@@ -2903,6 +2901,19 @@ fn unreachable_files(
     Ok(candidates)
 }
 
+fn retain_compacted_key(
+    retained: &[VersionedValue],
+    retain_all_versions: bool,
+    shadows_unselected: impl FnOnce() -> bool,
+) -> bool {
+    // Only a tombstone that would otherwise be discarded needs reachability
+    // outside this merge. Live/protected values must survive either way.
+    !retained.is_empty()
+        && (retain_all_versions
+            || retained.iter().any(|version| version.value.is_some())
+            || shadows_unselected())
+}
+
 fn remove_candidates(
     directory: &AnchoredPath,
     candidates: Vec<(AnchoredPath, String, u64)>,
@@ -2933,6 +2944,65 @@ fn remove_candidates(
         Ok(more) => {
             sync?;
             Ok(more)
+        }
+    }
+}
+
+#[cfg(test)]
+mod compaction_shadow_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    fn live(sequence: u64) -> VersionedValue {
+        VersionedValue {
+            sequence,
+            value: Some(b"value".to_vec().into_boxed_slice()),
+        }
+    }
+
+    fn deleted(sequence: u64) -> VersionedValue {
+        VersionedValue {
+            sequence,
+            value: None,
+        }
+    }
+
+    #[test]
+    fn live_or_protected_history_never_probes_unselected_segments() {
+        for versions in [
+            vec![live(1)],
+            vec![live(1), deleted(2)],
+            vec![deleted(1), live(2)],
+        ] {
+            for retain_all in [false, true] {
+                assert!(retain_compacted_key(&versions, retain_all, || {
+                    panic!("live history must not scan unrelated segments")
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn empty_or_unpruned_tombstones_do_not_probe_shadows() {
+        assert!(!retain_compacted_key(&[], false, || panic!("empty output")));
+        assert!(!retain_compacted_key(&[], true, || panic!("empty output")));
+        assert!(retain_compacted_key(&[deleted(1)], true, || panic!(
+            "no pruning"
+        )));
+    }
+
+    #[test]
+    fn tombstone_pruning_requires_exactly_one_shadow_decision() {
+        for shadowed in [false, true] {
+            let probes = Cell::new(0);
+            assert_eq!(
+                retain_compacted_key(&[deleted(1), deleted(2)], false, || {
+                    probes.set(probes.get() + 1);
+                    shadowed
+                }),
+                shadowed
+            );
+            assert_eq!(probes.get(), 1);
         }
     }
 }

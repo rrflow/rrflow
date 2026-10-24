@@ -13,6 +13,13 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [final growth candidate record](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md)
+retains the integrated Desktop preflight's failure at 55,047 acknowledged
+records and the separate installation-lease CI failure. Lazy compaction shadow
+checks and explicit lease release are under validation. The prior candidate's
+three native crash/capacity and three 100-reopen jobs passed, but its overall
+gate failed. No actual 24-hour soak or C-07 closure is claimed.
+
 The [metadata-pressure fixture record](../../evidence/change-journals/gate-c/c-07f-metadata-pressure.md)
 retains a later macOS count-limit failure: metadata creation consumed the
 8192-entry allowance without a native capacity error. Bounded data refills
