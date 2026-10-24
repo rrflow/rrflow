@@ -175,3 +175,51 @@ is separate and changes no runtime behavior. Its CI must still pass before
 landing. Next attribution belongs to existing native read/maintenance and
 scheduler paths; the query planner already has identity/adjacency access, so
 this evidence does not justify creating a parallel index or read authority.
+
+
+### Configured cache characterization
+
+A separate clean-source 5481dc3b characterization changes only the installed
+page-cache configuration from 4 MiB to 64 MiB, plus the required distinct
+profile/path/digest identity. It retains the same binary, 1,000-record corpus,
+5-RPS/four-client/seed-7 schedule, four CPUs, 2-GiB aggregate cgroup and
+500-ms scheduled-response limit. The shipped default remains unchanged.
+
+`wsl -d Ubuntu -- python3 /mnt/d/localdev/devlabs/rrflow/target/run_c07_cache64_5rps.py 1000`
+completed in 184.89 seconds including preparation. All 600 requests were
+acknowledged; every phase had zero failures, unresolved effects, latency
+exceedances and missing metrics. Independent corpus/readback, two forced
+reopens, backup under writes and owned cleanup completed. Maximum scheduled
+response was 468.630 ms and maximum sampled engine RSS was 380,260,352 bytes.
+This is a short characterization, not the Desktop profile or a 24-hour soak;
+`qualification_passed` correctly remains false.
+
+Final native counters show one successful automatic flush and compaction,
+zero failed maintenance and zero final compaction debt. Cache misses were
+13,257, evictions 7,269 and segment I/O 75,374,246 bytes. The failed 4-MiB run
+recorded 34,265 misses, 33,854 evictions and 154,823,641 segment-read bytes.
+The outcomes differ, so these totals are diagnostic comparisons rather than
+normalized per-request benchmark claims. Native cache residence remained
+67,060,163 bytes under its 67,108,864-byte cap. Configuration sensitivity is
+observed; causal attribution and growth qualification remain open. Do not
+increase acceptance limits or change the shipped default from this one point.
+
+Campaign digest:
+`649e492b66dcf38d7fc5f3ae756d1c7663ed0ef2c53e22859980bc4579dd0dce`.
+Raw receipts remain under
+`/home/devcontainers/rrflow-c07-native-79663cdd/cache64-5rps-growth-1000-5481dc3b`;
+small copies, frozen configuration and derived resource/timing summaries are
+retained at operator-local `target/c07-pr117-cache-evidence/1000`.
+A separately frozen 10,000-record characterization is running; its result
+must be recorded independently. No actual 24-hour soak is running.
+
+
+The 10k run acknowledged all corpus writes, then exposed slow independent
+readback. A bounded 10-second, 49-Hz userspace CPU profile attached only to the
+engine whose executable hash and project path matched this owned campaign.
+It collected 86 samples with zero lost samples and a 0.045-MB artifact;
+`Segment::load_page_with_access` accounted for 4.65%, with allocation/copy and
+version-selection samples also present. This sample is too small to attribute
+a complete root cause; it does not justify a default-cache change. The sampled
+interval can affect timing and remains diagnostic only. Raw profile/report and
+ownership receipt remain in this campaign's directory; no host policy changed.

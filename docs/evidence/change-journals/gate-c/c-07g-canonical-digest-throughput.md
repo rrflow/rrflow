@@ -204,3 +204,27 @@ integration. Its ongoing optimized Linux characterization keeps its original
 source identity. Both candidates still require native CI before landing.
 
 The integrated 13-check cleanup suite passed in 0.056 seconds. Documentation caught an encoding error during conflict resolution; restored the original UTF-8 heading from Git and retained both evidence additions before regenerating indexes.
+
+
+### Exact kernel dependency CI correction
+
+Candidate 9f141ac1 failed verification job 120951637749 after all 31
+architecture checks and evaluation verification passed. The workflow retained
+an old serde-only direct-dependency assertion, which rejects the approved
+locked sha2 primitive. This executable guard was missed in the original
+manifest/comment change; it is a package failure, not an unrelated CI flake.
+
+The PR brief was extended before updating `.github/workflows/ci-reusable.yml`.
+The complete kernel dependency step was read and replaced with an exact sorted
+name comparison using prefix-free, uncolored Cargo output. The permitted set
+is precisely serde and sha2; missing, substituted or additional dependencies
+still fail. Cargo.lock, runtime code and every other architecture/offline gate
+remain unchanged. The tested native 5481dc3b bytes retain their own identity.
+
+`wsl -d Ubuntu -- bash /mnt/d/localdev/devlabs/rrflow/target/check_c07_kernel_dependencies.sh`
+executes the exact extracted workflow step against the same Linux candidate
+manifest: serde 1.0.229 and sha2 0.11.0 pass. The predicate rejects a missing
+name, unexpected third name and substituted name. `python scripts/ci/check_workflow.py`
+passes (three workflows, nine substantive jobs, five engine suites). Full new
+candidate CI remains required. Original job log is retained operator-locally at
+`target/pr117-120951637749.log`.

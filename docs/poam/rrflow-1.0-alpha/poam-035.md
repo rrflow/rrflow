@@ -755,3 +755,12 @@ Its later short endurance phase still rejected 59 requests with 40 overruns;
 final readback/restart passed with zero unresolved effects. Retain this failed
 point and attribute post-flush response/readback costs before qualification.
 No 24-hour soak is running or accepted from these results.
+
+
+A separately frozen 64-MiB-cache characterization at the same 1k/5RPS point
+acknowledged all 600 requests with zero latency overruns and sampled RSS below
+363 MiB. Readback/restart and owned cleanup completed. The shipped 4-MiB
+default is unchanged, the failed point is retained, and the 10k growth run
+already shows slow independent readback after all writes acknowledged. The
+linked backup journal records configuration sensitivity and bounded diagnostic
+profiling; neither the small result nor an increased cache closes this gap.
