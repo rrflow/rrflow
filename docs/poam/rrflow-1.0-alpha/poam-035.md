@@ -832,5 +832,13 @@ The [completed integrated 10k characterization](../../evidence/change-journals/g
 records 600 acknowledged operations without failures or latency overruns,
 verified backup under offered writes, compaction/drain and complete restart
 readback. It does not resolve the earlier intermittent startup denial or
-qualify the full profile/24-hour matrix. A separate 100-reopen investigation
-is running; no C-07 completion follows.
+qualify the full profile/24-hour matrix. The subsequent [100-reopen run](../../evidence/change-journals/gate-c/c-07g-integrated-hundred-reopens.md)
+also completed, including full final readback and 600 acknowledged load
+operations without latency overruns. Its exact-source characterization does
+not explain the earlier intermittent admission failure or complete C-07.
+
+The [integrated growth candidate](../../evidence/change-journals/gate-c/c-07-integrated-growth-candidate.md) preserves the related digest,
+point-read, backup scheduling, startup diagnostic and metadata-pressure repairs
+in one current-main landing PR. Its own complete candidate pipeline must pass;
+predecessor checks and short native characterizations cannot substitute.
+Full profile and actual 24-hour acceptance remain open.
