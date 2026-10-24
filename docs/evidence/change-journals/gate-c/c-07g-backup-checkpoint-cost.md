@@ -121,3 +121,57 @@ Full profile matrix, 24-hour soak, query-growth optimization, comparative
 reasoning quality/token savings and accounting UI are not proved by this repair.
 
 Final authored diff review, formatting, documentation policy, generated navigation, 1,594-record execution inventory and staged whitespace checks passed. Native sustained comparison and candidate CI remain pending at commit.
+
+
+### Candidate CI boundary finding and correction
+
+Candidate 5481dc3b failed engine-authority and optional-engine CI in
+`direct_read_source_closure`: two direct `changes_since` calls in the new
+round-trip unit test increased the protected source allowlist count. Production
+export reads were unchanged. Preserve the allowlist and replace those test
+reads with a full restored-archive re-export/inventory/byte comparison, retaining
+independent claim comparison and existing canonical-family integration tests.
+No production read path or allowlist was widened to pass CI.
+
+`cargo test --locked -p rrd-engine --test direct_read_source_closure --jobs 6`
+passed. The three checkpoint tests passed again (one manual measurement ignored),
+and strict rrd-store all-target lint passed. Log:
+`target/c07-backup-source-closure.log`. This test-only correction does not alter
+the running 5481dc3b native binary; that run retains its original source identity.
+
+
+### Optimized installed comparison, including retained failure
+
+Exact source 5481dc3b built optimized Linux in 299.3 seconds. Ordinary binary
+SHA-256 `5fd92ca949d17bfb71e94134e723f3d89b55fffe0ed2ab2aa485bda14fb29b44`,
+harness `8a0674e085db96f732f7d26ae0014d065d99387e37f30cf3f038af006a465131`.
+The same frozen 1k/4-client/5-RPS characterization completed with final readback,
+restart and owned cleanup. Launcher elapsed was 447.55 seconds, including
+preparation; it is not evidence of whole-engine speedup.
+
+Backup creation was 1,939.776 ms, verification 195.285 ms and its offered
+segment finished in 10,030.450 ms. The earlier 11,891.742-ms creation and
+4,934.522-ms following dispatch delay were removed from that measured window.
+All 300 warmup/measured/burst requests acknowledged, with zero latency overruns,
+unresolved effects or missing metrics in those phases. This is an observed
+installed backup improvement, not overall acceptance.
+
+The later short endurance phase still failed: 241 acknowledged and 59 rejected
+(55 driver-slot, four storage-conflict), with 40 latency overruns. Across the
+run: 541 acknowledged, 59 rejected, zero unresolved and no missing metrics.
+Late segment maxima reached 2,240.462-ms response and 3,020.225-ms independent
+verification, producing late dispatch and exhausted client slots. Native
+counters recorded one automatic flush and compaction, no failed maintenance,
+and zero final maintenance debt. These are attribution leads; no cause is
+claimed solely from correlation. Full qualification and actual 24-hour soak
+remain blocked. Do not run a higher-rate qualification or alter thresholds to
+hide this failure.
+
+Raw receipts remain at
+`/home/devcontainers/rrflow-c07-native-79663cdd/backup-5rps-growth-1000-5481dc3b`.
+Small copies and derived timing analysis: `target/c07-pr117-backup-evidence`.
+The frozen candidate is clean; the subsequent source-closure test correction
+is separate and changes no runtime behavior. Its CI must still pass before
+landing. Next attribution belongs to existing native read/maintenance and
+scheduler paths; the query planner already has identity/adjacency access, so
+this evidence does not justify creating a parallel index or read authority.

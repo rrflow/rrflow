@@ -748,3 +748,10 @@ incomplete 10k characterization. Bounded default export checkpoints reduce
 per-action sync overhead while preserving final publication and public progress
 semantics. Owning storage and installed smoke checks pass; native sustained
 acceptance remains pending and POAM035 stays open.
+
+The installed backup candidate reduced observed creation from 11.892 to 1.940
+seconds, and all 300 preflight requests acknowledged without latency overruns.
+Its later short endurance phase still rejected 59 requests with 40 overruns;
+final readback/restart passed with zero unresolved effects. Retain this failed
+point and attribute post-flush response/readback costs before qualification.
+No 24-hour soak is running or accepted from these results.

@@ -662,9 +662,14 @@ mod checkpoint_tests {
             reopened.claims().claims_in_range(0, 130).unwrap(),
             store.claims().claims_in_range(0, 130).unwrap()
         );
+        let reexported = dir.path().join("restored-export");
         assert_eq!(
-            reopened.runtime().changes_since(0, 131, None).unwrap(),
-            store.runtime().changes_since(0, 131, None).unwrap()
+            export_logical_archive(&reopened, &reexported).unwrap(),
+            expected
+        );
+        assert_eq!(
+            std::fs::read(reexported).unwrap(),
+            std::fs::read(archive).unwrap()
         );
     }
 
