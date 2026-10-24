@@ -25,6 +25,78 @@ fn assert_pair(database: &Database, id: u8) {
 }
 
 #[test]
+fn interrupted_multi_partition_flush_reclaims_outputs_and_recovers_acknowledgements() {
+    fn fixture() -> (tempfile::TempDir, Database) {
+        let temp = tempfile::tempdir().unwrap();
+        let options = crate::DatabaseOptions {
+            compaction: crate::CompactionPolicy {
+                target_segment_bytes: 32,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut database = Database::create_with_options(&temp.path().join("db"), options).unwrap();
+        for id in 1..=3 {
+            database
+                .write(&pair(id), Durability::Authoritative)
+                .unwrap();
+        }
+        (temp, database)
+    }
+    let (_temp, mut database) = fixture();
+    let session = Session::start(database.root(), None);
+    database.flush_memtable(10).unwrap();
+    let baseline = session.finish();
+    let renames = baseline
+        .events
+        .iter()
+        .enumerate()
+        .filter_map(|(ordinal, event)| {
+            (event.kind == Kind::Rename && event.path.parent().unwrap().ends_with("segments"))
+                .then_some(ordinal)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(renames.len(), 6);
+    drop(database);
+
+    for partition in [0, 2, 5] {
+        for mode in [Fault::Before, Fault::After] {
+            let (temp, mut database) = fixture();
+            let original = database.manifest().clone();
+            let session = Session::start(database.root(), Some((renames[partition], mode)));
+            assert!(database.flush_memtable(10).is_err());
+            assert_eq!(database.manifest(), &original);
+            assert_eq!(database.memtable().version_count(), 6);
+            assert!(
+                database.maintenance_step().unwrap(),
+                "idle quantum owns partial outputs"
+            );
+            assert_eq!(
+                std::fs::read_dir(database.root().join("segments"))
+                    .unwrap()
+                    .count(),
+                0
+            );
+            for id in 1..=3 {
+                assert_pair(&database, id);
+            }
+            drop(database);
+            let state = session.finish();
+            assert!(state.fired);
+            state.device.lose_volatile();
+            let mut reopened = Database::open(&temp.path().join("db")).unwrap();
+            for id in 1..=3 {
+                assert_pair(&reopened, id);
+            }
+            reopened.flush_memtable(11).unwrap();
+            for id in 1..=3 {
+                assert_pair(&reopened, id);
+            }
+        }
+    }
+}
+
+#[test]
 fn standalone_sync_failure_fences_writer() {
     for mode in [Fault::Before, Fault::After] {
         let temp = tempfile::tempdir().unwrap();

@@ -2,9 +2,9 @@
 
 package rrd
 
-// OpenAPI SHA-256: 13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814
+// OpenAPI SHA-256: 9ed23e2c77c13e05d17714dfb0e5dbed4afd530a0d8112e7ff263dfa5c5fa71e
 
-const EndpointOpenAPIDocumentSHA256 = "13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814"
+const EndpointOpenAPIDocumentSHA256 = "9ed23e2c77c13e05d17714dfb0e5dbed4afd530a0d8112e7ff263dfa5c5fa71e"
 
 type OperationID string
 
@@ -19,6 +19,8 @@ const (
 	OperationContextAssemble          OperationID = "context-assemble"
 	OperationDataSchemaRead           OperationID = "data-schema-read"
 	OperationDiagnosticsRead          OperationID = "diagnostics-read"
+	OperationDiagnosticsStorageCursor OperationID = "diagnostics-storage-cursor"
+	OperationDiagnosticsStorageRead   OperationID = "diagnostics-storage-read"
 	OperationEmbeddingBuiltinActivate OperationID = "embedding-builtin-activate"
 	OperationEndpointCatalogue        OperationID = "endpoint-catalogue"
 	OperationEstateRead               OperationID = "estate-read"
@@ -70,6 +72,8 @@ var endpoints = map[OperationID]Endpoint{
 	OperationContextAssemble:          {Method: "POST", Path: "/v1/context/assemble", Authentication: "session_bearer", Mutation: false},
 	OperationDataSchemaRead:           {Method: "POST", Path: "/v1/data/schema", Authentication: "session_bearer", Mutation: false},
 	OperationDiagnosticsRead:          {Method: "POST", Path: "/v1/diagnostics/read", Authentication: "session_bearer", Mutation: false},
+	OperationDiagnosticsStorageCursor: {Method: "POST", Path: "/v1/diagnostics/storage/cursor", Authentication: "session_bearer", Mutation: false},
+	OperationDiagnosticsStorageRead:   {Method: "POST", Path: "/v1/diagnostics/storage/read", Authentication: "session_bearer", Mutation: false},
 	OperationEmbeddingBuiltinActivate: {Method: "POST", Path: "/v1/embedding/builtin/activate", Authentication: "session_bearer", Mutation: true},
 	OperationEndpointCatalogue:        {Method: "GET", Path: "/v1/schema/endpoints", Authentication: "public", Mutation: false},
 	OperationEstateRead:               {Method: "POST", Path: "/v1/estates/{estate}/read", Authentication: "session_bearer", Mutation: false},

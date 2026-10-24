@@ -36,6 +36,11 @@ impl RrdEngine {
         if !matches!(request.scope.as_str(), "claims" | "data") {
             return Err(ServiceError::WrongScope);
         }
+        let _transaction_guard = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         let (bytes, mut state) = self.load_authenticated(session_id, token)?;
         self.authorize_session_policy(&state, SecurityAction::TransactionBegin, now)?;
         let operation_sha256 = match intent_sha256 {
@@ -46,7 +51,7 @@ impl RrdEngine {
             "transaction",
             &[session_id.as_str(), idempotency_key.as_str()],
         )?;
-        if let Some(existing) = state.transactions.get(&transaction_id) {
+        if let Some(existing) = self.transaction_record(&state, &transaction_id)? {
             if existing.begin_idempotency_key != *idempotency_key
                 || existing.begin_operation_sha256 != operation_sha256
             {
@@ -107,7 +112,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "transaction.began",
             context.request_id.as_str(),
@@ -140,9 +145,8 @@ impl RrdEngine {
         self.authorize_session_policy(&state, SecurityAction::TransactionCommit, now)?;
         let principal_id = state.principal_id.clone();
         self.validate_collection_vector_mutations(request)?;
-        let record = state
-            .transactions
-            .get(transaction_id)
+        let record = self
+            .transaction_record(&state, transaction_id)?
             .ok_or(ServiceError::TransactionNotFound)?;
         let transaction_scope = record.lease.scope.clone();
         let read = record.read.clone();
@@ -199,7 +203,7 @@ impl RrdEngine {
                 self.replace_session(
                     session_id,
                     bytes,
-                    state,
+                    &mut state,
                     now,
                     "transaction.expired",
                     request_id,
@@ -267,7 +271,7 @@ impl RrdEngine {
             bytes = self.replace_session(
                 session_id,
                 bytes,
-                state.clone(),
+                &mut state,
                 now,
                 "transaction.commit_prepared",
                 request_id,
@@ -356,10 +360,13 @@ impl RrdEngine {
                             if matches!(
                                 error,
                                 rrd_store::Error::Kernel(_)
+                                    | rrd_store::Error::SourcePageLimit { .. }
+                                    | rrd_store::Error::TransactionLimit { .. }
                                     | rrd_store::Error::WriteBatchLimit { .. }
                                     | rrd_store::Error::MutableLimit { .. }
                                     | rrd_store::Error::MaintenanceLimit { .. }
                                     | rrd_store::Error::DiskAdmission { .. }
+                                    | rrd_store::Error::CheckpointLimit { .. }
                                     | rrd_store::Error::ReclamationPending
                                     | rrd_store::Error::ReclamationLimit { .. }
                                     | rrd_store::Error::RuntimeConflict { .. }
@@ -378,14 +385,20 @@ impl RrdEngine {
                                 self.replace_session(
                                     session_id,
                                     bytes,
-                                    state,
+                                    &mut state,
                                     now,
                                     "transaction.commit_rejected",
                                     request_id,
                                     operation_id,
                                 )?;
                             }
-                            return Err(error.into());
+                            return Err(match error {
+                                rrd_store::Error::TransactionLimit { .. }
+                                | rrd_store::Error::SourcePageLimit { .. } => {
+                                    ServiceError::StorageAdmission(error.to_string())
+                                }
+                                other => other.into(),
+                            });
                         }
                     },
                 }
@@ -409,7 +422,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "transaction.committed",
             request_id,
@@ -440,6 +453,11 @@ impl RrdEngine {
         let idempotency_key = context.idempotency_key.as_ref().ok_or_else(|| {
             ServiceError::Contract("transaction abort requires idempotency".into())
         })?;
+        let _transaction_guard = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         let (bytes, mut state) = self.authorize(
             session_id,
             token,
@@ -448,9 +466,8 @@ impl RrdEngine {
             context.request_id.as_str(),
             context.operation_id.as_str(),
         )?;
-        let transaction = state
-            .transactions
-            .get_mut(transaction_id)
+        let mut transaction = self
+            .transaction_record(&state, transaction_id)?
             .ok_or(ServiceError::TransactionNotFound)?;
         let operation_sha256 = operation_digest(request)?;
         let action = match transaction.lease.state {
@@ -484,21 +501,24 @@ impl RrdEngine {
             TransactionState::Expired => return Err(ServiceError::TransactionExpired),
             TransactionState::Committed => return Err(ServiceError::TransactionClosed),
         };
-        let transaction = transaction.lease.clone();
+        let lease = transaction.lease.clone();
+        state
+            .transactions
+            .insert(transaction_id.clone(), transaction);
         touch_session(&mut state, now);
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             action,
             context.request_id.as_str(),
             context.operation_id.as_str(),
         )?;
-        if transaction.state == TransactionState::Expired {
+        if lease.state == TransactionState::Expired {
             return Err(ServiceError::TransactionExpired);
         }
-        Ok(transaction)
+        Ok(lease)
     }
 
     pub fn preview_transaction(
@@ -519,6 +539,11 @@ impl RrdEngine {
         request
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
+        let _transaction_guard = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         let (bytes, mut state) = self.authorize(
             session_id,
             token,
@@ -527,9 +552,8 @@ impl RrdEngine {
             context.request_id.as_str(),
             context.operation_id.as_str(),
         )?;
-        let transaction = state
-            .transactions
-            .get(transaction_id)
+        let transaction = self
+            .transaction_record(&state, transaction_id)?
             .ok_or(ServiceError::TransactionNotFound)?;
         if transaction.lease.state != TransactionState::Open {
             return Err(ServiceError::TransactionClosed);
@@ -547,7 +571,7 @@ impl RrdEngine {
             self.replace_session(
                 session_id,
                 bytes,
-                state,
+                &mut state,
                 now,
                 "transaction.expired",
                 context.request_id.as_str(),
@@ -617,7 +641,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "transaction.prepared",
             context.request_id.as_str(),

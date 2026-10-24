@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814
+// OpenAPI SHA-256: 9ed23e2c77c13e05d17714dfb0e5dbed4afd530a0d8112e7ff263dfa5c5fa71e
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -14,6 +14,8 @@ public enum OperationId
     ContextAssemble,
     DataSchemaRead,
     DiagnosticsRead,
+    DiagnosticsStorageCursor,
+    DiagnosticsStorageRead,
     EmbeddingBuiltinActivate,
     EndpointCatalogue,
     EstateRead,
@@ -70,8 +72,8 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const string OpenApiDocumentSha256 = "13435dd98b812a64f630d4ae91cb065501e4abab934aa07bd8e53f37b6773814";
-    public const int Count = 48;
+    public const string OpenApiDocumentSha256 = "9ed23e2c77c13e05d17714dfb0e5dbed4afd530a0d8112e7ff263dfa5c5fa71e";
+    public const int Count = 50;
 
     public static Endpoint Get(OperationId operation) => operation switch
     {
@@ -85,6 +87,8 @@ public static class EndpointCatalog
         OperationId.ContextAssemble => new("context-assemble", "POST", "/v1/context/assemble", Authentication.SessionBearer, false),
         OperationId.DataSchemaRead => new("data-schema-read", "POST", "/v1/data/schema", Authentication.SessionBearer, false),
         OperationId.DiagnosticsRead => new("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SessionBearer, false),
+        OperationId.DiagnosticsStorageCursor => new("diagnostics-storage-cursor", "POST", "/v1/diagnostics/storage/cursor", Authentication.SessionBearer, false),
+        OperationId.DiagnosticsStorageRead => new("diagnostics-storage-read", "POST", "/v1/diagnostics/storage/read", Authentication.SessionBearer, false),
         OperationId.EmbeddingBuiltinActivate => new("embedding-builtin-activate", "POST", "/v1/embedding/builtin/activate", Authentication.SessionBearer, true),
         OperationId.EndpointCatalogue => new("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.Public, false),
         OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),

@@ -43,9 +43,9 @@ merely compare JSON shapes.
 
 ## Audited current surface
 
-The executable `endpoint_catalogue()` contains 48 HTTP operations and one
+The executable `endpoint_catalogue()` contains 50 HTTP operations and one
 generic authenticated `/v1/ws` descriptor. `RrdClient` currently supplies
-typed HTTP methods for 43 of those 48 operations, while `RrdWebSocket`
+typed HTTP methods for 45 of those 50 operations, while `RrdWebSocket`
 implements the bounded B-04 multiplexed protocol. The current boundary is:
 
 | Family | Catalogued HTTP operations | Rust methods now | Missing now |
@@ -63,12 +63,12 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Backup and restore | 3 | 3 | none |
 | Estate | 1 | 1 | none |
 | Audit | 2 | 2 | none |
-| Diagnostics | 1 | 1 | none |
+| Diagnostics | 3 | 3 | none |
 | Prompt flights | 3 | 3 | none |
 | Tasks | 4 | 4 | none |
 | Task effort and explicit reference inference | 6 | 6 | none |
 | Context | 1 | 1 | none |
-| **Total** | **48** | **43** | **5** |
+| **Total** | **50** | **45** | **5** |
 
 The [task effort flow](../inference/lfg-swag.md#public-task-effort-flow) uses
 `configure_task_budget`, `activate_builtin_embedding`,
@@ -360,7 +360,7 @@ The gates then close behavior in dependency order:
 2. **B-04 (implemented):** the dedicated socket is absent; one bounded
    multiplexed protocol and Rust carriage now own request/cancel/subscription
    correlation, exact resume state, and adversarial frame rejection.
-3. **H-04:** bind all 42 operations from the catalogue, validate every request
+3. **H-04:** bind all 44 operations from the catalogue, validate every request
    and response, and compare Rust with every supported surface against one
    real `RrdEngine` corpus.
 4. **H-07:** add endpoint resolution/rotation as an outward adapter while
@@ -376,7 +376,7 @@ The gates then close behavior in dependency order:
 - [Tokio timeout](https://docs.rs/tokio/1.53.1/tokio/time/fn.timeout.html)
   defines local cancellation by dropping the future; it is not server
   completion evidence.
-- [Rustls `ClientConfig`](https://docs.rs/rustls/0.23.43/rustls/client/struct.ClientConfig.html)
+- [Rustls `ClientConfig`](https://docs.rs/rustls/0.23.45/rustls/client/struct.ClientConfig.html)
   owns TLS server verification and client-credential selection, distinct from
   RRD authorization.
 - [W3C Trace Context](https://www.w3.org/TR/trace-context/) defines interoperable

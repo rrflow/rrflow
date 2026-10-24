@@ -370,15 +370,27 @@ not an installed daemon/UI Stop operation or durable cancellation after restart.
 The required `[storage]` configuration separates active-state, output, cache,
 and maintenance controls:
 `mutable_accounted_bytes` (128 MiB default), `mutable_versions` (1,048,576),
-`projected_output_bytes` (128 MiB), `page_cache_bytes` (4 MiB, zero disables
+`projected_output_bytes` (128 MiB), `source_page_bytes` (256 MiB),
+`page_cache_bytes` (4 MiB, zero disables
 caching), `wal_flush_target_bytes` (64 MiB) and
 `memtable_flush_target_versions` (524,288). The first two are native active-state
-hard caps; the next two bound retained projected allocations and cache bytes;
+hard caps; the next three bound retained projected allocations, live owned
+source-page allocations and cache residency;
 the last two are soft synchronous maintenance targets. A single atomic batch
 may exceed a soft target only within hard admission. These are not aggregate
 RSS bounds. Protocol ceilings and checked native conversion
 reject invalid configuration. Current limits require reopening; no live
 configure operation or qualified capacity profile is implied.
+
+Source-page admission precedes file-page allocation and decompression. It
+counts the compressed input and decoded output while both exist, and retains
+the charge through cache eviction, Arrow clones/slices and reader/database
+close. Raw mapped pages remain borrowed and use the separate file-pin policy.
+Cache pressure evicts cache owners before returning typed resource exhaustion;
+held reader buffers cannot lose their charge. Storage admission diagnostics
+expose `retained_source_bytes`, `peak_source_bytes` and
+`denied_source_allocations`. These count owned page payload allocations, not
+allocator overhead, borrowed mappings, snapshot-input backing bytes or RSS.
 
 Immutable maintenance adds `compaction_input_bytes` (1 GiB),
 `compaction_input_logical_bytes` (256 MiB), `compaction_input_versions`
@@ -395,6 +407,56 @@ pruning protected history. Unpublished partition files from interrupted work
 remain subject to the existing validated garbage collector. Total on-disk
 history, higher-level debt, retained snapshots and process memory are separate
 qualification obligations; these controls do not claim those are bounded.
+
+Flushes partition the mutable table at key boundaries using the native
+`CompactionPolicy::target_segment_bytes` output target (8 MiB default), also
+used for compaction. This is a logical payload target, not a physical-file or
+RSS cap; one complete version chain stays together even when larger. The plan
+borrows boundary keys and checks the complete output count against both L0
+and output-segment limits before syncing or creating output. Each partition
+uses the existing v6 writer; one manifest publishes every partition and the
+successor WAL together. Failed partial output remains unreachable and is
+reclaimed by the existing collector. The cooperative maintenance deadline
+applies before publication. The [partitioned-flush evidence](../../evidence/change-journals/gate-c/c-07d-partitioned-flush.md)
+does not establish installed capacity or a completed soak.
+
+A compaction-budget denial at a soft write-triggered flush defers that optional
+merge and retains its debt/failure counters. The incoming write still must pass
+hard L0, reclamation and mutable admission before WAL append; a failed optional
+merge cannot by itself consume otherwise available write capacity. Native I/O,
+corruption and publication uncertainty are not ignored. Cleanup ownership begins
+before partition creation, including when idle work fails before publication.
+
+Writers also offer one immutable compaction quantum when L0 debt between
+flushes reaches a full configured input-segment quantum, or the hard L0 cap
+if smaller. Smaller debt remains eligible for idle upkeep. The offer runs
+before a flush needs additional slots; if no earlier quantum
+was offered, a newly flushed table can trigger one afterward. A write never
+loops to drain debt or offers a second compaction at saturation. This path does
+not flush the mutable tail as a side effect of housekeeping. The same hard
+admission and protected-snapshot rules apply; failed admission is backpressure,
+not permission to exceed the cap. The [foreground debt record](../../evidence/change-journals/gate-c/c-07d-foreground-debt-progress.md)
+separates this component behavior from installed capacity evidence.
+
+While serving, the existing one-second host sweep offers one engine-owned
+physical maintenance quantum to a single joined worker. Busy ticks are skipped.
+Each admitted quantum either reclaims a bounded pending inventory or performs
+one bounded compaction to reduce L0 debt. It uses the same writer lock and
+configured limits and does not flush the active mutable tail or advance logical
+cursors. For both foreground commit maintenance and idle upkeep, the store
+explicitly permits pruning superseded physical versions:
+registered transactions remain protected, read views and named checkpoints
+retain their generations, and logical versioned keys remain data. Standalone
+automatic maintenance retains all versions for untracked copyable snapshots;
+an owner may select the explicit protected-snapshot entry point. Shutdown and
+cancellation stop new offers and join any admitted quantum; the cooperative deadline still cannot
+interrupt a blocked filesystem call. Embedded hosts can offer the same work
+through `RrdEngine::maintain_storage`. The
+[idle-maintenance evidence](../../evidence/change-journals/gate-c/c-07d-idle-maintenance.md)
+and [owned-history evidence](../../evidence/change-journals/gate-c/c-07d-tracked-history-maintenance.md)
+do not replace installed latency, drain or soak qualification.
+The [foreground retention evidence](../../evidence/change-journals/gate-c/c-07d-write-history-retention.md)
+also checks that enabling diagnostics does not change retained state.
 
 Retained mutable generations share an ownership-based pool per opened database:
 `retained_mutable_bytes` (512 MiB), `retained_mutable_versions` (4,194,304) and

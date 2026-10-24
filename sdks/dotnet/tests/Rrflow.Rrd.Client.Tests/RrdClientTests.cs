@@ -55,6 +55,7 @@ public sealed class RrdClientTests
                             ["mutable_accounted_bytes"] = 134217728,
                             ["mutable_versions"] = 1048576,
                             ["projected_output_bytes"] = 134217728,
+                            ["source_page_bytes"] = 268435456,
                             ["page_cache_bytes"] = 4194304,
                             ["wal_flush_target_bytes"] = 67108864,
                             ["memtable_flush_target_versions"] = 524288,
@@ -277,7 +278,11 @@ public sealed class RrdClientTests
             },
             TestContext.Current.CancellationToken));
         Assert.Contains("deadline has expired", expired.Message, StringComparison.Ordinal);
-        Assert.Equal(48, EndpointCatalog.Count);
+        Assert.Equal(50, EndpointCatalog.Count);
+        Assert.False(EndpointCatalog.Get(OperationId.DiagnosticsStorageCursor).Mutation);
+        Assert.Equal(
+            Authentication.SessionBearer,
+            EndpointCatalog.Get(OperationId.DiagnosticsStorageCursor).Authentication);
         Assert.True(EndpointCatalog.Get(OperationId.BackupCreate).Mutation);
         Assert.True(EndpointCatalog.Get(OperationId.TransactionPreview).Mutation);
         Assert.Equal(
