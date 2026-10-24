@@ -63,3 +63,9 @@ candidate must pass its source policy/CI before merge. No surfaced integration
 error was suppressed. The first journal commit only enables a reviewable PR;
 the final source pin is the implementation effect. No gate/POA&M completion,
 latest-engine bundle qualification, training or cloud service is claimed.
+
+Before landing, integrated public main
+`2255c2bee9c2e4c2f7b44f053dc73a92feebc7b6` after PR109/110 passed all 23
+checks and merged. The source merge was clean. Regenerate the inventory to
+include both prerequisite histories and this pin, then require fresh candidate
+CI. The child gitlink and its tested tree remain unchanged.

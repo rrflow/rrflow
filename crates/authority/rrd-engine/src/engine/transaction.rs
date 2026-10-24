@@ -51,7 +51,7 @@ impl RrdEngine {
             "transaction",
             &[session_id.as_str(), idempotency_key.as_str()],
         )?;
-        if let Some(existing) = state.transactions.get(&transaction_id) {
+        if let Some(existing) = self.transaction_record(&state, &transaction_id)? {
             if existing.begin_idempotency_key != *idempotency_key
                 || existing.begin_operation_sha256 != operation_sha256
             {
@@ -112,7 +112,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "transaction.began",
             context.request_id.as_str(),
@@ -145,9 +145,8 @@ impl RrdEngine {
         self.authorize_session_policy(&state, SecurityAction::TransactionCommit, now)?;
         let principal_id = state.principal_id.clone();
         self.validate_collection_vector_mutations(request)?;
-        let record = state
-            .transactions
-            .get(transaction_id)
+        let record = self
+            .transaction_record(&state, transaction_id)?
             .ok_or(ServiceError::TransactionNotFound)?;
         let transaction_scope = record.lease.scope.clone();
         let read = record.read.clone();
@@ -204,7 +203,7 @@ impl RrdEngine {
                 self.replace_session(
                     session_id,
                     bytes,
-                    state,
+                    &mut state,
                     now,
                     "transaction.expired",
                     request_id,
@@ -272,7 +271,7 @@ impl RrdEngine {
             bytes = self.replace_session(
                 session_id,
                 bytes,
-                state.clone(),
+                &mut state,
                 now,
                 "transaction.commit_prepared",
                 request_id,
@@ -386,7 +385,7 @@ impl RrdEngine {
                                 self.replace_session(
                                     session_id,
                                     bytes,
-                                    state,
+                                    &mut state,
                                     now,
                                     "transaction.commit_rejected",
                                     request_id,
@@ -423,7 +422,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "transaction.committed",
             request_id,
@@ -467,9 +466,8 @@ impl RrdEngine {
             context.request_id.as_str(),
             context.operation_id.as_str(),
         )?;
-        let transaction = state
-            .transactions
-            .get_mut(transaction_id)
+        let mut transaction = self
+            .transaction_record(&state, transaction_id)?
             .ok_or(ServiceError::TransactionNotFound)?;
         let operation_sha256 = operation_digest(request)?;
         let action = match transaction.lease.state {
@@ -503,21 +501,24 @@ impl RrdEngine {
             TransactionState::Expired => return Err(ServiceError::TransactionExpired),
             TransactionState::Committed => return Err(ServiceError::TransactionClosed),
         };
-        let transaction = transaction.lease.clone();
+        let lease = transaction.lease.clone();
+        state
+            .transactions
+            .insert(transaction_id.clone(), transaction);
         touch_session(&mut state, now);
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             action,
             context.request_id.as_str(),
             context.operation_id.as_str(),
         )?;
-        if transaction.state == TransactionState::Expired {
+        if lease.state == TransactionState::Expired {
             return Err(ServiceError::TransactionExpired);
         }
-        Ok(transaction)
+        Ok(lease)
     }
 
     pub fn preview_transaction(
@@ -551,9 +552,8 @@ impl RrdEngine {
             context.request_id.as_str(),
             context.operation_id.as_str(),
         )?;
-        let transaction = state
-            .transactions
-            .get(transaction_id)
+        let transaction = self
+            .transaction_record(&state, transaction_id)?
             .ok_or(ServiceError::TransactionNotFound)?;
         if transaction.lease.state != TransactionState::Open {
             return Err(ServiceError::TransactionClosed);
@@ -571,7 +571,7 @@ impl RrdEngine {
             self.replace_session(
                 session_id,
                 bytes,
-                state,
+                &mut state,
                 now,
                 "transaction.expired",
                 context.request_id.as_str(),
@@ -641,7 +641,7 @@ impl RrdEngine {
         self.replace_session(
             session_id,
             bytes,
-            state,
+            &mut state,
             now,
             "transaction.prepared",
             context.request_id.as_str(),
