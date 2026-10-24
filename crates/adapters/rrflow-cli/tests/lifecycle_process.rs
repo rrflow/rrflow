@@ -21,6 +21,14 @@ fn fixture(mode: &str, deadline: Duration, limit: usize) -> process::Process {
 #[test]
 #[ignore = "explicit subprocess fixture; every mode is invoked by a parent test"]
 fn owned_child() {
+    #[cfg(feature = "crash-test")]
+    if std::env::var_os("RRFLOW_CAPTURE_OBSERVED").is_some() {
+        // The observed process protocol writes private input before startup
+        // returns. Consume it before a fast fixture can close its input pipe.
+        let mut input = [0; 4];
+        std::io::Read::read_exact(&mut std::io::stdin().lock(), &mut input).unwrap();
+        assert_eq!(&input, b"null");
+    }
     match std::env::var("RRFLOW_CAPTURE_FIXTURE").unwrap().as_str() {
         "hang" => std::thread::sleep(Duration::from_secs(30)),
         "flood" => {
@@ -34,6 +42,13 @@ fn owned_child() {
         "exit" => {
             println!("bounded stdout");
             eprintln!("bounded stderr");
+        }
+        #[cfg(feature = "crash-test")]
+        "queue" => {
+            // Overflow after input admission, not on libtest's startup lines.
+            for _ in 0..64 {
+                println!("bounded diagnostic event");
+            }
         }
         #[cfg(feature = "crash-test")]
         "partial" => {
@@ -56,7 +71,8 @@ fn observed_fixture(
     let mut command = Command::new(std::env::current_exe().unwrap());
     command
         .args(["--exact", "owned_child", "--ignored", "--nocapture"])
-        .env("RRFLOW_CAPTURE_FIXTURE", mode);
+        .env("RRFLOW_CAPTURE_FIXTURE", mode)
+        .env("RRFLOW_CAPTURE_OBSERVED", "1");
     let (send, receive) = std::sync::mpsc::sync_channel(capacity);
     let process = process::Process::start_observed(
         &mut command,
@@ -85,7 +101,7 @@ fn observed_events_preserve_complete_lines_and_both_streams() {
 #[cfg(feature = "crash-test")]
 #[test]
 fn observed_queue_and_line_failures_reap_only_the_owned_child() {
-    for (mode, capacity) in [("exit", 1), ("flood", 32), ("partial", 32)] {
+    for (mode, capacity) in [("queue", 32), ("flood", 32), ("partial", 32)] {
         let (mut child, _receive) = observed_fixture(mode, capacity);
         let error = child.finish().unwrap_err();
         assert!(

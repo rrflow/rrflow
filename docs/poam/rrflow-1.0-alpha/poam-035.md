@@ -6,6 +6,12 @@
 
 ## Observed deficiency
 
+PR125 Ubuntu job `121000145879` also exposed a diagnostic subprocess fixture
+race: the child could exit before required stdin delivery, producing
+`BrokenPipe`. The [integrated repair journal](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md#observed-process-fixture-input-race)
+records the raw failure, bounded input-consumption repair and pending native
+candidate proof. This does not change the installed capacity acceptance bar.
+
 The [integrated growth failure and repair](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md)
 records preflight `7b6e56a5` failing at 55,047 acknowledged records with a
 30-second corpus-write deadline, one failed compaction and confirmed cleanup.

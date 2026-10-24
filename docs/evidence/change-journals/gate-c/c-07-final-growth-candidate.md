@@ -107,13 +107,36 @@ path/privacy marker and still returns the original setup failure. It does not
 upload credentials or treat retained state as completed acceptance. Successful
 campaign cleanup is unchanged.
 
+## Observed-process fixture input race
+
+While this package was being validated, PR125's native Ubuntu job
+`121000145879` failed `observed_events_preserve_complete_lines_and_both_streams`
+at `lifecycle_process.rs:68` with `BrokenPipe`. The raw job log is retained at
+operator `target/c07-final-integration-evidence/pr125-native-crash-121000145879.log`,
+SHA-256 `4a346e808fa299184691e500fd28535fd7d9da4826021ef8f1154549fc9ad1af`.
+The existing fixture could exit before `Process::start_observed` wrote the
+mandatory private input. The PR brief was amended before the repair to bind
+this additional source and its oracle to the same installed-harness boundary.
+
+`tests/lifecycle_process.rs::observed_fixture` now explicitly marks observed
+children, and `owned_child` reads and asserts the exact four-byte `null` input
+before emitting output or exiting. The queue-overflow case emits 64 bounded lines after input admission into its
+32-line queue; libtest startup lines cannot trigger that intentional failure
+before admission. Ordinary fixtures are unchanged. Production
+`support/process.rs` retains its existing input-error propagation, process
+cleanup, output/queue bounds and deadlines. The complete feature-enabled
+`lifecycle_process` suite is the acceptance oracle; no sleeps or retries hide
+the race. This additional source was read together with the production input
+write and monitor/cleanup paths. It replaces no production implementation.
+
 ## Acceptance, review and remaining work
 
 Source review follows the C-07 owner, POAM035, change-authoring/traceability
 procedure, the component integration journals, compaction selection/merge and
 limits, the installation apply/lease/recovery/concurrency paths, the manifest
 guard, and installed workload/process/owned-directory cleanup. Changes are
-confined to the three implementation files above, their inline tests, this
+confined to the three implementation files above, their inline tests, the
+observed subprocess fixture repair, this
 journal, C-07/POAM links and generated discovery. The complete candidate also
 preserves the three integrated inputs listed above.
 
@@ -127,8 +150,25 @@ passed in 242.687 seconds, including the fault-injection/compound-recovery
 sweep, physical compaction, snapshot and reopen cases. The inline test module
 was subsequently placed after production items; its code is unchanged.
 
-`cargo test -p rrd-engine --lib --all-features --locked` and subsequent CLI,
-strict lint and format checks are running or pending at this source freeze.
+`cargo test -p rrd-engine --lib --all-features --locked` passed: 172 tests,
+two explicitly ignored, 165 seconds including compilation. The Windows run
+does not select the Unix-only duplicated-description regression.
+`cargo test -p rrflow-cli --test installed_reopen --locked` passed: 12 tests,
+seven explicitly ignored native campaigns, 93.594 seconds including compilation.
+The crash-test command-attribution regression passed (one test), as did the
+five filler allocation/time/metadata regressions. The first observed-fixture
+draft incorrectly expected a newline from `start_observed`; two fixture tests
+failed with `UnexpectedEof`/unsuccessful child status. Source inspection showed
+only `start_controlled` appends that newline. The fixture was corrected to the
+actual four-byte observed input, preserving both protocols; the corrected
+fixture suite then passed all 14 tests (one child-fixture entry intentionally
+ignored), 58.282 seconds including compilation/lock wait. Strict
+`cargo clippy -p rrd-lsm -p rrd-engine --all-targets --all-features --locked --
+-D warnings` passed in 88.718 seconds. `cargo clippy -p rrflow-cli --test installed_reopen --test installed_crash
+--features crash-test --locked -- -D warnings` passed in 41.766 seconds;
+its `--test lifecycle_process` counterpart passed in 39.047 seconds.
+`cargo fmt --all -- --check` and both candidate-admission/CI-policy checks
+passed after the fixture correction.
 Native Linux installation tests, full candidate CI, exact-source preflight and
 qualification remain pending; this record does not claim their success.
 Their exact source-bound results must accompany candidate review. No previous
@@ -149,3 +189,19 @@ first-failure oracle; full package/candidate validation distinguished; no
 acceptance, resource or deadline relaxation. Stop for undeclared scope,
 changed durable semantics, a weakened oracle or a source conflict without a
 reviewed replacement. C-07, POAM035 and alpha remain open.
+
+Linux preparation on initial repair test merge `d429b1ff` first stopped before
+compilation because the offline cache lacked locked crate `ahash 0.7.8`.
+The operator preparation now fetches locked Linux-target dependencies once,
+then returns to offline tests/builds. This is build preparation, not a runtime
+fetch or a workload failure. No campaign or qualification was launched from
+that initial revision before the fixture scope amendment.
+
+PR123 and PR125 were closed as superseded after the normal merges and scoped
+source comparison; their failed native/engine evidence remains retained.
+PR125's obsolete CI was cancelled after its fixture failure was captured;
+PR124's useful native jobs were allowed to finish. The integrated reusable
+workflow also retains PR123's `serde`/`sha2` kernel dependency assertion, and
+the capacity fixture combines PR124 attribution with PR123 metadata refills;
+these are intentional preserved behaviors, not byte-identical inputs. No
+closed input PR is represented as merged or accepted.
