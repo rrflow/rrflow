@@ -6,6 +6,53 @@
 
 ## Observed deficiency
 
+The [conflict-probe repair and execution reset](../../evidence/change-journals/gate-c/c-07g-conflict-spine-and-execution.md)
+removes reproduced unnecessary value-page reads during native write-conflict
+validation. The existing C-07 owner now separates implemented paths, native
+capacity failures and the failed Desktop growth campaign. This narrow physical
+improvement does not diagnose all campaign traffic or complete qualification.
+
+The [retained nominal Desktop failure](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-failure.md)
+records a corpus-write deadline after 50685 acknowledgements, zero accepted
+segments and confirmed cleanup. The 24-hour phase never began. The next repair
+must attribute the bounded write failure and high cumulative segment reads at
+the existing allocation; no timeout extension or completed qualification is
+claimed. C-07g and this deficiency remain open.
+
+The [nominal Desktop qualification launch](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-launch.md)
+configured the existing installed driver in the isolated eight-GiB guest with
+three seeds, 100 forced reopens and 24-hour soak phases. Its first seed failed
+during ingestion as recorded above. Full readback,
+lifecycle, sustained phases, offline reconciliation and remaining profile
+points stay required. The separate WSL preflight remains characterization.
+
+The [isolated Desktop host preparation](../../evidence/change-journals/gate-c/c-07g-desktop-vm-preparation.md)
+provides an owned four-vCPU/eight-GiB KVM guest, verified image provenance,
+ordinary-primary compatibility and writable delegated resource limits. This
+removes a host-preparation prerequisite; no guest installed workload or
+24-hour result is claimed. The larger WSL preflight continues separately.
+
+The [post-synchronization filler probe](../../evidence/change-journals/gate-c/c-07f-settled-filler.md)
+repairs a reproduced fixture gap: allocation available after the final barrier
+was not consumed before resume. Local control-flow evidence retains native
+failure/recovery requirements and all existing bounds; the missing selected
+macOS I/O event and complete native capacity matrix remain unqualified.
+
+The [filler allocation-sync correction](../../evidence/change-journals/gate-c/c-07f-filler-allocation-sync.md)
+removes Apple hardware-cache flush requests from disposable capacity filler
+files while preserving native allocation errors, existing limits and every
+engine durability barrier. Windows focused/process and orchestration checks
+pass; the actual APFS exhaustion deadline and native matrix still require
+candidate evidence. This is a fixture correction, not native qualification.
+
+The [Desktop-corpus preflight launch](../../evidence/change-journals/gate-c/c-07g-desktop-preflight-launch.md)
+advances to the actual 100000-record/500000-edge/100000-vector corpus under
+the two-GiB engine cap. Its launch is not a completed result: ingestion,
+independent readback and the frozen short load phases must finish before any
+success claim. The eight-GiB host profile, complete repetitions/native matrix
+and 24-hour qualification remain outstanding. The same record retains a
+further macOS metadata-fill deadline failure from PR108; this gap stays open.
+
 The [session retention regression and repair](../../evidence/change-journals/gate-c/c-07g-session-transaction-retention.md)
 reproduced 52280 bytes of hot session state after 32 completed transactions on
 both rrflowMX and rrflowKV. Historical transaction accumulation could exhaust
@@ -638,3 +685,9 @@ the original rejection and failed campaign. It changes no storage policy or
 qualification threshold. Successful diagnostic capture and a causal repair
 still need installed evidence; neither preceding local suite resolves this
 capacity failure.
+
+The [allocation-sync candidate failure](../../evidence/change-journals/gate-c/c-07f-allocation-sync-candidate.md)
+retains PR112's macOS WAL case: actual filler ENOSPC and public
+ResourceExhausted did not produce the required selected native-I/O receipt.
+The test remains failed; this result is neither OOM attribution nor native
+storage-full qualification. Exact syscall attribution remains open.

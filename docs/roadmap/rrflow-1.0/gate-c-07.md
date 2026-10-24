@@ -1,6 +1,6 @@
 # C-07 — installed durability and bounded growth
 
-**Status:** active canonical implementation plan; C-07a/b have bounded contract and I/O-model evidence, C-07c–h remain unimplemented or unqualified
+**Status:** active canonical implementation plan; installed crash/resource/lifetime and capacity drivers exist; native and sustained qualification remain incomplete
 **Coordinate:** `rrflow://rrflow-instance/data/roadmap/rrflow-1.0/gate-c-07`
 **Owner:** [Gate C](gate-c.md), under the [RRFlow 1.0 release roadmap](../rrflow-1.0.md)
 
@@ -30,14 +30,62 @@ default engine operation must not depend on the UI or a vendor account.
 
 ### Existing foundation and remaining proof
 
-| Current behavior | What C-07 must add or qualify |
-|---|---|
-| Authoritative WAL append requests synchronization; complete corruption is distinguished from an incomplete tail. | Actual short-write/sync/publication failure coverage, exact uncertain-outcome handling, native process-death and acknowledged-history reconciliation. |
-| Maintenance flushes synchronously on the next write when thresholds would be exceeded; one oversized atomic batch is retained and counted. | Separate soft targets from hard admission limits; bound all live owners and outstanding work, including one batch and retained generations. |
-| Compaction bounds input segment count and targets output size at key boundaries. Automatic compaction retains untracked snapshot history. | Bound bytes/work and debt as well as counts; account for hot keys with long histories, stalled reclamation and safe retention. Never erase required versions merely to meet a target. |
-| Transaction/read-view leases and manifest reachability protect snapshots; projected reads have limits and cancellation. | Concurrent reader/writer/compaction/GC histories and buffers retained beyond stream lifetime, across native OSes and actual memory measurement. |
-| Component failure matrices inject typed errors and reopen. D-01 exercises real installed binaries. | Join these proofs: labeled StorageFull is not native disk exhaustion, dropping an object is not a killed process, and a killed process is not loss of volatile OS/device caches. |
-| Component RSS fixtures are Linux-only; existing physical diagnostics are useful but partial. | Native process memory, pinned/mapped/private allocations, queue/debt and recovery-cost evidence with bounded observability. |
+The following is a current code inventory, not gate acceptance. Earlier
+implementation journals retain their historical results. Do not restart these
+packages as if their implementation were absent.
+
+| Package | Existing implementation | Remaining acceptance/blocker |
+|---|---|---|
+| a/b | Evaluation workload/result/independent ledger; native fault facility and stable/volatile model; repaired WAL/publication fencing. | Preserve these oracles in every repair; do not recreate them. |
+| c | `installed_crash.rs`, `installed_reopen.rs`, response-loss/history support and diagnostic-only native pause protocol. | Join fresh/existing domain/publication/compound-recovery and 100-cycle native results for the final candidate. A different PR's green job cannot be rebound to it. |
+| d | `TransactionGate` count/byte/deadline admission; installed storage configuration; native mutable/retention, maintenance, reclamation, recovery and disk-reserve limits. | Demonstrate aggregate process limits and sustained progress under the declared profiles. Logical reservations alone are not RSS or proof that a large estate progresses. |
+| e | Native source-page and retained-output pools, read-view lifetime registry, projected/interleaved lifetime and native memory fixtures. | Complete the required physical/lifetime/native matrix and retained-owner drain evidence on the final candidate. |
+| f | Owned ext4/APFS/NTFS runner, selected native-error/recovery ledger and damaged-state tests. | macOS capacity qualification is failing. PR112 repairs filler synchronization; only actual selected native failure plus recovery can qualify it. |
+| g | `installed_reopen.rs::sustained` driver, bounded corpus generator/independent readback, `run_sustained_capacity.py`, frozen profiles and progress/result receipts. | Desktop corpus ingestion failed at 50,685 acknowledgements; no completed corpus or 24-hour soak. Repair/attribute growth before repeating long campaigns. |
+| h | `collect_storage_acceptance.py` and canonical Rust receipt validation. | No complete joined accepted candidate/profile/native/soak evidence. Collection tooling is implemented; accepted evidence is missing. |
+
+### Execution reset after the failed Desktop corpus
+
+This is the execution order within the existing a-h requirements, not a new
+roadmap or weaker alpha definition. The retained
+[Desktop failure](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-failure.md)
+reported 1,981,981,149,033 cumulative segment bytes read for 1,414,786,770 bytes
+of segments, one failed compaction and a corpus-operation deadline. Those are
+attribution leads, not a diagnosed root cause, an OOM result or a completed soak.
+
+1. **Finish two blocking tracks:** qualify native capacity through PR112 and
+   repair demonstrated engine growth costs through PR115. Use current public
+   main as the source baseline and preserve each failed campaign. Do not start
+   new UI/provider/configuration packages while these storage blockers remain.
+2. **Attribute and remove growth costs at their owner.** First measure native
+   conflict validation's unnecessary value-page reads using the existing page
+   and I/O counters. Preserve conflict/tombstone/reopen behavior while selecting
+   only authenticated key/sequence pages and honoring the active-memory version.
+   Then use existing write-phase/maintenance diagnostics on bounded growth
+   characterizations (1,000 and 10,000 records before the full profile)
+   to distinguish validation, read amplification, compaction and publication.
+   This first optimization is not assumed to explain all Desktop read traffic.
+3. **Freeze one integrated candidate and run preflight.** Keep the Desktop
+   corpus, allocation, 30-second operation deadline and acceptance limits.
+   Require complete ingestion and independent readback, restart, backup under
+   writes, pin interference and burst/drain. A failed stage stops its dependent
+   soak, not independent native failure qualification. Never relabel setup as
+   soak, shrink the qualification corpus or extend a timeout to conceal failure.
+4. **Run the required profile/repetition matrix and actual soak.** Follow J-04's
+   allocations and the existing C-07g seeds, durations and 24-hour requirement.
+   Use the existing bounded launcher, exact artifact identities and independent
+   ledgers. A short characterization diagnoses; it cannot close this step.
+5. **Close against evidence, then hand off.** The existing acceptance collector
+   must bind all required native and sustained cases to the candidate. Merge
+   only passing candidate PRs and update Gate C/POAM035 only when their named
+   exits pass. Then resume dependent indexing/retrieval, knowledge paths and UI.
+
+Execution discipline: describe progress as implemented behavior, reproduced
+failure, measured improvement, or completed acceptance. Keep outstanding work
+in this owner and POAM035; use one linked journal per source package. Run the
+smallest failing oracle, owning suite and required candidate pipeline; repeat
+broader checks only for new source or a new failure. Avoid making multiple
+unrelated candidate pipelines compete with the blocking qualification runs.
 
 The known whole-scope commit-validation cost in
 [POAM-034](../../poam/rrflow-1.0-alpha/poam-034.md) remains E-01/E-02 work.
@@ -253,7 +301,8 @@ admission, installed GC, measured RSS or the complete e matrix.
 C-07b has now merged through [PR 56](https://github.com/rrflow/rrflow-development/pull/56):
 candidate `88df70b39b0d73e91930a26d3017363c36c615f6`,
 [CI run 39705515593](https://github.com/rrflow/rrflow-development/actions/runs/39705515593),
-merge `ecfeea332e6d7a0138b2dbb6c393e0d734d50db9`. The next package is c.
+merge `ecfeea332e6d7a0138b2dbb6c393e0d734d50db9`. Current execution follows
+the reset above.
 The contracts below make c-h executable review units; they do not waive a
 row above or create another completion ledger. Resolve exact current symbols
 in each PR rather than maintaining a parallel source-tree plan here.
@@ -392,12 +441,13 @@ and process-death tests must not be relabeled as those experiments.
 
 ## Capacity, signals and growth acceptance
 
-### Configuration admission to implement
+### Configuration admission to qualify
 
 Use existing canonical Rust configuration/diagnostic owners and generate their
-schemas and UI descriptions. These are required policy concepts, not new
-implemented field names. Each has explicit units, estate/process scope and a
-declared live-change or restart rule; no unlimited sentinel is admissible in
+schemas and UI descriptions. These are required policy concepts; the
+implemented native and installed limits above must be matched to their exact
+owners and measured together. Each has explicit units, estate/process scope
+and a declared live-change or restart rule; no unlimited sentinel is admissible in
 a qualification manifest.
 
 | Policy group | Required bounds and validation |
@@ -582,9 +632,9 @@ git diff --check
 ```
 
 The C-07a bounded history schemas and offline validation commands now exist.
-The future native fault/scale drivers, sustained workload collection and new
-native case names remain planned deliverables. Their owning PR must add
-the exact invocation and CI/run-manifest binding before claiming acceptance.
+Native fault/scale drivers and sustained workload collection now exist at the
+paths above. Their invocation and CI/run-manifest bindings are implementation
+inputs, not proof that every required case ran or passed.
 Stop on any lost ACK, partial batch, stale authority, cap violation,
 unexplained growing live owner, unknown effect or changed format/authority.
 Retain failures; repair at the canonical boundary before advancing. Neither
