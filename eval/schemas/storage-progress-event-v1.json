@@ -972,6 +972,15 @@
           "minimum": 0,
           "type": "integer"
         },
+        "verification_finished_ns": {
+          "description": "End of independent readback while the admitted client slot is still held.\nAbsent in historical evidence; never infer zero verification cost.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "write": {
           "anyOf": [
             {
