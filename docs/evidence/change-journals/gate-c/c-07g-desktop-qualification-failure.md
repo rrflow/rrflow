@@ -77,3 +77,12 @@ marker in this new record; the header was corrected. Documentation, navigation,
 execution inventory and whitespace checks then passed. The complete new record,
 POAM change and generated diff were reviewed. C-07 and POAM-035 remain open;
 this result closes no gate. Candidate CI is required before PR111 merges.
+
+Before landing this evidence, integrated accepted public main
+`2255c2bee9c2e4c2f7b44f053dc73a92feebc7b6` after PR109/110 merged with
+passing candidate CI. The merge itself changed no files: this branch already
+contained their exact prerequisite source. The immutable failed campaign keeps
+its original executable/source identities; no result is rebound to the merge.
+Regenerate and check documentation/navigation/inventory and whitespace for
+this journal update. No runtime suite was rerun for this evidence-only merge;
+the new candidate pipeline remains required.
