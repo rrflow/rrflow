@@ -6,6 +6,14 @@
 
 ## Observed deficiency
 
+The [integrated public-client readback package](../../evidence/change-journals/gate-c/c-07-integrated-readback.md)
+addresses a separate demonstration gap: the existing local database example
+combined two independent HEAD queries, so a concurrent commit could yield a
+mixed-cursor view. Its fixed-cursor read and independently expected sample
+verification retain the real transaction/reopen checks. This improves the
+usable DB/graph/QL flow; it does not close native capacity, lifetime, full
+profile or 24-hour-soak acceptance. The C-07 qualification gap remains open.
+
 The [conflict-probe repair and execution reset](../../evidence/change-journals/gate-c/c-07g-conflict-spine-and-execution.md)
 removes reproduced unnecessary value-page reads during native write-conflict
 validation. The existing C-07 owner now separates implemented paths, native
