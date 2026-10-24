@@ -700,3 +700,10 @@ its start, acknowledged-write overlap and verified completion without retaining
 old ledgers. Missing or unfinished evidence fails. Native smoke and contract
 checks support the implementation; integrated growth, profile repetitions and
 the actual 24-hour soak remain required before C-07 can close.
+
+The [integrated native growth record](../../evidence/change-journals/gate-c/c-07g-integrated-native-growth.md)
+retains both failed exact-source comparisons. The 10k corpus fully acknowledged
+and read back, then restart failed with `multiply linked file denied`. The
+failed estate was removed during harness unwinding, preventing file/link-count
+inspection. Preserve owned failure state and identify that admission before
+repairing its canonical owner; no link guard or capacity threshold is waived.
