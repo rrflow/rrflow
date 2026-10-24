@@ -713,3 +713,11 @@ No 24-hour soak ran. The [admission/timing journal](../../evidence/change-journa
 records the repair: reject invalid qualification preflight before soak and
 measure independent readback completion separately from response completion.
 This does not diagnose all growth cost or close POAM-035/C-07.
+
+
+The PR116 macOS candidate passed five capacity cases then failed owned-image
+cleanup with exit 16. The [bounded detachment repair](../../evidence/change-journals/gate-c/c-07f-owned-image-detachment.md)
+rechecks ownership on EBUSY retries within one deadline and preserves failure
+retention. Thirteen orchestration checks pass; native candidate rerun remains
+required. This new observed cleanup deficiency does not erase PR115 evidence
+or qualify PR116, and C-07 remains open.
