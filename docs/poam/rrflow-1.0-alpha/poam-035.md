@@ -732,3 +732,11 @@ sampling failed on a 2.230-second interval around automatic maintenance. A
 profiled repeat later failed restart startup; profiling is not qualification.
 No full 24-hour soak started. Complete the new installed comparison and diagnose
 remaining scheduling, maintenance, startup and full-profile gaps before closure.
+
+
+The PR116 macOS candidate passed five capacity cases then failed owned-image
+cleanup with exit 16. The [bounded detachment repair](../../evidence/change-journals/gate-c/c-07f-owned-image-detachment.md)
+rechecks ownership on EBUSY retries within one deadline and preserves failure
+retention. Thirteen orchestration checks pass; native candidate rerun remains
+required. This new observed cleanup deficiency does not erase PR115 evidence
+or qualify PR116, and C-07 remains open.

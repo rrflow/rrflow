@@ -189,3 +189,18 @@ accounting implementation is claimed. Existing C-07 and POAM-035 remain open;
 the accounting plan remains owned by the existing data-flow/H-05/G-06 records.
 
 Documentation policy, generated navigation check, generated execution inventory (1,592 records), final formatting and staged whitespace checks passed. Candidate CI and optimized Linux sustained comparison are pending at commit; no roadmap completion status changed.
+
+
+### CI-exposed prerequisite cleanup integration
+
+PR116 source 469a4a56 failed macOS job 120935676134 after five passing native
+capacity cases, during owned-image cleanup (exit 16). Its repair is separately
+recorded in [the cleanup journal](c-07f-owned-image-detachment.md). The PR117
+brief was extended before integrating exact prerequisite repair
+`88fbc5b41128371eabff21928b48d84255372e90` normally. Resolve the POAM append
+conflict by retaining both observations; regenerate the mechanical inventory.
+No runtime code differs from digest candidate d512b932 because of this cleanup
+integration. Its ongoing optimized Linux characterization keeps its original
+source identity. Both candidates still require native CI before landing.
+
+The integrated 13-check cleanup suite passed in 0.056 seconds. Documentation caught an encoding error during conflict resolution; restored the original UTF-8 heading from Git and retained both evidence additions before regenerating indexes.
