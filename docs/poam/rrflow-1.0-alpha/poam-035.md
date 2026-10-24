@@ -764,3 +764,12 @@ default is unchanged, the failed point is retained, and the 10k growth run
 already shows slow independent readback after all writes acknowledged. The
 linked backup journal records configuration sensitivity and bounded diagnostic
 profiling; neither the small result nor an increased cache closes this gap.
+
+
+The 64-MiB-cache 10k run completed all corpus acknowledgements/readbacks but
+failed its first forced restart before any measured segment. The test capture
+hid the engine's stderr behind a readiness-channel disconnection. The
+[bounded startup capture repair](../../evidence/change-journals/gate-c/c-07g-startup-failure-capture.md)
+keeps both stream limits and failure semantics while retaining the terminal
+cause. The engine restart defect remains undiagnosed; native reproduction is
+required and no soak is running.
