@@ -100,6 +100,7 @@ mod query_admission;
 mod query_transaction;
 mod recovery;
 mod security;
+mod session_transactions;
 mod storage_cursor;
 mod subscription;
 mod task;

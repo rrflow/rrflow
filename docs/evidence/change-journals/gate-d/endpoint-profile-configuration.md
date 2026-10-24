@@ -156,3 +156,27 @@ projections were checked against the canonical exporter. Existing unrelated
 implementations remain intact. There is no new product deficiency beyond the
 already-open D-06/D-05/H-04 obligations; roadmap completion and POA&M status are
 unchanged. Candidate CI and merge evidence remain attached to PR113.
+
+## Integration after PR109 and PR110
+
+Merged public main `2255c2bee9c2e4c2f7b44f053dc73a92feebc7b6` into this
+branch after both prerequisite candidates passed all 23 checks. The only
+conflict was the generated execution inventory; regenerate it from the combined
+tracked source. Engine module/test registrations merged both endpoint
+configuration and retained transaction modules. No implementation was discarded
+or history rewritten. Endpoint configuration keeps using the same control
+transaction authority; terminal session records remain independently addressed.
+The prior candidate does not qualify this combined tree: rerun the focused
+endpoint and session histories and require the new candidate pipeline.
+The first inventory regeneration rejected the still-unmerged index entry.
+Resolved that generated entry to its prior projection as an intermediate index
+state, then regenerated it from the complete combined tree before validation.
+Combined-tree checks passed: `cargo test -p rrd-engine --lib --locked`
+(176 passed, two existing ignored child/privileged fixtures; includes all four
+endpoint configuration and six retained-session histories), and
+`cargo test -p rrd-server --test http_process
+installed_endpoint_configuration_http_flow --locked -- --nocapture`
+(one actual installed HTTP restart/revocation test passed). Documentation,
+navigation, execution inventory, formatting and staged whitespace checks are
+repeated before the merge commit. Other package-wide checks above remain bound
+to their earlier revision; candidate CI must validate the combined revision.
