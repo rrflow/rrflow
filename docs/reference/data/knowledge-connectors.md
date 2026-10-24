@@ -14,6 +14,15 @@ graph families and project links. The
 schema generation and validation. D-06 owns activation, D-05 owns ingestion,
 H-09 owns family formation, H-10 owns project links, and H-04 owns client parity.
 
+**Knowledge path** is the user-facing name for a project-scoped binding to an
+external database or knowledge/reasoning service through such an adapter.
+It is a specialization of the existing connector boundary, not another plugin
+registry, database or executable type. Connecting HydraDB, Pinecone Nexus,
+Qdrant or SurrealDB must preserve that source's actual supported profile and
+provenance. A configured path does not authorize import, cross-project sharing
+or background learning. The engine may propose project profile enrichment
+from admitted evidence; accepting a profile revision remains a separate effect.
+
 ## AI-readable requirements and availability
 
 Extend the existing executable operation/capability catalogue and
@@ -120,6 +129,72 @@ supported citations, answer quality, multi-hop recall, stale/denied leakage,
 indexing cost and update cost. Graph summaries must not amplify untrusted
 source instructions into permissions.
 
+## Graph and retrieval baselines
+
+This is a target acceptance contract; no baseline-management operation is
+implemented by this document. Implement it through the existing engine-owned
+versioned evidence, configuration, projection and job boundaries. Generate
+public operations and client models from their canonical types when admitted.
+
+A baseline captures the evidence needed to compare a proposed change, rather
+than copying an unbounded estate or freezing a user's permissions forever:
+
+| Coordinate | Required retained identity |
+|---|---|
+| Project and reads | Exact estate/instance, relevant committed project inventory, read stamp, schema revision and source manifest/checkpoints. An unversioned foreign response is explicitly non-reproducible. |
+| Knowledge construction | Source/chunk/claim locators and digests; extraction, chunking and graph-family definitions; model/template identities; accepted corrections and projection build/source cursors. |
+| Retrieval | Query/task corpus and split digests, embedding space, index/artifact revisions, filtering/fusion/reranking policy, eligible models and effective configuration. |
+| Evaluation | Verifier/rubric versions, expected facts/relations/citations, budgets, hardware/runtime profile, measurements and uncertainty. Freeze acceptance thresholds before examining candidate test results. |
+| Retention | Required retained artifacts and evidence, expiry, pin/lease owner, storage budget and cleanup policy. Metadata references alone do not guarantee replay availability. |
+
+Bind the baseline to one coherent published state. Concurrent source updates
+cannot produce a silently mixed snapshot. Immutable foreign revisions may be
+retained only when authorized; otherwise record the limitation and reject an
+exact-replay claim. Retention expiry, source deletion, unavailable artifacts or
+incompatible readers produce an explicit unavailable or partial result.
+Historical authorization is evidence, never a grant: every inspection,
+comparison and export must pass current authorization and deletion policy.
+
+Distinguish three operations in the UI and engine:
+
+1. A graph layout/filter change is a bounded presentation preference. It does
+   not mutate facts, infer edges, rebuild indexes or change query semantics.
+2. A knowledge correction is an authorized canonical mutation with source
+   evidence, expected version and receipt. It creates a new revision; a
+   historical baseline is not overwritten. Distinguish corrected facts from
+   unverified extracted relationships.
+3. A graph-building or retrieval-policy change creates a candidate derived
+   revision under the admitted build/job mechanism. Compare against the pinned
+   baseline before publication; never create a second persistence authority or
+   route normal queries to incomplete candidate output.
+
+Run baseline and candidate over the same authorized corpus and budgets. Report
+retrieval recall, supported citations, downstream task success, relationship
+changes, stale/denied leakage, update cost, p50/p95/p99 latency and peak
+resource work, with sample counts and per-family failures. Separate quality
+effects from changed source content or model endpoints. Use a fixed retrieval
+oracle where possible; model-answer comparisons require repeated evaluations
+and reported variation. An authorization violation cannot be traded for a
+better aggregate score. Candidate rejection leaves the active revision intact.
+
+Promotion is a separately authorized configuration/projection transition with
+expected revision, verified artifact identities and a durable receipt. In-flight
+reads retain their original stamp. Rollback selects a compatible prior policy
+through a new revision; it cannot undo later source corrections or deletions.
+A baseline is not a backup, native restore image or cross-project sharing grant.
+Bound concurrent builds, pinned bytes, leases, query work and cancellation;
+refuse admission when the estate cannot afford the retained comparison.
+
+Qualification must join connect/import, baseline capture, query/citations,
+source edit, candidate rebuild, comparison, promotion/rejection, restart and
+readback. Include source ACL revocation, deleted chunks, incompatible embeddings,
+expired retention, stale promotion, lost ACK, partial publication and quota
+failure. Historical evidence must remain interpretable when retained and
+authorized, while current results use the accepted current revision. D-05/D-06,
+E/F, H-02/H-09 and H-06 own their respective parts; the
+[dependency spine](../../roadmap/rrflow-1.0/executable-dependency-spine.md#project-to-learning-acceptance-journey)
+binds the joined acceptance journey. This adds no gate-completion claim.
+
 ## Parquet and external knowledge services
 
 Apache Parquet is a columnar interchange/analytical artifact format, not
@@ -196,7 +271,7 @@ a separate [interoperability contract](duckdb.md). Support is not implemented;
 the existing Parquet export is its starting boundary, not conformance evidence.
 Its ordered packages remain under D-06 and depend on C-07/F as specified there.
 
-HydraDB, Pinecone Nexus and Qdrant each require a separately implemented and
+HydraDB, Pinecone Nexus, Qdrant and SurrealDB each require a separately implemented and
 qualified optional adapter; none is qualified by this document.
 Never advertise vendor support from a logo, schema stub or generic HTTP
 client. Pin the actual service API/SDK and admitted feature profile when its

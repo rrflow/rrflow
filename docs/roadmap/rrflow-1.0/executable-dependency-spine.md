@@ -34,6 +34,42 @@ checkout-only constructor.
 | 11 | I-01 through I-07 | Canonical events, triggers, routines, skills, and optional host adapters are explicit persisted capabilities, not hooks or a parallel runtime. |
 | 12 | J-01 through J-03, then KB-08, then J-04 and J-05 | Alternate paths are absent; failure and clean-install qualification pass on every supported native artifact; rrflowDB becomes the normal warp path; comparative evidence and the signed distribution close release. |
 
+## Project-to-learning acceptance journey
+
+The owner-requested experience below maps onto the waves above. It is not a
+second implementation order, an added runtime workflow or a completion ledger.
+**C-07 remains the active implementation gate.** Existing installed local
+database and bounded Connectome evidence do not qualify the full journey.
+
+| User milestone | Existing owners and prerequisite exit | Real-world acceptance that must be retained |
+|---|---|---|
+| Create or reopen a project | D-01 installed identity/plan/apply; C-07 durability; D-02/D-03 jobs and inventory; H-06 guided client. | In fresh/existing modes, accept an exact preview and automatically provision one project estate/rrflowDB with native rrflowKV; reopen reuses its identities and acknowledged data. Cancel/deny performs no unauthorized effect. Two projects remain isolated during simultaneous work, UI switching and restart. |
+| Add a knowledge path | D-06 typed binding and requirements; D-05 ingestion after E/F; H-04 public operations; H-09 derived families. | A qualified real source yields versioned chunks, relations and citations with ACL/freshness evidence. Edit/delete/revoke, duplicate delivery, source outage, interrupted ingest and restart cannot silently publish stale, partial or foreign knowledge. HydraDB, Pinecone Nexus, Qdrant and SurrealDB each need their own admitted real-service profile. |
+| Establish and edit against a baseline | D/E/F provenance, stamped access and budgets; H-02 feedback and H-09 graph families; H-06 comparison projection. | Capture an authorized retained baseline, change a graph/retrieval candidate, compare equal corpus/budgets, reject or promote by exact revision, then reopen and verify. Layout changes leave semantics unchanged; knowledge corrections create new revisions. Expired artifacts, ACL changes, stale promotion and resource exhaustion fail explicitly. |
+| Understand and replay a session | H-05 causal/redacted evidence and H-06 public projections; G and I prerequisites for the specific reasoning/routine records displayed. | Inspect a real retained session/run after restart with source/configuration identity and visible evidence gaps; a model/tool effect counter remains unchanged during inspection. A requested new run has new identity, current authorization, budget and receipts. No old bearer session, hidden reasoning or uncertain mutation is replayed as new work. |
+| Attune and improve locally | G-06 fixed-corpus evaluation may prepare early; installed comparisons require G-01–G-05; I-03/I-07 depend on their generic routine/configuration/evidence foundations. | Supervised and unsupervised candidates remain distinct proposals. Held-out quality, denied-data exclusion, bounded recursion, drift/regression, restart, competing promotions and rollback prove governed improvement. Failed candidates never replace the active revision. |
+| Opt into remote access or sync | H-07a–g, D-06 and H-04; the learning-service role additionally requires G/I qualification. | A real configured account binds the intended instance; a second device authenticates independently. Both-direction lost ACK, offline edits/deletes, conflicts, revoke and three-peer echo tests retain exact receipts and bounded checkpoints. No login implies training consent; local work survives service loss. |
+| Open a private devspace | H-07e/f/g runtime, selected files/environment and native state; J platform/distribution evidence. | DevPulse or shippin.cloud provisions an authorized isolated runtime, builds/runs Rust/Python/Go fixtures and opens their private UIs. Database, source and environment readiness are separately visible; account/project switches cannot expose another project's data or mounts. Repeat the supported homelab profile without managed services. |
+
+Detailed semantics remain with the single owners:
+[project topology](../../architecture/instance-topology.md),
+[knowledge paths and baselines](../../reference/data/knowledge-connectors.md#graph-and-retrieval-baselines),
+[Connectome project/session interaction](../../reference/client/connectome.md#guided-project-knowledge-and-session-journey),
+[RROFLOW learning](../../reference/inference/learning/controller-training.md#staged-learning-and-feedback)
+and [optional managed-service roles](../../reference/client/devpulse-cloud.md#optional-managed-service-roles).
+rrflow.ai/rroflow.ai are planned configurable destinations; their names do not
+establish deployed endpoints. H-07 and local learning can be qualified
+independently; the combined offering requires both. Cloud participation is
+optional, and parallel project execution never implies shared context.
+
+Each acceptance run must bind exact engine/client/adapter artifacts, project
+fixtures, source revisions, policies and budgets, then retain operations,
+failures and durable readback across the joined flow. One green event, a mock
+service, elapsed engineering time or a UI screenshot cannot close these rows.
+Gate J still owns comparative claims, signed delivery and final release.
+
+## Continuing implementation and accepted foundations
+
 A-07 freezes the operation-name, causal-link, attribute, and propagation
 vocabulary. Each later work package adds the trace and physical counters for
 its behavior in the same change. H-05 proves complete cross-surface
