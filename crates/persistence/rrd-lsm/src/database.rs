@@ -3,7 +3,7 @@ use crate::io::{IoContext, SharedIoContext};
 use crate::mutable::MutableCharge;
 use crate::segment::{
     new_page_cache_with_limits, next_projected_cache_access, page_cache_stats, ActiveReadViews,
-    ReadView, SharedPageCache,
+    ReadView, SelectedVersion, SharedPageCache,
 };
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
 use crate::{
@@ -2418,19 +2418,27 @@ impl Database {
             return Ok(version.value.as_deref().map(<[u8]>::to_vec));
         }
         let mut best_sequence = 0;
-        let mut best_value = None;
+        let mut selected = None;
         for segment in &self.segments {
-            if let Some(version) = segment.get_version(key, snapshot.sequence)? {
-                if version.sequence > best_sequence {
-                    best_sequence = version.sequence;
-                    best_value = version.value;
+            if let Some(version) = segment.select_version(key, snapshot.sequence)? {
+                if version.sequence() > best_sequence {
+                    best_sequence = version.sequence();
+                    selected = Some(version);
                 }
             }
         }
-        Ok(best_value.map(|value| value.into_vec()))
+        // Selection loads authenticated key/sequence spines, not value pages.
+        // Materialize only the winner, including a winning tombstone.
+        match selected {
+            Some(version) => version.value(),
+            None => Ok(None),
+        }
     }
 
     pub fn get_many(&self, keys: &[Vec<u8>], snapshot: Snapshot) -> Result<Vec<Option<Vec<u8>>>> {
+        if self.segments.len() <= 1 {
+            return keys.iter().map(|key| self.get(key, snapshot)).collect();
+        }
         let mut values = vec![None; keys.len()];
         let mut unresolved = Vec::with_capacity(keys.len());
         for (index, key) in keys.iter().enumerate() {
@@ -2443,34 +2451,30 @@ impl Database {
         if unresolved.is_empty() {
             return Ok(values);
         }
-        let unresolved_keys = unresolved
-            .iter()
-            .map(|index| keys[*index].as_slice())
-            .collect::<Vec<_>>();
-        if self.segments.len() == 1 && self.memtable.version_count() == 0 {
-            for (position, version) in self.segments[0]
-                .get_versions(&unresolved_keys, snapshot.sequence)?
-                .into_iter()
-                .enumerate()
-            {
-                values[unresolved[position]] = version
-                    .and_then(|version| version.value)
-                    .map(|value| value.into_vec());
-            }
-            return Ok(values);
-        }
-        let mut best_sequences = vec![0u64; unresolved.len()];
+        // Visit keys within each segment so a small cache can reuse its spine.
+        // Keep only borrowed row identities, never a batch of losing payloads
+        // or retained pages. The first segment still wins equal sequences.
+        let mut selected: Vec<Option<SelectedVersion<'_>>> = std::iter::repeat_with(|| None)
+            .take(unresolved.len())
+            .collect();
         for segment in &self.segments {
-            for (position, version) in segment
-                .get_versions(&unresolved_keys, snapshot.sequence)?
-                .into_iter()
-                .enumerate()
-            {
-                if let Some(version) = version {
-                    if version.sequence > best_sequences[position] {
-                        best_sequences[position] = version.sequence;
-                        values[unresolved[position]] = version.value.map(|value| value.into_vec());
+            for (position, index) in unresolved.iter().enumerate() {
+                if let Some(version) = segment.select_version(&keys[*index], snapshot.sequence)? {
+                    if selected[position]
+                        .as_ref()
+                        .is_none_or(|current| version.sequence() > current.sequence())
+                    {
+                        selected[position] = Some(version);
                     }
+                }
+            }
+        }
+        // Preserve payload locality too when requested keys alternate between
+        // segments. Caller order and duplicates remain in the result vector.
+        for segment in &self.segments {
+            for (index, selected) in unresolved.iter().zip(&mut selected) {
+                if let Some(version) = selected.take_if(|version| version.belongs_to(segment)) {
+                    values[*index] = version.value()?;
                 }
             }
         }

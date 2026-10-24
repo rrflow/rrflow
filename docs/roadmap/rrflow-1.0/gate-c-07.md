@@ -651,3 +651,12 @@ Stop on any lost ACK, partial batch, stale authority, cap violation,
 unexplained growing live owner, unknown effect or changed format/authority.
 Retain failures; repair at the canonical boundary before advancing. Neither
 this plan nor a successful component suite marks C-07 or alpha complete.
+
+
+The [immutable point-read selection repair](../../evidence/change-journals/gate-c/c-07g-point-read-selection.md)
+records a reproduced growth cost: a six-byte winner read 131219 bytes because
+superseded values were hydrated before sequence selection. Winner-only reads
+reduce that fixture to 113 bytes; bounded batch traversal preserves both
+metadata and payload locality. Exact snapshot, deletion, compaction and reopen
+checks accompany the repair. This component evidence does not establish the
+installed operating point or close the scheduling, growth or 24-hour soak gap.
