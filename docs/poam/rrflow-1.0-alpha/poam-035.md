@@ -6,6 +6,34 @@
 
 ## Observed deficiency
 
+The [retained nominal Desktop failure](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-failure.md)
+records a corpus-write deadline after 50685 acknowledgements, zero accepted
+segments and confirmed cleanup. The 24-hour phase never began. The next repair
+must attribute the bounded write failure and high cumulative segment reads at
+the existing allocation; no timeout extension or completed qualification is
+claimed. C-07g and this deficiency remain open.
+
+The [nominal Desktop qualification launch](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-launch.md)
+starts the existing installed driver in the isolated eight-GiB guest with
+three seeds, 100 forced reopens and 24-hour soak phases. Its first seed is
+still ingesting; a running campaign is not a completed result. Full readback,
+lifecycle, sustained phases, offline reconciliation and remaining profile
+points stay required. The separate WSL preflight remains characterization.
+
+The [isolated Desktop host preparation](../../evidence/change-journals/gate-c/c-07g-desktop-vm-preparation.md)
+provides an owned four-vCPU/eight-GiB KVM guest, verified image provenance,
+ordinary-primary compatibility and writable delegated resource limits. This
+removes a host-preparation prerequisite; no guest installed workload or
+24-hour result is claimed. The larger WSL preflight continues separately.
+
+The [Desktop-corpus preflight launch](../../evidence/change-journals/gate-c/c-07g-desktop-preflight-launch.md)
+advances to the actual 100000-record/500000-edge/100000-vector corpus under
+the two-GiB engine cap. Its launch is not a completed result: ingestion,
+independent readback and the frozen short load phases must finish before any
+success claim. The eight-GiB host profile, complete repetitions/native matrix
+and 24-hour qualification remain outstanding. The same record retains a
+further macOS metadata-fill deadline failure from PR108; this gap stays open.
+
 The [session retention regression and repair](../../evidence/change-journals/gate-c/c-07g-session-transaction-retention.md)
 reproduced 52280 bytes of hot session state after 32 completed transactions on
 both rrflowMX and rrflowKV. Historical transaction accumulation could exhaust
