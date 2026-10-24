@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [retained nominal Desktop failure](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-failure.md)
+records a corpus-write deadline after 50685 acknowledgements, zero accepted
+segments and confirmed cleanup. The 24-hour phase never began. The next repair
+must attribute the bounded write failure and high cumulative segment reads at
+the existing allocation; no timeout extension or completed qualification is
+claimed. C-07g and this deficiency remain open.
+
 The [nominal Desktop qualification launch](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-launch.md)
 starts the existing installed driver in the isolated eight-GiB guest with
 three seeds, 100 forced reopens and 24-hour soak phases. Its first seed is
