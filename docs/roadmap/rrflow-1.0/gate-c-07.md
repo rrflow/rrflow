@@ -92,6 +92,15 @@ frozen 5-RPS characterization is allowed by the profile matrix; it cannot erase
 or qualify the failed 25-RPS point. Preserve transaction, backup and readback
 oracles throughout this investigation.
 
+The [canonical digest optimization](../../evidence/change-journals/gate-c/c-07g-canonical-digest-throughput.md)
+records the next measured cost: native CPU samples identify scalar SHA-256 as a
+hot path. Reuse the pinned cryptographic primitive at the existing kernel
+boundary, require unchanged persisted/public digests and then rerun the installed
+flow. Primitive throughput and faster development checks do not qualify the
+sustained operating point. Retain the 25-RPS failures, the 5-RPS resource-sampling
+gap and the diagnostic restart failures; full profile/repetition and actual
+24-hour acceptance remain open.
+
 Execution discipline: describe progress as implemented behavior, reproduced
 failure, measured improvement, or completed acceptance. Keep outstanding work
 in this owner and POAM035; use one linked journal per source package. Run the
@@ -651,3 +660,43 @@ Stop on any lost ACK, partial batch, stale authority, cap violation,
 unexplained growing live owner, unknown effect or changed format/authority.
 Retain failures; repair at the canonical boundary before advancing. Neither
 this plan nor a successful component suite marks C-07 or alpha complete.
+
+
+The [bounded backup-checkpoint repair](../../evidence/change-journals/gate-c/c-07g-backup-checkpoint-cost.md)
+addresses another measured cost before full growth: default logical export
+synced each action and receipt, extending backup beyond the offered segment.
+Bounded checkpoints preserve final durability, byte identity and explicit
+per-action callback semantics. The digest-only 1k/5RPS point completed but
+still failed; the 10k run was explicitly interrupted after all corpus writes
+and partial independent readback. These are retained limitations, not closure.
+
+
+The [startup capture and completed 10k reproduction](../../evidence/change-journals/gate-c/c-07g-startup-failure-capture.md)
+records PR116's accepted 23-check prerequisite and PR117's remaining growth
+blockers. The full 10k data/restart/readback flow completed, but 110/600 offers
+were rejected and 95 exceeded latency budget; final readback cost 431.358 s.
+Separate the backup join's artificial dispatch delay from the later native
+response/readback/maintenance cost. The next bounded driver repair must keep
+management work within explicit resource/deadline ownership while continuing
+offers on the original schedule, preserve reader lifetime bounds and prove
+write/backup overlap from receipts. Do not hide delay by resetting clocks,
+raising thresholds, omitting independent readback, or silently changing the
+frozen profile. The prior intermittent startup exit still needs diagnosis;
+one successful reproduction does not close it. C-07 and actual 24-hour
+qualification remain open.
+
+The [immutable point-read selection repair](../../evidence/change-journals/gate-c/c-07g-point-read-selection.md)
+records a reproduced growth cost: a six-byte winner read 131219 bytes because
+superseded values were hydrated before sequence selection. Winner-only reads
+reduce that fixture to 113 bytes; bounded batch traversal preserves both
+metadata and payload locality. Exact snapshot, deletion, compaction and reopen
+checks accompany the repair. This component evidence does not establish the
+installed operating point or close the scheduling, growth or 24-hour soak gap.
+
+The [bounded backup scheduling repair](../../evidence/change-journals/gate-c/c-07g-backup-scheduling.md)
+removes the per-segment management join from offered-load dispatch. One task
+keeps its original deadline across segments; stream validation reconstructs
+its start, acknowledged-write overlap and verified completion without retaining
+old ledgers. Missing or unfinished evidence fails. Native smoke and contract
+checks support the implementation; integrated growth, profile repetitions and
+the actual 24-hour soak remain required before C-07 can close.
