@@ -714,3 +714,10 @@ owned startup-failure bytes after child cleanup. Admission remains strict;
 actual native cause and repair remain pending. The same record retains a new
 macOS CI failure: metadata fill reached its 8192-file bound before obtaining
 capacity denial. That C-07f fixture gap also blocks candidate acceptance.
+
+The [completed integrated 10k characterization](../../evidence/change-journals/gate-c/c-07g-admission-native-characterization.md)
+records 600 acknowledged operations without failures or latency overruns,
+verified backup under offered writes, compaction/drain and complete restart
+readback. It does not resolve the earlier intermittent startup denial or
+qualify the full profile/24-hour matrix. A separate 100-reopen investigation
+is running; no C-07 completion follows.
