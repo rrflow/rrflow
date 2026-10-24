@@ -72,13 +72,37 @@ fn lexical_escape_and_hard_link_denial_preserve_outside_bytes() {
     }
     std::fs::hard_link(&outside, root.join("linked")).unwrap();
     let linked = anchor.join("linked");
-    assert!(linked.read().is_err());
+    let error = linked.read().unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert!(error.to_string().contains("observed=2"));
+    assert!(error.to_string().contains("\"linked\""));
+    assert!(!error
+        .to_string()
+        .contains(&root.to_string_lossy().to_string()));
     assert!(OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(&linked)
         .is_err());
     assert_eq!(std::fs::read(&outside).unwrap(), b"outside sentinel");
+}
+
+#[cfg(unix)]
+#[test]
+fn unlinked_open_handle_is_distinguished_without_relaxing_admission() {
+    let fixture = tempfile::tempdir().unwrap();
+    let anchor = AnchoredPath::open_root(fixture.path()).unwrap();
+    let name = fixture.path().join("unlinked");
+    std::fs::write(&name, b"retained bytes").unwrap();
+    let file = std::fs::File::open(&name).unwrap();
+    std::fs::remove_file(&name).unwrap();
+    let error = anchor
+        .join("unlinked")
+        .open_file_with(|_, _| Ok(file))
+        .unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    assert!(error.to_string().contains("observed=0"));
+    assert!(error.to_string().contains("\"unlinked\""));
 }
 
 #[test]
