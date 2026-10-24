@@ -148,7 +148,9 @@ processes were preserved.
 Final formatting, documentation, navigation, generated-surface, execution-
 inventory and whitespace checks are recorded before the implementation commit.
 The whitespace check caught an extra terminal blank line in this journal;
-it was trimmed and the check rerun. Changed boundary code and the complete
+it was trimmed and the check rerun. The staged diff additionally caught CRLF
+line endings in the new HTTP handler, which the earlier unstaged-only check did
+not inspect. The handler was normalized to LF before publication. Changed boundary code and the complete
 package diff were reviewed; generated
 projections were checked against the canonical exporter. Existing unrelated
 implementations remain intact. There is no new product deficiency beyond the
