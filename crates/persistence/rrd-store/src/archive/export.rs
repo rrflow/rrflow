@@ -14,6 +14,24 @@ use std::collections::VecDeque;
 
 const PAGE_SIZE: usize = 1_024;
 
+#[derive(Clone, Copy)]
+struct CheckpointPolicy {
+    actions: usize,
+    payload_bytes: usize,
+}
+
+// No action is retained in memory for batching. These bounds limit the private
+// archive prefix since its last durable receipt; publication still syncs all
+// bytes. One already-admitted action may cross the byte threshold.
+const BACKUP_CHECKPOINTS: CheckpointPolicy = CheckpointPolicy {
+    actions: 64,
+    payload_bytes: 1024 * 1024,
+};
+const ACTION_CHECKPOINTS: CheckpointPolicy = CheckpointPolicy {
+    actions: 1,
+    payload_bytes: 1024 * 1024,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SourceSummary {
     claim_sequence: u64,
@@ -31,7 +49,7 @@ pub fn export_logical_archive<E: StorageEngine>(
     destination: &(impl AnchorInput + ?Sized),
 ) -> Result<LogicalArchiveInventory> {
     let destination = &destination.anchor().map_err(archive_io)?;
-    export_logical_archive_with_progress(engine, destination, |_| Ok(()))
+    export_with_checkpoints(engine, destination, BACKUP_CHECKPOINTS, |_| Ok(()))
 }
 
 /// Exports a stable logical cut while publishing durable action/receipt
@@ -41,6 +59,15 @@ pub fn export_logical_archive<E: StorageEngine>(
 pub fn export_logical_archive_with_progress<E: StorageEngine>(
     engine: &E,
     destination: &(impl AnchorInput + ?Sized),
+    progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
+) -> Result<LogicalArchiveInventory> {
+    export_with_checkpoints(engine, destination, ACTION_CHECKPOINTS, progress)
+}
+
+fn export_with_checkpoints<E: StorageEngine>(
+    engine: &E,
+    destination: &(impl AnchorInput + ?Sized),
+    checkpoints: CheckpointPolicy,
     mut progress: impl FnMut(&LogicalArchiveProgress) -> Result<()>,
 ) -> Result<LogicalArchiveInventory> {
     let destination = &destination.anchor().map_err(archive_io)?;
@@ -148,11 +175,7 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
 
     let mut prefix_reader = PrefixActionReader::open(&partial_path, &prefix)?;
     let mut writer = ArchiveWriter::resume(&partial_path, &prefix)?;
-    let emitted = stream_source(engine, |action, payload| {
-        if prefix_reader.compare_or_absent(action, payload)? {
-            return Ok(());
-        }
-        writer.action(action, payload)?;
+    let mut checkpoint = |writer: &mut ArchiveWriter| -> Result<()> {
         writer.sync()?;
         let durable = writer.prefix_inventory()?;
         let checkpoint = LogicalArchiveProgress {
@@ -174,6 +197,24 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
             checkpoint: LogicalArchiveCheckpoint::ReceiptDurable,
             ..checkpoint
         })
+    };
+    let mut pending_actions = 0usize;
+    let mut pending_bytes = 0usize;
+    let emitted = stream_source(engine, |action, payload| {
+        if prefix_reader.compare_or_absent(action, payload)? {
+            return Ok(());
+        }
+        writer.action(action, payload)?;
+        pending_actions += 1;
+        pending_bytes = pending_bytes
+            .checked_add(payload.len())
+            .ok_or_else(|| Error::Archive("export checkpoint byte count overflow".into()))?;
+        if pending_actions >= checkpoints.actions || pending_bytes >= checkpoints.payload_bytes {
+            checkpoint(&mut writer)?;
+            pending_actions = 0;
+            pending_bytes = 0;
+        }
+        Ok(())
     });
     let emitted = match emitted {
         Ok(value) => value,
@@ -192,6 +233,9 @@ pub fn export_logical_archive_with_progress<E: StorageEngine>(
         return Err(Error::Archive(
             "logical export source changed between validation and publication".into(),
         ));
+    }
+    if pending_actions != 0 {
+        checkpoint(&mut writer)?;
     }
     let inventory = writer.finish()?;
     if inventory.runtime_audit_sha256 != expected.runtime_audit_sha256 {
@@ -540,4 +584,175 @@ impl<'a, E: StorageEngine> RuntimeCommitPager<'a, E> {
 
 fn archive_io(error: std::io::Error) -> Error {
     Error::Archive(error.to_string())
+}
+
+#[cfg(test)]
+mod checkpoint_tests {
+    use super::*;
+    use crate::RrflowKvStore;
+    use rrd_core::{Predicate, Producer, ScopeId, Subject};
+    use std::path::Path;
+
+    fn source(path: &Path, actions: u64, value_bytes: usize) -> RrflowKvStore {
+        let store = RrflowKvStore::open(path).unwrap();
+        for index in 0..actions {
+            let claim = Claim::new(
+                Subject::new(format!("checkpoint:{index}")).unwrap(),
+                Predicate::new("value").unwrap(),
+                "x".repeat(value_bytes),
+                index + 1,
+                index + 1,
+                Producer {
+                    actor: "archive-checkpoint-test".into(),
+                    on_behalf_of: None,
+                    session: None,
+                },
+            );
+            if index % 2 == 0 {
+                store.claims().append_batch(&[claim]).unwrap();
+            } else {
+                store
+                    .runtime()
+                    .commit(&RuntimeCommit {
+                        scope: ScopeId::new("instance:checkpoint").unwrap(),
+                        at: index + 1,
+                        actor: "archive-checkpoint-test".into(),
+                        expected_cursor: store.runtime().cursor().unwrap(),
+                        mutations: vec![RuntimeMutation::Claim { claim }],
+                    })
+                    .unwrap();
+            }
+        }
+        store
+    }
+
+    #[test]
+    fn batched_export_preserves_bytes_restore_and_per_action_callbacks() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = source(&dir.path().join("source"), 130, 8);
+        let baseline = dir.path().join("per-action");
+        let mut per_action = Vec::new();
+        let expected = export_logical_archive_with_progress(&store, &baseline, |p| {
+            if p.checkpoint == LogicalArchiveCheckpoint::ReceiptDurable {
+                per_action.push(p.completed_actions);
+            }
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(per_action, (1..=130).collect::<Vec<_>>());
+        let archive = dir.path().join("batched");
+        let mut checkpoints = Vec::new();
+        let actual = export_with_checkpoints(&store, &archive, BACKUP_CHECKPOINTS, |p| {
+            if p.checkpoint == LogicalArchiveCheckpoint::ReceiptDurable {
+                checkpoints.push(p.completed_actions);
+            }
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(checkpoints, [64, 128, 130]);
+        assert_eq!(actual, expected);
+        assert_eq!(
+            std::fs::read(&archive).unwrap(),
+            std::fs::read(baseline).unwrap()
+        );
+        let restored = dir.path().join("restored");
+        crate::restore_logical_archive_to_new_root(&archive, &restored, 200).unwrap();
+        let reopened = RrflowKvStore::open(&restored).unwrap();
+        assert_eq!(
+            reopened.claims().claims_in_range(0, 130).unwrap(),
+            store.claims().claims_in_range(0, 130).unwrap()
+        );
+        let reexported = dir.path().join("restored-export");
+        assert_eq!(
+            export_logical_archive(&reopened, &reexported).unwrap(),
+            expected
+        );
+        assert_eq!(
+            std::fs::read(reexported).unwrap(),
+            std::fs::read(archive).unwrap()
+        );
+    }
+
+    #[test]
+    fn interruption_at_batched_durable_boundaries_resumes_identically() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = source(&dir.path().join("source"), 130, 8);
+        let baseline = dir.path().join("baseline");
+        let expected = export_logical_archive(&store, &baseline).unwrap();
+        for (ordinal, checkpoint) in [
+            LogicalArchiveCheckpoint::ActionDurable,
+            LogicalArchiveCheckpoint::ReceiptDurable,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for count in [64, 128, 130] {
+                let archive = dir.path().join(format!("interrupted-{ordinal}-{count}"));
+                let error = export_with_checkpoints(&store, &archive, BACKUP_CHECKPOINTS, |p| {
+                    if p.checkpoint == checkpoint && p.completed_actions == count {
+                        return Err(Error::FaultInjected("batched_checkpoint"));
+                    }
+                    Ok(())
+                })
+                .unwrap_err();
+                assert!(matches!(error, Error::FaultInjected("batched_checkpoint")));
+                assert!(!archive.exists());
+                assert_eq!(export_logical_archive(&store, &archive).unwrap(), expected);
+                assert_eq!(
+                    std::fs::read(archive).unwrap(),
+                    std::fs::read(&baseline).unwrap()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn payload_bound_checkpoints_before_action_count_and_flushes_tail() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = source(&dir.path().join("source"), 5, 400_000);
+        let mut checkpoints = Vec::new();
+        let archive = dir.path().join("bounded");
+        export_with_checkpoints(&store, &archive, BACKUP_CHECKPOINTS, |p| {
+            if p.checkpoint == LogicalArchiveCheckpoint::ReceiptDurable {
+                checkpoints.push(p.completed_actions);
+            }
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(checkpoints, [3, 5]);
+        let baseline = dir.path().join("baseline");
+        export_logical_archive_with_progress(&store, &baseline, |_| Ok(())).unwrap();
+        assert_eq!(
+            std::fs::read(archive).unwrap(),
+            std::fs::read(baseline).unwrap()
+        );
+    }
+
+    #[test]
+    #[ignore = "manual bounded native checkpoint comparison, not capacity qualification"]
+    fn bounded_checkpoint_measurement() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = source(&dir.path().join("source"), 512, 1024);
+        let mut baseline = None;
+        for (name, policy) in [
+            ("per-action", ACTION_CHECKPOINTS),
+            ("bounded", BACKUP_CHECKPOINTS),
+        ] {
+            let mut checkpoints = 0;
+            let started = std::time::Instant::now();
+            let inventory = export_with_checkpoints(&store, &dir.path().join(name), policy, |p| {
+                if p.checkpoint == LogicalArchiveCheckpoint::ReceiptDurable {
+                    checkpoints += 1;
+                }
+                Ok(())
+            })
+            .unwrap();
+            println!("archive_checkpoint_measurement mode={name} actions={} checkpoints={checkpoints} elapsed_ns={} qualification=false", inventory.action_count, started.elapsed().as_nanos());
+            if let Some(expected) = &baseline {
+                assert_eq!(&inventory, expected);
+            } else {
+                baseline = Some(inventory);
+            }
+        }
+    }
 }

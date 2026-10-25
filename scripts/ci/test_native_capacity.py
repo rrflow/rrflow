@@ -2,12 +2,15 @@
 from contextlib import contextmanager, redirect_stdout
 import io
 import json
+import plistlib
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import run_native_capacity as runner
+import run_filesystem_containment as containment
 
 
 class NativeCapacityCases(unittest.TestCase):
@@ -98,6 +101,97 @@ class NativeCapacityCases(unittest.TestCase):
         self.assertEqual(self.generation, 1)
         self.assertTrue((self.root / "capacity.img").is_file())
         self.assertNotIn("native_capacity_suite=", output.getvalue())
+
+
+class OwnedImageDetachment(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="rrflow-detach-")
+        self.addCleanup(self.temp.cleanup)
+        self.image = Path(self.temp.name).resolve() / "capacity.dmg"
+        self.image.write_bytes(b"owned fixture")
+        self.clock = 0.0
+        self.calls = []
+
+    def info(self, devices=("/dev/disk7",), duplicate=False):
+        rows = [{"image-path": str(self.image), "system-entities": [
+            {"dev-entry": device} for device in devices]}] if devices else []
+        if duplicate:
+            rows *= 2
+        return subprocess.CompletedProcess([], 0, plistlib.dumps({"images": rows}).decode(), "")
+
+    def detach(self, code=0):
+        return subprocess.CompletedProcess([], code, "", "native busy" if code == 16 else "native failure")
+
+    def invoke(self, responses, advance=0.1):
+        responses = iter(responses)
+        def run(*args, **kwargs):
+            self.calls.append(args)
+            self.assertTrue(kwargs["process_group"])
+            self.assertFalse(kwargs["check"])
+            self.assertGreater(kwargs["timeout"], 0)
+            self.assertLessEqual(kwargs["timeout"], 30)
+            self.clock += advance
+            return next(responses)
+        def sleep(seconds):
+            self.clock += seconds
+        with patch.object(containment, "run", side_effect=run), \
+             patch.object(containment.time, "monotonic", side_effect=lambda: self.clock), \
+             patch.object(containment.time, "sleep", side_effect=sleep):
+            containment.detach_owned_image(self.image)
+
+    def test_success_requires_verified_absence(self):
+        self.invoke([self.info(), self.detach(), self.info(())])
+        self.assertEqual([x[1] for x in self.calls], ["info", "detach", "info"])
+        self.assertEqual(self.image.read_bytes(), b"owned fixture")
+
+    def test_busy_rechecks_ownership_before_retry(self):
+        self.invoke([self.info(), self.detach(16), self.info(), self.detach(), self.info(())])
+        self.assertEqual([x[1] for x in self.calls], ["info", "detach", "info", "detach", "info"])
+        self.assertEqual([x[-1] for x in self.calls if x[1] == "detach"], ["/dev/disk7"] * 2)
+
+    def test_busy_response_can_be_resolved_by_confirmed_absence(self):
+        self.invoke([self.info(), self.detach(16), self.info(())])
+        self.assertEqual(len(self.calls), 3)
+
+    def test_nonbusy_failure_keeps_native_diagnostics_and_never_retries(self):
+        with self.assertRaisesRegex(RuntimeError, r"hdiutil detach \(5\): native failure"):
+            self.invoke([self.info(), self.detach(5)])
+        self.assertEqual(len(self.calls), 2)
+        self.assertTrue(self.image.exists())
+
+    def test_changed_or_ambiguous_device_is_never_detached(self):
+        with self.assertRaisesRegex(RuntimeError, "identity changed"):
+            self.invoke([self.info(), self.detach(16), self.info(("/dev/disk9",))])
+        self.assertEqual(len(self.calls), 3)
+        self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "ambiguous"):
+            self.invoke([self.info(duplicate=True)])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_busy_retries_are_finite_and_keep_fixture(self):
+        with self.assertRaisesRegex(RuntimeError, "bounded cleanup.*native busy"):
+            self.invoke([item for _ in range(5) for item in (self.info(), self.detach(16))] + [self.info()])
+        self.assertEqual(sum(x[1] == "detach" for x in self.calls), 5)
+        self.assertTrue(self.image.exists())
+
+    def test_deadline_is_shared_across_all_commands(self):
+        with self.assertRaisesRegex(RuntimeError, "cleanup deadline"):
+            self.invoke([self.info(), self.detach(16), self.info()], advance=15)
+        self.assertEqual(len(self.calls), 2)
+
+    def test_success_with_attachment_still_present_is_denied(self):
+        with self.assertRaisesRegex(RuntimeError, "remains attached"):
+            self.invoke([self.info(), self.detach(), self.info()])
+        self.assertEqual(len(self.calls), 3)
+        self.assertTrue(self.image.exists())
+
+    def test_missing_device_and_failed_inspection_never_detach(self):
+        with self.assertRaisesRegex(RuntimeError, "whole-device identity"):
+            self.invoke([self.info(("/dev/disk7s1",))])
+        self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "inspection failed"):
+            self.invoke([self.detach(5)])
+        self.assertEqual(len(self.calls), 1)
 
 
 if __name__ == "__main__":

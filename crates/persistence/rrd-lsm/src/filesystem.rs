@@ -224,8 +224,23 @@ impl AnchoredPath {
     ) -> io::Result<File> {
         let file = self.with_parent(open)?;
         self.admit_mount(&file)?;
-        native::validate_file(&file)?;
+        self.validate_file(&file)?;
         Ok(file)
+    }
+
+    fn validate_file(&self, file: &File) -> io::Result<()> {
+        native::validate_file(file).map_err(|error| {
+            // Preserve native OS error identities. Only our own admission
+            // denial gains bounded relative context; never emit file contents.
+            if error.kind() != io::ErrorKind::PermissionDenied || error.raw_os_error().is_some() {
+                return error;
+            }
+            let label: String = self.relative.to_string_lossy().chars().take(256).collect();
+            io::Error::new(
+                error.kind(),
+                format!("file admission at {label:?}: {error}"),
+            )
+        })
     }
 
     pub fn parent(&self) -> Option<Self> {
@@ -536,7 +551,7 @@ impl OpenOptions {
         crate::crash_test::observe_native_error("open", path.diagnostic_path(), &result);
         let file = result?;
         path.admit_mount(&file)?;
-        native::validate_file(&file)?;
+        path.validate_file(&file)?;
         if self.truncate {
             file.set_len(0)?;
         }

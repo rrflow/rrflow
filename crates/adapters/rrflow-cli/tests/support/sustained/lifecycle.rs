@@ -9,7 +9,15 @@ pub(super) async fn backup(
     key: String,
     clock: Instant,
 ) -> DriverResult<BackupEvidence> {
-    let started_ns = ns(clock);
+    backup_started(work, key, clock, ns(clock)).await
+}
+
+pub(super) async fn backup_started(
+    work: Workload,
+    key: String,
+    clock: Instant,
+    started_ns: u64,
+) -> DriverResult<BackupEvidence> {
     let receipt = work
         .client
         .create_backup(

@@ -149,6 +149,8 @@ capture contents, and fault lanes are owned by the
 No average-only report, development-profile timing, unbound debug log, or
 passing exporter test qualifies H-05.
 
+H-05 also owns the [project evidence and model-usage accounting contract](../../architecture/engine-data-flow.md#project-evidence-model-usage-and-reasoning-efficiency). Implement its public signals and project/session drilldown through the existing catalogue and Connectome boundary; a planned table is not emitted telemetry.
+
 ## Exit condition
 
 Gate H exits only after one prompt can be followed from ingress through LFG or

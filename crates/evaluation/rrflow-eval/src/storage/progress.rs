@@ -78,6 +78,12 @@ pub enum ProgressEvent {
         segment: u64,
         observation: Box<ReaderInterferenceEvidence>,
     },
+    BackupStarted {
+        segment: u64,
+        point: Id,
+        seed: u64,
+        started_ns: u64,
+    },
     Backup {
         segment: u64,
         observation: BackupEvidence,
@@ -272,6 +278,19 @@ fn scan(
     )
 }
 
+pub(super) fn backup_start_digest(
+    previous: &Option<Digest>,
+    segment: u64,
+    point: &Id,
+    seed: u64,
+    started_ns: u64,
+) -> Result<Digest> {
+    digest(
+        "c07g.backup-start-progress",
+        &(previous, segment, point, seed, started_ns),
+    )
+}
+
 #[derive(Default)]
 struct PointAudit {
     files: u64,
@@ -290,6 +309,8 @@ pub(super) struct ProgressAudit {
     failed: bool,
     reader_observed: Option<Digest>,
     reader_bound: Option<Digest>,
+    backup_starts_observed: Option<Digest>,
+    backup_starts_bound: Option<Digest>,
 }
 
 impl ProgressAudit {
@@ -308,11 +329,33 @@ impl ProgressAudit {
             failed: false,
             reader_observed: None,
             reader_bound: None,
+            backup_starts_observed: None,
+            backup_starts_bound: None,
         }
     }
 
     fn observe(&mut self, campaign: &StorageCampaign, event: &ProgressEvent) -> Result<()> {
         match event {
+            ProgressEvent::BackupStarted {
+                segment,
+                point,
+                seed,
+                started_ns,
+            } => {
+                require(
+                    self.points.contains_key(&(point.clone(), *seed))
+                        && *started_ns <= MAX_EXACT_INTEGER,
+                    "backup progress names an undeclared point, seed or time",
+                )?;
+                self.backup_starts_observed = Some(backup_start_digest(
+                    &self.backup_starts_observed,
+                    *segment,
+                    point,
+                    *seed,
+                    *started_ns,
+                )?);
+            }
+
             ProgressEvent::Failure { .. } => self.failed = true,
             ProgressEvent::ReaderInterference {
                 segment,
@@ -455,6 +498,15 @@ impl ProgressAudit {
 
     pub(super) fn bind_segment(&mut self, segment: &SustainedSegment) -> Result<()> {
         self.check_readback_order(&segment.point, segment.seed, segment.finished_ns)?;
+        if let Some(started_ns) = segment.backup_started_ns {
+            self.backup_starts_bound = Some(backup_start_digest(
+                &self.backup_starts_bound,
+                segment.index,
+                &segment.point,
+                segment.seed,
+                started_ns,
+            )?);
+        }
         if let Some(reader) = &segment.reader {
             self.reader_bound = Some(digest(
                 "c07g.reader-progress",
@@ -492,11 +544,19 @@ impl ProgressAudit {
         )
     }
 
+    pub(super) fn check_backup_starts(&self, bound: &Option<Digest>) -> Result<()> {
+        require(
+            &self.backup_starts_observed == bound,
+            "backup start progress differs from accepted segments",
+        )
+    }
+
     pub(super) fn require_bound(&self, status: CampaignStatus) -> Result<()> {
         if status == CampaignStatus::Completed {
             require(
-                self.reader_observed == self.reader_bound,
-                "reader receipts differ from raw progress",
+                self.reader_observed == self.reader_bound
+                    && self.backup_starts_observed == self.backup_starts_bound,
+                "reader or backup-start receipts differ from raw progress",
             )?;
         }
         if status == CampaignStatus::Completed {
@@ -541,6 +601,34 @@ fn verify(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completed_progress_requires_the_exact_backup_start_in_the_segment_chain() {
+        let (campaign, mut segment) = super::super::sustained::tests::fixture();
+        let mut audit = ProgressAudit::new(&campaign);
+        audit
+            .observe(
+                &campaign,
+                &ProgressEvent::BackupStarted {
+                    segment: segment.index,
+                    point: segment.point.clone(),
+                    seed: segment.seed,
+                    started_ns: 1,
+                },
+            )
+            .unwrap();
+        assert!(audit.require_bound(CampaignStatus::Completed).is_err());
+        audit.require_bound(CampaignStatus::Interrupted).unwrap();
+        segment.backup_started_ns = Some(1);
+        audit.bind_segment(&segment).unwrap();
+        audit.require_bound(CampaignStatus::Completed).unwrap();
+        // A duplicated or changed start cannot be absorbed as the same receipt.
+        audit.bind_segment(&segment).unwrap();
+        assert!(audit.require_bound(CampaignStatus::Completed).is_err());
+        let mut missing = ProgressAudit::new(&campaign);
+        missing.bind_segment(&segment).unwrap();
+        assert!(missing.require_bound(CampaignStatus::Completed).is_err());
+    }
 
     #[test]
     fn progress_survives_failed_run_and_rejects_missing_truncated_or_changed_bytes() {

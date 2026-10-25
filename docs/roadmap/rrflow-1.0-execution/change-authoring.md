@@ -70,6 +70,44 @@ different scope, stop and open a new pull request from current `main`.
 
 ## Pull request and CI binding
 
+### Team ownership and integration
+
+Use the repository's `.github/PULL_REQUEST_TEMPLATE.md` to make the existing
+brief and handoff visible. Name one package driver (a person or working
+session), its dependency PRs, overlapping source boundaries, and the next
+concrete action. The driver carries that package through implementation,
+focused validation, review, and integration; a handoff names the successor
+and retained evidence. No new product or completion ledger is introduced.
+
+Work in a separate branch/worktree for each independently reviewable package.
+Inspect existing diffs before editing shared files. Assign overlapping source
+changes to one package or agree an explicit dependency order; coordinate
+through the PR brief rather than concurrently rewriting the same worktree.
+Do not delete another worker's branch, files, worktree, process or evidence
+because it appears stale.
+
+Keep an incomplete or dependency-blocked package draft. After implementation,
+focused checks, complete diff review and the linked journal, mark the candidate
+ready to start the [full candidate pipeline](../../operations/ci.md#candidate-chain).
+For a failed run, preserve the failing command, exact revision, native platform
+and retained artifact before changing code or retrying. A green unrelated job
+does not clear that failure. Fix the shared blocker in its owning package,
+then refresh dependents with ordinary merges and regenerate derived indexes.
+
+Land dependency-ready packages through the required repository merge controls.
+Consolidating PRs requires the implementation-requirements traceability map;
+only close superseded work after reusable behavior and tests have an identified
+destination. Avoid duplicating full candidate runs for intermediate drafts.
+Queue, check and branch state come from GitHub, not a copied Markdown board.
+
+Before a long C-07/J-04 qualification, integrate required repairs and freeze
+the exact tested revision/tree, binary and harness digests, configuration,
+corpus, hardware limits and retained evidence location. Preflight remains
+characterization until its own admission oracle passes. A later code change
+does not inherit the running campaign's evidence: retain that run under its
+original identity and explicitly decide which final-candidate qualification
+must be rerun. Report actual soak launch/completion independently of setup.
+
 Every change reaches `main` through a pull request. The
 [candidate CI pipeline](../../operations/ci.md) runs on the pull request and
 must pass before merge; a direct push to `main` is not a landing path. The pull
