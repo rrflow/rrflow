@@ -295,6 +295,30 @@ fn allocate_metadata_payload(
     allocate()
 }
 
+// One category can release allocation usable by the other. Admission to the
+// selected engine operation requires a whole pressure round without progress.
+fn settle_pressure(
+    started: Instant,
+    mut previous: (u64, usize),
+    mut round: impl FnMut() -> (u64, usize),
+) {
+    loop {
+        assert!(
+            started.elapsed() < Duration::from_secs(25),
+            "bounded joint pressure"
+        );
+        let current = round();
+        assert!(
+            current.0 >= previous.0 && current.1 >= previous.1,
+            "owned pressure accounting must be monotonic"
+        );
+        if current == previous {
+            return;
+        }
+        previous = current;
+    }
+}
+
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
         let directory = metadata_directory.map(|path| {
@@ -380,8 +404,30 @@ impl Filler {
             fill_data(&mut file, volume.max_bytes, started, &allocation_sync)
                 .expect("native filler allocation");
         filler.file = Some(file);
-        // Resident metadata on APFS/NTFS is exhausted after data allocation.
-        if !cfg!(target_os = "linux") {
+        if cfg!(target_os = "macos") {
+            let directory = directory
+                .as_ref()
+                .expect("APFS metadata pressure directory");
+            // Either category can release allocation usable by the other. A
+            // single final drain is insufficient: finish a whole round with no
+            // additional files or data before resuming the selected operation.
+            settle_pressure(started, (filler.bytes, filler.metadata_paths.len()), || {
+                filler.fill_metadata(volume, directory, started, &allocation_sync);
+                filler.native_code = fill_remaining_data(
+                    filler.file.as_mut().expect("data filler remains owned"),
+                    &mut filler.bytes,
+                    volume
+                        .max_bytes
+                        .checked_sub(filler.metadata_payload_bytes)
+                        .expect("metadata payload byte bound"),
+                    started,
+                    &allocation_sync,
+                )
+                .expect("native joint metadata-phase data allocation");
+                filler.data_refills += 1;
+                (filler.bytes, filler.metadata_paths.len())
+            });
+        } else if !cfg!(target_os = "linux") {
             if let Some(directory) = &directory {
                 filler.fill_metadata(volume, directory, started, &allocation_sync);
             }
@@ -390,24 +436,6 @@ impl Filler {
         // failure in one directory must not end the global metadata fill.
         for directory in filler.metadata_directories.clone() {
             filler.fill_metadata(volume, &directory, started, &allocation_sync);
-        }
-        if cfg!(target_os = "macos") {
-            // The final partial metadata interval can release data allocation.
-            // Drain it before resuming the engine, using the original clock and
-            // aggregate allowance. Neither a create error nor this drain alone
-            // substitutes for the selected engine syscall's native error.
-            filler.native_code = fill_remaining_data(
-                filler.file.as_mut().expect("data filler remains owned"),
-                &mut filler.bytes,
-                volume
-                    .max_bytes
-                    .checked_sub(filler.metadata_payload_bytes)
-                    .expect("metadata payload byte bound"),
-                started,
-                &allocation_sync,
-            )
-            .expect("native final metadata-phase data allocation");
-            filler.data_refills += 1;
         }
         filler
     }
@@ -418,7 +446,10 @@ impl Filler {
         started: Instant,
         allocation_sync: &impl Fn(&File) -> std::io::Result<()>,
     ) {
-        for index in 0..8192u32 {
+        // A new round must observe its own capacity error, and must not reuse
+        // names belonging to successfully created entries from an earlier round.
+        self.metadata_native_code = None;
+        for index in self.metadata_paths.len()..8192 {
             assert!(self.metadata_paths.len() < 8192, "metadata entry bound");
             assert!(
                 started.elapsed() < Duration::from_secs(25),
@@ -534,6 +565,44 @@ fn filler_host_sync_preserves_native_noncapacity_errors() {
 mod filler_tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn settle_pressure_repeats_after_either_category_allocates() {
+        let mut calls = 0;
+        let states = [(8, 1), (8, 2), (12, 2), (12, 2)];
+        settle_pressure(Instant::now(), (0, 0), || {
+            let state = states[calls];
+            calls += 1;
+            state
+        });
+        assert_eq!(
+            calls,
+            states.len(),
+            "stopped before both categories settled"
+        );
+    }
+
+    #[test]
+    fn settle_pressure_stable_state_stops_and_expired_clock_has_no_effect() {
+        let calls = Cell::new(0);
+        settle_pressure(Instant::now(), (8, 2), || {
+            calls.set(calls.get() + 1);
+            (8, 2)
+        });
+        assert_eq!(calls.get(), 1);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            settle_pressure(Instant::now() - Duration::from_secs(25), (8, 2), || {
+                calls.set(calls.get() + 1);
+                (8, 2)
+            });
+        }))
+        .is_err());
+        assert_eq!(
+            calls.get(),
+            1,
+            "expired original clock allowed a new effect"
+        );
+    }
 
     #[test]
     fn metadata_payload_is_charged_before_effect_and_reduces_data_allowance() {
