@@ -111,6 +111,7 @@ class OwnedImageDetachment(unittest.TestCase):
         self.image.write_bytes(b"owned fixture")
         self.clock = 0.0
         self.calls = []
+        self.sleeps = []
 
     def info(self, devices=("/dev/disk7",), duplicate=False):
         rows = [{"image-path": str(self.image), "system-entities": [
@@ -123,7 +124,12 @@ class OwnedImageDetachment(unittest.TestCase):
         return subprocess.CompletedProcess([], code, "", "native busy" if code == 16 else "native failure")
 
     def invoke(self, responses, advance=0.1):
-        responses = iter(responses)
+        if callable(responses):
+            respond = responses
+        else:
+            iterator = iter(responses)
+            def respond(*_):
+                return next(iterator)
         def run(*args, **kwargs):
             self.calls.append(args)
             self.assertTrue(kwargs["process_group"])
@@ -131,8 +137,9 @@ class OwnedImageDetachment(unittest.TestCase):
             self.assertGreater(kwargs["timeout"], 0)
             self.assertLessEqual(kwargs["timeout"], 30)
             self.clock += advance
-            return next(responses)
+            return respond(*args)
         def sleep(seconds):
+            self.sleeps.append(seconds)
             self.clock += seconds
         with patch.object(containment, "run", side_effect=run), \
              patch.object(containment.time, "monotonic", side_effect=lambda: self.clock), \
@@ -153,6 +160,18 @@ class OwnedImageDetachment(unittest.TestCase):
         self.invoke([self.info(), self.detach(16), self.info(())])
         self.assertEqual(len(self.calls), 3)
 
+    def test_busy_attachment_can_settle_within_existing_deadline(self):
+        def response(*args):
+            if args[1] == "info":
+                return self.info(()) if self.clock >= 2.5 else self.info()
+            self.assertEqual(args[1:], ("detach", "-force", "/dev/disk7"))
+            return self.detach(16)
+        self.invoke(response)
+        self.assertEqual(self.sleeps, [1, 2])
+        self.assertEqual(sum(x[1] == "detach" for x in self.calls), 2)
+        self.assertLess(self.clock, 30)
+        self.assertTrue(self.image.exists(), "settlement never authorizes image deletion here")
+
     def test_nonbusy_failure_keeps_native_diagnostics_and_never_retries(self):
         with self.assertRaisesRegex(RuntimeError, r"hdiutil detach \(5\): native failure"):
             self.invoke([self.info(), self.detach(5)])
@@ -172,6 +191,8 @@ class OwnedImageDetachment(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "bounded cleanup.*native busy"):
             self.invoke([item for _ in range(5) for item in (self.info(), self.detach(16))] + [self.info()])
         self.assertEqual(sum(x[1] == "detach" for x in self.calls), 5)
+        self.assertEqual(self.sleeps, [1, 2, 4, 8])
+        self.assertLess(self.clock, 30)
         self.assertTrue(self.image.exists())
 
     def test_deadline_is_shared_across_all_commands(self):

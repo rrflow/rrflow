@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [owned-image settlement correction](../../evidence/change-journals/gate-c/c-07f-owned-image-settlement.md)
+records PR129 run 40158423166 passing eleven macOS native capacity/recovery
+cases before teardown exhausted five rapid EBUSY attempts. Paced retries use
+the same five attempts and 30-second deadline, retaining ownership and absence
+checks. This candidate failed cleanup; its passing cases and Linux/Windows
+matrix do not establish complete qualification. Native validation remains open.
+
 The [APFS volume-settlement correction](../../evidence/change-journals/gate-c/c-07f-volume-allocation-settlement.md)
 records PR118 run 40156063858 failing the 8192-entry cap after 64 data refills
 at the existing segment pause. Individual-file barriers did not establish

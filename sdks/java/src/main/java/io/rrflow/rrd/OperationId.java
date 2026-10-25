@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+// OpenAPI SHA-256: a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07
 package io.rrflow.rrd;
 
 public enum OperationId {
@@ -15,13 +15,19 @@ public enum OperationId {
     DIAGNOSTICS_READ("diagnostics-read", "POST", "/v1/diagnostics/read", Authentication.SESSION_BEARER, false),
     DIAGNOSTICS_STORAGE_CURSOR("diagnostics-storage-cursor", "POST", "/v1/diagnostics/storage/cursor", Authentication.SESSION_BEARER, false),
     DIAGNOSTICS_STORAGE_READ("diagnostics-storage-read", "POST", "/v1/diagnostics/storage/read", Authentication.SESSION_BEARER, false),
+    EMBEDDING_BUILTIN_ACTIVATE("embedding-builtin-activate", "POST", "/v1/embedding/builtin/activate", Authentication.SESSION_BEARER, true),
     ENDPOINT_CATALOGUE("endpoint-catalogue", "GET", "/v1/schema/endpoints", Authentication.PUBLIC, false),
+    ENDPOINT_CONFIGURATION_APPLY("endpoint-configuration-apply", "POST", "/v1/configuration/endpoints/apply", Authentication.SESSION_BEARER, true),
+    ENDPOINT_CONFIGURATION_PREVIEW("endpoint-configuration-preview", "POST", "/v1/configuration/endpoints/preview", Authentication.SESSION_BEARER, false),
+    ENDPOINT_CONFIGURATION_READ("endpoint-configuration-read", "POST", "/v1/configuration/endpoints/read", Authentication.SESSION_BEARER, false),
     ESTATE_READ("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SESSION_BEARER, false),
     FLIGHT_LAUNCH("flight-launch", "POST", "/v1/flights", Authentication.SESSION_BEARER, true),
     FLIGHT_LIST("flight-list", "POST", "/v1/flights/list", Authentication.SESSION_BEARER, false),
     FLIGHT_READ("flight-read", "POST", "/v1/flights/read", Authentication.SESSION_BEARER, false),
     HEALTH_LIVE("health-live", "GET", "/v1/health/live", Authentication.PUBLIC, false),
     HEALTH_READY("health-ready", "GET", "/v1/health/ready", Authentication.PUBLIC, false),
+    KNOWLEDGE_TREE_LIST("knowledge-tree-list", "POST", "/v1/knowledge/trees/list", Authentication.SESSION_BEARER, false),
+    KNOWLEDGE_TREE_REPLACE("knowledge-tree-replace", "POST", "/v1/knowledge/trees/replace", Authentication.SESSION_BEARER, true),
     OPENAPI_READ("openapi-read", "GET", "/v1/schema/openapi", Authentication.PUBLIC, false),
     QUERY_EXECUTE("query-execute", "POST", "/v1/query", Authentication.SESSION_BEARER, false),
     QUERY_EXPORT("query-export", "POST", "/v1/query/export", Authentication.SESSION_BEARER, false),
@@ -34,7 +40,12 @@ public enum OperationId {
     SESSION_RENEW("session-renew", "POST", "/v1/sessions/{session}/renew", Authentication.SESSION_BEARER, true),
     SUBSCRIPTION_CLOSE("subscription-close", "POST", "/v1/subscriptions/close", Authentication.SESSION_BEARER, true),
     SUBSCRIPTION_OPEN("subscription-open", "POST", "/v1/subscriptions/open", Authentication.SESSION_BEARER, true),
+    TASK_ATTEMPT_READ("task-attempt-read", "POST", "/v1/tasks/attempt/read", Authentication.SESSION_BEARER, false),
+    TASK_BUDGET_CONFIGURE("task-budget-configure", "POST", "/v1/tasks/budget/configure", Authentication.SESSION_BEARER, true),
+    TASK_BUDGET_READ("task-budget-read", "POST", "/v1/tasks/budget/read", Authentication.SESSION_BEARER, false),
+    TASK_BUDGET_STOP("task-budget-stop", "POST", "/v1/tasks/budget/stop", Authentication.SESSION_BEARER, true),
     TASK_CLOSE("task-close", "POST", "/v1/tasks/close", Authentication.SESSION_BEARER, true),
+    TASK_EMBEDDING_EXECUTE("task-embedding-execute", "POST", "/v1/tasks/embedding/execute", Authentication.SESSION_BEARER, true),
     TASK_LIST("task-list", "POST", "/v1/tasks/list", Authentication.SESSION_BEARER, false),
     TASK_OPEN("task-open", "POST", "/v1/tasks", Authentication.SESSION_BEARER, true),
     TASK_READ("task-read", "POST", "/v1/tasks/read", Authentication.SESSION_BEARER, false),
@@ -48,7 +59,7 @@ public enum OperationId {
     VECTOR_POINT_SCROLL("vector-point-scroll", "POST", "/v1/vector/points/scroll", Authentication.SESSION_BEARER, false),
     VECTOR_SEARCH("vector-search", "POST", "/v1/vector/search", Authentication.SESSION_BEARER, false);
 
-    static final String OPENAPI_DOCUMENT_SHA256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee";
+    static final String OPENAPI_DOCUMENT_SHA256 = "a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07";
 
     public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }
 
