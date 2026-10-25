@@ -13,6 +13,15 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [authenticated read-cost repair](../../evidence/change-journals/gate-c/c-07g-proof-node-reuse.md)
+records the next full Desktop failure: candidate `8a6752b2` acknowledged all
+100000 corpus operations but verified only 34191 before its original two-hour
+setup deadline. Segment handles stayed bounded with zero denials. Scoped proof
+node reuse addresses measured repeated backing reads without skipping change
+verification. Component tests are not full-profile or actual soak acceptance;
+C-07 and the repository-wide review remain open.
+
+
 The [retained descriptor-exhaustion result](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
 shows that encoder candidate `9957ed39` reached 77,945 acknowledged records,
 then exhausted native file handles. The installed verifier passes on the
@@ -84,7 +93,7 @@ packages as if their implementation were absent.
 | d | `TransactionGate` count/byte/deadline admission; installed storage configuration; native mutable/retention, maintenance, reclamation, recovery and disk-reserve limits. | Demonstrate aggregate process limits and sustained progress under the declared profiles. Logical reservations alone are not RSS or proof that a large estate progresses. |
 | e | Native source-page and retained-output pools, read-view lifetime registry, projected/interleaved lifetime and native memory fixtures. | Complete the required physical/lifetime/native matrix and retained-owner drain evidence on the final candidate. |
 | f | Owned ext4/APFS/NTFS runner, selected native-error/recovery ledger and damaged-state tests. | PR115 candidate `3c13f455` passed all 24 selected native capacity cases across Linux, macOS and Windows. Bind these exact results to the accepted candidate; full profile/soak qualification remains separate. |
-| g | `installed_reopen.rs::sustained` driver, bounded corpus generator/independent readback, `run_sustained_capacity.py`, frozen profiles and progress/result receipts. | Desktop corpus ingestion failed at 50,685 acknowledgements. The subsequent 1,000-record characterization completed but failed the 25-RPS operating point. No 24-hour soak has started; measure scheduling/readback and repair growth before full qualification. |
+| g | `installed_reopen.rs::sustained` driver, bounded corpus generator/independent readback, `run_sustained_capacity.py`, frozen profiles and progress/result receipts. | Latest frozen Desktop candidate `8a6752b2` acknowledged all 100000 corpus operations, then hit the two-hour setup limit at 34191 independent verifications. Earlier failures remain in linked journals. Bounded proof-node reuse is under validation; final profile/repetition and actual 24-hour qualification remain open. |
 | h | `collect_storage_acceptance.py` and canonical Rust receipt validation. | No complete joined accepted candidate/profile/native/soak evidence. Collection tooling is implemented; accepted evidence is missing. |
 
 ### Execution reset after the failed Desktop corpus

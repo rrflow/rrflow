@@ -386,7 +386,7 @@ fn assert_direct_reads(engine: &dyn StorageEngine, corpus: &Corpus) -> Vec<Runti
             retained.evidence.values_decoded,
             retained.evidence.decoded_bytes,
         ),
-        (49, 10, 68, 68, 16_336),
+        (29, 10, 48, 48, 15_056),
     );
     assert_eq!(
         (
@@ -396,7 +396,7 @@ fn assert_direct_reads(engine: &dyn StorageEngine, corpus: &Corpus) -> Vec<Runti
             current.evidence.values_decoded,
             current.evidence.decoded_bytes,
         ),
-        (89, 9, 107, 107, 18_074),
+        (40, 9, 58, 58, 14_938),
     );
     for evidence in [&retained.evidence, &current.evidence] {
         evidence.validate().unwrap();
@@ -525,4 +525,84 @@ fn rrflow_mx_and_rrflow_kv_direct_versions_match_the_exact_oracle_and_reopen() {
     assert!(after.page_loads.unwrap() > before.page_loads.unwrap());
     assert!(after.page_bytes_read.unwrap() > before.page_bytes_read.unwrap());
     assert!(after.filter_checks.unwrap() > before.filter_checks.unwrap());
+}
+
+#[test]
+fn adjacent_versions_reuse_proof_nodes_without_changing_the_authenticated_result() {
+    fn check(engine: &dyn StorageEngine, read: &rrd_core::ReadStamp) {
+        let sources = [RuntimeVersionedSource::Records {
+            kind: Some(RuntimeType::new("entity").unwrap()),
+        }];
+        let selected = engine
+            .runtime()
+            .read_versioned(read, &sources, RuntimeReadBudget::new(READ_BUDGET).unwrap())
+            .unwrap();
+        let expected = oracle_changes(engine, read)
+            .into_iter()
+            .filter(|change| matches!(change.mutation, RuntimeMutation::Record { .. }))
+            .collect::<Vec<_>>();
+        assert_eq!(selected.changes, expected);
+        assert_eq!(selected.changes.len(), 32);
+        let proofs = selected
+            .evidence
+            .paths
+            .iter()
+            .find(|path| path.path == RuntimeReadAccessPath::AccumulatorProof)
+            .unwrap();
+        eprintln!("adjacent proof backing reads={}", proofs.point_reads);
+        assert!(
+            proofs.point_reads < 96,
+            "repeated proof nodes were reread: {}",
+            proofs.point_reads
+        );
+        // A new call owns a fresh cache and must account for the same work.
+        let exact = selected.evidence.keys_examined;
+        let repeated = engine
+            .runtime()
+            .read_versioned(read, &sources, RuntimeReadBudget::new(exact).unwrap())
+            .unwrap();
+        assert_eq!(selected.changes, repeated.changes);
+        assert_eq!(
+            selected.evidence.keys_examined,
+            repeated.evidence.keys_examined
+        );
+        assert!(matches!(
+            engine.runtime().read_versioned(
+                read,
+                &sources,
+                RuntimeReadBudget::new(exact - 1).unwrap(),
+            ),
+            Err(Error::RuntimeReadBudgetExceeded { .. })
+        ));
+    }
+    fn seed(engine: &dyn StorageEngine) -> rrd_core::ReadStamp {
+        let mut mutations = vec![RuntimeMutation::Schema { registry: schema() }];
+        mutations.extend((0..32).map(|n| RuntimeMutation::Record {
+            record: record(&format!("proof-{n:04}")),
+        }));
+        engine
+            .runtime()
+            .commit(&RuntimeCommit {
+                scope: scope(),
+                at: 100,
+                actor: "test:proof-reuse".into(),
+                expected_cursor: 0,
+                mutations,
+            })
+            .unwrap();
+        engine.runtime().read_stamp(&scope()).unwrap()
+    }
+    let mx = RrflowMxStore::new();
+    check(&mx, &seed(&mx));
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("proof-node-reuse");
+    let read = {
+        let kv = RrflowKvStore::open(&path).unwrap();
+        let read = seed(&kv);
+        check(&kv, &read);
+        kv.flush(200).unwrap();
+        read
+    };
+    let reopened = RrflowKvStore::open(&path).unwrap();
+    check(&reopened, &read);
 }

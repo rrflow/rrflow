@@ -4,6 +4,14 @@
 **Coordinate:** `rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-035`
 **Owner:** [RRFlow 1.0 alpha POA&M](../rrflow-1.0-alpha.md)
 
+The [authenticated read-cost repair](../../evidence/change-journals/gate-c/c-07g-proof-node-reuse.md)
+records the next full Desktop failure: candidate `8a6752b2` acknowledged all
+100000 corpus operations but verified only 34191 before its original two-hour
+setup deadline. Segment handles stayed bounded with zero denials. Scoped proof
+node reuse addresses measured repeated backing reads without skipping change
+verification. Component tests are not full-profile or actual soak acceptance;
+C-07 and the repository-wide review remain open.
+
 ## Observed deficiency
 
 The [fill-write recovery correction](../../evidence/change-journals/gate-c/c-07f-fill-write-recovery.md)
