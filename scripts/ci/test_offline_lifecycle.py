@@ -14,6 +14,11 @@ import run_offline_lifecycle as runner
 
 
 class OfflineLifecyclePolicyTests(unittest.TestCase):
+    def test_timeout_budget_keeps_namespace_wrapper_above_harness_deadline(self):
+        harness, wrapper = runner.lifecycle_timeouts()
+        self.assertEqual((harness, wrapper), (540, 600))
+        self.assertGreater(wrapper, harness)
+
     def test_storage_history_requires_both_modes_and_complete_checked_ledgers(self):
         # Deliberately incomplete history must not become evidence because its
         # producer printed a passing summary. The real fixture supplies a

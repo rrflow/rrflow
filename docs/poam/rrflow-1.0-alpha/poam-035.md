@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [owned-image settlement correction](../../evidence/change-journals/gate-c/c-07f-owned-image-settlement.md)
+records PR129 run 40158423166 passing eleven macOS native capacity/recovery
+cases before teardown exhausted five rapid EBUSY attempts. Paced retries use
+the same five attempts and 30-second deadline, retaining ownership and absence
+checks. This candidate failed cleanup; its passing cases and Linux/Windows
+matrix do not establish complete qualification. Native validation remains open.
+
 The [APFS volume-settlement correction](../../evidence/change-journals/gate-c/c-07f-volume-allocation-settlement.md)
 records PR118 run 40156063858 failing the 8192-entry cap after 64 data refills
 at the existing segment pause. Individual-file barriers did not establish
@@ -613,6 +620,13 @@ before restart. Fleet and Linux small runs have exact histories and no rejected
 or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
 All remain characterization. Required corpus profiles, complete 24-hour evidence,
 current-candidate CI and final acceptance reconciliation remain open.
+
+The [retained native failure record](../../evidence/change-journals/gate-c/c-07h-retained-native-failures.md)
+preserves Windows13's coverage failure and Linux04/05's frozen setup deadline
+failures with exact source/binary/campaign identities and confirmed cleanup.
+Combined component checks at d209218d pass but do not override those native
+failures. The repaired pipeline candidate and ongoing long characterization
+remain separate evidence; full profiles and completed soak are still required.
 
 The [overlapping resource-window repair](../../evidence/change-journals/gate-c/c-07g-overlapping-resource-windows.md)
 preserves real samples collected by a preceding late segment inside the next

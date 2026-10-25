@@ -178,6 +178,31 @@ pub struct GenerateEmbeddingsResult {
     pub embeddings: Vec<GeneratedEmbedding>,
 }
 
+impl GenerateEmbeddingsResult {
+    pub fn validate(&self) -> Result<()> {
+        validate_vector_scope(&self.scope)?;
+        validate_sha256(&self.read_manifest_sha256, "embedding read manifest")?;
+        validate_sha256(&self.backend.model_sha256, "embedding backend model")?;
+        if self.registry_revision == 0
+            || self.embeddings.is_empty()
+            || self.embeddings.len() > MAX_EMBEDDING_BATCH_INPUTS
+        {
+            return invalid("embedding result revision or count is invalid");
+        }
+        let mut ids = BTreeSet::new();
+        for embedding in &self.embeddings {
+            embedding.validate()?;
+            if !ids.insert(&embedding.input_id)
+                || embedding.provenance.model_sha256 != self.backend.model_sha256
+                || embedding.provenance.dimensions != self.backend.dimensions
+            {
+                return invalid("embedding result identity or model mismatch");
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct EmbedAndSearchVectors {

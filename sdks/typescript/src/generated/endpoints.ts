@@ -1,6 +1,6 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
-export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee" as const;
+// OpenAPI SHA-256: a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07" as const;
 
 export const endpoints = {
   "audit-export": {
@@ -45,6 +45,24 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": false
   },
+  "endpoint-configuration-apply": {
+    "method": "POST",
+    "path": "/v1/configuration/endpoints/apply",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "endpoint-configuration-preview": {
+    "method": "POST",
+    "path": "/v1/configuration/endpoints/preview",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "endpoint-configuration-read": {
+    "method": "POST",
+    "path": "/v1/configuration/endpoints/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
   "context-assemble": {
     "method": "POST",
     "path": "/v1/context/assemble",
@@ -74,6 +92,12 @@ export const endpoints = {
     "path": "/v1/diagnostics/storage/read",
     "authentication": "session_bearer",
     "mutation": false
+  },
+  "embedding-builtin-activate": {
+    "method": "POST",
+    "path": "/v1/embedding/builtin/activate",
+    "authentication": "session_bearer",
+    "mutation": true
   },
   "estate-read": {
     "method": "POST",
@@ -110,6 +134,18 @@ export const endpoints = {
     "path": "/v1/health/ready",
     "authentication": "public",
     "mutation": false
+  },
+  "knowledge-tree-list": {
+    "method": "POST",
+    "path": "/v1/knowledge/trees/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "knowledge-tree-replace": {
+    "method": "POST",
+    "path": "/v1/knowledge/trees/replace",
+    "authentication": "session_bearer",
+    "mutation": true
   },
   "query-execute": {
     "method": "POST",
@@ -195,9 +231,39 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": true
   },
+  "task-attempt-read": {
+    "method": "POST",
+    "path": "/v1/tasks/attempt/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-budget-configure": {
+    "method": "POST",
+    "path": "/v1/tasks/budget/configure",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-budget-read": {
+    "method": "POST",
+    "path": "/v1/tasks/budget/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-budget-stop": {
+    "method": "POST",
+    "path": "/v1/tasks/budget/stop",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
   "task-close": {
     "method": "POST",
     "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-embedding-execute": {
+    "method": "POST",
+    "path": "/v1/tasks/embedding/execute",
     "authentication": "session_bearer",
     "mutation": true
   },

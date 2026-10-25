@@ -394,13 +394,14 @@ def poam_integrity_failures(parent: str) -> list[str]:
         "../../evidence/change-journals/repository/poam-027b-canonical-package-identity-correction-journal.md",
         "../../evidence/change-journals/repository/poam-027c-linked-execution-records-and-generated-navigation.md",
         "../../evidence/change-journals/repository/poam-027d-pull-request-landing-and-ci-gate.md",
+        "../../evidence/change-journals/repository/poam-027e-main-ruleset-and-direct-push-record.md",
         "../../operations/ci.md",
     ):
         if target not in poam_027:
             failures.append(f"POAM-027: missing remediation owner {target}")
     for required_text in (
         "only through pull requests whose candidate CI passes",
-        "written policy, not enforced",
+        "The pull request rule is now enforced.",
         "ruleset",
         "not a schema for exploratory or private AI reasoning",
     ):
