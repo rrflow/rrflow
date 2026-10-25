@@ -1,5 +1,7 @@
 //! C-07c ordinary-primary ACK/kill/reopen corpus. Explicitly run by native CI.
 //! This fixed correctness workload is not a capacity profile or a soak.
+#[path = "support/owned_directory.rs"]
+mod owned_directory;
 #[path = "support/process.rs"]
 mod process;
 #[path = "support/sustained.rs"]
@@ -31,7 +33,7 @@ const STREAM_LIMIT: usize = 1024 * 1024;
 const CORPUS_SECONDS: u64 = 3600;
 
 struct Estate {
-    temp: tempfile::TempDir,
+    temp: owned_directory::OwnedDirectory,
     binary: PathBuf,
     project: PathBuf,
     build: Value,
@@ -121,7 +123,7 @@ impl Estate {
             std::fs::write(project.join("README.md"), "project-owned\n").unwrap();
         }
         let mut estate = Self {
-            temp,
+            temp: owned_directory::OwnedDirectory::new(temp),
             binary,
             project,
             build: Value::Null,
@@ -193,15 +195,33 @@ impl Estate {
             .arg(&self.project)
             .args(["--bind", "127.0.0.1:0"]);
         let (send, receive) = mpsc::sync_channel(1);
-        let child =
+        let mut child =
             process::Process::start(&mut command, lifetime, STREAM_LIMIT, Some(send)).unwrap();
-        let announcement: Value = serde_json::from_slice(
-            &receive
-                .recv_timeout(Duration::from_secs(60))
-                .expect("bounded ordinary startup")
-                .unwrap(),
-        )
-        .unwrap();
+        let readiness = receive
+            .recv_timeout(Duration::from_secs(60))
+            .map_err(|error| error.to_string())
+            .and_then(|result| result.map_err(|error| error.to_string()));
+        let readiness = readiness.unwrap_or_else(|error| {
+            child.terminate();
+            let diagnosis = match child.finish() {
+                Err(capture) => capture,
+                Ok(output) => format!(
+                    "status={}; stderr_tail={:?}",
+                    output.status,
+                    String::from_utf8_lossy(
+                        &output.stderr[output.stderr.len().saturating_sub(2048)..]
+                    )
+                ),
+            };
+            // Child termination and stream collection precede retention. Keep
+            // the original private bytes, without copying or uploading them.
+            eprintln!(
+                "native_startup_failure_estate={}",
+                serde_json::json!({"path": self.temp.retain(), "private_state": true})
+            );
+            panic!("bounded ordinary startup: {error}; {diagnosis}");
+        });
+        let announcement: Value = serde_json::from_slice(&readiness).unwrap();
         assert_eq!(announcement["status"], "listening");
         assert_eq!(announcement["build"], self.build);
         let locator = RrdEngine::read_project_locator(&self.project).unwrap();
