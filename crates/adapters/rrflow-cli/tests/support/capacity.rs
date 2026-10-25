@@ -132,6 +132,7 @@ struct Filler {
     path: PathBuf,
     bytes: u64,
     native_code: i32,
+    data_refills: u32,
     metadata_paths: Vec<PathBuf>,
     metadata_directories: Vec<PathBuf>,
     metadata_native_code: Option<i32>,
@@ -232,6 +233,23 @@ fn fill_data<W: Write>(
     }
 }
 
+// Metadata transactions can make allocation available after the initial fill.
+// Every subsequent drain shares one aggregate byte allowance and start time.
+fn fill_remaining_data<W: Write>(
+    file: &mut W,
+    allocated: &mut u64,
+    max_bytes: u64,
+    started: Instant,
+    synchronize: impl FnMut(&W) -> std::io::Result<()>,
+) -> std::io::Result<i32> {
+    let remaining = max_bytes
+        .checked_sub(*allocated)
+        .expect("filler byte bound");
+    let (added, code) = fill_data(file, remaining, started, synchronize)?;
+    *allocated += added;
+    Ok(code)
+}
+
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
         let directory = metadata_directory.map(|path| {
@@ -257,6 +275,7 @@ impl Filler {
             path,
             bytes: 0,
             native_code: 0,
+            data_refills: 0,
             metadata_paths: Vec::new(),
             metadata_directories: Vec::new(),
             metadata_native_code: None,
@@ -343,7 +362,23 @@ impl Filler {
                     Ok(())
                 });
             match created {
-                Ok(()) => {}
+                Ok(()) => {
+                    // APFS metadata is copy-on-write. Keep data pressure current
+                    // as metadata transactions make old allocation reusable.
+                    // This is still the same filler, clock and byte/file caps;
+                    // only the selected engine syscall proves exhaustion.
+                    if cfg!(target_os = "macos") && (index + 1) % 128 == 0 {
+                        self.native_code = fill_remaining_data(
+                            self.file.as_mut().expect("data filler remains owned"),
+                            &mut self.bytes,
+                            volume.max_bytes,
+                            started,
+                            sync_filler_allocation,
+                        )
+                        .expect("native metadata-phase data allocation");
+                        self.data_refills += 1;
+                    }
+                }
                 Err(error) => {
                     let code = error.raw_os_error().expect("native metadata capacity code");
                     assert!(
@@ -357,7 +392,11 @@ impl Filler {
         }
         assert!(
             self.metadata_native_code.is_some(),
-            "metadata file count bound exhausted"
+            "metadata file count bound exhausted: files={} data_bytes={} refills={} elapsed_ms={}",
+            self.metadata_paths.len(),
+            self.bytes,
+            self.data_refills,
+            started.elapsed().as_millis()
         );
     }
 }
@@ -423,6 +462,37 @@ mod filler_tests {
         fn flush(&mut self) -> std::io::Result<()> {
             Ok(())
         }
+    }
+
+    #[test]
+    fn metadata_refills_share_the_original_byte_and_time_bounds() {
+        let mut file = DelayedAllocation::new();
+        let mut allocated = 0;
+        let started = Instant::now();
+        let code = fill_remaining_data(&mut file, &mut allocated, 20, started, |_| Ok(())).unwrap();
+        assert!(capacity_code(code));
+        assert_eq!(allocated, 8);
+        file.remaining.set(8); // Allocation released by a later metadata transaction.
+        fill_remaining_data(&mut file, &mut allocated, 20, started, |_| Ok(())).unwrap();
+        assert_eq!(allocated, 16);
+        file.remaining.set(8);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = fill_remaining_data(&mut file, &mut allocated, 20, started, |_| Ok(()));
+        }))
+        .is_err());
+        assert_eq!(
+            file.remaining.get(),
+            4,
+            "refill exceeded cumulative allowance"
+        );
+        let expired = Instant::now() - Duration::from_secs(25);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = fill_remaining_data(&mut file, &mut allocated, 20, expired, |_| {
+                panic!("expired refill synchronized")
+            });
+        }))
+        .is_err());
+        assert_eq!(file.remaining.get(), 4, "refill restarted the clock");
     }
 
     #[test]
@@ -553,7 +623,7 @@ fn resume_after_fill(
     println!(
         "native_capacity_fill={}",
         json!({"point":control["point"],
-        "bytes":filler.bytes,"native_code":filler.native_code,
+        "bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
         "metadata_files":filler.metadata_paths.len(),
         "metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes})
     );
@@ -788,7 +858,7 @@ fn capacity_case(point: &str, mode: &str) {
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();
-        let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code,
+        let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
             "metadata_files":filler.metadata_paths.len(),"metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes});
         drop(filler);
         ledger.attempts.push(Attempt {attempt_id:"capacity-uncertain".to_owned().try_into().unwrap(),
@@ -799,7 +869,8 @@ fn capacity_case(point: &str, mode: &str) {
         // tail yields a plan; any other failure remains fatal on serve/re-read.
         let mut command = estate.command();
         command.args(["repair","plan","--project"]).arg(&estate.project);
-        let output = process::Process::start(&mut command,Duration::from_secs(120),8*LIMIT,None).unwrap().finish().unwrap();
+        let output = installed_command(&mut command,CommandPhase::RepairPlan,Duration::from_secs(120),8*LIMIT)
+            .unwrap_or_else(|error| panic!("{error}"));
         let repair_receipt = if output.status.success() {
             let plan:Value = serde_json::from_slice(&output.stdout).unwrap();
             let path = estate.temp.path().join("repair.json");

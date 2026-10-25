@@ -1911,6 +1911,41 @@
       "additionalProperties": false,
       "properties": {
         "kind": {
+          "const": "backup_started",
+          "type": "string"
+        },
+        "point": {
+          "$ref": "#/$defs/Id"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "segment": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "segment",
+        "point",
+        "seed",
+        "started_ns"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
           "const": "backup",
           "type": "string"
         },
