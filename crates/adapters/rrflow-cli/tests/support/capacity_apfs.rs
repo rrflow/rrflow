@@ -8,6 +8,60 @@ use std::{fs::File, io, os::fd::AsRawFd};
 const FSIOC_SYNC_VOLUME: libc::c_ulong = 0x8004_4101;
 const FSCTL_SYNC_WAIT: u32 = 1 << 1;
 
+// Apple File System Reference: embedded attributes fit below 3804 bytes.
+// Only disposable filler files receive this private, create-only attribute.
+pub(super) const METADATA_PAYLOAD_BYTES: usize = 3072;
+const METADATA_NAME: &std::ffi::CStr = c"org.rrflow.capacity-fixture";
+
+pub(super) fn allocate_metadata(file: &File) -> io::Result<()> {
+    let payload = [0xa5u8; METADATA_PAYLOAD_BYTES];
+    // SAFETY: the live descriptor, NUL-terminated name and initialized payload
+    // remain valid throughout the synchronous call. Position zero is required
+    // for ordinary attributes. XATTR_CREATE prevents replacing existing data.
+    let result = unsafe {
+        libc::fsetxattr(
+            file.as_raw_fd(),
+            METADATA_NAME.as_ptr(),
+            payload.as_ptr().cast(),
+            payload.len(),
+            0,
+            libc::XATTR_CREATE,
+        )
+    };
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
+#[test]
+fn metadata_payload_is_native_create_only_and_preserves_file_data() {
+    use std::io::Write;
+    let mut file = tempfile::tempfile().unwrap();
+    file.write_all(b"fixture data").unwrap();
+    allocate_metadata(&file).unwrap();
+    let mut payload = [0u8; METADATA_PAYLOAD_BYTES];
+    // SAFETY: writable buffer and live descriptor/name for the entire call.
+    let count = unsafe {
+        libc::fgetxattr(
+            file.as_raw_fd(),
+            METADATA_NAME.as_ptr(),
+            payload.as_mut_ptr().cast(),
+            payload.len(),
+            0,
+            0,
+        )
+    };
+    assert_eq!(count, METADATA_PAYLOAD_BYTES as isize);
+    assert_eq!(payload, [0xa5; METADATA_PAYLOAD_BYTES]);
+    assert_eq!(file.metadata().unwrap().len(), 12);
+    assert_eq!(
+        allocate_metadata(&file).unwrap_err().raw_os_error(),
+        Some(libc::EEXIST)
+    );
+}
+
 unsafe extern "C" {
     // Apple Libc/include/unistd.h; libc does not expose this declaration.
     fn ffsctl(
