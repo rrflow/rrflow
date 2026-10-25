@@ -110,7 +110,7 @@ The current `endpoints_gen.go` contains:
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65`.
+  `a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07`.
 
 It does not generate request/result/error types, path-parameter sets, security
 actions, exact success statuses, media types, causal identity rules,

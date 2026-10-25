@@ -1,0 +1,55 @@
+# Endpoint profile: shared native candidate integration
+
+**Status:** active integration evidence; final candidate qualification pending
+**Coordinate:** `rrflow://rrflow-instance/data/evidence/endpoint-profile-native-integration`
+**Owner:** D-06 / POAM-006 and POAM-017 / PR113
+
+Starting head `088cfca2da1c82eea853614e5056e50377a76a95` integrates PR129
+`d0e7f54c1496bf55c1a0932c6f4d574cae21545f` by ordinary merge.
+The PR description declared this dependency and effect scope before edits.
+The [previous integration](endpoint-profile-accepted-main.md) retains its exact-source
+checks. This record does not rebind them to the new tree.
+
+The merge has no implementation conflict. Its only conflict is the generated
+execution inventory, regenerated from the combined tracked source. Reusable
+behavior stays in its existing canonical module: the segment-v6 encoder uses
+one row-group builder and reusable compression scratch; the database example
+binds task/relationship reads to one captured cursor; the native capacity
+fixture records bounded WAL allocation and synthetic API errors; the receipt
+validator requires the repeated APFS WAL step. Their original journals and
+characterization tests are retained. Feature contracts, SDK projections and
+transaction authority are unchanged by this integration.
+
+Reviewed the incoming implementation diff, complete added encoder test and WAL
+observation module, native workflow/acceptance deltas, database-view delta,
+previous feature integration, C-07 owner and pre-effect PR brief. No code is
+moved, deleted or substituted. The smallest cross-boundary oracle is installed authenticated configuration, restart and revocation.
+No additional upstream research or runtime tracing is needed for this ordinary
+integration; inherited native diagnostics and all time/resource/failure bounds
+remain intact. Unexpected source conflicts or lost semantics stop the package.
+
+## Validation
+
+`cargo test --locked -p rrd-server --test http_process
+installed_endpoint_configuration_http_flow` passed its one real installed
+HTTP configuration/restart/revocation test. `cargo clippy --locked -p rrd-engine
+-p rrd-server -p rrd-client --all-targets -- -D warnings` passed. No new source
+failure occurred. Full owning suites retain their prior exact-source evidence;
+the final candidate pipeline reruns them on this tree. Generated navigation,
+inventory, documentation/workflow, Rust formatting and whitespace checks are
+required before committing this final journal.
+
+## Limits and checklist
+
+Candidate CI and normal merge-queue CI are required before landing. This branch
+stays draft while PR129 qualifies. Its three native crash/capacity jobs passed
+on run 40154271269; the 100-cycle lanes remain pending at this record's review.
+That other candidate's evidence is not evidence for this feature tree.
+The retained descriptor-exhaustion failure remains owned by C-07/POAM-035;
+no 24-hour soak is running or accepted. Full workspace/native capacity, live
+providers and external UI were not exercised by this local integration.
+
+Checklist: pre-effect brief, preserved source/test ownership, only generated
+conflict, focused cross-boundary check, linked immutable journal, regenerated
+navigation/inventory and complete integration-diff review. No objective,
+roadmap, POA&M completion or product-version change is made.

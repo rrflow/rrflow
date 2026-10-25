@@ -12,6 +12,7 @@ mod diagnostic;
 mod storage_cursor;
 pub use storage_cursor::{InspectStorageCursor, StorageCursorAction, StorageCursorSnapshot};
 mod endpoint_binding;
+mod endpoint_configuration;
 mod flight;
 mod function;
 #[path = "generated/signal_catalogue.rs"]
@@ -25,6 +26,8 @@ mod model_manifest;
 mod platform;
 mod query_export;
 mod read;
+mod reasoning_budget;
+pub use reasoning_budget::*;
 mod reasoning_tree;
 mod restore_publication;
 mod router;
@@ -85,6 +88,11 @@ pub use endpoint_binding::{
     MAX_BINDING_CONCURRENCY, MAX_BINDING_INPUT_BYTES, MAX_BINDING_TIMEOUT_MS,
     MAX_CREDENTIAL_NAME_BYTES, MAX_DECLARED_BYTES, MAX_ENDPOINT_URL_BYTES, MAX_INVENTORY_MACHINES,
     MAX_PROFILE_BINDINGS,
+};
+pub use endpoint_configuration::{
+    ApplyEndpointConfiguration, EndpointConfiguration, EndpointConfigurationPlan,
+    PreviewEndpointConfiguration, ReadEndpointConfiguration, ENDPOINT_CONFIGURATION_PREVIEW_TTL_MS,
+    ENDPOINT_CONFIGURATION_VERSION, MAX_ENDPOINT_CONFIGURATION_BYTES,
 };
 pub use flight::{
     prompt_cohort_sha256, LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights,
@@ -229,7 +237,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65";
+    "a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -3612,6 +3620,36 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "PromptFlightReadResult",
         ),
         endpoint(
+            "endpoint-configuration-read",
+            HttpMethod::Post,
+            "/v1/configuration/endpoints/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::EstateRead,
+            "ReadEndpointConfiguration",
+            "EndpointConfiguration",
+        ),
+        endpoint(
+            "endpoint-configuration-preview",
+            HttpMethod::Post,
+            "/v1/configuration/endpoints/preview",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::EstateAdmin,
+            "PreviewEndpointConfiguration",
+            "EndpointConfigurationPlan",
+        ),
+        endpoint(
+            "endpoint-configuration-apply",
+            HttpMethod::Post,
+            "/v1/configuration/endpoints/apply",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::EstateAdmin,
+            "ApplyEndpointConfiguration",
+            "EndpointConfiguration",
+        ),
+        endpoint(
             "estate-read",
             HttpMethod::Post,
             "/v1/estates/{estate}/read",
@@ -3800,6 +3838,66 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::SubscriptionOpen,
             "OpenSubscription",
             "OpenSubscriptionResult",
+        ),
+        endpoint(
+            "embedding-builtin-activate",
+            HttpMethod::Post,
+            "/v1/embedding/builtin/activate",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "ActivateBuiltinEmbedding",
+            "EmbeddingModelCatalogue",
+        ),
+        endpoint(
+            "task-budget-configure",
+            HttpMethod::Post,
+            "/v1/tasks/budget/configure",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "ConfigureTaskBudget",
+            "TaskBudgetView",
+        ),
+        endpoint(
+            "task-budget-read",
+            HttpMethod::Post,
+            "/v1/tasks/budget/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::ReasoningRead,
+            "ReadTaskBudget",
+            "TaskBudgetView",
+        ),
+        endpoint(
+            "task-budget-stop",
+            HttpMethod::Post,
+            "/v1/tasks/budget/stop",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "StopTaskBudget",
+            "TaskBudgetView",
+        ),
+        endpoint(
+            "task-embedding-execute",
+            HttpMethod::Post,
+            "/v1/tasks/embedding/execute",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::ReasoningWrite,
+            "ExecuteTaskEmbedding",
+            "GenerateEmbeddingsResult",
+        ),
+        endpoint(
+            "task-attempt-read",
+            HttpMethod::Post,
+            "/v1/tasks/attempt/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::ReasoningRead,
+            "ReadTaskAttempt",
+            "TaskAttemptView",
         ),
         endpoint(
             "task-close",
@@ -4238,6 +4336,12 @@ fn schema_json<T: JsonSchema>() -> serde_json::Value {
 
 fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
     let schema = match name {
+        "ActivateBuiltinEmbedding" => schema_json::<RequestEnvelope<ActivateBuiltinEmbedding>>(),
+        "ConfigureTaskBudget" => schema_json::<RequestEnvelope<ConfigureTaskBudget>>(),
+        "ExecuteTaskEmbedding" => schema_json::<RequestEnvelope<ExecuteTaskEmbedding>>(),
+        "ReadTaskAttempt" => schema_json::<RequestEnvelope<ReadTaskAttempt>>(),
+        "ReadTaskBudget" => schema_json::<RequestEnvelope<ReadTaskBudget>>(),
+        "StopTaskBudget" => schema_json::<RequestEnvelope<StopTaskBudget>>(),
         "AbortTransaction" => schema_json::<RequestEnvelope<AbortTransaction>>(),
         "AssembleContext" => schema_json::<RequestEnvelope<AssembleContext>>(),
         "BeginTransaction" => schema_json::<RequestEnvelope<BeginTransaction>>(),
@@ -4246,6 +4350,13 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "CreateInstanceBackup" => schema_json::<RequestEnvelope<CreateInstanceBackup>>(),
         "CreateSession" => schema_json::<RequestEnvelope<CreateSession>>(),
         "ExecuteQuery" => schema_json::<RequestEnvelope<ExecuteQuery>>(),
+        "ReadEndpointConfiguration" => schema_json::<RequestEnvelope<ReadEndpointConfiguration>>(),
+        "PreviewEndpointConfiguration" => {
+            schema_json::<RequestEnvelope<PreviewEndpointConfiguration>>()
+        }
+        "ApplyEndpointConfiguration" => {
+            schema_json::<RequestEnvelope<ApplyEndpointConfiguration>>()
+        }
         "ExportQuery" => schema_json::<RequestEnvelope<ExportQuery>>(),
         "ExportAudit" => schema_json::<RequestEnvelope<ExportAudit>>(),
         "EnsureQueryIndex" => schema_json::<RequestEnvelope<EnsureQueryIndex>>(),
@@ -4286,6 +4397,10 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
 
 fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
     let schema = match name {
+        "EmbeddingModelCatalogue" => schema_json::<ResponseEnvelope<EmbeddingModelCatalogue>>(),
+        "GenerateEmbeddingsResult" => schema_json::<ResponseEnvelope<GenerateEmbeddingsResult>>(),
+        "TaskAttemptView" => schema_json::<ResponseEnvelope<TaskAttemptView>>(),
+        "TaskBudgetView" => schema_json::<ResponseEnvelope<TaskBudgetView>>(),
         "AuditExport" => schema_json::<ResponseEnvelope<AuditExport>>(),
         "AuditPage" => schema_json::<ResponseEnvelope<AuditPage>>(),
         "ChangefeedFollowResult" => schema_json::<ResponseEnvelope<ChangefeedFollowResult>>(),
@@ -4320,6 +4435,8 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "OpenApiDocument" => schema_json::<ResponseEnvelope<serde_json::Value>>(),
         "OpenSubscriptionResult" => schema_json::<ResponseEnvelope<OpenSubscriptionResult>>(),
         "QueryResult" => schema_json::<ResponseEnvelope<QueryResult>>(),
+        "EndpointConfiguration" => schema_json::<ResponseEnvelope<EndpointConfiguration>>(),
+        "EndpointConfigurationPlan" => schema_json::<ResponseEnvelope<EndpointConfigurationPlan>>(),
         "QueryExport" => schema_json::<ResponseEnvelope<QueryExport>>(),
         "EnsureQueryIndexResult" => schema_json::<ResponseEnvelope<EnsureQueryIndexResult>>(),
         "EnsureVectorCollectionResult" => {

@@ -10,3 +10,6 @@ mod session;
 mod subscription;
 mod task;
 mod vector;
+
+mod endpoint_configuration;
+mod reasoning_budget;
