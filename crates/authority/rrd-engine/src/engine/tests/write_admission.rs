@@ -2,13 +2,42 @@ use super::*;
 use rrd_store::RrflowKvStore;
 
 #[test]
+fn projected_read_denial_preserves_durable_uncertainty_and_read_pressure() {
+    let denial = || rrd_store::Error::ProjectedReadLimit {
+        resource: rrd_store::ProjectedReadResource::OutputBufferBytes,
+        limit: 8192,
+        observed: 8480,
+    };
+    let durable = ServiceError::from(denial());
+    assert_eq!(durable.kind(), crate::ServiceErrorKind::Internal);
+    assert!(!durable.retryable());
+    for read in [
+        crate::engine::error::storage_read_error(denial()),
+        crate::engine::error::query_storage_error(denial()),
+        ServiceError::from(rrd_query::Error::from(denial())),
+    ] {
+        assert_eq!(read.kind(), crate::ServiceErrorKind::ResourceExhausted);
+        assert!(!read.retryable());
+        assert!(read.to_string().contains("8192"));
+        assert!(read.to_string().contains("8480"));
+    }
+    let corruption = rrd_store::Error::Substrate("corrupt journal".into());
+    assert_eq!(
+        crate::engine::error::storage_read_error(corruption).kind(),
+        crate::ServiceErrorKind::Internal
+    );
+}
+
+#[test]
 fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     let policy = rrd_contract::StorageLimits {
+        checkpoint_entries: 7,
         recovery_reserve_bytes: 32 * 1024 * 1024,
         native_transactions: 5,
         native_transaction_bytes: 16384,
         active_read_views: 7,
         pinned_read_bytes: 8192,
+        source_page_bytes: 32768,
         ..Default::default()
     };
     let native = crate::engine::core::installed_storage_options(&policy).unwrap();
@@ -17,6 +46,30 @@ fn installed_disk_reserve_lowers_to_native_policy_and_rejection_class() {
     assert_eq!(native.transaction_limits.buffered_bytes, 16384);
     assert_eq!(native.active_read_views, 7);
     assert_eq!(native.pinned_read_bytes, 8192);
+    assert_eq!(native.source_page_bytes, 32768);
+    let source_error = rrd_store::Error::SourcePageLimit {
+        limit: 32768,
+        observed: 32769,
+    };
+    assert!(matches!(
+        ServiceError::from(source_error),
+        ServiceError::Storage(_)
+    ));
+    let query_error = rrd_query::Error::from(rrd_store::Error::SourcePageLimit {
+        limit: 32768,
+        observed: 32769,
+    });
+    assert!(matches!(
+        ServiceError::from(query_error),
+        ServiceError::StorageAdmission(_)
+    ));
+
+    assert_eq!(native.checkpoint_entries, 7);
+    let checkpoint = ServiceError::from(rrd_store::Error::CheckpointLimit {
+        limit: 7,
+        observed: 8,
+    });
+    assert!(matches!(checkpoint, ServiceError::StorageAdmission(_)));
     let error = rrd_store::Error::DiskAdmission {
         available: 100,
         required: 200,

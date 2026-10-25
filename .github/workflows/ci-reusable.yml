@@ -239,7 +239,9 @@ jobs:
       - name: Test build provenance and diagnostic profile policy
         run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
-        run: python3 scripts/ci/check_workflow.py
+        run: |
+          python3 scripts/ci/test_candidate_admission.py
+          python3 scripts/ci/check_workflow.py
       - name: Test offline qualification input and artifact policy
         run: python3 scripts/ci/test_offline_lifecycle.py
       - name: Enforce documentation authority and local links
@@ -270,10 +272,10 @@ jobs:
         run: cargo run --locked -p rrflow-eval -- verify eval/results/2026-08-18-summary.json
       - name: Enforce kernel dependency boundary
         run: |
-          tree="$(cargo tree --locked -p rrd-core --edges normal --depth 1)"
+          tree="$(cargo tree --locked -p rrd-core --edges normal --depth 1 --prefix none --format '{p}' --color never)"
           printf '%s\n' "$tree"
-          test "$(printf '%s\n' "$tree" | tail -n +2 | wc -l)" -eq 1
-          printf '%s\n' "$tree" | tail -n 1 | grep -q 'serde v'
+          dependencies="$(printf '%s\n' "$tree" | tail -n +2 | cut -d ' ' -f 1 | sort)"
+          test "$dependencies" = "$(printf 'serde\nsha2')"
       - name: Enforce offline edge dependency and binary budgets
         run: |
           tree="$(cargo tree --locked -p rrflow-edge --edges normal)"
@@ -616,9 +618,53 @@ jobs:
         run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run
       - name: Test bounded diagnostic process control
         run: cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+      - name: Test native capacity ownership and WAL observation
+        run: |
+          python scripts/ci/test_native_capacity.py
+          cargo test -p rrd-lsm --test installed_wal_selection --features crash-test --locked
       - name: Test exact installed domain boundaries and compound recovery
         timeout-minutes: 20
-        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2 --skip publication_and_reclamation
+      - name: Test installed publication and reclamation with compound recovery
+        timeout-minutes: 20
+        env:
+          RRFLOW_PUBLICATION_RECEIPT_DIR: ${{ runner.temp }}/rrflow-publication
+        run: cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- publication_and_reclamation --nocapture --test-threads=2
+      - name: Require both complete installed publication receipts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'rrflow-publication'
+          points = ['segment_synced', 'successor_wal_synced', 'current_before_rename', 'current_renamed', 'reclaim_before_remove', 'reclaim_removed']
+          builds = []
+          for mode in ['fresh', 'existing']:
+              path = root / (mode + '.json')
+              assert path.is_file() and not path.is_symlink() and path.stat().st_size <= 4 * 1024 * 1024
+              receipt = json.loads(path.read_text())
+              assert receipt['mode'] == mode and receipt['publication'] is True
+              assert receipt['instrumentation'] == 'crash-test-primary'
+              assert receipt['report'] == {'logical_calls': 7, 'attempts': 25, 'acknowledged': 19, 'rejected': 0, 'uncertain': 6, 'resolved_present': 7, 'resolved_absent': 0, 'unresolved': 0, 'violations': []}
+              assert len(receipt['ledger']['expected']) == len(receipt['ledger']['readback']) == 7
+              assert len(receipt['ledger']['attempts']) == 25 and len(receipt['hits']) == 12
+              for index, point in enumerate(points):
+                  effect, recovery = receipt['hits'][2*index:2*index+2]
+                  for event, selected in [(effect, point), (recovery, 'recovery_manifest')]:
+                      assert event['hit']['point'] == selected and event['hit']['id'] == index + 1
+                      assert event['hit']['pid'] > 0 and event['hit_ns'] <= event['reaped_ns']
+                  assert effect['hit']['nonce'] != recovery['hit']['nonce']
+              builds.append(receipt['build'])
+          assert builds[0] == builds[1]
+          print('installed publication: both native histories and all 12 compound kills verified')
+          PY
+      - name: Retain installed publication evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installed-publication-${{ matrix.os }}
+          path: ${{ runner.temp }}/rrflow-publication/*.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Qualify installed native capacity failure and recovery
         timeout-minutes: 30
         run: python3 scripts/ci/run_native_capacity.py

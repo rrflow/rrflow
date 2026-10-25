@@ -451,6 +451,8 @@ pub struct DiagnosticRrflowKvSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DiagnosticStorageAdmission {
+    pub checkpoint_entries: u64,
+    pub checkpoint_limit: u64,
     pub native_transactions: u64,
     pub native_transaction_bytes: u64,
     /// Actual live physical read views and conservative aggregate pin charge.
@@ -459,6 +461,10 @@ pub struct DiagnosticStorageAdmission {
     /// Logical owner charges; these are not allocator or process RSS bytes.
     pub retained_mutable_bytes: u64,
     pub retained_projected_bytes: u64,
+    /// Owned source-page allocation charges; excludes borrowed mmap residency.
+    pub retained_source_bytes: u64,
+    pub peak_source_bytes: u64,
+    pub denied_source_allocations: u64,
     /// Includes the active request plus admitted waiters, matching admission.
     pub outstanding_requests: u64,
     pub outstanding_logical_bytes: u64,
@@ -486,6 +492,9 @@ impl DiagnosticStorageSnapshot {
         }
         if let Some(admission) = &self.admission {
             if self.evidence_level != DiagnosticStorageEvidenceLevel::RrflowKvCounters
+                || !(1..=65_536).contains(&admission.checkpoint_limit)
+                || admission.checkpoint_entries > admission.checkpoint_limit
+                || admission.retained_source_bytes > admission.peak_source_bytes
                 || admission
                     .queued_requests
                     .checked_add(u64::from(admission.active))

@@ -2547,6 +2547,19 @@ fn storage_observation_has_bounded_scope_and_a_read_only_authenticated_route() {
 }
 
 #[test]
+fn source_page_capacity_is_explicit_finite_and_part_of_sealed_configuration() {
+    let mut limits = rrd_contract::StorageLimits::default();
+    assert_eq!(limits.source_page_bytes, 256 * 1024 * 1024);
+    limits.source_page_bytes = 0;
+    assert!(limits.validate().is_err());
+    limits.source_page_bytes = (1_u64 << 40) + 1;
+    assert!(limits.validate().is_err());
+    let mut wire = serde_json::to_value(rrd_contract::StorageLimits::default()).unwrap();
+    wire.as_object_mut().unwrap().remove("source_page_bytes");
+    assert!(serde_json::from_value::<rrd_contract::StorageLimits>(wire).is_err());
+}
+
+#[test]
 fn storage_cursor_rejects_unknown_actions_fields_and_unbounded_budgets() {
     use rrd_contract::{CorrelationId, InspectStorageCursor, StorageCursorAction};
     for action in [

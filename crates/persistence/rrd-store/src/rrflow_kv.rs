@@ -197,18 +197,17 @@ impl StorageTransaction for RrflowKvTransaction<'_> {
             Durability::Authoritative => rrd_lsm::Durability::Authoritative,
             Durability::Buffered => rrd_lsm::Durability::Buffered,
         };
-        let commit = if diagnostics_enabled {
-            database.commit_transaction_with_write_context(
-                transaction,
-                physical_durability,
-                WriteLockWait {
-                    begin_mutex_wait_ns,
-                    commit_mutex_wait_ns,
-                },
-            )
-        } else {
-            database.commit_transaction(transaction, physical_durability)
-        };
+        // No untracked physical Snapshot escapes this store. Foreground and
+        // idle maintenance use the same registered-reader retention contract.
+        let commit = database.commit_transaction_with_protected_snapshots(
+            transaction,
+            physical_durability,
+            &[],
+            WriteLockWait {
+                begin_mutex_wait_ns,
+                commit_mutex_wait_ns,
+            },
+        );
         let outcome = match commit {
             Ok(outcome) => outcome,
             Err(error) => {
@@ -300,7 +299,10 @@ impl RrflowKvStore {
 
     pub fn open_existing_anchored(path: &AnchoredPath, options: DatabaseOptions) -> Result<Self> {
         let database = Database::open_anchored(path, options).map_err(|error| {
-            if matches!(error, rrd_lsm::Error::MutableLimit { .. }) {
+            if matches!(
+                error,
+                rrd_lsm::Error::MutableLimit { .. } | rrd_lsm::Error::SourcePageLimit { .. }
+            ) {
                 return Error::from(error);
             }
             Error::Substrate(format!(
@@ -370,7 +372,10 @@ impl RrflowKvStore {
             Database::create_anchored(path, options, Some(keyspaces::RRFLOW_KV_FORMAT))?
         } else {
             Database::open_anchored(path, options).map_err(|error| {
-                if matches!(error, rrd_lsm::Error::MutableLimit { .. }) {
+                if matches!(
+                    error,
+                    rrd_lsm::Error::MutableLimit { .. } | rrd_lsm::Error::SourcePageLimit { .. }
+                ) {
                     return Error::from(error);
                 }
                 Error::Substrate(format!(
@@ -476,6 +481,24 @@ impl RrflowKvStore {
     /// Publishes the current rrflowKV memtable as an immutable segment.
     pub fn flush(&self, at: Millis) -> Result<Option<Manifest>> {
         self.lock()?.flush_memtable(at).map_err(Error::from)
+    }
+
+    /// Offer one physical maintenance quantum without queuing behind a reader
+    /// or writer. Busy is a skipped offer, not a second worker or a retry loop.
+    pub fn try_maintenance_step(&self) -> Result<bool> {
+        match self.database.try_lock() {
+            // The private database never exposes an untracked Snapshot.
+            // Transactions own registered leases; inspection streams and
+            // runtime checkpoints retain physical generations independently.
+            // Logical versioned keys are data, not superseded MVCC versions.
+            Ok(mut database) => database
+                .maintenance_step_with_protected_snapshots(&[])
+                .map_err(Error::from),
+            Err(std::sync::TryLockError::WouldBlock) => Ok(false),
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(Error::Substrate("rrflowKV database lock poisoned".into()))
+            }
+        }
     }
 
     pub fn manifest(&self) -> Result<Manifest> {
@@ -836,11 +859,13 @@ impl StorageEngine for RrflowKvStore {
         let database = self.lock()?;
         let manifest = database.manifest();
         let cache = database.page_cache_stats();
+        let source_pages = database.source_page_memory().stats();
         let segment_io = database.segment_io_stats();
         let maintenance = database.maintenance_policy();
         let compaction = database.compaction_policy();
         let maintenance_stats = database.maintenance_stats();
         let memtable = database.memtable().profile();
+        let (checkpoint_entries, checkpoint_limit) = database.checkpoint_ownership()?;
         let (native_transactions, native_transaction_bytes) = database.transaction_ownership()?;
         let (active_read_views, pinned_read_bytes) = database.read_view_ownership()?;
         Ok(PhysicalStoreEvidence {
@@ -849,11 +874,16 @@ impl StorageEngine for RrflowKvStore {
             physical_sequence: Some(database.snapshot().sequence),
             manifest_generation: Some(manifest.generation),
             durable_sequence: Some(manifest.durable_sequence),
+            checkpoint_entries: Some(checkpoint_entries),
+            checkpoint_limit: Some(checkpoint_limit),
             native_transactions: Some(native_transactions),
             native_transaction_bytes: Some(native_transaction_bytes),
             active_read_views: Some(active_read_views),
             pinned_read_bytes: Some(pinned_read_bytes),
             retained_mutable_bytes: Some(database.mutable_memory().stats().accounted_bytes as u64),
+            retained_source_bytes: Some(source_pages.reserved_bytes as u64),
+            peak_source_bytes: Some(source_pages.peak_reserved_bytes as u64),
+            denied_source_allocations: Some(source_pages.denied_allocations),
             retained_projected_bytes: Some(
                 database.projected_output_memory().stats().reserved_bytes as u64,
             ),
@@ -1088,6 +1118,11 @@ fn reconcile_runtime_checkpoints(
         .filter(|checkpoint| checkpoint.name.starts_with(RUNTIME_CHECKPOINT_PREFIX))
         .map(|checkpoint| checkpoint.name.clone())
         .collect::<BTreeSet<_>>();
+    // Canonical live handles decide reachability. Release only obsolete runtime
+    // pins before admitting missing pins so the quota cannot block reconciliation.
+    for name in existing.difference(&desired) {
+        database.release_checkpoint(name)?;
+    }
     let missing = desired.difference(&existing).cloned().collect::<Vec<_>>();
     if !missing.is_empty() {
         let created_at = at.max(database.manifest().created_at);
@@ -1095,9 +1130,6 @@ fn reconcile_runtime_checkpoints(
         for name in missing {
             database.checkpoint(&name, created_at)?;
         }
-    }
-    for name in existing.difference(&desired) {
-        database.release_checkpoint(name)?;
     }
     Ok(())
 }
@@ -1411,6 +1443,18 @@ mod tests {
     };
     use rrd_lsm::{FailureMode, WriteBatch, WriteBoundary};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn idle_maintenance_does_not_queue_behind_the_database_owner() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = RrflowKvStore::open(&directory.path().join("idle")).unwrap();
+        let owner = store.lock().unwrap();
+        assert!(!store.try_maintenance_step().unwrap());
+        drop(owner);
+        // Opening a store can leave one physical reclamation quantum.
+        store.try_maintenance_step().unwrap();
+        assert!(!store.try_maintenance_step().unwrap());
+    }
 
     #[test]
     fn reconciliation_evidence_fails_on_counter_regression() {

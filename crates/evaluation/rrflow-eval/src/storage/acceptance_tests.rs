@@ -16,6 +16,8 @@ fn api_fixture() -> (Value, Value, Value) {
             &[
                 "Test exact installed domain boundaries and compound recovery",
                 "Qualify installed native capacity failure and recovery",
+                "Test installed publication and reclamation with compound recovery",
+                "Require both complete installed publication receipts",
             ],
         );
         add(
@@ -49,7 +51,7 @@ fn raw_ci_requires_exact_tested_merge_and_every_native_step() {
     let (run, jobs, commit) = api_fixture();
     let ci = receipt(&run, &jobs, &commit).unwrap();
     assert_ne!(ci.head_commit, ci.tested_commit);
-    for mutation in 0..6 {
+    for mutation in 0..8 {
         let (mut run, mut jobs, mut commit) = (run.clone(), jobs.clone(), commit.clone());
         match mutation {
             0 => run["conclusion"] = json!("failure"),
@@ -59,7 +61,11 @@ fn raw_ci_requires_exact_tested_merge_and_every_native_step() {
             4 => {
                 jobs.as_array_mut().unwrap().pop();
             }
-            _ => run["referenced_workflows"] = json!([]),
+            5 => run["referenced_workflows"] = json!([]),
+            6 => jobs[2]["steps"][2]["conclusion"] = json!("skipped"),
+            _ => {
+                jobs[2]["steps"].as_array_mut().unwrap().pop();
+            }
         }
         assert!(
             receipt(&run, &jobs, &commit).is_err(),

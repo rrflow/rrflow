@@ -6,6 +6,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    /// Native read admission. Durable callers still need outcome reconciliation.
+    ProjectedReadLimit {
+        resource: rrd_lsm::ProjectedReadResource,
+        limit: u64,
+        observed: u64,
+    },
+    SourcePageLimit {
+        limit: usize,
+        observed: usize,
+    },
+    /// Known checkpoint admission denial before a new publication.
+    CheckpointLimit {
+        limit: usize,
+        observed: usize,
+    },
     TransactionLimit {
         resource: rrd_lsm::TransactionResource,
         limit: usize,
@@ -136,6 +151,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
+            Error::ProjectedReadLimit { resource, limit, observed } => write!(f, "projected-read {} limit {limit} would be exceeded by {observed}", resource.as_str()),
+            Error::SourcePageLimit { limit, observed } => write!(f, "source page allocation limit {limit} would be exceeded by {observed}"),
+            Error::CheckpointLimit { limit, observed } => write!(f, "checkpoint entry limit {limit} would be exceeded by {observed}"),
             Error::TransactionLimit { resource, limit, observed } => write!(f, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
             Error::WriteBatchLimit { resource, limit, observed } => write!(
                 f, "write batch {} limit {limit} would be exceeded by {observed}", resource.as_str()
@@ -232,6 +250,18 @@ impl std::error::Error for Error {}
 impl From<rrd_lsm::Error> for Error {
     fn from(value: rrd_lsm::Error) -> Self {
         match value {
+            rrd_lsm::Error::ProjectedReadLimit {
+                resource,
+                limit,
+                observed,
+            } => Self::ProjectedReadLimit {
+                resource,
+                limit,
+                observed,
+            },
+            rrd_lsm::Error::SourcePageLimit { limit, observed } => {
+                Self::SourcePageLimit { limit, observed }
+            }
             rrd_lsm::Error::RecoveryLimit {
                 resource,
                 limit,
@@ -251,6 +281,9 @@ impl From<rrd_lsm::Error> for Error {
                 limit,
                 observed,
             },
+            rrd_lsm::Error::CheckpointLimit { limit, observed } => {
+                Self::CheckpointLimit { limit, observed }
+            }
             rrd_lsm::Error::TransactionLimit {
                 resource,
                 limit,

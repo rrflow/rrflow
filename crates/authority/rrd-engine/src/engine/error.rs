@@ -161,13 +161,16 @@ impl From<rrd_store::Error> for ServiceError {
     fn from(value: rrd_store::Error) -> Self {
         let message = value.to_string();
         match value {
-            // Transaction-owner exhaustion can occur while resolving an already
+            // Owner exhaustion or source-page pressure can obstruct an already
             // published commit. Only a proven-absent outcome permits rejection.
-            rrd_store::Error::TransactionLimit { .. } => Self::Storage(message),
+            rrd_store::Error::TransactionLimit { .. }
+            | rrd_store::Error::SourcePageLimit { .. }
+            | rrd_store::Error::ProjectedReadLimit { .. } => Self::Storage(message),
             rrd_store::Error::WriteBatchLimit { .. }
             | rrd_store::Error::MutableLimit { .. }
             | rrd_store::Error::MaintenanceLimit { .. }
             | rrd_store::Error::DiskAdmission { .. }
+            | rrd_store::Error::CheckpointLimit { .. }
             | rrd_store::Error::RecoveryLimit { .. }
             | rrd_store::Error::ReclamationPending
             | rrd_store::Error::ReclamationLimit { .. } => Self::StorageAdmission(message),
@@ -204,5 +207,37 @@ impl From<rrd_security::Error> for ServiceError {
             }
             rrd_security::Error::Store(error) => Self::from(error),
         }
+    }
+}
+
+impl From<rrd_query::Error> for ServiceError {
+    fn from(error: rrd_query::Error) -> Self {
+        match error {
+            rrd_query::Error::StorageAdmission(message) => Self::StorageAdmission(message),
+            rrd_query::Error::Budget(message) => Self::ConfigurationLimit(message),
+            other => Self::Query(other.to_string()),
+        }
+    }
+}
+
+/// Preserve the existing query error surface while carrying native admission
+/// through storage reads that precede the query pipeline.
+pub(super) fn query_storage_error(error: rrd_store::Error) -> ServiceError {
+    match error {
+        rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. } => {
+            ServiceError::StorageAdmission(error.to_string())
+        }
+        other => ServiceError::Query(other.to_string()),
+    }
+}
+
+/// Known read-only acquisition can report pressure without asserting a durable
+/// effect was rejected. Durable callers must use the ordinary conversion.
+pub(super) fn storage_read_error(error: rrd_store::Error) -> ServiceError {
+    match error {
+        rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. } => {
+            ServiceError::StorageAdmission(error.to_string())
+        }
+        other => ServiceError::from(other),
     }
 }

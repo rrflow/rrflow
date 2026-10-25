@@ -2,8 +2,8 @@ use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::io::{IoContext, SharedIoContext};
 use crate::mutable::MutableCharge;
 use crate::segment::{
-    new_page_cache_with_policy, next_projected_cache_access, page_cache_stats, ActiveReadViews,
-    ReadView, SharedPageCache,
+    new_page_cache_with_limits, next_projected_cache_access, page_cache_stats, ActiveReadViews,
+    ReadView, SelectedVersion, SharedPageCache,
 };
 use crate::write_diagnostics::{PendingWriteDiagnostics, PhaseClock, WritePathCollector};
 use crate::{
@@ -66,6 +66,8 @@ impl MaintenancePolicy {
 pub struct CompactionPolicy {
     pub l0_compaction_trigger: usize,
     pub max_input_segments: usize,
+    /// Soft logical output target shared by flush and compaction. A complete
+    /// MVCC key group may exceed it; hard mutable/maintenance limits still apply.
     pub target_segment_bytes: usize,
     pub max_level: u8,
 }
@@ -98,6 +100,8 @@ impl CompactionPolicy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseOptions {
+    /// Maximum named checkpoint-directory entries, including interrupted temporary files.
+    pub checkpoint_entries: usize,
     pub transaction_limits: crate::TransactionLimits,
     /// Per-open aggregate ownership ceilings, independent of caller budgets.
     pub active_read_views: usize,
@@ -107,6 +111,8 @@ pub struct DatabaseOptions {
     pub recovery_reserve_bytes: u64,
     /// Output allocation cap shared by projected streams of this open instance.
     pub projected_output_bytes: usize,
+    /// Live owned source allocations across cached and uncached readers.
+    pub source_page_bytes: usize,
     pub page_cache_bytes: usize,
     pub page_cache_policy: PageCachePolicy,
     pub segment_io: SegmentIoPolicy,
@@ -124,10 +130,12 @@ pub struct DatabaseOptions {
 impl Default for DatabaseOptions {
     fn default() -> Self {
         Self {
+            checkpoint_entries: crate::manifest::DEFAULT_CHECKPOINT_ENTRIES,
             transaction_limits: crate::TransactionLimits::default(),
             active_read_views: crate::DEFAULT_MAX_ACTIVE_READ_VIEWS,
             pinned_read_bytes: crate::DEFAULT_MAX_PINNED_READ_BYTES,
             projected_output_bytes: crate::DEFAULT_PROJECTED_OUTPUT_BYTES,
+            source_page_bytes: crate::DEFAULT_SOURCE_PAGE_BYTES,
             recovery_reserve_bytes: 16 * 1024 * 1024,
             page_cache_bytes: crate::DEFAULT_PAGE_CACHE_BYTES,
             page_cache_policy: PageCachePolicy::default(),
@@ -147,13 +155,19 @@ impl Default for DatabaseOptions {
 
 impl DatabaseOptions {
     pub(crate) fn validate(self) -> Result<Self> {
-        if self.projected_output_bytes == 0
+        if self.checkpoint_entries == 0 || self.checkpoint_entries > 65_536 {
+            return Err(Error::InvalidConfiguration(
+                "checkpoint entries must be in 1..=65536".into(),
+            ));
+        }
+        if self.source_page_bytes == 0
+            || self.projected_output_bytes == 0
             || self.recovery_reserve_bytes == 0
             || self.active_read_views == 0
             || self.pinned_read_bytes == 0
         {
             return Err(Error::InvalidConfiguration(
-                "projected output, read retention and recovery reserve must be positive".into(),
+                "source pages, projected output, read retention and recovery reserve must be positive".into(),
             ));
         }
         self.page_cache_policy
@@ -446,7 +460,8 @@ impl Database {
         }
         let root = root.pin_directory()?;
         let root = root.with_recovery_reserve(options.recovery_reserve_bytes)?;
-        let manifests = ManifestStore::create_anchored(&root)?;
+        let manifests = ManifestStore::create_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         root.join(WAL_DIRECTORY).create_dir()?;
         root.join(SEGMENT_DIRECTORY).create_dir()?;
         let manifest = new_manifest(1, None, 0, 0, 1, Vec::new(), application_format)?;
@@ -461,9 +476,10 @@ impl Database {
             memtable: mutable_memory.empty(0),
             mutable_memory,
             segments: Vec::new(),
-            page_cache: new_page_cache_with_policy(
+            page_cache: new_page_cache_with_limits(
                 options.page_cache_bytes,
                 options.page_cache_policy,
+                options.source_page_bytes,
             )?,
             segment_io,
             segment_open_evidence: SegmentOpenEvidence::default(),
@@ -516,13 +532,22 @@ impl Database {
         let mut recovery_budget = crate::recovery_budget::RecoveryBudget::new(options.recovery);
         let segment_io = IoContext::new(options.segment_io)?;
         let manifest_started = Instant::now();
-        let manifests = ManifestStore::open_existing_anchored(&root)?;
+        let manifests = ManifestStore::open_existing_anchored(&root)?
+            .with_checkpoint_limits(options.checkpoint_entries, options.reclamation)?;
         let (_, manifest) = manifests
             .current_bounded(&mut recovery_budget)?
             .ok_or_else(|| Error::InvalidManifest("database has no CURRENT manifest".into()))?;
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::boundary(
+            crate::crash_test::Point::RecoveryManifest,
+            root.diagnostic_path(),
+        );
         let manifest_ms = manifest_started.elapsed().as_millis() as u64;
-        let page_cache =
-            new_page_cache_with_policy(options.page_cache_bytes, options.page_cache_policy)?;
+        let page_cache = new_page_cache_with_limits(
+            options.page_cache_bytes,
+            options.page_cache_policy,
+            options.source_page_bytes,
+        )?;
         let mut segment_bytes = 0u64;
         for segment in &manifest.segments {
             recovery_budget.file(segment.bytes)?;
@@ -674,6 +699,10 @@ impl Database {
         ActiveReadViews::ownership(&self.active_read_views)
     }
 
+    pub fn source_page_memory(&self) -> crate::SourcePageMemory {
+        crate::segment::source_page_memory(&self.page_cache)
+    }
+
     pub fn projected_output_memory(&self) -> crate::ProjectedOutputMemory {
         self.projected_output.clone()
     }
@@ -779,7 +808,13 @@ impl Database {
         transaction: crate::Transaction,
         durability: Durability,
     ) -> Result<crate::TransactionCommit> {
-        self.commit_transaction_inner(transaction, durability, None, WriteLockWait::default())
+        self.commit_transaction_inner(
+            transaction,
+            durability,
+            None,
+            WriteLockWait::default(),
+            None,
+        )
     }
 
     /// Commits through the ordinary transaction path while attaching
@@ -791,7 +826,22 @@ impl Database {
         durability: Durability,
         lock_wait: WriteLockWait,
     ) -> Result<crate::TransactionCommit> {
-        self.commit_transaction_inner(transaction, durability, None, lock_wait)
+        self.commit_transaction_inner(transaction, durability, None, lock_wait, None)
+    }
+
+    /// Commits with explicit snapshot retention for any foreground compaction.
+    /// As with [`Self::compact`], callers must supply all untracked snapshots
+    /// they need. Registered transactions are retained automatically; owned
+    /// projected views and named checkpoints preserve their own generations.
+    /// The lock-wait context only records an explicitly enabled diagnostic.
+    pub fn commit_transaction_with_protected_snapshots(
+        &mut self,
+        transaction: crate::Transaction,
+        durability: Durability,
+        protected: &[Snapshot],
+        lock_wait: WriteLockWait,
+    ) -> Result<crate::TransactionCommit> {
+        self.commit_transaction_inner(transaction, durability, None, lock_wait, Some(protected))
     }
 
     /// Commits through one deterministic write-boundary failure. This is the
@@ -809,6 +859,7 @@ impl Database {
             durability,
             Some((boundary, mode)),
             WriteLockWait::default(),
+            None,
         )
     }
 
@@ -818,6 +869,7 @@ impl Database {
         durability: Durability,
         failure: Option<(WriteBoundary, FailureMode)>,
         lock_wait: WriteLockWait,
+        protected: Option<&[Snapshot]>,
     ) -> Result<crate::TransactionCommit> {
         let mut diagnostics = self.write_path_diagnostics.as_ref().map(|_| {
             PendingWriteDiagnostics::start(
@@ -879,7 +931,7 @@ impl Database {
                 .phases
                 .batch_prepare = started.finish();
         }
-        let receipt = self.write_owned_inner(batch, durability, failure, diagnostics)?;
+        let receipt = self.write_owned_inner(batch, durability, failure, diagnostics, protected)?;
         tracing::debug!(
             target: "rrd_lsm::transaction",
             snapshot_sequence,
@@ -910,14 +962,16 @@ impl Database {
 
     fn latest_sequence_for_key(&self, key: &[u8]) -> Result<Option<u64>> {
         let read_sequence = self.snapshot().sequence;
-        let mut latest = self
-            .memtable
-            .get_version(key, read_sequence)
-            .map(|version| version.sequence);
+        // As in get(), every active-memtable version is newer than all
+        // published segments. A tombstone is still an authoritative version.
+        if let Some(version) = self.memtable.get_version(key, read_sequence) {
+            return Ok(Some(version.sequence));
+        }
+        let mut latest = None;
         for segment in &self.segments {
-            if let Some(version) = segment.get_version(key, read_sequence)? {
-                if latest.is_none_or(|sequence| version.sequence > sequence) {
-                    latest = Some(version.sequence);
+            if let Some(sequence) = segment.get_sequence(key, read_sequence)? {
+                if latest.is_none_or(|latest| sequence > latest) {
+                    latest = Some(sequence);
                 }
             }
         }
@@ -948,7 +1002,7 @@ impl Database {
         let charge = MutableCharge::batch(batch)?;
         self.mutable_limits.check(charge)?;
         let payload = batch.encode()?;
-        self.prepare_write(batch, payload.len(), charge)?;
+        self.prepare_write(batch, payload.len(), charge, None)?;
         let prepared_mutable = self.mutable_memory.prepare(&self.memtable, charge)?;
         inject_write_failure(failure, WriteBoundary::Prepared)?;
         let append_durability = append_durability(durability, failure);
@@ -993,7 +1047,7 @@ impl Database {
                 self.memtable.approximate_bytes(),
             )
         });
-        self.write_owned_inner(batch, durability, None, diagnostics)
+        self.write_owned_inner(batch, durability, None, diagnostics, None)
     }
 
     pub fn write_owned_with_failure(
@@ -1010,7 +1064,7 @@ impl Database {
                 self.memtable.approximate_bytes(),
             )
         });
-        self.write_owned_inner(batch, durability, Some((boundary, mode)), diagnostics)
+        self.write_owned_inner(batch, durability, Some((boundary, mode)), diagnostics, None)
     }
 
     fn write_owned_inner(
@@ -1019,6 +1073,7 @@ impl Database {
         durability: Durability,
         failure: Option<(WriteBoundary, FailureMode)>,
         mut diagnostics: Option<PendingWriteDiagnostics>,
+        protected: Option<&[Snapshot]>,
     ) -> Result<AppendReceipt> {
         self.ensure_writer_ready()?;
         let charge = MutableCharge::batch(&batch)?;
@@ -1035,7 +1090,7 @@ impl Database {
         }
         let payload_bytes = payload.len();
         let maintenance_started = diagnostics.is_some().then(PhaseClock::start);
-        self.prepare_write(&batch, payload.len(), charge)?;
+        self.prepare_write(&batch, payload.len(), charge, protected)?;
         if let Some(started) = maintenance_started {
             diagnostics
                 .as_mut()
@@ -1183,8 +1238,20 @@ impl Database {
         batch: &WriteBatch,
         payload_bytes: usize,
         charge: MutableCharge,
+        protected: Option<&[Snapshot]>,
     ) -> Result<()> {
         self.reclaim_if_pending()?;
+        // A busy writer must not depend on the idle worker winning this lock.
+        // Offer one immutable quantum once a full configured source quantum
+        // accumulates (or hard capacity is reached). Smaller debt remains idle-
+        // eligible. Never flush the mutable tail or loop to drain housekeeping.
+        let foreground_threshold =
+            (self.compaction.max_input_segments as u64).min(self.compaction_limits.l0_segments);
+        let maintenance_offered = self.compaction_debt_segments() > 0
+            && self.l0_segment_count() as u64 >= foreground_threshold;
+        if maintenance_offered {
+            self.offer_write_compaction(protected)?;
+        }
         let projected_bytes = self.wal_payload_bytes.saturating_add(payload_bytes);
         let projected_versions = self.memtable.version_count().saturating_add(batch.len());
         let active = self.memtable.version_count() != 0;
@@ -1201,31 +1268,8 @@ impl Database {
                 Ok(Some(_)) => {
                     self.maintenance_stats.automatic_flushes =
                         self.maintenance_stats.automatic_flushes.saturating_add(1);
-                    match self.compact_if_needed(self.manifest.created_at) {
-                        Ok(Some(outcome)) => {
-                            self.maintenance_stats.automatic_compactions = self
-                                .maintenance_stats
-                                .automatic_compactions
-                                .saturating_add(1);
-                            self.maintenance_stats.compaction_input_bytes = self
-                                .maintenance_stats
-                                .compaction_input_bytes
-                                .saturating_add(outcome.input_bytes);
-                            self.maintenance_stats.compaction_output_bytes = self
-                                .maintenance_stats
-                                .compaction_output_bytes
-                                .saturating_add(outcome.output_bytes);
-                            self.maintenance_stats.peak_compaction_buffer_bytes = self
-                                .maintenance_stats
-                                .peak_compaction_buffer_bytes
-                                .max(outcome.peak_buffer_bytes);
-                        }
-                        Ok(None) => {}
-                        Err(error) => {
-                            self.maintenance_stats.failed_compactions =
-                                self.maintenance_stats.failed_compactions.saturating_add(1);
-                            return Err(error);
-                        }
+                    if !maintenance_offered {
+                        self.offer_write_compaction(protected)?;
                     }
                 }
                 Ok(None) => {}
@@ -1242,15 +1286,11 @@ impl Database {
             .filter(|segment| segment.descriptor.level == 0)
             .count() as u64;
         if l0_segments >= self.compaction_limits.l0_segments {
-            self.compact_if_needed(self.manifest.created_at)?;
-            let remaining = self
-                .segments
-                .iter()
-                .filter(|segment| segment.descriptor.level == 0)
-                .count() as u64;
+            // The single offered quantum above has already had its chance.
+            // Preserve rejection before WAL append rather than retrying work.
             self.compaction_limits.check(
                 crate::MaintenanceResource::L0Segments,
-                remaining.saturating_add(1),
+                l0_segments.saturating_add(1),
             )?;
         }
         self.reclaim_if_pending()?;
@@ -1263,6 +1303,38 @@ impl Database {
                 self.maintenance_stats.oversized_batches.saturating_add(1);
         }
         Ok(())
+    }
+
+    fn compact_for_write(
+        &mut self,
+        protected: Option<&[Snapshot]>,
+    ) -> Result<Option<CompactionOutcome>> {
+        self.compact_segments_inner(
+            protected.unwrap_or(&[]),
+            self.manifest.created_at,
+            None,
+            false,
+            protected.is_none(),
+        )
+    }
+
+    fn offer_write_compaction(&mut self, protected: Option<&[Snapshot]>) -> Result<()> {
+        let result = self.compact_for_write(protected);
+        match self.record_automatic_compaction(result) {
+            Ok(_) => Ok(()),
+            // A denied optional merge leaves debt visible. The hard L0,
+            // reclamation and mutable admission still decide if the write fits.
+            Err(Error::MaintenanceLimit {
+                resource:
+                    crate::MaintenanceResource::InputBytes
+                    | crate::MaintenanceResource::InputLogicalBytes
+                    | crate::MaintenanceResource::InputVersions
+                    | crate::MaintenanceResource::OutputSegments
+                    | crate::MaintenanceResource::ElapsedMs,
+                ..
+            }) => Ok(()),
+            Err(error) => Err(error),
+        }
     }
 
     fn record_memtable_peak(&mut self) {
@@ -1285,7 +1357,8 @@ impl Database {
         self.wal.sync()
     }
 
-    /// Flushes the current WAL-backed memtable into one immutable segment.
+    /// Flushes the WAL-backed memtable into key-range immutable partitions,
+    /// published together by one manifest and one successor WAL.
     /// Publication order makes either the old or new manifest fully recoverable
     /// at every crash boundary.
     pub fn flush_memtable(&mut self, at: u64) -> Result<Option<Manifest>> {
@@ -1314,25 +1387,64 @@ impl Database {
             self.wal.sync()?;
             return Ok(None);
         }
+        let started = Instant::now();
         let l0_segments = self
             .segments
             .iter()
             .filter(|segment| segment.descriptor.level == 0)
             .count() as u64;
-        self.compaction_limits.check(
-            crate::MaintenanceResource::L0Segments,
-            l0_segments.saturating_add(1),
-        )?;
+        // Retain only borrowed boundary keys, bounded before each push. The
+        // encoder borrows one range at a time; no second mutable table exists.
+        let mut boundaries = Vec::new();
+        let mut partition_bytes = 0usize;
+        for (key, versions) in self.memtable.all_versions() {
+            self.compaction_limits.check_elapsed(started)?;
+            let group_bytes = versions.iter().try_fold(0usize, |bytes, version| {
+                bytes
+                    .checked_add(key.len())
+                    .and_then(|bytes| {
+                        bytes.checked_add(version.value.as_ref().map_or(0, |value| value.len()))
+                    })
+                    .and_then(|bytes| bytes.checked_add(24))
+                    .ok_or_else(|| {
+                        Error::InvalidSegment("flush key-group estimate overflow".into())
+                    })
+            })?;
+            if boundaries.is_empty()
+                || partition_bytes.saturating_add(group_bytes)
+                    > self.compaction.target_segment_bytes
+            {
+                let outputs = (boundaries.len() as u64).saturating_add(1);
+                self.compaction_limits
+                    .check(crate::MaintenanceResource::OutputSegments, outputs)?;
+                self.compaction_limits.check(
+                    crate::MaintenanceResource::L0Segments,
+                    l0_segments.saturating_add(outputs),
+                )?;
+                boundaries.push(key);
+                partition_bytes = 0;
+            }
+            partition_bytes = partition_bytes.saturating_add(group_bytes);
+        }
         let sequence = self.wal.sync()?;
         inject_failure(failure, FlushBoundary::WalSynced)?;
-        let (segment, _) = Segment::write_from_memtable_with_cache(
-            &self.root.join(SEGMENT_DIRECTORY),
-            &self.memtable,
-            self.segment_row_group_budget,
-            self.segment_compression,
-            Arc::clone(&self.page_cache),
-            Arc::clone(&self.segment_io),
-        )?;
+        // Failed partial output is unreachable from the old manifest and must
+        // be collected even when the caller stays in this process.
+        self.reclamation_pending = true;
+        let mut flushed = Vec::with_capacity(boundaries.len());
+        for (index, first) in boundaries.iter().enumerate() {
+            self.compaction_limits.check_elapsed(started)?;
+            let (segment, _) = Segment::write_from_versions_with_cache(
+                &self.root.join(SEGMENT_DIRECTORY),
+                self.memtable
+                    .range_versions(Some(first), boundaries.get(index + 1).copied()),
+                self.segment_row_group_budget,
+                self.segment_compression,
+                Arc::clone(&self.page_cache),
+                Arc::clone(&self.segment_io),
+            )?;
+            flushed.push(segment);
+        }
         inject_failure(failure, FlushBoundary::SegmentSynced)?;
         let next_sequence = sequence
             .checked_add(1)
@@ -1345,7 +1457,7 @@ impl Database {
         };
         inject_failure(failure, FlushBoundary::SuccessorWalSynced)?;
         let mut descriptors = self.manifest.segments.clone();
-        descriptors.push(segment.descriptor.clone());
+        descriptors.extend(flushed.iter().map(|segment| segment.descriptor.clone()));
         let next = new_manifest(
             self.manifest
                 .generation
@@ -1358,11 +1470,12 @@ impl Database {
             descriptors,
             self.manifest.application_format,
         )?;
+        self.compaction_limits.check_elapsed(started)?;
         self.manifests.publish(&next, Some(&self.manifest.digest))?;
         self.wal = successor;
         self.memtable = self.mutable_memory.empty(sequence);
         self.wal_payload_bytes = 0;
-        self.segments.push(Arc::new(segment));
+        self.segments.extend(flushed.into_iter().map(Arc::new));
         self.manifest = next.clone();
         self.reclamation_pending = true;
         inject_failure(failure, FlushBoundary::ManifestPublished)?;
@@ -1371,6 +1484,10 @@ impl Database {
 
     pub fn checkpoint(&self, name: &str, at: u64) -> Result<Checkpoint> {
         self.manifests.checkpoint(name, &self.manifest.digest, at)
+    }
+
+    pub fn checkpoint_ownership(&self) -> Result<(u64, u64)> {
+        self.manifests.checkpoint_ownership()
     }
 
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {
@@ -1677,6 +1794,83 @@ impl Database {
         self.compact_inner(&[], at, None, false, true)
     }
 
+    /// One bounded physical housekeeping quantum. No logical write or flush is
+    /// introduced: the mutable tail stays in its acknowledged WAL generation.
+    /// Reclamation and compaction use the same publication owner and configured
+    /// limits as foreground maintenance. A caller decides when to offer work.
+    pub fn maintenance_step(&mut self) -> Result<bool> {
+        self.maintenance_step_inner(&[], true)
+    }
+
+    /// One idle quantum with the same pruning contract as [`Self::compact`].
+    /// The owner must supply every untracked snapshot it needs to retain.
+    /// Registered transactions are protected automatically; projected views
+    /// and named checkpoints retain their original physical generations.
+    /// Unlike explicit compaction, this never flushes the mutable tail.
+    pub fn maintenance_step_with_protected_snapshots(
+        &mut self,
+        protected: &[Snapshot],
+    ) -> Result<bool> {
+        self.maintenance_step_inner(protected, false)
+    }
+
+    fn maintenance_step_inner(
+        &mut self,
+        protected: &[Snapshot],
+        retain_all_versions: bool,
+    ) -> Result<bool> {
+        self.ensure_writer_ready()?;
+        if self.reclamation_pending {
+            let report = self.garbage_collect()?;
+            self.reclamation_pending = report.has_more;
+            return Ok(true);
+        }
+        if self.compaction_debt_segments() == 0 {
+            return Ok(false);
+        }
+        let result = self.compact_segments_inner(
+            protected,
+            self.manifest.created_at,
+            None,
+            false,
+            retain_all_versions,
+        );
+        self.record_automatic_compaction(result)
+    }
+
+    fn record_automatic_compaction(
+        &mut self,
+        result: Result<Option<CompactionOutcome>>,
+    ) -> Result<bool> {
+        match result {
+            Ok(Some(outcome)) => {
+                self.maintenance_stats.automatic_compactions = self
+                    .maintenance_stats
+                    .automatic_compactions
+                    .saturating_add(1);
+                self.maintenance_stats.compaction_input_bytes = self
+                    .maintenance_stats
+                    .compaction_input_bytes
+                    .saturating_add(outcome.input_bytes);
+                self.maintenance_stats.compaction_output_bytes = self
+                    .maintenance_stats
+                    .compaction_output_bytes
+                    .saturating_add(outcome.output_bytes);
+                self.maintenance_stats.peak_compaction_buffer_bytes = self
+                    .maintenance_stats
+                    .peak_compaction_buffer_bytes
+                    .max(outcome.peak_buffer_bytes);
+                Ok(true)
+            }
+            Ok(None) => Ok(false),
+            Err(error) => {
+                self.maintenance_stats.failed_compactions =
+                    self.maintenance_stats.failed_compactions.saturating_add(1);
+                Err(error)
+            }
+        }
+    }
+
     fn compact_inner(
         &mut self,
         protected: &[Snapshot],
@@ -1686,6 +1880,18 @@ impl Database {
         retain_all_versions: bool,
     ) -> Result<Option<CompactionOutcome>> {
         self.flush_memtable_inner(at, None)?;
+        self.compact_segments_inner(protected, at, failure, force, retain_all_versions)
+    }
+
+    fn compact_segments_inner(
+        &mut self,
+        protected: &[Snapshot],
+        at: u64,
+        failure: Option<(CompactionBoundary, FailureMode)>,
+        force: bool,
+        retain_all_versions: bool,
+    ) -> Result<Option<CompactionOutcome>> {
+        self.ensure_writer_ready()?;
         let started = Instant::now();
         let Some(candidate) = self.select_compaction_candidate(force, started)? else {
             return Ok(None);
@@ -1701,6 +1907,9 @@ impl Database {
         protected_sequences.insert(durable);
         let previous_manifest = self.manifest.digest.clone();
         let input_segments = candidate.indices.len();
+        // Partition creation can fail before a replacement manifest exists.
+        // Keep cleanup owned even when an idle quantum began without a flush.
+        self.reclamation_pending = true;
         let merge = self.merge_compaction_candidate(
             &candidate,
             durable,
@@ -1754,7 +1963,6 @@ impl Database {
         retained_segments.extend(compacted_segments.into_iter().map(Arc::new));
         self.segments = retained_segments;
         self.manifest = next.clone();
-        self.reclamation_pending = true;
         inject_compaction_failure(failure, CompactionBoundary::ManifestPublished)?;
         Ok(Some(CompactionOutcome {
             previous_manifest,
@@ -1781,6 +1989,7 @@ impl Database {
         started: Instant,
     ) -> Result<Option<CompactionCandidate>> {
         let mut denied = None;
+        let mut overlap_blocked = false;
         for source_level in 0..self.compaction.max_level {
             self.compaction_limits.check_elapsed(started)?;
             let mut sources = self
@@ -1790,7 +1999,7 @@ impl Database {
                 .filter(|(_, segment)| segment.descriptor.level == source_level)
                 .map(|(index, _)| index)
                 .collect::<Vec<_>>();
-            let blocked = denied.is_some();
+            let blocked = denied.is_some() || overlap_blocked;
             let threshold = if source_level == 0 {
                 self.compaction.l0_compaction_trigger
             } else {
@@ -1813,34 +2022,47 @@ impl Database {
                         .then_with(|| left.id.cmp(&right.id))
                 }
             });
-            for take in (1..=sources.len().min(self.compaction.max_input_segments)).rev() {
-                let Some(candidate) =
-                    self.compaction_overlap_candidate(&sources[..take], source_level, started)?
-                else {
-                    continue;
-                };
-                // Do not disguise a rejected merge of multiple source segments
-                // as a successful move of just one. A sole blocking target may
-                // move down to free its parent; this is finite in max_level.
-                if candidate.indices.len() < 2 && !(sources.len() == 1 && (force || blocked)) {
-                    continue;
-                }
-                match self.admit_compaction_input(&candidate, started) {
-                    Ok(_) => return Ok(Some(candidate)),
-                    Err(
-                        error @ Error::MaintenanceLimit {
-                            resource:
-                                crate::MaintenanceResource::InputBytes
-                                | crate::MaintenanceResource::InputLogicalBytes
-                                | crate::MaintenanceResource::InputVersions,
-                            ..
-                        },
-                    ) => {
-                        if denied.is_none() {
-                            denied = Some(error);
-                        }
+            // Preserve oldest/key-first preference, but a blocked prefix must
+            // not hide independent ranges that fit the same admitted quantum.
+            // Enumeration remains subject to the existing elapsed bound; every
+            // candidate includes its complete target-level overlap closure.
+            for start in 0..sources.len() {
+                for take in
+                    (1..=(sources.len() - start).min(self.compaction.max_input_segments)).rev()
+                {
+                    self.compaction_limits.check_elapsed(started)?;
+                    let Some(candidate) = self.compaction_overlap_candidate(
+                        &sources[start..start + take],
+                        source_level,
+                        started,
+                    )?
+                    else {
+                        overlap_blocked = true;
+                        continue;
+                    };
+                    // Do not disguise a rejected merge of multiple source segments
+                    // as a successful move of just one. A sole blocking target may
+                    // move down to free its parent; this is finite in max_level.
+                    if candidate.indices.len() < 2 && !(sources.len() == 1 && (force || blocked)) {
+                        continue;
                     }
-                    Err(error) => return Err(error),
+                    match self.admit_compaction_input(&candidate, started) {
+                        Ok(_) => return Ok(Some(candidate)),
+                        Err(
+                            error @ Error::MaintenanceLimit {
+                                resource:
+                                    crate::MaintenanceResource::InputBytes
+                                    | crate::MaintenanceResource::InputLogicalBytes
+                                    | crate::MaintenanceResource::InputVersions,
+                                ..
+                            },
+                        ) => {
+                            if denied.is_none() {
+                                denied = Some(error);
+                            }
+                        }
+                        Err(error) => return Err(error),
+                    }
                 }
             }
         }
@@ -1997,15 +2219,13 @@ impl Database {
                     .map(|(sequence, value)| VersionedValue { sequence, value })
                     .collect::<Vec<_>>()
             };
-            let tombstone_only = retained.iter().all(|version| version.value.is_none());
-            let shadows_unselected = self.segments.iter().enumerate().any(|(index, segment)| {
-                !selected.contains(&index)
-                    && key >= segment.descriptor.first_key
-                    && key <= segment.descriptor.last_key
-            });
-            if retained.is_empty()
-                || (!retain_all_versions && tombstone_only && !shadows_unselected)
-            {
+            if !retain_compacted_key(&retained, retain_all_versions, || {
+                self.segments.iter().enumerate().any(|(index, segment)| {
+                    !selected.contains(&index)
+                        && key >= segment.descriptor.first_key
+                        && key <= segment.descriptor.last_key
+                })
+            }) {
                 continue;
             }
             let group_bytes = version_group_bytes(&key, &retained);
@@ -2196,19 +2416,27 @@ impl Database {
             return Ok(version.value.as_deref().map(<[u8]>::to_vec));
         }
         let mut best_sequence = 0;
-        let mut best_value = None;
+        let mut selected = None;
         for segment in &self.segments {
-            if let Some(version) = segment.get_version(key, snapshot.sequence)? {
-                if version.sequence > best_sequence {
-                    best_sequence = version.sequence;
-                    best_value = version.value;
+            if let Some(version) = segment.select_version(key, snapshot.sequence)? {
+                if version.sequence() > best_sequence {
+                    best_sequence = version.sequence();
+                    selected = Some(version);
                 }
             }
         }
-        Ok(best_value.map(|value| value.into_vec()))
+        // Selection loads authenticated key/sequence spines, not value pages.
+        // Materialize only the winner, including a winning tombstone.
+        match selected {
+            Some(version) => version.value(),
+            None => Ok(None),
+        }
     }
 
     pub fn get_many(&self, keys: &[Vec<u8>], snapshot: Snapshot) -> Result<Vec<Option<Vec<u8>>>> {
+        if self.segments.len() <= 1 {
+            return keys.iter().map(|key| self.get(key, snapshot)).collect();
+        }
         let mut values = vec![None; keys.len()];
         let mut unresolved = Vec::with_capacity(keys.len());
         for (index, key) in keys.iter().enumerate() {
@@ -2221,34 +2449,30 @@ impl Database {
         if unresolved.is_empty() {
             return Ok(values);
         }
-        let unresolved_keys = unresolved
-            .iter()
-            .map(|index| keys[*index].as_slice())
-            .collect::<Vec<_>>();
-        if self.segments.len() == 1 && self.memtable.version_count() == 0 {
-            for (position, version) in self.segments[0]
-                .get_versions(&unresolved_keys, snapshot.sequence)?
-                .into_iter()
-                .enumerate()
-            {
-                values[unresolved[position]] = version
-                    .and_then(|version| version.value)
-                    .map(|value| value.into_vec());
-            }
-            return Ok(values);
-        }
-        let mut best_sequences = vec![0u64; unresolved.len()];
+        // Visit keys within each segment so a small cache can reuse its spine.
+        // Keep only borrowed row identities, never a batch of losing payloads
+        // or retained pages. The first segment still wins equal sequences.
+        let mut selected: Vec<Option<SelectedVersion<'_>>> = std::iter::repeat_with(|| None)
+            .take(unresolved.len())
+            .collect();
         for segment in &self.segments {
-            for (position, version) in segment
-                .get_versions(&unresolved_keys, snapshot.sequence)?
-                .into_iter()
-                .enumerate()
-            {
-                if let Some(version) = version {
-                    if version.sequence > best_sequences[position] {
-                        best_sequences[position] = version.sequence;
-                        values[unresolved[position]] = version.value.map(|value| value.into_vec());
+            for (position, index) in unresolved.iter().enumerate() {
+                if let Some(version) = segment.select_version(&keys[*index], snapshot.sequence)? {
+                    if selected[position]
+                        .as_ref()
+                        .is_none_or(|current| version.sequence() > current.sequence())
+                    {
+                        selected[position] = Some(version);
                     }
+                }
+            }
+        }
+        // Preserve payload locality too when requested keys alternate between
+        // segments. Caller order and duplicates remain in the result vector.
+        for segment in &self.segments {
+            for (index, selected) in unresolved.iter().zip(&mut selected) {
+                if let Some(version) = selected.take_if(|version| version.belongs_to(segment)) {
+                    values[*index] = version.value()?;
                 }
             }
         }
@@ -2677,6 +2901,19 @@ fn unreachable_files(
     Ok(candidates)
 }
 
+fn retain_compacted_key(
+    retained: &[VersionedValue],
+    retain_all_versions: bool,
+    shadows_unselected: impl FnOnce() -> bool,
+) -> bool {
+    // Only a tombstone that would otherwise be discarded needs reachability
+    // outside this merge. Live/protected values must survive either way.
+    !retained.is_empty()
+        && (retain_all_versions
+            || retained.iter().any(|version| version.value.is_some())
+            || shadows_unselected())
+}
+
 fn remove_candidates(
     directory: &AnchoredPath,
     candidates: Vec<(AnchoredPath, String, u64)>,
@@ -2707,6 +2944,65 @@ fn remove_candidates(
         Ok(more) => {
             sync?;
             Ok(more)
+        }
+    }
+}
+
+#[cfg(test)]
+mod compaction_shadow_tests {
+    use super::*;
+    use std::cell::Cell;
+
+    fn live(sequence: u64) -> VersionedValue {
+        VersionedValue {
+            sequence,
+            value: Some(b"value".to_vec().into_boxed_slice()),
+        }
+    }
+
+    fn deleted(sequence: u64) -> VersionedValue {
+        VersionedValue {
+            sequence,
+            value: None,
+        }
+    }
+
+    #[test]
+    fn live_or_protected_history_never_probes_unselected_segments() {
+        for versions in [
+            vec![live(1)],
+            vec![live(1), deleted(2)],
+            vec![deleted(1), live(2)],
+        ] {
+            for retain_all in [false, true] {
+                assert!(retain_compacted_key(&versions, retain_all, || {
+                    panic!("live history must not scan unrelated segments")
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn empty_or_unpruned_tombstones_do_not_probe_shadows() {
+        assert!(!retain_compacted_key(&[], false, || panic!("empty output")));
+        assert!(!retain_compacted_key(&[], true, || panic!("empty output")));
+        assert!(retain_compacted_key(&[deleted(1)], true, || panic!(
+            "no pruning"
+        )));
+    }
+
+    #[test]
+    fn tombstone_pruning_requires_exactly_one_shadow_decision() {
+        for shadowed in [false, true] {
+            let probes = Cell::new(0);
+            assert_eq!(
+                retain_compacted_key(&[deleted(1), deleted(2)], false, || {
+                    probes.set(probes.get() + 1);
+                    shadowed
+                }),
+                shadowed
+            );
+            assert_eq!(probes.get(), 1);
         }
     }
 }

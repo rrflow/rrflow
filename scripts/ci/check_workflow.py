@@ -60,6 +60,42 @@ def require(condition: bool, message: str) -> None:
         raise PolicyError(message)
 
 
+def verify_candidate_admission(caller: str) -> None:
+    """Keep the thin caller's admission envelope explicit and fail closed on drift.
+
+    This intentionally accepts the small checked-in YAML shape, not arbitrary
+    workflow syntax. GitHub evaluates the condition; this policy prevents lost
+    transitions, path filters, or an alternate caller from bypassing that shape.
+    """
+    trigger = re.search(r"(?ms)^on:\n(.*?)(?=^\S)", caller)
+    require(trigger is not None, "candidate CI must declare its event envelope")
+    events = re.fullmatch(
+        r"  pull_request:\n    types: \[([a-z_, ]+)\]\n"
+        r"  merge_group:\n  workflow_dispatch:\n\n",
+        trigger.group(1),
+    )
+    require(events is not None, "candidate events must not add filters or omit merge/manual dispatch")
+    activities = [item.strip() for item in events.group(1).split(",")]
+    required = {"opened", "synchronize", "reopened", "ready_for_review", "converted_to_draft"}
+    require(
+        len(activities) == len(required) and set(activities) == required,
+        "candidate PR events must include ready and draft transitions exactly once",
+    )
+    jobs = job_blocks(caller)
+    require(set(jobs) == {"pipeline"}, "candidate admission must have one pipeline caller")
+    conditions = re.findall(r"(?m)^    if: (.+)$", jobs["pipeline"])
+    require(
+        conditions == ["${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}"],
+        "draft PRs must defer full CI; ready, merge-group and manual candidates must run it",
+    )
+    require(
+        "concurrency:\n"
+        "  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}\n"
+        "  cancel-in-progress: true\n" in caller,
+        "draft transitions must cancel only stale runs for the same PR or ref",
+    )
+
+
 def job_blocks(workflow: str) -> dict[str, str]:
     marker = "\njobs:\n"
     require(marker in workflow, "reusable workflow must define jobs")
@@ -489,6 +525,11 @@ def main() -> None:
     caller = workflows[CALLER]
     reusable = workflows[REUSABLE]
     jobs = job_blocks(reusable)
+    verify_candidate_admission(caller)
+    require(
+        reusable.count("python3 scripts/ci/test_candidate_admission.py") == 1,
+        "candidate admission regressions must run exactly once",
+    )
 
     for trigger in ["pull_request:", "merge_group:", "workflow_dispatch:"]:
         require(
@@ -611,6 +652,10 @@ def main() -> None:
         "cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked",
         "cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings",
         "C07C_NATIVE_PAUSE_V1=",
+        "--skip publication_and_reclamation",
+        "publication_and_reclamation --nocapture --test-threads=2",
+        "Require both complete installed publication receipts",
+        "RRFLOW_PUBLICATION_RECEIPT_DIR:",
     ]:
         require(command in diagnostic, f"installed diagnostic qualification missing: {command}")
     require(diagnostic.index("Verify diagnostic protocol") < diagnostic.index("Build explicit diagnostic"),

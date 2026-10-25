@@ -651,6 +651,21 @@
           "minimum": 0,
           "type": "integer"
         },
+        "checkpoint_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "denied_source_allocations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "fenced": {
           "type": "boolean"
         },
@@ -675,6 +690,11 @@
           "minimum": 0,
           "type": "integer"
         },
+        "peak_source_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "pinned_read_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -695,15 +715,26 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "retained_source_bytes": {
+          "description": "Owned source-page allocation charges; excludes borrowed mmap residency.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
+        "checkpoint_entries",
+        "checkpoint_limit",
         "native_transactions",
         "native_transaction_bytes",
         "active_read_views",
         "pinned_read_bytes",
         "retained_mutable_bytes",
         "retained_projected_bytes",
+        "retained_source_bytes",
+        "peak_source_bytes",
+        "denied_source_allocations",
         "outstanding_requests",
         "outstanding_logical_bytes",
         "queued_requests",
@@ -940,6 +971,15 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "verification_finished_ns": {
+          "description": "End of independent readback while the admitted client slot is still held.\nAbsent in historical evidence; never infer zero verification cost.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "write": {
           "anyOf": [
@@ -1864,6 +1904,41 @@
         "kind",
         "segment",
         "observation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "backup_started",
+          "type": "string"
+        },
+        "point": {
+          "$ref": "#/$defs/Id"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "segment": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "segment",
+        "point",
+        "seed",
+        "started_ns"
       ],
       "type": "object"
     },

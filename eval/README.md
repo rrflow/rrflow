@@ -165,6 +165,24 @@ allocation and every frozen acceptance condition. Actual retained physical
 readers and multi-estate orchestration are implemented; their presence does
 not qualify a profile. macOS constrained-capacity launch is unavailable.
 Characterization results cannot close the profile or 24-hour requirement.
+Before a qualification enters its soak, `CampaignWriter::admit_soak` checks
+warmup, measured, burst and drain using the same operating thresholds as final
+qualification, including required lanes, transitions, reopen evidence and
+settled ownership. A failing preflight retains its failure and cannot spend
+another 24 hours on a result already known to be unqualified. Diagnostic
+characterization can still collect unsuccessful operating points.
+
+Each new load attempt also records `verification_finished_ns`: the end of
+independent verification while its admitted client slot remains occupied.
+Use `started_ns - scheduled_ns` for dispatch delay, `finished_ns - started_ns`
+for logical-operation response time, and `verification_finished_ns - finished_ns`
+for subsequent readback time. Slot occupancy ends at verification completion.
+These are client-observed intervals, not server CPU time; totals from concurrent
+operations are not wall-clock duration. Historical missing timestamps remain
+unavailable. The validator rejects completion before response or after the
+segment. Keep these intervals beside native maintenance/debt counters; they do
+not by themselves assign maintenance as a latency cause. Harness exit zero
+means valid collected evidence, not a passing capacity operating point.
 
 The Linux cold lane stops the owned engine, synchronizes and advises eviction
 only for regular files inside its installed native root, and checks actual

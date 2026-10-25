@@ -20,10 +20,14 @@ mod damage;
 mod fleet;
 #[path = "sustained/lifecycle.rs"]
 mod lifecycle;
+#[path = "sustained/management.rs"]
+mod management;
 #[path = "sustained/native.rs"]
 mod native;
 #[path = "sustained/reader.rs"]
 mod reader;
+#[path = "sustained/resource_window.rs"]
+mod resource_window;
 #[path = "sustained/workload.rs"]
 mod workload;
 use workload::{Prepared, Workload};
@@ -207,6 +211,7 @@ async fn sample(
                 value: value
                     .retained_mutable_bytes
                     .checked_add(value.retained_projected_bytes)
+                    .and_then(|bytes| bytes.checked_add(value.retained_source_bytes))
                     .and_then(|bytes| bytes.checked_add(value.native_transaction_bytes))
                     .ok_or("retained sum overflow")?,
             },
@@ -243,6 +248,8 @@ struct PointRun<'a> {
     clock: Instant,
     allocation: Option<NativeAllocationReceipt>,
     generations: Vec<u64>,
+    previous_resources: Vec<ResourceSample>,
+    backup: management::ManagementTask<BackupEvidence>,
 }
 
 impl PointRun<'_> {
@@ -296,6 +303,8 @@ impl PointRun<'_> {
         let mut resources = Vec::new();
         let deadline =
             self.clock + Duration::from_nanos(started) + Duration::from_millis(duration_ms);
+        let period = Duration::from_millis(self.campaign.schedule.sample_ms.get());
+        let mut next_sample = Instant::now();
         loop {
             resources.push(self.sample(writer).await?);
             if Instant::now() >= deadline {
@@ -304,12 +313,9 @@ impl PointRun<'_> {
             if resources.len() as u64 >= self.campaign.evidence.samples_per_segment.get() {
                 return Err("drain resource sample cap exhausted".into());
             }
-            tokio::time::sleep_until(
-                (Instant::now() + Duration::from_millis(self.campaign.schedule.sample_ms.get()))
-                    .min(deadline)
-                    .into(),
-            )
-            .await;
+            next_sample =
+                resource_window::next_sample_deadline(next_sample, period, Instant::now())?;
+            tokio::time::sleep_until(next_sample.min(deadline).into()).await;
         }
         writer.record_event(&ProgressEvent::LoadIntent {
             segment: writer.next_index(),
@@ -383,6 +389,7 @@ impl PointRun<'_> {
             corpus: None,
             cold_start: None,
             reopens: None,
+            backup_started_ns: None,
             backup: None,
             reader: None,
             manifest,
@@ -399,6 +406,7 @@ impl PointRun<'_> {
         origin: u64,
         first: u64,
         count: u64,
+        final_segment: bool,
     ) -> DriverResult<SustainedSegment> {
         let campaign = self.campaign;
         let rate =
@@ -460,7 +468,22 @@ impl PointRun<'_> {
             seed: self.workload.seed,
             expected_ledger_sha256: expected_digest(&ledger.expected)?,
         }];
-        let mut resources = vec![self.sample(writer).await?];
+        // Offered windows may overlap when the preceding segment drains late.
+        // Its actual observations still cover that time; never invent a new
+        // origin or lose their evidence merely because the ledger changed.
+        let mut resources = resource_window::overlapping_samples(
+            &self.previous_resources,
+            started,
+            self.pid,
+            campaign.evidence.samples_per_segment.get() as usize,
+        )?;
+        for value in &resources {
+            writer.record_event(&ProgressEvent::Resource {
+                segment: writer.next_index(),
+                sample: Box::new(value.clone()),
+            })?;
+        }
+        resources.push(self.sample(writer).await?);
         let held_reader = if phase == LoadPhase::Measured
             && campaign
                 .required_lanes
@@ -474,10 +497,18 @@ impl PointRun<'_> {
         let mut attempts = Vec::new();
         let mut failure = ReadbackFailures::default();
         let mut joins = JoinSet::new();
-        let mut backup = JoinSet::new();
+        let mut backup_started_ns = None;
         let deadline = Duration::from_millis(campaign.schedule.operation_deadline_ms.get());
+        let period = Duration::from_millis(campaign.schedule.sample_ms.get());
+        let last_observed = self.clock
+            + Duration::from_nanos(
+                resources
+                    .last()
+                    .ok_or("missing first resource sample")?
+                    .elapsed_ns,
+            );
         let mut next_sample =
-            tokio::time::Instant::now() + Duration::from_millis(campaign.schedule.sample_ms.get());
+            resource_window::next_sample_deadline(last_observed, period, Instant::now())?;
         for (offset, operation) in prepared.iter().enumerate() {
             let sequence = first + offset as u64;
             let due = self.clock + Duration::from_nanos(scheduled(sequence));
@@ -487,12 +518,12 @@ impl PointRun<'_> {
                     result=joins.join_next(), if !joins.is_empty() => {
                         collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,&mut failure,writer)?;
                     }
-                    _=tokio::time::sleep_until(next_sample) => {
+                    _=tokio::time::sleep_until(due.into()) => break,
+                    _=tokio::time::sleep_until(next_sample.into()) => {
                         if resources.len() as u64>=campaign.evidence.samples_per_segment.get() {return Err("resource sample cap exhausted".into());}
                         resources.push(self.sample(writer).await?);
-                        next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                        next_sample=resource_window::next_sample_deadline(next_sample,period,Instant::now())?;
                     }
-                    _=tokio::time::sleep_until(due.into()) => break,
                 }
             }
             let work = self.workload.clone();
@@ -501,11 +532,19 @@ impl PointRun<'_> {
             if phase == LoadPhase::Measured && sequence == 14 {
                 let work = work.clone();
                 let name = format!("capacity-backup-{}", writer.next_index());
-                backup.spawn(async move {
-                    tokio::time::timeout(deadline, lifecycle::backup(work, name, clock))
-                        .await
-                        .map_err(|_| "backup interference deadline".to_owned())?
-                });
+                let started_ns = ns(clock);
+                backup_started_ns = Some(started_ns);
+                writer.record_event(&ProgressEvent::BackupStarted {
+                    segment: writer.next_index(),
+                    point: self.point.id.clone(),
+                    seed: self.workload.seed,
+                    started_ns,
+                })?;
+                writer.checkpoint_progress()?;
+                self.backup.start(
+                    clock + Duration::from_nanos(started_ns) + deadline,
+                    lifecycle::backup_started(work, name, clock, started_ns),
+                )?;
             }
             if joins.len() as u64 >= self.point.clients.get() {
                 let at = ns(clock);
@@ -513,6 +552,7 @@ impl PointRun<'_> {
                     (
                         sequence,
                         scheduled(sequence),
+                        at,
                         at,
                         at,
                         operation,
@@ -554,6 +594,7 @@ impl PointRun<'_> {
                         at,
                         began,
                         finished,
+                        ns(clock),
                         operation,
                         result,
                         verification,
@@ -565,10 +606,10 @@ impl PointRun<'_> {
         while !joins.is_empty() {
             tokio::select! {
                 result=joins.join_next() => collect(result.ok_or("missing scheduled task")?.map_err(|_|"scheduled task panicked")?,started,&mut attempts,&mut ledger,&mut failure,writer)?,
-                _=tokio::time::sleep_until(next_sample) => {
+                _=tokio::time::sleep_until(next_sample.into()) => {
                     if resources.len() as u64>=campaign.evidence.samples_per_segment.get(){return Err("resource sample cap exhausted".into());}
                     resources.push(self.sample(writer).await?);
-                    next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                    next_sample=resource_window::next_sample_deadline(next_sample,period,Instant::now())?;
                 }
             }
         }
@@ -583,28 +624,22 @@ impl PointRun<'_> {
             })?;
             writer.checkpoint_progress()?;
         }
-        let mut backup_receipt = None;
-        while !backup.is_empty() {
+        // An evidence boundary must not join management work while more offers
+        // remain. The task keeps its original absolute deadline across segments.
+        let mut backup_receipt = self.backup.try_finish()?;
+        while final_segment && self.backup.is_pending() {
             tokio::select! {
-                value=backup.join_next() => {
-                    backup_receipt=Some(value.ok_or("backup task missing")?.map_err(|_|"backup task panicked")??);
-                }
-                _=tokio::time::sleep_until(next_sample) => {
+                value=self.backup.finish() => { backup_receipt=value?; }
+                _=tokio::time::sleep_until(next_sample.into()) => {
                     if resources.len() as u64+1>=campaign.evidence.samples_per_segment.get() {
                         return Err("backup resource sample cap exhausted".into());
                     }
                     resources.push(self.sample(writer).await?);
-                    next_sample=tokio::time::Instant::now()+Duration::from_millis(campaign.schedule.sample_ms.get());
+                    next_sample=resource_window::next_sample_deadline(next_sample,period,Instant::now())?;
                 }
             }
         }
         let verified = failure.count == 0;
-        if let Some(observation) = &backup_receipt {
-            writer.record_event(&ProgressEvent::Backup {
-                segment: writer.next_index(),
-                observation: observation.clone(),
-            })?;
-        }
         // Each working slot appears at most once in this admitted segment.
         // Only an independently verified response advances its next generation.
         for operation in &prepared {
@@ -623,18 +658,24 @@ impl PointRun<'_> {
         }
         let offered_end = self.clock + Duration::from_nanos(scheduled(first + count));
         while Instant::now() < offered_end {
-            tokio::time::sleep_until(
-                (Instant::now() + Duration::from_millis(campaign.schedule.sample_ms.get()))
-                    .min(offered_end)
-                    .into(),
-            )
-            .await;
+            tokio::time::sleep_until(next_sample.min(offered_end).into()).await;
             if resources.len() as u64 + 1 >= campaign.evidence.samples_per_segment.get() {
                 return Err("offered interval resource sample cap exhausted".into());
             }
             resources.push(self.sample(writer).await?);
+            next_sample =
+                resource_window::next_sample_deadline(next_sample, period, Instant::now())?;
         }
         resources.push(self.sample(writer).await?);
+        if backup_receipt.is_none() {
+            backup_receipt = self.backup.try_finish()?;
+        }
+        if let Some(observation) = &backup_receipt {
+            writer.record_event(&ProgressEvent::Backup {
+                segment: writer.next_index(),
+                observation: observation.clone(),
+            })?;
+        }
         attempts.sort_by_key(|a| a.sequence);
         writer.checkpoint_progress()?;
         let mut lanes = match &backup_receipt {
@@ -684,6 +725,9 @@ impl PointRun<'_> {
                 acknowledged_readback_verified: verified,
             });
         }
+        // One admitted segment only. A failure to append/validate the segment
+        // stops the campaign, so unvalidated observations cannot advance it.
+        self.previous_resources.clone_from(&resources);
         Ok(SustainedSegment {
             format_version: 1,
             campaign_sha256: writer.identity().clone(),
@@ -697,6 +741,7 @@ impl PointRun<'_> {
             corpus: None,
             cold_start: None,
             reopens: None,
+            backup_started_ns,
             backup: backup_receipt,
             reader: reader_receipt,
             manifest,
@@ -796,13 +841,24 @@ type Completion = (
     u64,
     u64,
     u64,
+    u64,
     Prepared,
     DriverResult<workload::Completed>,
     Option<DriverResult<()>>,
     bool,
 );
 fn collect(
-    (sequence, scheduled_ns, started_ns, finished_ns, operation, result, verification, rejected): Completion,
+    (
+        sequence,
+        scheduled_ns,
+        started_ns,
+        finished_ns,
+        verification_finished_ns,
+        operation,
+        result,
+        verification,
+        rejected,
+    ): Completion,
     segment_start: u64,
     attempts: &mut Vec<LoadAttempt>,
     ledger: &mut AcknowledgementLedger,
@@ -877,6 +933,7 @@ fn collect(
         scheduled_ns,
         started_ns,
         finished_ns,
+        verification_finished_ns: Some(verification_finished_ns),
         outcome,
         logical_id: evidence_id(operation.id),
         request_sha256: operation.request_sha256,
@@ -1046,12 +1103,24 @@ fn installed_capacity_workload_smoke() {
             )
             .unwrap();
         let retained_reader = reader::HeldReader::open(&work, 0, clock).await.unwrap();
-        let (written, backup) = tokio::join!(
-            work.execute(&write),
-            lifecycle::backup(work.clone(), "smoke-backup".into(), clock)
-        );
-        let written = written.unwrap();
-        let backup = backup.unwrap();
+        let mut management = management::ManagementTask::new();
+        let (release_receipt, held_receipt) = tokio::sync::oneshot::channel();
+        let backup_work = work.clone();
+        management.start(Instant::now() + Duration::from_secs(30), async move {
+            let receipt = lifecycle::backup(backup_work, "smoke-backup".into(), clock).await?;
+            // Hold only the verified receipt handoff, not engine execution. This
+            // makes the owned pending-task boundary deterministic in native CI.
+            held_receipt.await.map_err(|_| "smoke receipt handoff cancelled".to_owned())?;
+            Ok(receipt)
+        }).unwrap();
+        let written = work.execute(&write).await.unwrap();
+        assert!(management.try_finish().unwrap().is_none());
+        let followup = work.prepare("smoke-management-followup".into(), StorageLoadKind::PointRead, 1).unwrap();
+        work.execute(&followup).await.unwrap();
+        work.verify(&followup).await.unwrap();
+        release_receipt.send(()).unwrap();
+        let backup = management.finish().await.unwrap().unwrap();
+        assert!(!management.is_pending());
         let reader_evidence = retained_reader.finish(&work, clock).await.unwrap();
         work.verify(&write).await.unwrap();
         let killed = super::kill(child, clock);
@@ -1081,7 +1150,7 @@ fn installed_capacity_workload_smoke() {
             serde_json::json!({
             "build":estate.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
             "replayed_transactions":12,"write_transitions":{"insert":3,"update":4,"retire":3,"recreate":2},"backup_sha256":backup.receipt.backup.backup_sha256,
-            "reader_interference":reader_evidence,"termination":killed,"reopened":identity,"capacity_qualification":false})
+            "management_followup_verified":true,"reader_interference":reader_evidence,"termination":killed,"reopened":identity,"capacity_qualification":false})
         );
         super::kill(reopened, clock);
     });
@@ -1180,18 +1249,62 @@ async fn run_estate(
                 session_ordinal,
             )
             .await?;
-            let mut corpus = Some(
-                corpus::seed(
-                    &estate,
-                    &mut work,
-                    campaign,
-                    &ProgressContext { writer, point },
-                    clock,
-                    &mut session_ordinal,
-                    &mut session_opened,
-                )
-                .await?,
-            );
+            let seeded = corpus::seed(
+                &estate,
+                &mut work,
+                campaign,
+                &ProgressContext { writer, point },
+                clock,
+                &mut session_ordinal,
+                &mut session_opened,
+            )
+            .await;
+            if seeded.is_err() {
+                // Preserve a single supplemental observation before stopping
+                // the owned server. This is not a workload
+                // segment and cannot qualify the campaign or hide its error.
+                let status = if let Some(child) = &child {
+                    match tokio::time::timeout(
+                        Duration::from_secs(5),
+                        sample(&work, child.id(), clock, &allocation),
+                    )
+                    .await
+                    {
+                        Ok(Ok(observation)) => {
+                            if writer
+                                .record_event(&ProgressEvent::Resource {
+                                    segment: writer.next_index(),
+                                    sample: Box::new(observation),
+                                })
+                                .and_then(|_| writer.checkpoint_progress())
+                                .is_ok()
+                            {
+                                "observed"
+                            } else {
+                                "artifact-denied"
+                            }
+                        }
+                        Ok(Err(_)) => "unavailable",
+                        Err(_) => "timeout",
+                    }
+                } else {
+                    "unavailable"
+                };
+                eprintln!("native_setup_failure_observation={status}");
+                if let Some(mut stopped) = child.take() {
+                    stopped.terminate();
+                    // finish joins the monitor and reaps the child even when
+                    // bounded output capture reports a failure. Drop remains
+                    // the process guard for an early monitor error.
+                    let _ = stopped.finish();
+                    drop(stopped);
+                }
+                eprintln!(
+                    "native_setup_failure_estate={}",
+                    serde_json::json!({"path": estate.temp.retain(), "private_state": true})
+                );
+            }
+            let mut corpus = Some(seeded?);
             // Fresh session for the bounded lifecycle lane, avoiding inherited
             // setup age. Subsequent load still rotates joined session segments.
             session_opened = Instant::now() - Duration::from_secs(120);
@@ -1243,6 +1356,8 @@ async fn run_estate(
                 clock,
                 allocation: allocation.clone(),
                 generations: vec![0; campaign.evidence.segment_attempts.get() as usize],
+                previous_resources: Vec::new(),
+                backup: management::ManagementTask::new(),
             };
             for phase in [
                 LoadPhase::Warmup,
@@ -1251,6 +1366,9 @@ async fn run_estate(
                 LoadPhase::Drain,
                 LoadPhase::Soak,
             ] {
+                if phase == LoadPhase::Soak {
+                    writer.admit_soak(&point.id, *seed)?;
+                }
                 let mut phase_origin = if let Some(fleet) = fleet {
                     rotate_session(
                         &estate,
@@ -1330,15 +1448,17 @@ async fn run_estate(
                 let mut next = 0;
                 while next < count {
                     writer.admit_next()?;
-                    rotate_session(
-                        &estate,
-                        &mut driver.workload,
-                        campaign,
-                        point.clients.get(),
-                        &mut session_ordinal,
-                        &mut session_opened,
-                    )
-                    .await?;
+                    if !driver.backup.is_pending() {
+                        rotate_session(
+                            &estate,
+                            &mut driver.workload,
+                            campaign,
+                            point.clients.get(),
+                            &mut session_ordinal,
+                            &mut session_opened,
+                        )
+                        .await?;
+                    }
                     let active_ms = campaign
                         .storage
                         .budgets
@@ -1380,7 +1500,7 @@ async fn run_estate(
                     }
                     let mut segment = tokio::time::timeout(
                         Duration::from_millis(campaign.storage.budgets.run_ms.get().min(180_000)),
-                        driver.segment(writer, phase, origin, next, take),
+                        driver.segment(writer, phase, origin, next, take, next + take == count),
                     )
                     .await
                     .map_err(|_| "installed segment exceeded its frozen deadline")??;

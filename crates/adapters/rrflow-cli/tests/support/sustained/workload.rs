@@ -78,8 +78,71 @@ fn error(value: impl std::fmt::Display) -> String {
 // never used to infer effects or retryability. Return constants, not message
 // slices: even an arbitrary server body can disclose only an allowlisted label.
 fn engine_error_label(message: &str) -> Option<&'static str> {
+    if message == "Storage(\"substrate: control state exceeds one MiB\")" {
+        return Some("control-state-size");
+    }
+    // Read pressure can occur after publication, so the engine intentionally
+    // keeps Storage's Internal classification. This label is diagnostic only;
+    // the existing abort/readback evidence still determines durable outcome.
+    if let Some(detail) = message.strip_prefix("Storage(\"") {
+        for (prefix, label) in [
+            ("projected-read active_views limit ", "read-active-views"),
+            ("projected-read ranges limit ", "read-ranges"),
+            ("projected-read runs limit ", "read-runs"),
+            ("projected-read pinned_bytes limit ", "read-pinned-bytes"),
+            ("projected-read versions_examined limit ", "read-versions"),
+            ("projected-read page_requests limit ", "read-page-requests"),
+            (
+                "projected-read page_logical_bytes limit ",
+                "read-page-logical-bytes",
+            ),
+            ("projected-read output_rows limit ", "read-output-rows"),
+            (
+                "projected-read output_buffer_bytes limit ",
+                "read-output-buffer-bytes",
+            ),
+            ("projected-read batch_rows limit ", "read-batch-rows"),
+            (
+                "projected-read batch_allocated_bytes limit ",
+                "read-batch-allocated-bytes",
+            ),
+            (
+                "projected-read retained_output_bytes limit ",
+                "read-retained-output-bytes",
+            ),
+            ("source page allocation limit ", "read-source-pages"),
+            ("transaction active owners limit ", "transaction-active"),
+            (
+                "transaction owned buffer bytes limit ",
+                "transaction-buffered-bytes",
+            ),
+            ("substrate: ", "storage-substrate"),
+            ("claim codec: ", "storage-codec"),
+            ("kernel: ", "storage-kernel"),
+            ("corrupt sequence watermark: ", "storage-watermark"),
+        ] {
+            if detail.starts_with(prefix) {
+                return Some(label);
+            }
+        }
+    }
     if let Some(detail) = message.strip_prefix("StorageAdmission(\"") {
         for (prefix, label) in [
+            ("maintenance input_bytes limit ", "maintenance-input-bytes"),
+            (
+                "maintenance input_logical_bytes limit ",
+                "maintenance-input-logical",
+            ),
+            (
+                "maintenance input_versions limit ",
+                "maintenance-input-versions",
+            ),
+            (
+                "maintenance output_segments limit ",
+                "maintenance-output-segments",
+            ),
+            ("maintenance elapsed_ms limit ", "maintenance-elapsed"),
+            ("maintenance l0_segments limit ", "maintenance-l0-segments"),
             ("transaction admission ", "storage-admission-queue"),
             ("transaction request ", "storage-admission-request"),
             ("transaction ", "storage-admission-transaction"),
@@ -101,6 +164,7 @@ fn engine_error_label(message: &str) -> Option<&'static str> {
     }
     let variant = message.split_once('(').map_or(message, |(name, _)| name);
     match variant {
+        "Storage" => Some("storage"),
         "TransactionQuota" => Some("transaction-quota"),
         "RenewalQuota" => Some("renewal-quota"),
         "StorageAdmission" => Some("storage-admission"),
@@ -141,7 +205,134 @@ fn client_error(value: rrd_client::Error) -> String {
 }
 
 #[test]
+fn diagnostic_labels_attribute_read_pressure_without_changing_internal_semantics() {
+    use rrd_store::ProjectedReadResource as Resource;
+    for (resource, label) in [
+        (Resource::ActiveViews, "read-active-views"),
+        (Resource::Ranges, "read-ranges"),
+        (Resource::Runs, "read-runs"),
+        (Resource::PinnedBytes, "read-pinned-bytes"),
+        (Resource::VersionsExamined, "read-versions"),
+        (Resource::PageRequests, "read-page-requests"),
+        (Resource::PageLogicalBytes, "read-page-logical-bytes"),
+        (Resource::OutputRows, "read-output-rows"),
+        (Resource::OutputBufferBytes, "read-output-buffer-bytes"),
+        (Resource::BatchRows, "read-batch-rows"),
+        (Resource::BatchAllocatedBytes, "read-batch-allocated-bytes"),
+        (Resource::RetainedOutputBytes, "read-retained-output-bytes"),
+    ] {
+        let error = rrd_engine::ServiceError::from(rrd_store::Error::ProjectedReadLimit {
+            resource,
+            limit: 5,
+            observed: 6,
+        });
+        assert_eq!(error.kind(), rrd_engine::ServiceErrorKind::Internal);
+        assert_eq!(engine_error_label(&error.to_string()), Some(label));
+        assert_eq!(
+            engine_error_label(&format!(
+                "Storage(\"projected-read {} limit private secret\")",
+                resource.as_str()
+            )),
+            Some(label)
+        );
+        assert_eq!(
+            engine_error_label(&format!(
+                "Storage(\"projected-read {}_private limit secret\")",
+                resource.as_str()
+            )),
+            Some("storage")
+        );
+        assert!(format!("rejected-api-internal-{label}:{}", "a".repeat(64)).len() <= 128);
+    }
+    for (error, label) in [
+        (
+            rrd_store::Error::SourcePageLimit {
+                limit: 5,
+                observed: 6,
+            },
+            "read-source-pages",
+        ),
+        (
+            rrd_store::Error::TransactionLimit {
+                resource: rrd_store::TransactionResource::Active,
+                limit: 5,
+                observed: 6,
+            },
+            "transaction-active",
+        ),
+        (
+            rrd_store::Error::TransactionLimit {
+                resource: rrd_store::TransactionResource::BufferedBytes,
+                limit: 5,
+                observed: 6,
+            },
+            "transaction-buffered-bytes",
+        ),
+    ] {
+        let error = rrd_engine::ServiceError::from(error);
+        assert_eq!(error.kind(), rrd_engine::ServiceErrorKind::Internal);
+        assert_eq!(engine_error_label(&error.to_string()), Some(label));
+    }
+    assert_eq!(engine_error_label("StorageSecret(\"private\")"), None);
+    assert_eq!(
+        engine_error_label("Storage(\"substrate: private secret\")"),
+        Some("storage-substrate")
+    );
+    assert_eq!(
+        engine_error_label("Storage(\"private secret\")"),
+        Some("storage")
+    );
+}
+
+#[test]
+fn diagnostic_labels_identify_control_state_capacity_from_the_real_validator() {
+    let error = rrd_store::ControlTransition {
+        key: "server/state/test/capacity".into(),
+        expected: None,
+        replacement: Some(vec![0; 1024 * 1024 + 1]),
+        at: 1,
+        actor: "test".into(),
+        action: "test".into(),
+        request_id: "test".into(),
+        operation_id: "test".into(),
+    }
+    .validate()
+    .unwrap_err();
+    let error = rrd_engine::ServiceError::from(error);
+    assert_eq!(error.kind(), rrd_engine::ServiceErrorKind::Internal);
+    assert_eq!(
+        engine_error_label(&error.to_string()),
+        Some("control-state-size")
+    );
+    assert_eq!(
+        engine_error_label("Storage(\"substrate: control state exceeds one MiB private\")"),
+        Some("storage-substrate")
+    );
+}
+
+#[test]
 fn diagnostic_labels_never_copy_server_details_or_imply_outcomes() {
+    for (resource, label) in [
+        ("input_bytes", "maintenance-input-bytes"),
+        ("input_logical_bytes", "maintenance-input-logical"),
+        ("input_versions", "maintenance-input-versions"),
+        ("output_segments", "maintenance-output-segments"),
+        ("elapsed_ms", "maintenance-elapsed"),
+        ("l0_segments", "maintenance-l0-segments"),
+    ] {
+        assert_eq!(
+            engine_error_label(&format!(
+                "StorageAdmission(\"maintenance {resource} limit secret suffix\")"
+            )),
+            Some(label)
+        );
+        // The complete API label and digest must also fit campaign evidence.
+        assert!(format!("api-resourceexhausted-{label}:{}", "a".repeat(64)).len() <= 128);
+    }
+    assert_eq!(
+        engine_error_label("StorageAdmission(\"maintenance input_bytes_private limit secret\")"),
+        Some("storage-admission-maintenance")
+    );
     assert_eq!(
         engine_error_label("StorageAdmission(\"mutable secret suffix\")"),
         Some("storage-admission-mutable")

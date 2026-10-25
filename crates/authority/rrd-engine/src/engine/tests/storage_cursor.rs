@@ -1,5 +1,57 @@
 use super::*;
+use crate::ServiceErrorKind;
 use rrd_contract::{InspectStorageCursor, StorageCursorAction};
+
+#[test]
+fn physical_cursor_denial_is_resource_exhausted_and_retry_releases_owners() {
+    let (_root, engine) = isolated_engine();
+    let session = engine
+        .create_session(
+            &session_request(9000, 8),
+            &id("denied-cursor-session"),
+            1000,
+            "create",
+            "create",
+        )
+        .unwrap();
+    let call = |action| {
+        engine.inspect_storage_cursor(
+            &session.session_id,
+            &session.token,
+            &InspectStorageCursor {
+                scope: "instance:test-instance".into(),
+                cursor_id: id("bounded"),
+                action,
+            },
+            1100,
+            "bounded",
+            "bounded",
+        )
+    };
+    let error = call(StorageCursorAction::Open {
+        batch_rows: 1,
+        batch_bytes: 1,
+        lifetime_ms: 8000,
+    })
+    .unwrap_err();
+    assert_eq!(error.kind(), ServiceErrorKind::ResourceExhausted, "{error}");
+    assert!(!error.retryable());
+    assert!(engine.storage_cursors.lock().unwrap().is_empty());
+    let ownership = engine.storage.physical_store_evidence().unwrap();
+    assert_eq!(ownership.active_read_views, Some(0));
+    assert_eq!(ownership.retained_projected_bytes, Some(0));
+    let page = call(StorageCursorAction::Open {
+        batch_rows: 1,
+        batch_bytes: 4096,
+        lifetime_ms: 8000,
+    })
+    .unwrap();
+    assert!(page.rows > 0);
+    call(StorageCursorAction::Release {}).unwrap();
+    let ownership = engine.storage.physical_store_evidence().unwrap();
+    assert_eq!(ownership.active_read_views, Some(0));
+    assert_eq!(ownership.retained_projected_bytes, Some(0));
+}
 
 #[test]
 fn physical_cursor_is_session_scoped_retry_safe_and_released_on_close() {

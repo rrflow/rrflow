@@ -24,6 +24,8 @@ pub enum Point {
     ReclaimBeforeRemove,
     ReclaimRemoved,
     RecoveryRead,
+    #[cfg(not(test))]
+    RecoveryManifest,
     Acknowledged,
     #[cfg(not(test))]
     ReceiptPersisted,
@@ -66,6 +68,9 @@ struct Hit {
     pid: u32,
     point: Point,
     id: u16,
+    #[cfg(not(test))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    wal_payload_bytes: Option<usize>,
 }
 
 fn arm(schedule: Schedule) {
@@ -112,6 +117,8 @@ fn pause_if(matches: impl FnOnce(&mut Armed) -> bool) {
         pid: std::process::id(),
         point: active.schedule.point,
         id: active.schedule.id,
+        #[cfg(not(test))]
+        wal_payload_bytes: installed::selected_wal_payload_bytes(),
     };
     // Exactly one bounded identity receipt, without paths, values or secrets.
     let line = format!("{PREFIX}{}\n", serde_json::to_string(&hit).unwrap());
@@ -180,6 +187,6 @@ mod tests;
 mod installed;
 #[cfg(not(test))]
 pub use installed::{
-    before_io, boundary, configure_from_stdin, enter_domain, enter_recovery, observe_native_error,
-    ScopeGuard,
+    after_io, before_io, boundary, configure_from_stdin, enter_domain, enter_recovery,
+    observe_native_error, wal_before_write, ScopeGuard,
 };

@@ -19,6 +19,7 @@ pub(super) fn installed_storage_options(
         })
     };
     let mut options = rrd_store::DatabaseOptions {
+        checkpoint_entries: native("checkpoint_entries", policy.checkpoint_entries)?,
         recovery_reserve_bytes: policy.recovery_reserve_bytes,
         ..rrd_store::DatabaseOptions::default()
     };
@@ -32,6 +33,7 @@ pub(super) fn installed_storage_options(
     options.pinned_read_bytes = policy.pinned_read_bytes;
     options.projected_output_bytes =
         native("projected_output_bytes", policy.projected_output_bytes)?;
+    options.source_page_bytes = native("source_page_bytes", policy.source_page_bytes)?;
     options.page_cache_bytes = native("page_cache_bytes", policy.page_cache_bytes)?;
     options.maintenance.wal_payload_max_bytes =
         native("wal_flush_target_bytes", policy.wal_flush_target_bytes)?;

@@ -278,7 +278,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "80c636c87a1646f7a63af6f57ffec55b9a888683b9c7c2617e63517464bacabb",
+      "configuration_sha256": "2d382dbde4b923db65fb5ebbf841d12b45ec0e278c7cab41635dbff782072d55",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -303,6 +303,7 @@
       "revision": 1,
       "storage": {
         "active_read_views": 1024,
+        "checkpoint_entries": 1024,
         "compaction_elapsed_ms": 30000,
         "compaction_input_bytes": 1073741824,
         "compaction_input_logical_bytes": 268435456,
@@ -332,6 +333,7 @@
         "retained_mutable_bytes": 536870912,
         "retained_mutable_generations": 64,
         "retained_mutable_versions": 4194304,
+        "source_page_bytes": 268435456,
         "transaction_admission_bytes": 67108864,
         "transaction_admission_requests": 64,
         "transaction_admission_wait_ms": 30000,
@@ -445,7 +447,7 @@
         "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "467843af07eb97460119186788a00fea039ac7683a3b71a40518019b188bddab",
+    "plan_sha256": "1578ce519c200b3b0a06f71dc95023875581d3c1e89cb08c239bdc165aa09955",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -511,8 +513,8 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "467843af07eb97460119186788a00fea039ac7683a3b71a40518019b188bddab",
-    "result_sha256": "859b0c2722873f07ee871c88b23a2998e33d469459641d00eb834ee19659754b",
+    "plan_sha256": "1578ce519c200b3b0a06f71dc95023875581d3c1e89cb08c239bdc165aa09955",
+    "result_sha256": "3bedfbc00881781d8f7143cd85a5650e0391630c6ad0faefb6fda305c91861c1",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },

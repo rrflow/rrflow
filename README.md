@@ -5,6 +5,13 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
+RRFlow is being built as an open-source reasoning engine for people building
+with AI, including vibe coders learning professional development practices.
+Connectome should make project context, evidence, change previews, verification
+and review understandable without hiding their limits. The existing roadmap's
+[project-to-learning journey](docs/roadmap/rrflow-1.0/executable-dependency-spine.md#project-to-learning-acceptance-journey)
+maps that experience to its implementation dependencies and real-world tests.
+
 **rrflowDB is the database within RRFlow: a pure Rust, PostgreSQL-inspired
 database dedicated to AI and designed for AI use, with PostgreSQL compatibility
 as a product requirement.** It stores the knowledge, memory, reasoning state,
@@ -35,8 +42,11 @@ UI, maintained in its own repository and pinned here as the optional
 `connectome/` Git submodule. The [Connectome client contract](docs/reference/client/connectome.md#repository-checkout)
 owns checkout instructions and the UI's public-engine boundary.
 
-We plan to offer RRFlow as a cloud service through **shippin.cloud**, with a
-private devspace included. The initial friends-and-family experience will
+Planned **rrflow.ai** and **rroflow.ai** services offer optional remote engine
+access/synchronization and governed learning respectively; their
+[service roles and opt-in boundaries](docs/reference/client/devpulse-cloud.md#optional-managed-service-roles)
+are targets, not deployed-service claims. **shippin.cloud** extends this
+experience with a private devspace. The initial friends-and-family experience will
 demonstrate current AI-assisted development: create projects, run Rust,
 Python, and Go code, load the running project's UI inside the private cloud
 devspace, and launch projects on the web.

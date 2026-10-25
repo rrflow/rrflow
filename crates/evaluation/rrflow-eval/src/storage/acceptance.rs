@@ -144,6 +144,14 @@ impl CandidateCiReceipt {
                 crash,
                 "Qualify installed native capacity failure and recovery",
             )?;
+            Self::step(
+                crash,
+                "Test installed publication and reclamation with compound recovery",
+            )?;
+            Self::step(
+                crash,
+                "Require both complete installed publication receipts",
+            )?;
             let reopen = self.job(&format!("pipeline / installed 100-cycle reopen ({os})"))?;
             for name in [
                 "Require both complete ordinary-primary receipts",

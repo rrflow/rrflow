@@ -845,6 +845,8 @@ fn diagnostic_storage(
         admission: if evidence_level == DiagnosticStorageEvidenceLevel::RrflowKvCounters {
             let queue = engine.transaction_admission_snapshot()?;
             Some(DiagnosticStorageAdmission {
+                checkpoint_entries: counter(evidence.checkpoint_entries, "checkpoint_entries")?,
+                checkpoint_limit: counter(evidence.checkpoint_limit, "checkpoint_limit")?,
                 native_transactions: counter(evidence.native_transactions, "native_transactions")?,
                 native_transaction_bytes: counter(
                     evidence.native_transaction_bytes,
@@ -855,6 +857,15 @@ fn diagnostic_storage(
                 retained_mutable_bytes: counter(
                     evidence.retained_mutable_bytes,
                     "retained_mutable_bytes",
+                )?,
+                retained_source_bytes: counter(
+                    evidence.retained_source_bytes,
+                    "retained_source_bytes",
+                )?,
+                peak_source_bytes: counter(evidence.peak_source_bytes, "peak_source_bytes")?,
+                denied_source_allocations: counter(
+                    evidence.denied_source_allocations,
+                    "denied_source_allocations",
                 )?,
                 retained_projected_bytes: counter(
                     evidence.retained_projected_bytes,

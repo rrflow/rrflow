@@ -1,5 +1,9 @@
 mod format;
 mod output;
+mod source_memory;
+#[cfg(test)]
+mod source_memory_tests;
+pub use source_memory::{SourcePageMemory, SourcePageStats, DEFAULT_SOURCE_PAGE_BYTES};
 #[cfg(feature = "physical-policy-lab")]
 mod physical_policy_lab;
 mod reader;
@@ -439,6 +443,7 @@ impl SegmentOpenEvidence {
 
 #[derive(Debug)]
 pub(crate) struct PageCache {
+    source_memory: SourcePageMemory,
     policy: PageCachePolicy,
     capacity_bytes: usize,
     protected_capacity_bytes: usize,
@@ -523,8 +528,17 @@ pub(crate) fn new_page_cache_with_policy(
     capacity_bytes: usize,
     policy: PageCachePolicy,
 ) -> Result<SharedPageCache> {
+    new_page_cache_with_limits(capacity_bytes, policy, DEFAULT_SOURCE_PAGE_BYTES)
+}
+
+pub(crate) fn new_page_cache_with_limits(
+    capacity_bytes: usize,
+    policy: PageCachePolicy,
+    source_page_bytes: usize,
+) -> Result<SharedPageCache> {
     let protected_capacity_bytes = policy.protected_capacity_bytes(capacity_bytes)?;
     Ok(Arc::new(Mutex::new(PageCache {
+        source_memory: SourcePageMemory::new(source_page_bytes),
         policy,
         capacity_bytes,
         protected_capacity_bytes,
@@ -646,7 +660,7 @@ struct PageReadContext {
 
 impl LoadedPage {
     fn resident_bytes(&self) -> usize {
-        self.buffer.capacity().max(1)
+        self.buffer.capacity().max(self.buffer.len()).max(1)
     }
 }
 
@@ -691,6 +705,29 @@ impl fmt::Debug for Segment {
 pub(crate) struct SegmentVersion {
     pub sequence: u64,
     pub value: Option<Box<[u8]>>,
+}
+
+/// Authenticated row identity without a retained page or copied value. Keeping
+/// the segment here prevents a selected row from being read from another file.
+pub(crate) struct SelectedVersion<'a> {
+    segment: &'a Segment,
+    row_group: usize,
+    row: usize,
+    sequence: u64,
+}
+
+impl SelectedVersion<'_> {
+    pub(crate) fn sequence(&self) -> u64 {
+        self.sequence
+    }
+
+    pub(crate) fn belongs_to(&self, segment: &Segment) -> bool {
+        std::ptr::eq(self.segment, segment)
+    }
+
+    pub(crate) fn value(self) -> Result<Option<Vec<u8>>> {
+        self.segment.value_at(self.row_group, self.row)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -756,7 +793,39 @@ impl Segment {
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<(Self, AnchoredPath)> {
-        let encoded = encode(table, row_group_budget, compression_policy)?;
+        Self::write_encoded_with_cache(
+            directory,
+            encode(table, row_group_budget, compression_policy)?,
+            compression_policy,
+            cache,
+            io,
+        )
+    }
+
+    pub(crate) fn write_from_versions_with_cache<'a>(
+        directory: &AnchoredPath,
+        versions: impl Iterator<Item = (&'a [u8], &'a [VersionedValue])> + Clone,
+        row_group_budget: SegmentRowGroupBudget,
+        compression_policy: SegmentCompressionPolicy,
+        cache: SharedPageCache,
+        io: SharedIoContext,
+    ) -> Result<(Self, AnchoredPath)> {
+        Self::write_encoded_with_cache(
+            directory,
+            format::encode_versions(versions, row_group_budget, compression_policy)?,
+            compression_policy,
+            cache,
+            io,
+        )
+    }
+
+    fn write_encoded_with_cache(
+        directory: &AnchoredPath,
+        encoded: format::EncodedSegment,
+        compression_policy: SegmentCompressionPolicy,
+        cache: SharedPageCache,
+        io: SharedIoContext,
+    ) -> Result<(Self, AnchoredPath)> {
         let write_evidence = encoded.evidence;
         let path = directory.join(format!("{}.seg", encoded.checksum));
         directory.create_dir_all()?;
@@ -1012,6 +1081,28 @@ impl Segment {
         key: &[u8],
         read_sequence: u64,
     ) -> Result<Option<SegmentVersion>> {
+        let Some(selected) = self.select_version(key, read_sequence)? else {
+            return Ok(None);
+        };
+        Ok(Some(SegmentVersion {
+            sequence: selected.sequence(),
+            value: selected.value()?.map(Box::<[u8]>::from),
+        }))
+    }
+
+    // Conflict validation needs presence and sequence, including tombstones,
+    // but must not load/copy payload columns simply to discard their values.
+    pub(crate) fn get_sequence(&self, key: &[u8], read_sequence: u64) -> Result<Option<u64>> {
+        Ok(self
+            .select_version(key, read_sequence)?
+            .map(|selected| selected.sequence()))
+    }
+
+    pub(crate) fn select_version(
+        &self,
+        key: &[u8],
+        read_sequence: u64,
+    ) -> Result<Option<SelectedVersion<'_>>> {
         if key < self.descriptor.first_key.as_slice()
             || key > self.descriptor.last_key.as_slice()
             || read_sequence < self.descriptor.minimum_sequence
@@ -1046,23 +1137,12 @@ impl Segment {
             }
             row += 1;
         }
-        let Some((row, sequence)) = selected else {
-            return Ok(None);
-        };
-        Ok(Some(SegmentVersion {
+        Ok(selected.map(|(row, sequence)| SelectedVersion {
+            segment: self,
+            row_group: index,
+            row,
             sequence,
-            value: self.value_at(index, row)?.map(Box::<[u8]>::from),
         }))
-    }
-
-    pub(crate) fn get_versions(
-        &self,
-        keys: &[&[u8]],
-        read_sequence: u64,
-    ) -> Result<Vec<Option<SegmentVersion>>> {
-        keys.iter()
-            .map(|key| self.get_version(key, read_sequence))
-            .collect()
     }
 
     pub fn scan(
@@ -1274,24 +1354,33 @@ impl Segment {
                 offsets: Arc::new(read_page(
                     &self.source,
                     descriptor.page(PageKind::KeyOffsets),
+                    &self.cache,
                 )?),
-                data: Arc::new(read_page(&self.source, descriptor.page(PageKind::KeyData))?),
+                data: Arc::new(read_page(
+                    &self.source,
+                    descriptor.page(PageKind::KeyData),
+                    &self.cache,
+                )?),
                 sequences: Arc::new(read_page(
                     &self.source,
                     descriptor.page(PageKind::SequenceValues),
+                    &self.cache,
                 )?),
             },
             validity: Arc::new(read_page(
                 &self.source,
                 descriptor.page(PageKind::ValueValidity),
+                &self.cache,
             )?),
             value_offsets: Arc::new(read_page(
                 &self.source,
                 descriptor.page(PageKind::ValueOffsets),
+                &self.cache,
             )?),
             values: Arc::new(read_page(
                 &self.source,
                 descriptor.page(PageKind::ValueData),
+                &self.cache,
             )?),
         })
     }
@@ -1358,7 +1447,7 @@ impl Segment {
             .get(row_group)
             .ok_or_else(|| Error::InvalidSegment("row-group index is outside the segment".into()))?
             .page(kind);
-        let loaded = Arc::new(read_page(&self.source, descriptor)?);
+        let loaded = Arc::new(read_page(&self.source, descriptor, &self.cache)?);
         let evidence = PageLoadEvidence {
             cache_miss: true,
             cache_load: true,
@@ -1934,7 +2023,45 @@ fn open_page_source(file: File, io: SharedIoContext) -> Result<PageSource> {
     })
 }
 
-fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedPage> {
+fn reserve_source(
+    cache: &SharedPageCache,
+    bytes: usize,
+) -> Result<source_memory::SourceReservation> {
+    let mut cache = cache
+        .lock()
+        .map_err(|_| Error::InvalidSegment("immutable page cache lock poisoned".into()))?;
+    loop {
+        let stats = cache.source_memory.stats();
+        if bytes <= stats.limit_bytes - stats.reserved_bytes {
+            break;
+        }
+        let removed = match cache.policy {
+            PageCachePolicy::ExactLru => cache.evict_oldest(CacheRegion::Exact)?,
+            PageCachePolicy::ScanResistantLru { .. } => {
+                cache.evict_oldest(CacheRegion::Probationary)?
+                    || cache.evict_oldest(CacheRegion::Protected)?
+            }
+        };
+        if !removed {
+            break;
+        }
+    }
+    cache.source_memory.reserve(bytes)
+}
+
+pub(crate) fn source_page_memory(cache: &SharedPageCache) -> SourcePageMemory {
+    cache
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .source_memory
+        .clone()
+}
+
+fn read_page(
+    source: &PageSource,
+    descriptor: &PageDescriptor,
+    cache: &SharedPageCache,
+) -> Result<LoadedPage> {
     let start = usize::try_from(descriptor.offset)
         .map_err(|_| Error::InvalidSegment("v6 page offset exceeds usize".into()))?;
     let end = start
@@ -1942,8 +2069,8 @@ fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedP
         .ok_or_else(|| Error::InvalidSegment("v6 page range overflow".into()))?;
     match source {
         PageSource::File { file, selected, io } => {
-            let mut bytes = MutableBuffer::new(descriptor.physical_bytes);
-            bytes.resize(descriptor.physical_bytes, 0);
+            let reservation = reserve_source(cache, descriptor.physical_bytes)?;
+            let mut bytes = MutableBuffer::from_len_zeroed(descriptor.physical_bytes);
             // A row group retains a complete key/version chain and can exceed
             // the soft page target. The I/O policy bounds each native request,
             // not that authenticated page. Do not expose any bytes until every
@@ -1963,10 +2090,11 @@ fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedP
                     })?;
                 }
             }
-            let buffer = Buffer::from(bytes);
-            let allocated = buffer.capacity();
+            let allocated = bytes.capacity();
+            let buffer = reservation.wrap(bytes)?;
             verify_stored_page(buffer.as_slice(), descriptor)?;
             finish_page(
+                cache,
                 buffer.as_slice(),
                 descriptor,
                 Some(buffer.clone()),
@@ -1989,6 +2117,7 @@ fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedP
                 None
             };
             finish_page(
+                cache,
                 slice,
                 descriptor,
                 raw,
@@ -2005,9 +2134,13 @@ fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedP
                 .ok_or_else(|| Error::InvalidSegment("v6 snapshot page range is absent".into()))?;
             verify_stored_page(slice, descriptor)?;
             if descriptor.compression == format::PageCompression::None {
-                let buffer = Buffer::from(slice);
-                let allocated = buffer.capacity();
+                let reservation = reserve_source(cache, slice.len())?;
+                let mut bytes = MutableBuffer::from_len_zeroed(slice.len());
+                bytes.as_slice_mut().copy_from_slice(slice);
+                let allocated = bytes.capacity();
+                let buffer = reservation.wrap(bytes)?;
                 finish_page(
+                    cache,
                     buffer.as_slice(),
                     descriptor,
                     Some(buffer.clone()),
@@ -2018,7 +2151,7 @@ fn read_page(source: &PageSource, descriptor: &PageDescriptor) -> Result<LoadedP
                     },
                 )
             } else {
-                finish_page(slice, descriptor, None, PageReadContext::default())
+                finish_page(cache, slice, descriptor, None, PageReadContext::default())
             }
         }
     }
@@ -2032,6 +2165,7 @@ fn verify_stored_page(stored: &[u8], descriptor: &PageDescriptor) -> Result<()> 
 }
 
 fn finish_page(
+    cache: &SharedPageCache,
     stored: &[u8],
     descriptor: &PageDescriptor,
     raw_buffer: Option<Buffer>,
@@ -2051,8 +2185,8 @@ fn finish_page(
             })
         }
         format::PageCompression::Lz4Block => {
-            let mut decoded = MutableBuffer::new(descriptor.logical_bytes);
-            decoded.resize(descriptor.logical_bytes, 0);
+            let reservation = reserve_source(cache, descriptor.logical_bytes)?;
+            let mut decoded = MutableBuffer::from_len_zeroed(descriptor.logical_bytes);
             let decoded_bytes = lz4_flex::block::decompress_into(stored, decoded.as_slice_mut())
                 .map_err(|error| {
                     Error::InvalidSegment(format!("v6 LZ4 page decode failed: {error}"))
@@ -2063,10 +2197,11 @@ fn finish_page(
                     descriptor.logical_bytes
                 ));
             }
-            let buffer = Buffer::from(decoded);
+            let decoded_capacity = decoded.capacity();
+            let buffer = reservation.wrap(decoded)?;
             let allocated_bytes = context
                 .source_allocated_bytes
-                .checked_add(buffer.capacity())
+                .checked_add(decoded_capacity)
                 .ok_or_else(|| {
                     Error::InvalidSegment("v6 page allocation evidence overflow".into())
                 })?;

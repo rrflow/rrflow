@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 6a8d3e490eeb0e13a10465b752dee165223c7097e18ccd08acb79b38934e4650
+// OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3366,6 +3366,11 @@ export interface operations {
                                          * @description Aggregate live physical read owners and charged pinned bytes; restart required.
                                          */
                                         active_read_views: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Named checkpoint-directory entry ceiling; restart required.
+                                         */
+                                        checkpoint_entries: number;
                                         /** Format: uint64 */
                                         compaction_elapsed_ms: number;
                                         /** Format: uint64 */
@@ -3431,6 +3436,8 @@ export interface operations {
                                         retained_mutable_generations: number;
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
                                         /** Format: uint64 */
                                         transaction_admission_bytes: number;
                                         /** Format: uint64 */
@@ -3653,6 +3660,11 @@ export interface operations {
                                          * @description Aggregate live physical read owners and charged pinned bytes; restart required.
                                          */
                                         active_read_views: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Named checkpoint-directory entry ceiling; restart required.
+                                         */
+                                        checkpoint_entries: number;
                                         /** Format: uint64 */
                                         compaction_elapsed_ms: number;
                                         /** Format: uint64 */
@@ -3718,6 +3730,8 @@ export interface operations {
                                         retained_mutable_generations: number;
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
                                         /** Format: uint64 */
                                         transaction_admission_bytes: number;
                                         /** Format: uint64 */
@@ -11165,6 +11179,12 @@ export interface operations {
                                          * @description Actual live physical read views and conservative aggregate pin charge.
                                          */
                                         active_read_views: number;
+                                        /** Format: uint64 */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
                                         native_transaction_bytes: number;
@@ -11178,6 +11198,8 @@ export interface operations {
                                          */
                                         outstanding_requests: number;
                                         /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
                                         pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         queued_requests: number;
@@ -11188,6 +11210,11 @@ export interface operations {
                                         retained_mutable_bytes: number;
                                         /** Format: uint64 */
                                         retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
                                     } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
@@ -13744,6 +13771,12 @@ export interface operations {
                                          * @description Actual live physical read views and conservative aggregate pin charge.
                                          */
                                         active_read_views: number;
+                                        /** Format: uint64 */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
                                         fenced: boolean;
                                         /** Format: uint64 */
                                         native_transaction_bytes: number;
@@ -13757,6 +13790,8 @@ export interface operations {
                                          */
                                         outstanding_requests: number;
                                         /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
                                         pinned_read_bytes: number;
                                         /** Format: uint64 */
                                         queued_requests: number;
@@ -13767,6 +13802,11 @@ export interface operations {
                                         retained_mutable_bytes: number;
                                         /** Format: uint64 */
                                         retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
                                     } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
@@ -14299,6 +14339,12 @@ export interface operations {
                                      * @description Actual live physical read views and conservative aggregate pin charge.
                                      */
                                     active_read_views: number;
+                                    /** Format: uint64 */
+                                    checkpoint_entries: number;
+                                    /** Format: uint64 */
+                                    checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
                                     native_transaction_bytes: number;
@@ -14312,6 +14358,8 @@ export interface operations {
                                      */
                                     outstanding_requests: number;
                                     /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
                                     pinned_read_bytes: number;
                                     /** Format: uint64 */
                                     queued_requests: number;
@@ -14322,6 +14370,11 @@ export interface operations {
                                     retained_mutable_bytes: number;
                                     /** Format: uint64 */
                                     retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
                                 } | null;
                                 /** @description How much physical evidence the instance's storage profile reports. */
                                 evidence_level: "logical_only" | "rrflow_kv_counters";
@@ -14529,6 +14582,12 @@ export interface operations {
                                      * @description Actual live physical read views and conservative aggregate pin charge.
                                      */
                                     active_read_views: number;
+                                    /** Format: uint64 */
+                                    checkpoint_entries: number;
+                                    /** Format: uint64 */
+                                    checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
                                     fenced: boolean;
                                     /** Format: uint64 */
                                     native_transaction_bytes: number;
@@ -14542,6 +14601,8 @@ export interface operations {
                                      */
                                     outstanding_requests: number;
                                     /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
                                     pinned_read_bytes: number;
                                     /** Format: uint64 */
                                     queued_requests: number;
@@ -14552,6 +14613,11 @@ export interface operations {
                                     retained_mutable_bytes: number;
                                     /** Format: uint64 */
                                     retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
                                 } | null;
                                 /** @description How much physical evidence the instance's storage profile reports. */
                                 evidence_level: "logical_only" | "rrflow_kv_counters";

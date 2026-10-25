@@ -63,6 +63,25 @@ commands above do not prove the planned cases already exist or pass. Fix test
 names from the actual checkout before running; keep real-model and installed
 acceptance separate from reference-adapter results.
 
+### Aggregate reasoning-budget acceptance
+
+The [user-selected effort contract](../../reference/inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+is mandatory across G-01a adapter execution, G-02a durable dispatch and G-05
+context escalation. Implement one engine-owned aggregate run budget; retries,
+fallbacks, reads and planning consume its remaining time/attempts. Extend the
+existing installed limits and run/receipt authority, never a provider loop or
+client timer. D-06 owns governed configuration changes; H-06 exposes finite
+presets/custom limits, remaining budget, stop reasons and explicit extensions.
+
+The falsifying corpus includes endless context requests, repeated invalid
+output, fallback cycles, no progress, blocked/late providers, cancellation,
+lost ACK/restart, clock rollback and concurrent budget reservations. No case
+may reset consumption or silently extend the deadline. Accepted effects remain
+durable and uncertain work remains visible. Unit/mock timers alone cannot
+close this requirement; G-06 needs installed evidence with the chosen real
+adapter. Existing configuration fields and examples do not implement it.
+This preparation changes no gate status or dependency order.
+
 ## Controller learning packages
 
 The [learning contract](../../reference/inference/learning/controller-training.md)
@@ -93,3 +112,9 @@ Every selected model-backed profile needs its real pinned artifact/provider
 evidence; deterministic LFG does not require a trained model. Routing must
 steer a persisted tree without storage or planner authority, with qualified
 budgets, explicit fallbacks and scoped cache behavior.
+
+G-06's installed comparison also consumes the [project evidence and model-usage
+contract](../../architecture/engine-data-flow.md#project-evidence-model-usage-and-reasoning-efficiency):
+prove task quality and supported citations alongside local/remote model usage,
+web/tool work and adaptive escalation. Deterministic retrieval work has no
+model-token count. Missing provider usage cannot become zero or a savings claim.
