@@ -140,6 +140,7 @@ struct Filler {
     bytes: u64,
     native_code: i32,
     data_refills: u32,
+    metadata_payload_bytes: u64,
     metadata_paths: Vec<PathBuf>,
     metadata_directories: Vec<PathBuf>,
     metadata_native_code: Option<i32>,
@@ -272,6 +273,28 @@ fn fill_remaining_data<W: Write>(
     Ok(code)
 }
 
+// Charge before the native effect, including uncertain/error outcomes. Metadata
+// and file contents share the admitted volume's existing payload allowance.
+fn allocate_metadata_payload(
+    charged: &mut u64,
+    data_bytes: u64,
+    max_bytes: u64,
+    payload_bytes: u64,
+    allocate: impl FnOnce() -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    let next = charged
+        .checked_add(payload_bytes)
+        .expect("metadata byte overflow");
+    assert!(
+        data_bytes
+            .checked_add(next)
+            .is_some_and(|total| total <= max_bytes),
+        "metadata payload exceeds aggregate filler byte bound"
+    );
+    *charged = next;
+    allocate()
+}
+
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
         let directory = metadata_directory.map(|path| {
@@ -298,6 +321,7 @@ impl Filler {
             bytes: 0,
             native_code: 0,
             data_refills: 0,
+            metadata_payload_bytes: 0,
             metadata_paths: Vec::new(),
             metadata_directories: Vec::new(),
             metadata_native_code: None,
@@ -394,6 +418,21 @@ impl Filler {
                     // Register before sync so an allocation failure still cleans
                     // up this exact owned entry. Drop ignores close errors.
                     self.metadata_paths.push(path);
+                    #[cfg(target_os = "macos")]
+                    if let Err(error) = allocate_metadata_payload(
+                        &mut self.metadata_payload_bytes,
+                        self.bytes,
+                        volume.max_bytes,
+                        apfs::METADATA_PAYLOAD_BYTES as u64,
+                        || apfs::allocate_metadata(&file),
+                    ) {
+                        // Attribute exhaustion alone does not prove that the
+                        // smaller create/publication operation is exhausted.
+                        // Keep the registered file and continue native creates.
+                        if !error.raw_os_error().is_some_and(capacity_code) {
+                            return Err(error);
+                        }
+                    }
                     if cfg!(target_os = "macos") {
                         sync_filler_allocation(&file)?;
                     }
@@ -410,7 +449,10 @@ impl Filler {
                         self.native_code = fill_remaining_data(
                             self.file.as_mut().expect("data filler remains owned"),
                             &mut self.bytes,
-                            volume.max_bytes,
+                            volume
+                                .max_bytes
+                                .checked_sub(self.metadata_payload_bytes)
+                                .expect("metadata payload byte bound"),
                             started,
                             allocation_sync,
                         )
@@ -474,6 +516,47 @@ fn filler_host_sync_preserves_native_noncapacity_errors() {
 mod filler_tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn metadata_payload_is_charged_before_effect_and_reduces_data_allowance() {
+        let mut charged = 0;
+        let calls = Cell::new(0);
+        for code in [28, 5] {
+            let error = allocate_metadata_payload(&mut charged, 8, 16, 3, || {
+                calls.set(calls.get() + 1);
+                Err(std::io::Error::from_raw_os_error(code))
+            })
+            .unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(code));
+        }
+        assert_eq!(charged, 6, "failed native effects retain their allowance");
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = allocate_metadata_payload(&mut charged, 8, 16, 3, || {
+                calls.set(calls.get() + 1);
+                Ok(())
+            });
+        }))
+        .is_err());
+        assert_eq!(calls.get(), 2, "over-budget metadata must not reach the OS");
+        assert_eq!(charged, 6);
+        let mut file = DelayedAllocation::new();
+        let mut data_bytes = 8;
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = fill_remaining_data(
+                &mut file,
+                &mut data_bytes,
+                16 - charged,
+                Instant::now(),
+                |_| Ok(()),
+            );
+        }))
+        .is_err());
+        assert_eq!(
+            file.remaining.get(),
+            6,
+            "data refill ignored metadata charge"
+        );
+    }
 
     #[test]
     fn capacity_file_error_still_settles_volume_and_preserves_errors() {
@@ -695,7 +778,7 @@ fn resume_after_fill(
     println!(
         "native_capacity_fill={}",
         json!({"point":control["point"],
-        "bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
+        "bytes":filler.bytes,"metadata_payload_bytes":filler.metadata_payload_bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
         "metadata_files":filler.metadata_paths.len(),
         "metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes})
     );
@@ -942,7 +1025,7 @@ fn capacity_case(point: &str, mode: &str) {
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();
-        let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
+        let fill = json!({"bytes":filler.bytes,"metadata_payload_bytes":filler.metadata_payload_bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
             "metadata_files":filler.metadata_paths.len(),"metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes});
         drop(filler);
         ledger.attempts.push(Attempt {attempt_id:"capacity-uncertain".to_owned().try_into().unwrap(),
