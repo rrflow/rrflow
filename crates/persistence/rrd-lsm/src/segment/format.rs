@@ -2,6 +2,10 @@ use crate::{Error, Memtable, Result, SegmentDescriptor, VersionedValue};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Seek, SeekFrom};
 
+#[cfg(test)]
+#[path = "format_encoding_tests.rs"]
+mod encoding_tests;
+
 pub const SEGMENT_FORMAT_VERSION: u16 = 6;
 pub const SEGMENT_MAGIC: &[u8; 8] = b"RRDSEG06";
 pub const INDEX_MAGIC: &[u8; 8] = b"RRDIX006";
@@ -435,6 +439,26 @@ impl RowGroupBuilder {
         }
     }
 
+    fn reset(&mut self, row_start: u64) {
+        self.row_start = row_start;
+        self.keys.clear();
+        self.key_offsets.clear();
+        self.key_offsets.push(0);
+        self.sequences.clear();
+        self.value_validity.clear();
+        self.values.clear();
+        self.value_offsets.clear();
+        self.value_offsets.push(0);
+        self.first_key.clear();
+        self.last_key.clear();
+        self.unique_key_count = 0;
+        self.null_count = 0;
+        self.minimum_key_bytes = u64::MAX;
+        self.maximum_key_bytes = 0;
+        self.minimum_value_bytes = u64::MAX;
+        self.maximum_value_bytes = 0;
+    }
+
     fn rows(&self) -> usize {
         self.sequences.len()
     }
@@ -548,7 +572,12 @@ pub(super) fn encode_versions<'a>(
         return invalid("cannot write an empty segment");
     }
 
-    let mut builders = Vec::new();
+    let mut output = vec![0; SEGMENT_HEADER_BYTES];
+    let mut write_evidence = SegmentWriteEvidence::default();
+    let mut row_groups = Vec::new();
+    // The encoder owns one live row group and one bounded compression buffer.
+    // Earlier payload columns are released/reused before reading the next group.
+    let mut scratch = Vec::new();
     let mut current = RowGroupBuilder::new(0);
     for (key, versions) in versions {
         let key_bytes = versions.iter().try_fold(0usize, |total, version| {
@@ -569,129 +598,27 @@ pub(super) fn encode_versions<'a>(
                 .row_start
                 .checked_add(current.rows() as u64)
                 .ok_or_else(|| Error::InvalidSegment("v6 row offset overflow".into()))?;
-            builders.push(current);
-            current = RowGroupBuilder::new(next);
+            row_groups.push(append_row_group(
+                &current,
+                &mut output,
+                compression_policy,
+                &mut scratch,
+                &mut write_evidence,
+            )?);
+            current.reset(next);
         }
         for version in versions {
             current.append(key, version)?;
         }
     }
     if current.rows() > 0 {
-        builders.push(current);
-    }
-
-    let mut output = vec![0; SEGMENT_HEADER_BYTES];
-    let mut write_evidence = SegmentWriteEvidence::default();
-    let mut row_groups = Vec::with_capacity(builders.len());
-    for builder in builders {
-        let row_count = u32::try_from(builder.rows())
-            .map_err(|_| Error::InvalidSegment("v6 row-group count exceeds u32".into()))?;
-        let unique_key_count = builder.unique_key_count;
-        let filter = builder.filter()?;
-        let sequence_min = *builder
-            .sequences
-            .iter()
-            .min()
-            .expect("non-empty row group has sequences");
-        let sequence_max = *builder
-            .sequences
-            .iter()
-            .max()
-            .expect("non-empty row group has sequences");
-        let key_offsets = encode_i64_values(&builder.key_offsets);
-        let sequences = encode_u64_values(&builder.sequences);
-        let value_offsets = encode_i64_values(&builder.value_offsets);
-        let pages = [
-            append_page(
-                &mut output,
-                PageWriteMetadata::new(
-                    PageKind::KeyOffsets,
-                    builder.row_start,
-                    row_count,
-                    PageStatistics::new(0, builder.minimum_key_bytes, builder.maximum_key_bytes),
-                ),
-                &key_offsets,
-                compression_policy,
-                &mut write_evidence,
-            )?,
-            append_page(
-                &mut output,
-                PageWriteMetadata::new(
-                    PageKind::KeyData,
-                    builder.row_start,
-                    row_count,
-                    PageStatistics::new(0, builder.minimum_key_bytes, builder.maximum_key_bytes),
-                ),
-                &builder.keys,
-                compression_policy,
-                &mut write_evidence,
-            )?,
-            append_page(
-                &mut output,
-                PageWriteMetadata::new(
-                    PageKind::SequenceValues,
-                    builder.row_start,
-                    row_count,
-                    PageStatistics::new(0, sequence_min, sequence_max),
-                ),
-                &sequences,
-                compression_policy,
-                &mut write_evidence,
-            )?,
-            append_page(
-                &mut output,
-                PageWriteMetadata::new(
-                    PageKind::ValueValidity,
-                    builder.row_start,
-                    row_count,
-                    PageStatistics::new(builder.null_count, 0, 1),
-                ),
-                &builder.value_validity,
-                compression_policy,
-                &mut write_evidence,
-            )?,
-            append_page(
-                &mut output,
-                PageWriteMetadata::new(
-                    PageKind::ValueOffsets,
-                    builder.row_start,
-                    row_count,
-                    PageStatistics::new(
-                        builder.null_count,
-                        builder.minimum_value_bytes,
-                        builder.maximum_value_bytes,
-                    ),
-                ),
-                &value_offsets,
-                compression_policy,
-                &mut write_evidence,
-            )?,
-            append_page(
-                &mut output,
-                PageWriteMetadata::new(
-                    PageKind::ValueData,
-                    builder.row_start,
-                    row_count,
-                    PageStatistics::new(
-                        builder.null_count,
-                        builder.minimum_value_bytes,
-                        builder.maximum_value_bytes,
-                    ),
-                ),
-                &builder.values,
-                compression_policy,
-                &mut write_evidence,
-            )?,
-        ];
-        row_groups.push(RowGroupDescriptor {
-            row_start: builder.row_start,
-            row_count,
-            unique_key_count,
-            first_key: builder.first_key,
-            last_key: builder.last_key,
-            pages,
-            filter,
-        });
+        row_groups.push(append_row_group(
+            &current,
+            &mut output,
+            compression_policy,
+            &mut scratch,
+            &mut write_evidence,
+        )?);
     }
 
     align(&mut output);
@@ -760,6 +687,129 @@ pub(super) fn encode_versions<'a>(
         bytes: output,
         checksum,
         evidence: write_evidence,
+    })
+}
+
+fn append_row_group(
+    builder: &RowGroupBuilder,
+    output: &mut Vec<u8>,
+    compression_policy: SegmentCompressionPolicy,
+    scratch: &mut Vec<u8>,
+    write_evidence: &mut SegmentWriteEvidence,
+) -> Result<RowGroupDescriptor> {
+    let row_count = u32::try_from(builder.rows())
+        .map_err(|_| Error::InvalidSegment("v6 row-group count exceeds u32".into()))?;
+    let unique_key_count = builder.unique_key_count;
+    let filter = builder.filter()?;
+    let sequence_min = *builder
+        .sequences
+        .iter()
+        .min()
+        .expect("non-empty row group has sequences");
+    let sequence_max = *builder
+        .sequences
+        .iter()
+        .max()
+        .expect("non-empty row group has sequences");
+    let key_offsets = encode_i64_values(&builder.key_offsets);
+    let sequences = encode_u64_values(&builder.sequences);
+    let value_offsets = encode_i64_values(&builder.value_offsets);
+    let pages = [
+        append_page(
+            output,
+            PageWriteMetadata::new(
+                PageKind::KeyOffsets,
+                builder.row_start,
+                row_count,
+                PageStatistics::new(0, builder.minimum_key_bytes, builder.maximum_key_bytes),
+            ),
+            &key_offsets,
+            compression_policy,
+            scratch,
+            write_evidence,
+        )?,
+        append_page(
+            output,
+            PageWriteMetadata::new(
+                PageKind::KeyData,
+                builder.row_start,
+                row_count,
+                PageStatistics::new(0, builder.minimum_key_bytes, builder.maximum_key_bytes),
+            ),
+            &builder.keys,
+            compression_policy,
+            scratch,
+            write_evidence,
+        )?,
+        append_page(
+            output,
+            PageWriteMetadata::new(
+                PageKind::SequenceValues,
+                builder.row_start,
+                row_count,
+                PageStatistics::new(0, sequence_min, sequence_max),
+            ),
+            &sequences,
+            compression_policy,
+            scratch,
+            write_evidence,
+        )?,
+        append_page(
+            output,
+            PageWriteMetadata::new(
+                PageKind::ValueValidity,
+                builder.row_start,
+                row_count,
+                PageStatistics::new(builder.null_count, 0, 1),
+            ),
+            &builder.value_validity,
+            compression_policy,
+            scratch,
+            write_evidence,
+        )?,
+        append_page(
+            output,
+            PageWriteMetadata::new(
+                PageKind::ValueOffsets,
+                builder.row_start,
+                row_count,
+                PageStatistics::new(
+                    builder.null_count,
+                    builder.minimum_value_bytes,
+                    builder.maximum_value_bytes,
+                ),
+            ),
+            &value_offsets,
+            compression_policy,
+            scratch,
+            write_evidence,
+        )?,
+        append_page(
+            output,
+            PageWriteMetadata::new(
+                PageKind::ValueData,
+                builder.row_start,
+                row_count,
+                PageStatistics::new(
+                    builder.null_count,
+                    builder.minimum_value_bytes,
+                    builder.maximum_value_bytes,
+                ),
+            ),
+            &builder.values,
+            compression_policy,
+            scratch,
+            write_evidence,
+        )?,
+    ];
+    Ok(RowGroupDescriptor {
+        row_start: builder.row_start,
+        row_count,
+        unique_key_count,
+        first_key: builder.first_key.clone(),
+        last_key: builder.last_key.clone(),
+        pages,
+        filter,
     })
 }
 
@@ -1101,6 +1151,7 @@ fn append_page(
     metadata: PageWriteMetadata,
     bytes: &[u8],
     compression_policy: SegmentCompressionPolicy,
+    scratch: &mut Vec<u8>,
     evidence: &mut SegmentWriteEvidence,
 ) -> Result<PageDescriptor> {
     align(output);
@@ -1112,7 +1163,6 @@ fn append_page(
         .checked_add(logical_bytes)
         .ok_or_else(|| Error::InvalidSegment("v6 logical page evidence overflow".into()))?;
 
-    let mut scratch = Vec::new();
     let (compression, stored) = match compression_policy {
         SegmentCompressionPolicy::None => (PageCompression::None, bytes),
         SegmentCompressionPolicy::AdaptiveLz4 {
@@ -1120,17 +1170,23 @@ fn append_page(
             maximum_page_logical_bytes,
         } if !bytes.is_empty() && logical_bytes <= maximum_page_logical_bytes => {
             let maximum_output = lz4_flex::block::get_maximum_output_size(bytes.len());
-            scratch.try_reserve_exact(maximum_output).map_err(|_| {
-                Error::InvalidSegment("v6 LZ4 compression scratch allocation failed".into())
-            })?;
-            scratch.resize(maximum_output, 0);
+            if scratch.len() < maximum_output {
+                scratch
+                    .try_reserve_exact(maximum_output - scratch.len())
+                    .map_err(|_| {
+                        Error::InvalidSegment("v6 LZ4 compression scratch allocation failed".into())
+                    })?;
+                scratch.resize(maximum_output, 0);
+            }
             evidence.compression_scratch_high_water_bytes = evidence
                 .compression_scratch_high_water_bytes
                 .max(u64::try_from(scratch.capacity()).map_err(|_| {
                     Error::InvalidSegment("v6 LZ4 compression scratch exceeds u64".into())
                 })?);
-            let compressed_bytes = lz4_flex::block::compress_into(bytes, &mut scratch)
-                .map_err(|error| Error::InvalidSegment(format!("v6 LZ4 encode failed: {error}")))?;
+            let compressed_bytes =
+                lz4_flex::block::compress_into(bytes, &mut scratch[..maximum_output]).map_err(
+                    |error| Error::InvalidSegment(format!("v6 LZ4 encode failed: {error}")),
+                )?;
             let compressed = scratch.get(..compressed_bytes).ok_or_else(|| {
                 Error::InvalidSegment("v6 LZ4 encoder returned an invalid length".into())
             })?;
