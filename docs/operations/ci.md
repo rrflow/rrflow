@@ -17,10 +17,24 @@ RRFlow has one candidate CI chain. The thin caller is
 `.github/workflows/ci.yml`; `.github/workflows/ci-reusable.yml` owns every
 check. A branch push does not start a second copy of the same work.
 
-The caller accepts pull requests, merge-queue candidates, and explicit manual
-dispatches. Its concurrency key cancels stale executions for the same pull
-request or ref. The reusable workflow reduces every partition into one stable
-`ci-gate` check for branch protection:
+The caller accepts ready pull requests, merge-queue candidates, and explicit
+manual dispatches. Draft PRs remain reviewable packages without automatically
+launching the full pipeline. `opened`, `synchronize`, `reopened`,
+`ready_for_review`, and `converted_to_draft` are explicit PR activities.
+Becoming ready starts candidate CI even without a new commit; returning to
+draft cancels obsolete work through the same PR/ref concurrency key and skips
+the reusable caller. Other PRs' runs are unaffected. A skipped draft run is
+not candidate acceptance. Manual dispatch intentionally remains available for
+an explicitly requested full run on a draft branch.
+
+This uses GitHub's documented [pull-request activity types](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request);
+the default activity list does not include readiness transitions. The local
+`test_candidate_admission.py` corpus verifies the checked-in admission shape
+and rejects missing transitions, filters and lost merge/manual coverage; it
+does not emulate GitHub execution. Full checks still run for merge groups.
+No path filter or reduced ready-candidate lane substitutes for acceptance.
+The reusable workflow reduces every partition into one stable `ci-gate`
+check for branch protection:
 
 - installed primary-executable lifecycle on the standard Linux runner;
 - repository policy, formatting, architecture, evaluation, dependency, and

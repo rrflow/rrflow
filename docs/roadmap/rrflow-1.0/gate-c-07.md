@@ -13,6 +13,25 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [final growth candidate record](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md)
+retains the integrated Desktop preflight's failure at 55,047 acknowledged
+records and the separate installation-lease CI failure. Lazy compaction shadow
+checks and explicit lease release are under validation. The prior candidate's
+three native crash/capacity and three 100-reopen jobs passed, but its overall
+gate failed. No actual 24-hour soak or C-07 closure is claimed.
+
+The [metadata-pressure fixture record](../../evidence/change-journals/gate-c/c-07f-metadata-pressure.md)
+retains a later macOS count-limit failure: metadata creation consumed the
+8192-entry allowance without a native capacity error. Bounded data refills
+between metadata intervals are implemented for native validation; this is not
+accepted APFS exhaustion or a completed C-07 qualification.
+
+The [native capacity command-attribution record](../../evidence/change-journals/gate-c/c-07f-command-attribution.md)
+and POAM-035 retain the macOS selected-WAL-event timeout and Ubuntu
+`repair apply` command timeout. Static phase/timing diagnostics preserve the
+original deadlines and native failure oracle. These intermittent causes remain
+open; diagnostic implementation is not a causal repair or native acceptance.
+
 One installed native engine must preserve every acknowledged authoritative
 commit, publish atomic batches, reject uncertain or corrupt state safely, and
 keep admission, maintenance, recovery and retained buffers within explicit
@@ -91,6 +110,15 @@ with invalid operating results is not a passing capacity result. A separately
 frozen 5-RPS characterization is allowed by the profile matrix; it cannot erase
 or qualify the failed 25-RPS point. Preserve transaction, backup and readback
 oracles throughout this investigation.
+
+The [canonical digest optimization](../../evidence/change-journals/gate-c/c-07g-canonical-digest-throughput.md)
+records the next measured cost: native CPU samples identify scalar SHA-256 as a
+hot path. Reuse the pinned cryptographic primitive at the existing kernel
+boundary, require unchanged persisted/public digests and then rerun the installed
+flow. Primitive throughput and faster development checks do not qualify the
+sustained operating point. Retain the 25-RPS failures, the 5-RPS resource-sampling
+gap and the diagnostic restart failures; full profile/repetition and actual
+24-hour acceptance remain open.
 
 Execution discipline: describe progress as implemented behavior, reproduced
 failure, measured improvement, or completed acceptance. Keep outstanding work
@@ -651,3 +679,72 @@ Stop on any lost ACK, partial batch, stale authority, cap violation,
 unexplained growing live owner, unknown effect or changed format/authority.
 Retain failures; repair at the canonical boundary before advancing. Neither
 this plan nor a successful component suite marks C-07 or alpha complete.
+
+
+The [bounded backup-checkpoint repair](../../evidence/change-journals/gate-c/c-07g-backup-checkpoint-cost.md)
+addresses another measured cost before full growth: default logical export
+synced each action and receipt, extending backup beyond the offered segment.
+Bounded checkpoints preserve final durability, byte identity and explicit
+per-action callback semantics. The digest-only 1k/5RPS point completed but
+still failed; the 10k run was explicitly interrupted after all corpus writes
+and partial independent readback. These are retained limitations, not closure.
+
+
+The [startup capture and completed 10k reproduction](../../evidence/change-journals/gate-c/c-07g-startup-failure-capture.md)
+records PR116's accepted 23-check prerequisite and PR117's remaining growth
+blockers. The full 10k data/restart/readback flow completed, but 110/600 offers
+were rejected and 95 exceeded latency budget; final readback cost 431.358 s.
+Separate the backup join's artificial dispatch delay from the later native
+response/readback/maintenance cost. The next bounded driver repair must keep
+management work within explicit resource/deadline ownership while continuing
+offers on the original schedule, preserve reader lifetime bounds and prove
+write/backup overlap from receipts. Do not hide delay by resetting clocks,
+raising thresholds, omitting independent readback, or silently changing the
+frozen profile. The prior intermittent startup exit still needs diagnosis;
+one successful reproduction does not close it. C-07 and actual 24-hour
+qualification remain open.
+
+The [immutable point-read selection repair](../../evidence/change-journals/gate-c/c-07g-point-read-selection.md)
+records a reproduced growth cost: a six-byte winner read 131219 bytes because
+superseded values were hydrated before sequence selection. Winner-only reads
+reduce that fixture to 113 bytes; bounded batch traversal preserves both
+metadata and payload locality. Exact snapshot, deletion, compaction and reopen
+checks accompany the repair. This component evidence does not establish the
+installed operating point or close the scheduling, growth or 24-hour soak gap.
+
+The [bounded backup scheduling repair](../../evidence/change-journals/gate-c/c-07g-backup-scheduling.md)
+removes the per-segment management join from offered-load dispatch. One task
+keeps its original deadline across segments; stream validation reconstructs
+its start, acknowledged-write overlap and verified completion without retaining
+old ledgers. Missing or unfinished evidence fails. Native smoke and contract
+checks support the implementation; integrated growth, profile repetitions and
+the actual 24-hour soak remain required before C-07 can close.
+
+The [integrated native growth record](../../evidence/change-journals/gate-c/c-07g-integrated-native-growth.md)
+retains both failed exact-source comparisons. The 10k corpus fully acknowledged
+and read back, then restart failed with `multiply linked file denied`. The
+failed estate was removed during harness unwinding, preventing file/link-count
+inspection. Preserve owned failure state and identify that admission before
+repairing its canonical owner; no link guard or capacity threshold is waived.
+
+The [startup admission evidence](../../evidence/change-journals/gate-c/c-07g-reopen-admission.md)
+adds bounded relative file/link-count diagnostics and retention of original
+owned startup-failure bytes after child cleanup. Admission remains strict;
+actual native cause and repair remain pending. The same record retains a new
+macOS CI failure: metadata fill reached its 8192-file bound before obtaining
+capacity denial. That C-07f fixture gap also blocks candidate acceptance.
+
+The [completed integrated 10k characterization](../../evidence/change-journals/gate-c/c-07g-admission-native-characterization.md)
+records 600 acknowledged operations without failures or latency overruns,
+verified backup under offered writes, compaction/drain and complete restart
+readback. It does not resolve the earlier intermittent startup denial or
+qualify the full profile/24-hour matrix. The subsequent [100-reopen run](../../evidence/change-journals/gate-c/c-07g-integrated-hundred-reopens.md)
+also completed, including full final readback and 600 acknowledged load
+operations without latency overruns. Its exact-source characterization does
+not explain the earlier intermittent admission failure or complete C-07.
+
+The [integrated growth candidate](../../evidence/change-journals/gate-c/c-07-integrated-growth-candidate.md) preserves the related digest,
+point-read, backup scheduling, startup diagnostic and metadata-pressure repairs
+in one current-main landing PR. Its own complete candidate pipeline must pass;
+predecessor checks and short native characterizations cannot substitute.
+Full profile and actual 24-hour acceptance remain open.

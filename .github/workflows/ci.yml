@@ -2,6 +2,7 @@ name: ci
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   merge_group:
   workflow_dispatch:
 
@@ -15,6 +16,7 @@ concurrency:
 jobs:
   pipeline:
     name: pipeline
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     permissions:
       contents: read
     uses: ./.github/workflows/ci-reusable.yml
