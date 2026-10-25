@@ -403,7 +403,11 @@ fn coverage_failures_are_retained_not_silently_passed() {
 }
 
 fn golden(path: &Path, value: &Value) {
-    let mut rendered = serde_json::to_string_pretty(value).unwrap();
+    // Workspace feature unification may enable serde_json/preserve_order.
+    // Golden bytes must not depend on which other packages are being tested.
+    let mut canonical = value.clone();
+    canonical.sort_all_objects();
+    let mut rendered = serde_json::to_string_pretty(&canonical).unwrap();
     rendered.push('\n');
     if std::env::var_os("RRFLOW_UPDATE_STORAGE_GOLDENS").is_some() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

@@ -35,16 +35,17 @@ Rust application
 ```
 
 The SDK cannot select a storage profile, raw key, physical index, DataFusion
-plan, model backend, or project database. It may express semantic intent and
-budgets exposed by `rrd-contract`. Cross-surface proof must compare the result,
+plan or project database. It may select an engine-advertised embedding backend
+and express semantic intent and budgets exposed by `rrd-contract`.
+Cross-surface proof must compare the result,
 denial, stamp, digest, receipt, and causal identity produced by the engine—not
 merely compare JSON shapes.
 
 ## Audited current surface
 
-The executable `endpoint_catalogue()` contains 44 HTTP operations and one
+The executable `endpoint_catalogue()` contains 55 HTTP operations and one
 generic authenticated `/v1/ws` descriptor. `RrdClient` currently supplies
-typed HTTP methods for 39 of those 44 operations, while `RrdWebSocket`
+typed HTTP methods for 50 of those 55 operations, while `RrdWebSocket`
 implements the bounded B-04 multiplexed protocol. The current boundary is:
 
 | Family | Catalogued HTTP operations | Rust methods now | Missing now |
@@ -65,8 +66,20 @@ implements the bounded B-04 multiplexed protocol. The current boundary is:
 | Diagnostics | 3 | 3 | none |
 | Prompt flights | 3 | 3 | none |
 | Tasks | 4 | 4 | none |
+| Task effort and explicit reference inference | 6 | 6 | none |
 | Context | 1 | 1 | none |
-| **Total** | **44** | **39** | **5** |
+| Endpoint configuration | 3 | 3 | none |
+| Knowledge-tree configuration | 2 | 2 | none |
+| **Total** | **55** | **50** | **5** |
+
+The [task effort flow](../inference/lfg-swag.md#public-task-effort-flow) uses
+`configure_task_budget`, `activate_builtin_embedding`,
+`execute_task_embedding`, `read_task_budget`, `stop_task_budget` and
+`read_task_attempt`. Stop supplies the observed budget digest; a repeated
+attempt is inspected instead of automatically dispatched again. The real
+authenticated socket fixture `rrd-client/tests/task_effort.rs` executes this
+flow and reads the same result and stopped budget after native-store reopen.
+This reference inference path does not supply an LLM or a complete router.
 
 The WebSocket method authenticates one generic connection, validates the
 server's opening identity and negotiated limits, and carries request,
@@ -349,7 +362,7 @@ The gates then close behavior in dependency order:
 2. **B-04 (implemented):** the dedicated socket is absent; one bounded
    multiplexed protocol and Rust carriage now own request/cancel/subscription
    correlation, exact resume state, and adversarial frame rejection.
-3. **H-04:** bind all 44 operations from the catalogue, validate every request
+3. **H-04:** bind every operation from the executable catalogue, validate every request
    and response, and compare Rust with every supported surface against one
    real `RrdEngine` corpus.
 4. **H-07:** add endpoint resolution/rotation as an outward adapter while
@@ -365,7 +378,7 @@ The gates then close behavior in dependency order:
 - [Tokio timeout](https://docs.rs/tokio/1.53.1/tokio/time/fn.timeout.html)
   defines local cancellation by dropping the future; it is not server
   completion evidence.
-- [Rustls `ClientConfig`](https://docs.rs/rustls/0.23.43/rustls/client/struct.ClientConfig.html)
+- [Rustls `ClientConfig`](https://docs.rs/rustls/0.23.45/rustls/client/struct.ClientConfig.html)
   owns TLS server verification and client-credential selection, distinct from
   RRD authorization.
 - [W3C Trace Context](https://www.w3.org/TR/trace-context/) defines interoperable
