@@ -6,6 +6,104 @@
 
 ## Observed deficiency
 
+PR125 Ubuntu job `121000145879` also exposed a diagnostic subprocess fixture
+race: the child could exit before required stdin delivery, producing
+`BrokenPipe`. The [integrated repair journal](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md#observed-process-fixture-input-race)
+records the raw failure, bounded input-consumption repair and pending native
+candidate proof. This does not change the installed capacity acceptance bar.
+
+The [integrated growth failure and repair](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md)
+records preflight `7b6e56a5` failing at 55,047 acknowledged records with a
+30-second corpus-write deadline, one failed compaction and confirmed cleanup.
+It never entered soak. PR123's native crash and 100-reopen jobs passed on all
+three platforms, while an installation-recovery lease conflict failed its
+optional-engine job and final gate. PR126 consolidates the current candidate,
+removes irrelevant per-key compaction shadow scans, explicitly releases the
+installation lease and retains private setup-failure estates. Causal repair
+and acceptance require the final candidate suites and full-corpus rerun;
+existing deadlines and resource limits remain unchanged.
+
+The [metadata-pressure fixture record](../../evidence/change-journals/gate-c/c-07f-metadata-pressure.md)
+retains a later macOS count-limit failure: metadata creation consumed the
+8192-entry allowance without a native capacity error. Bounded data refills
+between metadata intervals are implemented for native validation; this is not
+accepted APFS exhaustion or a completed C-07 qualification.
+
+### Native capacity timeout attribution (2026-10-24)
+
+Two further failures are retained in the [command-attribution record](../../evidence/change-journals/gate-c/c-07f-command-attribution.md).
+[PR118 run 40121463373](https://github.com/rrflow/rrflow-development/actions/runs/40121463373/job/120953725578)
+reached the macOS `wal_before_write` pause in fresh mode, filled 254607360
+bytes to native ENOSPC (28), and returned `api-ResourceExhausted` without the
+required selected native-I/O receipt. The controller expired after 60 seconds.
+This establishes missing native attribution, not that the WAL pause was missed
+or that the failure necessarily preceded the WAL write. The existing APFS
+metadata-refill change does not execute on this WAL case.
+
+[PR23 run 40121518000](https://github.com/rrflow/rrflow-development/actions/runs/40121518000)
+filled 242651136 bytes on ext4 and returned `api-Internal`, then exceeded the
+120-second `Estate::invoke` limit. Its stack identifies the `capacity_case`
+async closure; the only invocation in that closure is `repair apply`.
+The old log lacks the command label, elapsed phase timings and resource trace
+needed to distinguish replay/hashing/copy/publication costs or a stalled repair.
+These are failed native cases, even though neither log reports a lost ACK or
+readback mismatch. API error classes alone do not identify a native syscall.
+
+C-07f owns reproduction and causal repair. PR124 adds static command phases
+and bounded timing to the existing monitor while preserving both deadlines,
+output limits, selected native-error requirements and recovery oracles. This
+closes the missing command-label diagnostic only; the two intermittent causes
+remain open until exact-candidate native evidence and attribution support a
+repair. No timeout increase, retries or C-07 status change is authorized by
+this record.
+
+The [conflict-probe repair and execution reset](../../evidence/change-journals/gate-c/c-07g-conflict-spine-and-execution.md)
+removes reproduced unnecessary value-page reads during native write-conflict
+validation. The existing C-07 owner now separates implemented paths, native
+capacity failures and the failed Desktop growth campaign. This narrow physical
+improvement does not diagnose all campaign traffic or complete qualification.
+
+The [retained nominal Desktop failure](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-failure.md)
+records a corpus-write deadline after 50685 acknowledgements, zero accepted
+segments and confirmed cleanup. The 24-hour phase never began. The next repair
+must attribute the bounded write failure and high cumulative segment reads at
+the existing allocation; no timeout extension or completed qualification is
+claimed. C-07g and this deficiency remain open.
+
+The [nominal Desktop qualification launch](../../evidence/change-journals/gate-c/c-07g-desktop-qualification-launch.md)
+configured the existing installed driver in the isolated eight-GiB guest with
+three seeds, 100 forced reopens and 24-hour soak phases. Its first seed failed
+during ingestion as recorded above. Full readback,
+lifecycle, sustained phases, offline reconciliation and remaining profile
+points stay required. The separate WSL preflight remains characterization.
+
+The [isolated Desktop host preparation](../../evidence/change-journals/gate-c/c-07g-desktop-vm-preparation.md)
+provides an owned four-vCPU/eight-GiB KVM guest, verified image provenance,
+ordinary-primary compatibility and writable delegated resource limits. This
+removes a host-preparation prerequisite; no guest installed workload or
+24-hour result is claimed. The larger WSL preflight continues separately.
+
+The [post-synchronization filler probe](../../evidence/change-journals/gate-c/c-07f-settled-filler.md)
+repairs a reproduced fixture gap: allocation available after the final barrier
+was not consumed before resume. Local control-flow evidence retains native
+failure/recovery requirements and all existing bounds; the missing selected
+macOS I/O event and complete native capacity matrix remain unqualified.
+
+The [filler allocation-sync correction](../../evidence/change-journals/gate-c/c-07f-filler-allocation-sync.md)
+removes Apple hardware-cache flush requests from disposable capacity filler
+files while preserving native allocation errors, existing limits and every
+engine durability barrier. Windows focused/process and orchestration checks
+pass; the actual APFS exhaustion deadline and native matrix still require
+candidate evidence. This is a fixture correction, not native qualification.
+
+The [Desktop-corpus preflight launch](../../evidence/change-journals/gate-c/c-07g-desktop-preflight-launch.md)
+advances to the actual 100000-record/500000-edge/100000-vector corpus under
+the two-GiB engine cap. Its launch is not a completed result: ingestion,
+independent readback and the frozen short load phases must finish before any
+success claim. The eight-GiB host profile, complete repetitions/native matrix
+and 24-hour qualification remain outstanding. The same record retains a
+further macOS metadata-fill deadline failure from PR108; this gap stays open.
+
 The [session retention regression and repair](../../evidence/change-journals/gate-c/c-07g-session-transaction-retention.md)
 reproduced 52280 bytes of hot session state after 32 completed transactions on
 both rrflowMX and rrflowKV. Historical transaction accumulation could exhaust
@@ -638,3 +736,154 @@ the original rejection and failed campaign. It changes no storage policy or
 qualification threshold. Successful diagnostic capture and a causal repair
 still need installed evidence; neither preceding local suite resolves this
 capacity failure.
+
+The [allocation-sync candidate failure](../../evidence/change-journals/gate-c/c-07f-allocation-sync-candidate.md)
+retains PR112's macOS WAL case: actual filler ENOSPC and public
+ResourceExhausted did not produce the required selected native-I/O receipt.
+The test remains failed; this result is neither OOM attribution nor native
+storage-full qualification. Exact syscall attribution remains open.
+
+
+### Pre-soak admission and current native result
+
+[PR115](https://github.com/rrflow/rrflow-development/pull/115) merged at
+`0273f11bc9784681f9532ca06d912b7f0e11ddb7` after candidate
+`3c13f4558e93315b12206f658eaf08b8a4995aea` passed pipeline
+`40107347790`. Its 24 native capacity cases passed across Linux/ext4,
+macOS/APFS and Windows/NTFS, including fresh/existing WAL, segment, manifest
+and CURRENT failures and exact recovery. This supersedes the earlier macOS
+candidate failure for that exact candidate, not the remaining full-profile gate.
+
+The same candidate's 1,000-record characterization completed at four clients /
+25 RPS but rejected 312 offers at the driver concurrency limit and nine at
+storage conflicts; 50 scheduled latencies exceeded budget. Zero unresolved
+writes/readback mismatches did not make this a passing operating point.
+Final 1,050-slot readback took 123.634 seconds. The subsequently started
+10,000-record attempt was interrupted and retained after this result was read.
+No 24-hour soak ran. The [admission/timing journal](../../evidence/change-journals/gate-c/c-07g-soak-admission.md)
+records the repair: reject invalid qualification preflight before soak and
+measure independent readback completion separately from response completion.
+This does not diagnose all growth cost or close POAM-035/C-07.
+
+
+### Measured digest cost and retained operating failures
+
+The [canonical digest optimization](../../evidence/change-journals/gate-c/c-07g-canonical-digest-throughput.md)
+replaces the first-party scalar SHA-256 primitive behind the existing kernel
+interface with pinned RustCrypto, preserving all content identities. Native
+profiling attributed 24.14% of 348 CPU samples to scalar compression; a bounded
+512-MiB release micro-measurement changed from 1.269 seconds to 0.123 seconds.
+This is a primitive result, not an engine-wide or capacity qualification claim.
+The existing contract/storage/evaluation goldens remain unchanged.
+
+The prerequisite candidate's repeated 25-RPS point still rejected 207 scheduled
+requests; a separately frozen evidence-segment configuration rejected 111.
+At 5 RPS, all 300 preflight requests acknowledged within latency budgets, but
+sampling failed on a 2.230-second interval around automatic maintenance. A
+profiled repeat later failed restart startup; profiling is not qualification.
+No full 24-hour soak started. Complete the new installed comparison and diagnose
+remaining scheduling, maintenance, startup and full-profile gaps before closure.
+
+
+The PR116 macOS candidate passed five capacity cases then failed owned-image
+cleanup with exit 16. The [bounded detachment repair](../../evidence/change-journals/gate-c/c-07f-owned-image-detachment.md)
+rechecks ownership on EBUSY retries within one deadline and preserves failure
+retention. Thirteen orchestration checks pass; native candidate rerun remains
+required. This new observed cleanup deficiency does not erase PR115 evidence
+or qualify PR116, and C-07 remains open.
+
+
+The [backup checkpoint cost record](../../evidence/change-journals/gate-c/c-07g-backup-checkpoint-cost.md)
+retains the digest-only candidate's completed but failed 1k/5RPS point and
+incomplete 10k characterization. Bounded default export checkpoints reduce
+per-action sync overhead while preserving final publication and public progress
+semantics. Owning storage and installed smoke checks pass; native sustained
+acceptance remains pending and POAM035 stays open.
+
+The installed backup candidate reduced observed creation from 11.892 to 1.940
+seconds, and all 300 preflight requests acknowledged without latency overruns.
+Its later short endurance phase still rejected 59 requests with 40 overruns;
+final readback/restart passed with zero unresolved effects. Retain this failed
+point and attribute post-flush response/readback costs before qualification.
+No 24-hour soak is running or accepted from these results.
+
+
+A separately frozen 64-MiB-cache characterization at the same 1k/5RPS point
+acknowledged all 600 requests with zero latency overruns and sampled RSS below
+363 MiB. Readback/restart and owned cleanup completed. The shipped 4-MiB
+default is unchanged, the failed point is retained, and the 10k growth run
+already shows slow independent readback after all writes acknowledged. The
+linked backup journal records configuration sensitivity and bounded diagnostic
+profiling; neither the small result nor an increased cache closes this gap.
+
+
+The 64-MiB-cache 10k run completed all corpus acknowledgements/readbacks but
+failed its first forced restart before any measured segment. The test capture
+hid the engine's stderr behind a readiness-channel disconnection. The
+[bounded startup capture repair](../../evidence/change-journals/gate-c/c-07g-startup-failure-capture.md)
+keeps both stream limits and failure semantics while retaining the terminal
+cause. The engine restart defect remains undiagnosed; native reproduction is
+required and no soak is running.
+
+
+PR116 repair head 88fbc5b4 passed all 23 candidate checks and merged as
+94d0567f. Its retained 24 native capacity receipts have zero unresolved effects
+or violations; macOS owned-image cleanup now passes all eight cases. The three
+100-cycle reopen jobs passed. This accepts that prerequisite only; PR117's
+changed runtime and full profile/soak evidence remain separate and open.
+
+
+The capture-repaired 779b3341 10k reproduction completed ingestion, all corpus
+checks, two setup reopens and final post-load restart/readback of 10,000 seeded
+records plus 40 working slots. The prior startup exit was not reproduced and
+remains unexplained. The operating point still failed: 110/600 rejected,
+95 latency overruns, zero unresolved effects; final readback cost 431.358 s.
+Backup completion blocks the driver's ten-second reader segment (14.220 s
+creation plus 1.606 s verification), while later endurance also fails without
+that barrier. Fix scheduling at its existing driver owner and attribute native
+read/maintenance costs separately, preserving offered time, audit, transaction
+and resource boundaries. No actual 24-hour soak ran.
+The [immutable point-read selection repair](../../evidence/change-journals/gate-c/c-07g-point-read-selection.md)
+records a reproduced growth cost: a six-byte winner read 131219 bytes because
+superseded values were hydrated before sequence selection. Winner-only reads
+reduce that fixture to 113 bytes; bounded batch traversal preserves both
+metadata and payload locality. Exact snapshot, deletion, compaction and reopen
+checks accompany the repair. This component evidence does not establish the
+installed operating point or close the scheduling, growth or 24-hour soak gap.
+
+The [bounded backup scheduling repair](../../evidence/change-journals/gate-c/c-07g-backup-scheduling.md)
+removes the per-segment management join from offered-load dispatch. One task
+keeps its original deadline across segments; stream validation reconstructs
+its start, acknowledged-write overlap and verified completion without retaining
+old ledgers. Missing or unfinished evidence fails. Native smoke and contract
+checks support the implementation; integrated growth, profile repetitions and
+the actual 24-hour soak remain required before C-07 can close.
+
+The [integrated native growth record](../../evidence/change-journals/gate-c/c-07g-integrated-native-growth.md)
+retains both failed exact-source comparisons. The 10k corpus fully acknowledged
+and read back, then restart failed with `multiply linked file denied`. The
+failed estate was removed during harness unwinding, preventing file/link-count
+inspection. Preserve owned failure state and identify that admission before
+repairing its canonical owner; no link guard or capacity threshold is waived.
+
+The [startup admission evidence](../../evidence/change-journals/gate-c/c-07g-reopen-admission.md)
+adds bounded relative file/link-count diagnostics and retention of original
+owned startup-failure bytes after child cleanup. Admission remains strict;
+actual native cause and repair remain pending. The same record retains a new
+macOS CI failure: metadata fill reached its 8192-file bound before obtaining
+capacity denial. That C-07f fixture gap also blocks candidate acceptance.
+
+The [completed integrated 10k characterization](../../evidence/change-journals/gate-c/c-07g-admission-native-characterization.md)
+records 600 acknowledged operations without failures or latency overruns,
+verified backup under offered writes, compaction/drain and complete restart
+readback. It does not resolve the earlier intermittent startup denial or
+qualify the full profile/24-hour matrix. The subsequent [100-reopen run](../../evidence/change-journals/gate-c/c-07g-integrated-hundred-reopens.md)
+also completed, including full final readback and 600 acknowledged load
+operations without latency overruns. Its exact-source characterization does
+not explain the earlier intermittent admission failure or complete C-07.
+
+The [integrated growth candidate](../../evidence/change-journals/gate-c/c-07-integrated-growth-candidate.md) preserves the related digest,
+point-read, backup scheduling, startup diagnostic and metadata-pressure repairs
+in one current-main landing PR. Its own complete candidate pipeline must pass;
+predecessor checks and short native characterizations cannot substitute.
+Full profile and actual 24-hour acceptance remain open.

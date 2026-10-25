@@ -439,3 +439,89 @@ fn authoritative_transaction_reopens_at_the_committed_value() {
         Some(b"value".to_vec())
     );
 }
+
+#[test]
+fn conflict_validation_reads_only_version_spines_and_skips_shadowed_segments() {
+    use rrd_lsm::{DatabaseOptions, SegmentCompressionPolicy, SegmentIoMode, SegmentIoPolicy};
+    for mode in [SegmentIoMode::Bounded, SegmentIoMode::Mmap] {
+        for compression in [
+            SegmentCompressionPolicy::None,
+            SegmentCompressionPolicy::default(),
+        ] {
+            for immutable_winner in [false, true] {
+                for tombstone in [false, true] {
+                    let temp = tempfile::tempdir().unwrap();
+                    let root = temp.path().join("conflict-probe");
+                    let options = DatabaseOptions {
+                        page_cache_bytes: 0,
+                        segment_compression: compression,
+                        segment_io: SegmentIoPolicy {
+                            mode,
+                            allow_fallback: false,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+                    let mut database = Database::create_with_options(&root, options).unwrap();
+                    let old = vec![7; 64 * 1024];
+                    seed(&mut database, &[(b"shared", &old)]);
+                    database.flush_memtable(1).unwrap();
+                    // Reopen validates the complete persisted segment before
+                    // measuring conflict work with no resident page cache.
+                    drop(database);
+                    let mut database = Database::open_with_options(&root, options).unwrap();
+                    let mut stale = database.begin_transaction().unwrap();
+                    stale
+                        .put(b"shared".to_vec(), b"must-not-publish".to_vec())
+                        .unwrap();
+                    let mut winner = database.begin_transaction().unwrap();
+                    if tombstone {
+                        winner.delete(b"shared".to_vec()).unwrap();
+                    } else {
+                        winner.put(b"shared".to_vec(), vec![9; 64 * 1024]).unwrap();
+                    }
+                    database
+                        .commit_transaction(winner, Durability::Authoritative)
+                        .unwrap();
+                    if immutable_winner {
+                        database.flush_memtable(2).unwrap();
+                    }
+                    let snapshot = database.snapshot();
+                    let before = database.page_cache_stats();
+                    assert!(
+                        matches!(database.commit_transaction(stale, Durability::Authoritative),
+                        Err(Error::TransactionConflict { conflicting_sequence, .. }) if conflicting_sequence == snapshot.sequence)
+                    );
+                    let after = database.page_cache_stats();
+                    let loads = after.loads - before.loads;
+                    let bytes = after.bytes_read - before.bytes_read;
+                    println!("conflict_probe mode={mode:?} compression={compression:?} immutable={immutable_winner} tombstone={tombstone} loads={loads} bytes={bytes}");
+                    assert_eq!(loads, if immutable_winner {6} else {0},
+                        "conflict detection must not fetch value columns or shadowed immutable history");
+                    assert!(bytes < 1024, "version-only probe read payload bytes");
+                    assert_eq!(database.snapshot(), snapshot);
+                    assert_eq!(database.transaction_ownership().unwrap(), (0, 0));
+                    let expected = if tombstone {
+                        None
+                    } else {
+                        Some(vec![9; 64 * 1024])
+                    };
+                    assert_eq!(database.get(b"shared", snapshot).unwrap(), expected);
+                    let mut retry = database.begin_transaction().unwrap();
+                    retry
+                        .put(b"shared".to_vec(), b"accepted-retry".to_vec())
+                        .unwrap();
+                    database
+                        .commit_transaction(retry, Durability::Authoritative)
+                        .unwrap();
+                    drop(database);
+                    let reopened = Database::open_with_options(&root, options).unwrap();
+                    assert_eq!(
+                        reopened.get(b"shared", reopened.snapshot()).unwrap(),
+                        Some(b"accepted-retry".to_vec())
+                    );
+                }
+            }
+        }
+    }
+}

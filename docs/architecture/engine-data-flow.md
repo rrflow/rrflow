@@ -879,6 +879,68 @@ raw histogram. Open-loop scheduling or coordinated-omission correction is
 required when a closed-loop driver could hide stalls. Comparative claims use
 identical correctness/quality requirements and retain failed samples.
 
+### Project evidence, model usage and reasoning efficiency
+
+This is the H-05/G-06/J-04 target contract, not a claim that the complete
+accounting or Connectome view is implemented. A useful mature-project result
+uses current authorized code, relationships and evidence to reduce repeated
+exploration, then invokes an admitted model only for the remaining work.
+The same `RrdEngine` transaction/read-stamp boundary owns that flow. Neither
+a knowledge path nor the UI becomes a second reasoning or storage authority.
+
+| Work class | Required observation | Interpretation |
+|---|---|---|
+| Local deterministic work | Selected/skipped seed, graph, lexical, vector and query stages; source/read/configuration identity; keys/pages/bytes, candidates, graph steps, returned evidence, truncation, CPU and elapsed time | This work has no generated model tokens. Count inspected and selected evidence, not invented local reasoning tokens. |
+| Local model work | Model/runtime/tokenizer identity and input, output, reported reasoning, cache-read and cache-write token counts; elapsed/device/host resources | Keep local model use distinct from local database work. Label tokenizer estimates separately from backend-reported usage. Unavailable counts remain unavailable. |
+| Remote model work | Provider/model/version, attempt/outcome identity, reported input/output/reasoning/cache usage and cost provenance | Account for retries, cancelled/late/uncertain work and failed attempts. Provider-reported reasoning usage is a count, not permission to collect private reasoning text. |
+| Web and external tools | Authorized tool/source identity, calls, fetched/selected bytes, freshness, latency and available tool charges | Web retrieval is not a token category. Its content can subsequently consume model input tokens; avoid counting the same content twice in totals. |
+| Evidence quality | Source revisions/digests, citation support, contradiction/staleness and permission failures, task success/abstention, independent evaluation version | Selected context volume is not proof of correct reasoning. Keep reused evidence traceable and invalidate it when its source or authorization changes. |
+
+H-05 must project this through the existing executable signal catalogue and
+public contracts, with bounded dimensions and controlled per-request drilldown.
+Raw prompts, code, credentials, project paths and request IDs are not metric
+labels. Missing usage is not zero. Cache and reasoning counts are subsets of
+the applicable input/output totals; provider adapters normalize the raw
+provider-specific definition once. Never add those subsets again to a total.
+Pin the implemented OpenTelemetry convention revision: the
+[GenAI registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/)
+now delegates to the [GenAI conventions repository](https://github.com/open-telemetry/semantic-conventions-genai).
+Do not silently change signal meaning when that upstream vocabulary changes.
+
+The per-project Connectome summary should show evidence/source coverage,
+local model usage, remote model usage, web/tool work, elapsed time and declared
+cost, with simple explanations and an advanced causal drilldown under the
+existing project/session routes. Readback/verification, scheduler waiting,
+model execution and storage/maintenance interference stay separate. Concurrent
+stage totals are not end-to-end elapsed time. Explain estimates and unavailable
+measurements in the UI; a subscription's marginal charge can be unknown even
+when its token use is reported. Any allocated subscription cost needs its
+period/allocation rule; API-price estimates need model, currency and price
+revision. Neither is an actual invoice without provider billing evidence.
+
+G-06 must run the same versioned tasks against: a declared baseline, current
+local evidence plus frontier synthesis, and an admitted local-model-assisted
+arm where available. J-04 accepts token/cost savings only at matched task
+quality, permissions and source freshness. Keep the questions, expected
+outcomes, model/configuration, cold/warm state and budgets fixed; report per
+attempt and distributional results, failures and sample size. Include ingestion,
+embedding/derivation, updates and cache invalidation in amortized costs.
+For positive baseline remote usage, remote-token reduction is
+`1 - candidate_remote_tokens / baseline_remote_tokens`; zero or unavailable
+baselines make that ratio unavailable. It is not a percentage of hidden thought
+performed locally. No fixed saving or competitor advantage is promised.
+
+Research decisions (reviewed 2026-10-24):
+[Adaptive-RAG, NAACL 2024](https://aclanthology.org/2024.naacl-long.389/)
+supports evaluating different retrieval effort for different question
+complexities. The [VikingRAG September 2026 preprint](https://arxiv.org/abs/2609.11390)
+proposes reusable retrieval traces and evidence-driven escalation. Its reported
+savings are not RRFlow evidence. Evaluate those ideas as bounded, versioned
+policy experiments after the existing storage/retrieval prerequisites, with
+freshness, revocation, poisoned evidence and quality-regression tests. Reuse
+existing context/provenance/cache boundaries; do not import another engine or
+activate experimental behavior by default.
+
 ### Signal-to-action acceptance
 
 The [scale design rationale](engine-scale-and-contracts.md) supports this
