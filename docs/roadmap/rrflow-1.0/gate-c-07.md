@@ -13,6 +13,12 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [retained descriptor-exhaustion result](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
+shows that encoder candidate `9957ed39` reached 77,945 acknowledged records,
+then exhausted native file handles. The installed verifier passes on the
+retained estate; corpus/soak qualification remains failed. Bound segment-handle
+ownership at the existing I/O boundary before a new full qualification attempt.
+
 The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
 preserves PR127/128 and records a further macOS failure: the selected WAL
 pause was reached, filler returned ENOSPC, but the required native error did

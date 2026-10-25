@@ -6,6 +6,12 @@
 
 ## Observed deficiency
 
+The [encoder candidate's native descriptor failure](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
+reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
+soft limit. Read-only installed verification passes, but full corpus readback
+and soak qualification did not complete. Bounded segment-handle ownership is
+required; the retained failed estate and its original identities remain evidence.
+
 The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
 preserves PR127/128 and records a further macOS failure: the selected WAL
 pause was reached, filler returned ENOSPC, but the required native error did
