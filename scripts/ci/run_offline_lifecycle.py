@@ -35,6 +35,12 @@ def require(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def lifecycle_timeouts() -> tuple[int, int]:
+    """Accepted harness and isolation-wrapper ceilings, including cleanup headroom."""
+    harness = 540
+    return harness, harness + 60
+
+
 def artifact_paths(output: str) -> tuple[Path, Path]:
     binaries: set[Path] = set()
     tests: set[Path] = set()
@@ -404,8 +410,9 @@ def qualify_payload(stage: Path, configuration: dict) -> None:
             "partial_progress": partial_lifecycle_progress(result)}, indent=2), encoding="utf-8")
     # The two independent project fixtures may run together; serial execution
     # duplicates their full restore/verification latency inside one deadline.
+    harness_timeout, _ = lifecycle_timeouts()
     result = run(str(harness), "--nocapture", "--test-threads=2", cwd=stage,
-                 env=environment, timeout=540, check=False, on_completion=retain_partial)
+                 env=environment, timeout=harness_timeout, check=False, on_completion=retain_partial)
     observed = re.findall(r"(?m)^test (\w+) \.\.\. (ok|FAILED|ignored[^\n]*)$", result.stdout)
     outcomes = [{"case": name, "status": status.split()[0]} for name, status in observed if name in REQUIRED_CASES]
     (stage / "receipt.json").write_text(json.dumps({"schema_version": 1, "status": "failed",
@@ -559,21 +566,22 @@ def main() -> None:
                          "filesystem": filesystem_profile(stage),
                          "sha256": source_hashes}
         (stage / "isolation.json").write_text(json.dumps(configuration), encoding="utf-8")
+        _, wrapper_timeout = lifecycle_timeouts()
         try:
             if sys.platform == "linux":
                 # Privileged timeout owns the namespace initializer, whose exit
                 # reaps every descendant, even if the unprivileged wrapper fails.
-                result = run("sudo", "-n", "/usr/bin/timeout", "--signal=TERM", "--kill-after=10s", "600s",
+                result = run("sudo", "-n", "/usr/bin/timeout", "--signal=TERM", "--kill-after=10s", f"{wrapper_timeout}s",
                              "/usr/bin/unshare", "--mount", "--net", "--pid", "--fork", "--kill-child=KILL",
                              "--mount-proc", "--propagation", "private", "/usr/bin/python3", str(stage / "runner.py"),
-                             "--inside", str(stage), cwd=stage, timeout=630)
+                             "--inside", str(stage), cwd=stage, timeout=wrapper_timeout + 30)
             elif sys.platform == "darwin":
                 profile = stage / "qualification.sb"
                 profile.write_text(macos_profile(len(masks)), encoding="utf-8")
                 parameters = [item for index, path in enumerate(masks) for item in ["-D", f"MASK{index}={path}"]]
                 result = run("/usr/bin/sandbox-exec", *parameters, "-f", str(profile), sys.executable,
                              str(stage / "runner.py"), "--mac-inside", str(stage), cwd=stage,
-                             timeout=600, process_group=True)
+                             timeout=wrapper_timeout, process_group=True)
             else:
                 from windows_offline import run_isolated
                 run_isolated(stage, masks)

@@ -17,6 +17,7 @@ fn api_fixture() -> (Value, Value, Value) {
                 "Test exact installed domain boundaries and compound recovery",
                 "Qualify installed native capacity failure and recovery",
                 "Test installed publication and reclamation with compound recovery",
+                "Require repeated APFS exhaustion and recovery",
                 "Require both complete installed publication receipts",
             ],
         );
@@ -73,6 +74,39 @@ fn raw_ci_requires_exact_tested_merge_and_every_native_step() {
         );
     }
 }
+#[test]
+fn native_apfs_repetitions_cannot_be_missing_or_skipped() {
+    const STEP: &str = "Require repeated APFS exhaustion and recovery";
+    for omit in [false, true] {
+        let (run, mut jobs, commit) = api_fixture();
+        let mac = jobs
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|job| job["name"] == "pipeline / installed domain crash (macos-latest)")
+            .unwrap();
+        let steps = mac["steps"].as_array_mut().unwrap();
+        if omit {
+            steps.retain(|step| step["name"] != STEP);
+        } else {
+            steps.iter_mut().find(|step| step["name"] == STEP).unwrap()["conclusion"] =
+                json!("skipped");
+        }
+        assert!(receipt(&run, &jobs, &commit).is_err());
+    }
+    let (run, mut jobs, commit) = api_fixture();
+    for job in jobs.as_array_mut().unwrap() {
+        if job["name"] != "pipeline / installed domain crash (macos-latest)" {
+            for step in job["steps"].as_array_mut().unwrap() {
+                if step["name"] == STEP {
+                    step["conclusion"] = json!("skipped");
+                }
+            }
+        }
+    }
+    receipt(&run, &jobs, &commit).unwrap();
+}
+
 fn acceptance_fixture(root: &Path) -> StorageAcceptanceManifest {
     let (run, jobs, commit) = api_fixture();
     let ci = receipt(&run, &jobs, &commit).unwrap();

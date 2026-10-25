@@ -13,6 +13,30 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [retained descriptor-exhaustion result](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
+shows that encoder candidate `9957ed39` reached 77,945 acknowledged records,
+then exhausted native file handles. The installed verifier passes on the
+retained estate; corpus/soak qualification remains failed. Bound segment-handle
+ownership at the existing I/O boundary before a new full qualification attempt.
+
+The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
+preserves PR127/128 and records a further macOS failure: the selected WAL
+pause was reached, filler returned ENOSPC, but the required native error did
+not arrive and the API reported resource exhaustion. Bounded physical-file
+and synthetic-request diagnostics plus repeated fresh/existing APFS cases
+address missing attribution. This is not yet a causal repair or acceptance;
+original deadlines, caps, native-error and recovery oracles remain required.
+
+The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-encoder-working-set.md)
+records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
+CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
+records on the 30-second write deadline. No failed compaction or OOM was
+reported, the private estate was retained, and continuation refused soak.
+Native profiling on a separate copy led to incremental row-group encoding and
+buffer reuse in PR128. Exact-byte and component checks do not establish repair
+of that installed timeout. Full growth/profile and actual 24-hour acceptance
+remain open; no deadline or resource cap is relaxed.
+
 The [final growth candidate record](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md)
 retains the integrated Desktop preflight's failure at 55,047 acknowledged
 records and the separate installation-lease CI failure. Lazy compaction shadow

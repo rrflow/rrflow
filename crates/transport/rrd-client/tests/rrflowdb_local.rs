@@ -224,9 +224,15 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
         initial_schema.revision + 1
     );
     installed_schema.read_evidence.validate().unwrap();
-    let joined = database::relationships(&client, &session, created_at, "db-join")
-        .await
-        .unwrap();
+    let joined = database::relationships(
+        &client,
+        &session,
+        created_at,
+        installed_schema.known_at_cursor,
+        "db-join",
+    )
+    .await
+    .unwrap();
     assert_eq!(joined.rows.len(), 1);
     assert_eq!(
         joined.rows[0].values["right.to_id"],
@@ -239,6 +245,38 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
         before.rows[0].values["status"],
         QueryValue::String("open".into())
     );
+    let scope = format!("instance:{}", client.instance_id());
+    let initial_view = database::read_view(&client, &session, created_at, "db-view")
+        .await
+        .unwrap();
+    initial_view.verify(&scope, "open").unwrap();
+    assert!(initial_view.verify(&scope, "done").is_err());
+    assert!(initial_view.verify("instance:foreign", "open").is_err());
+    for fault in 0..8 {
+        let mut invalid = initial_view.clone();
+        match fault {
+            0 => invalid.tasks.execution.truncated = true,
+            1 => invalid.relationships.known_at_cursor += 1,
+            2 => invalid.relationships.schema_revision += 1,
+            3 => invalid.tasks.rows.clear(),
+            4 => invalid
+                .relationships
+                .rows
+                .push(invalid.relationships.rows[0].clone()),
+            5 => {
+                invalid.relationships.rows[0].values.insert(
+                    "right.to_id".into(),
+                    QueryValue::String("another-task".into()),
+                );
+            }
+            6 => invalid.relationships.execution.truncated = true,
+            _ => invalid.tasks.execution.returned_rows += 1,
+        }
+        assert!(
+            invalid.verify(&scope, "open").is_err(),
+            "accepted fault {fault}"
+        );
+    }
 
     // A second init must not overwrite schema or application data.
     assert!(
@@ -276,6 +314,11 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
         .unwrap();
     assert_eq!(unchanged.rows, before.rows);
     assert_eq!(unchanged.known_at_cursor, before.known_at_cursor);
+    database::read_view(&client, &session, rejected_at, "db-invalid-view")
+        .await
+        .unwrap()
+        .verify(&scope, "open")
+        .unwrap();
 
     // Required typed fields cannot silently accept another type.
     let mut invalid = database::task_record("bad type", "done", rejected_at);
@@ -316,6 +359,11 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
     .is_err());
 
     let updated_at = created_at + 2;
+    database::read_view(&client, &session, updated_at, "db-cancel-view")
+        .await
+        .unwrap()
+        .verify(&scope, "open")
+        .unwrap();
     let stale = database::begin(&client, &session, "db-stale-begin")
         .await
         .unwrap();
@@ -369,6 +417,33 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
         updated.rows[0].values["status"],
         QueryValue::String("done".into())
     );
+    let updated_view = database::read_view(&client, &session, updated_at, "db-updated-view")
+        .await
+        .unwrap();
+    updated_view.verify(&scope, "done").unwrap();
+    assert!(updated_view.verify(&scope, "open").is_err());
+    assert!(updated_view.tasks.known_at_cursor > before.known_at_cursor);
+    // A commit between the two queries must not mix HEAD with the captured view.
+    let earlier_join = database::relationships(
+        &client,
+        &session,
+        created_at,
+        before.known_at_cursor,
+        "db-earlier-join",
+    )
+    .await
+    .unwrap();
+    let earlier_view = database::DatabaseView {
+        tasks: before.clone(),
+        relationships: earlier_join,
+    };
+    earlier_view.verify(&scope, "open").unwrap();
+    assert_eq!(earlier_view.relationships.rows, joined.rows);
+    let mixed = database::DatabaseView {
+        tasks: before.clone(),
+        relationships: updated_view.relationships,
+    };
+    assert!(mixed.verify(&scope, "open").is_err());
     assert_eq!(
         database::tasks(&client, &session, created_at, "db-history")
             .await
@@ -407,12 +482,23 @@ async fn installed_native_database_relations_atomicity_temporal_reads_and_reopen
     assert_eq!(durable.known_at_cursor, updated.known_at_cursor);
     assert_eq!(durable.schema_revision, updated.schema_revision);
     assert_eq!(
-        database::relationships(&reopened, &session, updated_at, "db-reopened-join")
-            .await
-            .unwrap()
-            .rows,
+        database::relationships(
+            &reopened,
+            &session,
+            updated_at,
+            durable.known_at_cursor,
+            "db-reopened-join"
+        )
+        .await
+        .unwrap()
+        .rows,
         joined.rows
     );
+    database::read_view(&reopened, &session, updated_at, "db-reopened-view")
+        .await
+        .unwrap()
+        .verify(&scope, "done")
+        .unwrap();
     assert_eq!(
         schema(&reopened, &session, "db-reopened-schema")
             .await

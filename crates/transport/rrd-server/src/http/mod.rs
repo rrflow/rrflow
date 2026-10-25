@@ -13,11 +13,12 @@ use rrd_contract::{
     CorrelationId, CreateInstanceBackup, CreateSession, DeploymentForm, DeploymentProfile,
     EndpointPresentation, EnsureQueryIndex, EnsureVectorCollection, ErrorBody, ErrorCode,
     ExecuteQuery, ExportAudit, FollowChangefeed, HttpMethod as ContractHttpMethod,
-    ListInstanceBackups, ListQueryIndexes, ListVectorCollections, Liveness, OpenSubscription,
-    PollLiveQuery, PreviewTransaction, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot,
-    ReadEstate, Readiness, RenewSession, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
-    ResponseEnvelope, ResponseOutcome, RestoreInstanceBackup, RetrieveVectorPoints,
-    ScrollVectorPoints, SearchVectors, ServiceCapabilities, PROTOCOL, PROTOCOL_VERSION,
+    ListInstanceBackups, ListKnowledgeTrees, ListQueryIndexes, ListVectorCollections, Liveness,
+    OpenSubscription, PollLiveQuery, PreviewTransaction, ReadAudit, ReadChangefeed,
+    ReadDiagnosticSnapshot, ReadEstate, Readiness, RenewSession, ReplaceKnowledgeTrees,
+    RequestContext, RequestEnvelope, ResourceId, ResourceKind, ResponseEnvelope, ResponseOutcome,
+    RestoreInstanceBackup, RetrieveVectorPoints, ScrollVectorPoints, SearchVectors,
+    ServiceCapabilities, PROTOCOL, PROTOCOL_VERSION,
 };
 use rrd_engine::{
     product_capability_catalogue, AuthorizedInvocation, Invocation, InvocationCompletion,

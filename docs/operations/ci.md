@@ -381,6 +381,13 @@ checksum, or image digest diverges from `rust-toolchain.toml` or
 lifecycle command. Build steps are POSIX `sh` because Podman's default OCI
 image format ignores `SHELL`.
 
+CI and the container track the latest stable release of every toolchain,
+using the long-term-support line where a project publishes one (Node.js 24,
+Java 25, .NET 10) and the Ubuntu release that GitHub's `ubuntu-latest` runner
+uses (24.04). A toolchain upgrade changes `.github/workflows/ci-reusable.yml`,
+`rust-toolchain.toml` where applicable, and the Containerfile in the same pull
+request; the parity check rejects one without the other.
+
 Keep the source on a Linux filesystem; a Windows bind mount is slow and
 reintroduces executable-bit and line-ending drift. Two entry points share the
 `rrflow-cache` volume (Cargo registry, target directory, and language caches):
@@ -399,8 +406,10 @@ podman compose -f .devcontainer/compose.yaml run --rm workspace
 ```
 
 The seed script clones committed history from the read-only `/seed` mount of
-the invoking checkout into the `rrflow-src` volume and restores its remote
-names, URLs, and upstream. It copies no credentials, hooks, local Git
+the invoking checkout into the `rrflow-src` volume, restores its remote names,
+URLs, and upstream, and then initializes every declared submodule (such as
+`connectome`) at its pinned gitlink revision, matching a recursive CI checkout.
+It copies no credentials, hooks, local Git
 configuration, or uncommitted files, and it refuses a non-empty volume. Set
 `RRFLOW_DEV_TARGET=full` to build and enter the SDK image.
 
@@ -682,26 +691,50 @@ must remain GitHub-hosted.
 
 ## Repository enforcement
 
-Public visibility exposes this control on the current hosting tier. Protect
-`main` with these invariants:
+Public visibility exposes this control on the current hosting tier. `main`
+is protected with these invariants:
 
 - pull requests and the stable `pipeline / ci-gate` check are required;
-- merge queue or an up-to-date branch is required;
+- the merge queue is required;
 - force pushes and deletion are denied; and
-- Actions must require immutable full-SHA references.
+- Actions must require immutable full-SHA references (enforced in this
+  checkout by `scripts/ci/check_workflow.py`; the hosted repository setting is
+  still open, see below).
 
 This is an external control and needs external evidence. On 2026-09-11,
 read-only GitHub API requests for both repository rulesets and `main` branch
 protection on the then-private `rrflow/rrflow-development` returned HTTP 403
-with the message that GitHub Pro or public visibility is required. The
-repository owner confirmed public visibility on 2026-10-16, so rulesets are
-available; no ruleset is recorded here yet. Therefore the checkout does
-**not** currently claim that `pipeline / ci-gate`, pull requests, reviews,
-deletion denial, or force-push denial is enforced. Do not compensate with a
-local hook or push to the official promotion repository. Create the `main`
-ruleset, then record the exact repository, rule identity, required check name,
-protected ref, API response, and verification attempt in this record and one
-linked package journal.
+with the message that GitHub Pro or public visibility is required. After the
+repository became public, ruleset `25439032` ("main: pull requests with passing
+candidate CI") was created on 2026-10-19 and is `active` on the default branch
+`main`:
+
+| Rule | Configuration |
+|---|---|
+| `pull_request` | required; 0 approving reviews (a sole maintainer cannot approve their own pull request); stale approvals dismissed; review threads must be resolved; merge, squash, and rebase allowed |
+| `required_status_checks` | `pipeline / ci-gate` from GitHub Actions (integration `15368`); since 2026-10-24 the branch need not be up to date, because the merge queue tests the merged result |
+| `merge_queue` | added 2026-10-24; merge commits; a queued group merges only when all its entries pass (`ALLGREEN`); up to 5 entries are built and merged at once; at least 1 entry, with a 5-minute wait; 180-minute check timeout, above the observed 64–92-minute candidate runs |
+| `non_fast_forward` | force pushes denied |
+| `deletion` | branch deletion denied |
+| bypass | repository administrators, `pull_request` mode only: an administrator may override a rule while merging a pull request, but cannot push directly to `main` |
+
+`GET /repos/rrflow/rrflow-development/rules/branches/main` reports all five
+rules from that ruleset, and the GraphQL `mergeQueue(branch: "main")` query
+returns the active queue with that configuration. A merge-queue candidate runs
+the same caller through its `merge_group` trigger on a
+`gh-readonly-queue/main/...` ref, which has its own concurrency group, and
+reports the same `pipeline / ci-gate` check. A direct push of an empty probe commit to `main` with
+administrator credentials was rejected with "Changes must be made through a
+pull request" and "Required status check `pipeline / ci-gate` is expected",
+and `main` was unchanged. Switching the bypass to `always` is one ruleset
+update, but it would also let any tool holding administrator credentials push
+directly to `main`.
+
+The repository-level Actions setting that requires full-SHA action references
+(`sha_pinning_required`) is still `false`. Every workflow already pins full
+SHAs and `scripts/ci/check_workflow.py` enforces that in this checkout; enabling
+the hosted setting remains open. Do not compensate with a local hook or push to
+the official promotion repository.
 
 The repository CI-policy check rejects candidate trigger duplication, unsafe
 fork routing, unpinned actions, service or runner images, persisted checkout
@@ -711,3 +744,8 @@ reduction, or a runner layout which exceeds the documented host allocation.
 The Rust workspace architecture test remains focused on engine ownership,
 dependency direction, and storage-opening authority rather than GitHub Actions
 implementation details.
+
+The macOS installed-crash lane additionally runs three planned fresh/existing
+WAL capacity pairs, each on a newly owned APFS image. These regress the
+intermittent selected-WAL error gap; the first failure stops the run. They do
+not replace the full native capacity matrix or permit retry-until-green.

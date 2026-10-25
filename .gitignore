@@ -1,6 +1,7 @@
 # Build artifacts (workspace also builds into CARGO_TARGET_DIR when set)
 /target
 **/node_modules/
+**/.pnpm-store/
 **/.venv/
 **/__pycache__/
 **/.pytest_cache/
