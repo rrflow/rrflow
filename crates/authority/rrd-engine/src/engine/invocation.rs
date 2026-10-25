@@ -18,6 +18,7 @@ pub enum RrdOperation {
     TransactionAbort,
     EstateRead,
     EstateAdmin,
+    EndpointConfigurationPreview,
     QueryExecute,
     QueryLivePoll,
     QueryIndexEnsure,
@@ -54,6 +55,8 @@ pub enum RrdOperation {
     MemoryContextRead,
     ReasoningRead,
     ReasoningWrite,
+    KnowledgeTreeRead,
+    KnowledgeTreeWrite,
 }
 
 impl RrdOperation {
@@ -83,6 +86,7 @@ impl RrdOperation {
                 | Self::FlightLaunch
                 | Self::TaskWrite
                 | Self::ReasoningWrite
+                | Self::KnowledgeTreeWrite
         )
     }
 
@@ -98,7 +102,7 @@ impl RrdOperation {
             Self::TransactionCommit => SecurityAction::TransactionCommit,
             Self::TransactionAbort => SecurityAction::TransactionAbort,
             Self::EstateRead => SecurityAction::EstateRead,
-            Self::EstateAdmin => SecurityAction::EstateAdmin,
+            Self::EstateAdmin | Self::EndpointConfigurationPreview => SecurityAction::EstateAdmin,
             Self::QueryExecute => SecurityAction::QueryExecute,
             Self::QueryLivePoll => SecurityAction::QueryLivePoll,
             Self::QueryIndexEnsure => SecurityAction::QueryIndexEnsure,
@@ -135,6 +139,8 @@ impl RrdOperation {
             Self::MemoryContextRead => SecurityAction::MemoryContextRead,
             Self::ReasoningRead => SecurityAction::ReasoningRead,
             Self::ReasoningWrite => SecurityAction::ReasoningWrite,
+            Self::KnowledgeTreeRead => SecurityAction::KnowledgeTreeRead,
+            Self::KnowledgeTreeWrite => SecurityAction::KnowledgeTreeWrite,
         }
     }
 }

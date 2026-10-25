@@ -86,7 +86,46 @@ resume. Connectome must not advertise those controls as operational while
 the capability is unavailable. This remains an implementation deficiency;
 the clarification does not close this item.
 
+[PR 102](https://github.com/rrflow/rrflow-development/pull/102) adds durable
+task-associated budget admission to an explicit embedded embedding operation.
+It preserves the original allowance across reconnect/reopen, reserves attempts
+atomically and denies automatic repetition of uncertain work. This does not
+close the missing governed runner: ordinary standalone embeddings still have
+only per-call limits, and routed/context/fallback work, installed crash proof,
+full output replay, reconciliation, extensions and UI remain unimplemented or
+unqualified. See the
+[implementation and evidence](../../evidence/change-journals/gate-g/g-02a-task-budget.md).
+
 ## Owning gates
+
+Repeated-work capacity qualification exposed an existing FeatureHash adapter
+deficiency: signed token contributions can cancel to a zero vector, and its
+normalization divided by zero. The shared output validator rejected the
+non-finite result before acceptance.
+[PR105](https://github.com/rrflow/rrflow-development/pull/105) now rejects the
+degenerate norm in the adapter itself; its direct/batch/controlled regression
+and recovery check are recorded in the
+[G-01a repair evidence](../../evidence/change-journals/gate-g/g-01a-featurehash-zero-norm.md).
+Candidate CI and broader G-01a qualification remain required. This correction
+is separate from repetition admission; its bounded-history fixture uses
+single-token, nonzero vectors.
+
+[PR104](https://github.com/rrflow/rrflow-development/pull/104) adds optional
+immutable repeated-embedding limits to the same task budget, with bounded
+history and durable denial across cycles/reconnect/reopen. Its
+[evidence](../../evidence/change-journals/gate-g/g-03-task-repetition.md)
+does not qualify general semantic no-progress control or the missing governed
+router/context/fallback runner. POAM-009 remains open.
+
+[PR103](https://github.com/rrflow/rrflow-development/pull/103) exposes the same
+task embedding budget through the public catalogue, HTTP and Rust client, with
+explicit reference-adapter activation, narrowed immutable limits, durable Stop
+and bounded output replay. The [linked evidence](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md)
+separates the real socket/reopen flow from installed qualification. This
+addresses that flow's missing public controls and replay; it does not close
+the governed router/context/fallback runner, semantic no-progress control,
+Connectome wiring, real LLM accounting or installed resource qualification.
+POAM-009 remains open.
 
 D-05, G-01 through G-06; I-03/I-07 for governed improvement
 
@@ -94,7 +133,28 @@ Roadmap owners: [Gate D](../../roadmap/rrflow-1.0/gate-d.md),
 [Gate G](../../roadmap/rrflow-1.0/gate-g.md), and
 [Gate I](../../roadmap/rrflow-1.0/gate-i.md).
 
+Installed resource qualification depends on
+[Gate C](../../roadmap/rrflow-1.0/gate-c.md); public effort controls cannot
+replace its crash, capacity or sustained-load evidence.
+Vector validation and client-flow qualification remain dependencies under
+[Gate F](../../roadmap/rrflow-1.0/gate-f.md) and
+[Gate H](../../roadmap/rrflow-1.0/gate-h.md).
+
 ## Closure evidence
+
+[PR 100](https://github.com/rrflow/rrflow-development/pull/100) adds a configured
+deadline to the existing embedding execution path. Late output is rejected and
+the admitted worker keeps its slot until actual return. This addresses caller
+waiting, not forced adapter cancellation or aggregate reasoning-run budgets.
+The [budget-control sequence](../../roadmap/rrflow-1.0/gate-g.md#budget-control-delivery-sequence)
+binds those remaining requirements to code owners and falsifying histories.
+POAM-009 remains open; controlled adapter tests do not qualify a real router.
+
+[PR 101](https://github.com/rrflow/rrflow-development/pull/101) propagates a
+sticky embedded cancellation signal into existing execution and FeatureHash
+checkpoints. A non-cooperative adapter retains admission until actual return.
+This is process-local cancellation only; the durable run/receipt and public
+Stop capability remain open.
 
 Invalid-output and identity-denial corpora, same-stamp principal/representation/seat/policy
 route packets, attributed CAS/reopen tests, and separated model/storage measurements pass.

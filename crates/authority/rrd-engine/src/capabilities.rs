@@ -13,9 +13,13 @@ pub fn product_capability_catalogue() -> ProductCapabilityCatalogue {
         .into_iter()
         .map(|endpoint| {
             let id = endpoint.operation.as_str().to_owned();
-            let engine_binding = match endpoint.action {
-                EndpointAction::Fixed { action } => {
-                    format!("rrd-engine:RrdOperation::{action:?}")
+            let engine_binding = if id == "endpoint-configuration-preview" {
+                "rrd-engine:RrdOperation::EndpointConfigurationPreview".to_owned()
+            } else {
+                match endpoint.action {
+                    EndpointAction::Fixed { action } => {
+                        format!("rrd-engine:RrdOperation::{action:?}")
+                    }
                 }
             };
             ProductCapability {

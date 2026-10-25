@@ -1,9 +1,9 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee
+# OpenAPI SHA-256: a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07
 from typing import Final, Literal, TypedDict
 
 ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = (
-    "adbeb8ca05179cc6551d31f6a0ba8dd959a29f8b468d870fc5b651bc3ce370ee"
+    "a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07"
 )
 
 OperationId = Literal[
@@ -19,13 +19,19 @@ OperationId = Literal[
     "diagnostics-read",
     "diagnostics-storage-cursor",
     "diagnostics-storage-read",
+    "embedding-builtin-activate",
     "endpoint-catalogue",
+    "endpoint-configuration-apply",
+    "endpoint-configuration-preview",
+    "endpoint-configuration-read",
     "estate-read",
     "flight-launch",
     "flight-list",
     "flight-read",
     "health-live",
     "health-ready",
+    "knowledge-tree-list",
+    "knowledge-tree-replace",
     "openapi-read",
     "query-execute",
     "query-export",
@@ -38,7 +44,12 @@ OperationId = Literal[
     "session-renew",
     "subscription-close",
     "subscription-open",
+    "task-attempt-read",
+    "task-budget-configure",
+    "task-budget-read",
+    "task-budget-stop",
     "task-close",
+    "task-embedding-execute",
     "task-list",
     "task-open",
     "task-read",
@@ -134,11 +145,35 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": False,
         "path": "/v1/diagnostics/storage/read",
     },
+    "embedding-builtin-activate": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/embedding/builtin/activate",
+    },
     "endpoint-catalogue": {
         "authentication": "public",
         "method": "GET",
         "mutation": False,
         "path": "/v1/schema/endpoints",
+    },
+    "endpoint-configuration-apply": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/configuration/endpoints/apply",
+    },
+    "endpoint-configuration-preview": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/configuration/endpoints/preview",
+    },
+    "endpoint-configuration-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/configuration/endpoints/read",
     },
     "estate-read": {
         "authentication": "session_bearer",
@@ -175,6 +210,18 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "GET",
         "mutation": False,
         "path": "/v1/health/ready",
+    },
+    "knowledge-tree-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/knowledge/trees/list",
+    },
+    "knowledge-tree-replace": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/knowledge/trees/replace",
     },
     "openapi-read": {
         "authentication": "public",
@@ -248,11 +295,41 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": True,
         "path": "/v1/subscriptions/open",
     },
+    "task-attempt-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/attempt/read",
+    },
+    "task-budget-configure": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/budget/configure",
+    },
+    "task-budget-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/budget/read",
+    },
+    "task-budget-stop": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/budget/stop",
+    },
     "task-close": {
         "authentication": "session_bearer",
         "method": "POST",
         "mutation": True,
         "path": "/v1/tasks/close",
+    },
+    "task-embedding-execute": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/embedding/execute",
     },
     "task-list": {
         "authentication": "session_bearer",
