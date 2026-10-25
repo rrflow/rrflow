@@ -6,6 +6,21 @@
 
 ## Observed deficiency
 
+The [joint APFS pressure correction](../../evidence/change-journals/gate-c/c-07f-apfs-joint-pressure.md)
+retains run 40162479866: 29 native cases passed before an existing segment
+case failed to produce the selected native error. One metadata pass and final
+data drain did not establish exhaustion. The fixture now requires a complete
+round with no added data or metadata entries under the same original limits.
+Native qualification remains pending; prior successes do not clear this failure.
+
+The [APFS WAL metadata-pressure correction](../../evidence/change-journals/gate-c/c-07f-apfs-wal-pressure.md)
+records PR113 run 40161414466: a data-only ENOSPC did not prevent the selected
+WAL append, and the later disk-admission rejection left the native-event
+oracle unsatisfied. APFS WAL now uses the same bounded metadata pressure as
+publication cases, followed by a final shared-budget data drain. The native
+failure and all earlier results remain retained; exact-candidate qualification
+is still required and this deficiency remains open.
+
 The [bounded APFS metadata-payload correction](../../evidence/change-journals/gate-c/c-07f-apfs-metadata-payload.md)
 records PR129 run 40159526278 passing six macOS cases before the existing
 manifest case exhausted the 8192-entry cap. Volume settlement alone is not
