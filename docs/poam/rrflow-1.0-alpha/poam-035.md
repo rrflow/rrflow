@@ -6,6 +6,16 @@
 
 ## Observed deficiency
 
+The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-encoder-working-set.md)
+records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
+CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
+records on the 30-second write deadline. No failed compaction or OOM was
+reported, the private estate was retained, and continuation refused soak.
+Native profiling on a separate copy led to incremental row-group encoding and
+buffer reuse in PR128. Exact-byte and component checks do not establish repair
+of that installed timeout. Full growth/profile and actual 24-hour acceptance
+remain open; no deadline or resource cap is relaxed.
+
 PR125 Ubuntu job `121000145879` also exposed a diagnostic subprocess fixture
 race: the child could exit before required stdin delivery, producing
 `BrokenPipe`. The [integrated repair journal](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md#observed-process-fixture-input-race)
