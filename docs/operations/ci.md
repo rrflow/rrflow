@@ -381,6 +381,13 @@ checksum, or image digest diverges from `rust-toolchain.toml` or
 lifecycle command. Build steps are POSIX `sh` because Podman's default OCI
 image format ignores `SHELL`.
 
+CI and the container track the latest stable release of every toolchain,
+using the long-term-support line where a project publishes one (Node.js 24,
+Java 25, .NET 10) and the Ubuntu release that GitHub's `ubuntu-latest` runner
+uses (24.04). A toolchain upgrade changes `.github/workflows/ci-reusable.yml`,
+`rust-toolchain.toml` where applicable, and the Containerfile in the same pull
+request; the parity check rejects one without the other.
+
 Keep the source on a Linux filesystem; a Windows bind mount is slow and
 reintroduces executable-bit and line-ending drift. Two entry points share the
 `rrflow-cache` volume (Cargo registry, target directory, and language caches):
@@ -399,8 +406,10 @@ podman compose -f .devcontainer/compose.yaml run --rm workspace
 ```
 
 The seed script clones committed history from the read-only `/seed` mount of
-the invoking checkout into the `rrflow-src` volume and restores its remote
-names, URLs, and upstream. It copies no credentials, hooks, local Git
+the invoking checkout into the `rrflow-src` volume, restores its remote names,
+URLs, and upstream, and then initializes every declared submodule (such as
+`connectome`) at its pinned gitlink revision, matching a recursive CI checkout.
+It copies no credentials, hooks, local Git
 configuration, or uncommitted files, and it refuses a non-empty volume. Set
 `RRFLOW_DEV_TARGET=full` to build and enter the SDK image.
 
