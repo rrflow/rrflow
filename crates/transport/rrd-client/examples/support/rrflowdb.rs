@@ -274,10 +274,11 @@ pub async fn relationships(
     client: &RrdClient,
     session: &Session,
     at: u64,
+    known: u64,
     key: &str,
 ) -> Result<QueryResult> {
     query(client, session, format!(
-        "FROM record:{PROJECT} JOIN relation:{OWNS} ON id = from_id AT VALID $at KNOWN HEAD WHERE left.slug = $project PROJECT left.name, right.to_id"
+        "FROM record:{PROJECT} JOIN relation:{OWNS} ON id = from_id AT VALID $at KNOWN {known} WHERE left.slug = $project PROJECT left.name, right.to_id"
     ), at, key).await
 }
 
@@ -295,4 +296,87 @@ pub async fn tasks(
         key,
     )
     .await
+}
+
+/// A bounded application view, not another engine snapshot or lifecycle authority.
+#[derive(Clone, serde::Serialize)]
+pub struct DatabaseView {
+    pub tasks: QueryResult,
+    pub relationships: QueryResult,
+}
+
+pub async fn read_view(
+    client: &RrdClient,
+    session: &Session,
+    at: u64,
+    key: &str,
+) -> Result<DatabaseView> {
+    let tasks = tasks(client, session, at, &format!("{key}-tasks")).await?;
+    let relationships = relationships(
+        client,
+        session,
+        at,
+        tasks.known_at_cursor,
+        &format!("{key}-join"),
+    )
+    .await?;
+    let view = DatabaseView {
+        tasks,
+        relationships,
+    };
+    view.validate(&format!("instance:{}", client.instance_id()))?;
+    Ok(view)
+}
+
+impl DatabaseView {
+    /// Never present partial or differently stamped queries as one complete view.
+    pub fn validate(&self, scope: &str) -> Result<()> {
+        for result in [&self.tasks, &self.relationships] {
+            result.execution.read_evidence.validate()?;
+            if result.scope != scope
+                || result.execution.truncated
+                || result.execution.returned_rows != result.rows.len() as u64
+            {
+                return Err("database view is incomplete or outside the requested scope".into());
+            }
+        }
+        if self.tasks.known_at_cursor != self.relationships.known_at_cursor
+            || self.tasks.schema_revision != self.relationships.schema_revision
+        {
+            return Err("database view has inconsistent read stamps".into());
+        }
+        Ok(())
+    }
+
+    /// The caller supplies the expected state independently of the returned rows.
+    pub fn verify(&self, scope: &str, expected_status: &str) -> Result<()> {
+        self.validate(scope)?;
+        let expected_task = BTreeMap::from([
+            ("id".into(), QueryValue::String("first-task".into())),
+            (
+                "title".into(),
+                QueryValue::String("Build with rrflowDB".into()),
+            ),
+            ("status".into(), QueryValue::String(expected_status.into())),
+        ]);
+        let expected_relationship = BTreeMap::from([
+            (
+                "left.name".into(),
+                QueryValue::String("Local AI project".into()),
+            ),
+            (
+                "right.to_id".into(),
+                QueryValue::String("first-task".into()),
+            ),
+        ]);
+        if self.tasks.rows.len() != 1 || self.tasks.rows[0].values != expected_task {
+            return Err("database task does not match the expected example state".into());
+        }
+        if self.relationships.rows.len() != 1
+            || self.relationships.rows[0].values != expected_relationship
+        {
+            return Err("database relationship does not match the expected example state".into());
+        }
+        Ok(())
+    }
 }

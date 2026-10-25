@@ -48,9 +48,9 @@ $project = Join-Path $env:TEMP ('rrflowdb-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $project | Out-Null
 $project
 $planFile = "$project-install-plan.json"
-$identity = & .\target\debug\rrflow.exe install identity | ConvertFrom-Json
+$identity = & .\target\debug\rrflow.exe install identity --json | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) { throw 'Installation identity generation failed' }
-$plan = & .\target\debug\rrflow.exe install plan --project $project --identity $identity.installation_identity --mode fresh
+$plan = & .\target\debug\rrflow.exe install plan --project $project --identity $identity.installation_identity --mode fresh --json
 if ($LASTEXITCODE -ne 0) { throw 'Installation planning failed' }
 $plan | Set-Content -LiteralPath $planFile -Encoding utf8NoBOM
 $preview = Get-Content -Raw $planFile | ConvertFrom-Json
@@ -66,9 +66,11 @@ same printed project path, then run:
 ```powershell
 .\target\debug\rrflow.exe ready --project $project --address 127.0.0.1:9477
 .\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 init
+.\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 verify open
 .\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 read
 .\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 update
 .\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 abort
+.\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 verify done
 .\target\debug\examples\rrflowdb.exe $project 127.0.0.1:9477 schema
 ```
 
@@ -79,7 +81,8 @@ a signed official release. Installed estates bind the executable digest:
 retain the binary used to install them; replacing it is not an automatic upgrade.
 
 Stop the service, run `rrflow verify --project <path> --level quick`, restart
-`serve`, and run the example's `read` again. The task remains `done`. The
+`serve`, and run the example's `verify done`. A nonzero exit is a failed
+readback, even if a previous step printed a success. The task remains `done`. The
 database lives under the engine-managed `.rrflow/rrd/` root selected by
 `.rrflow/config.toml`. Do not open that root with a second engine process.
 The example reads the installed locator and API credential locally without
@@ -150,6 +153,16 @@ authorized queries and transactions.
 `init` adds tables to the current catalogue and atomically creates the sample
 records/relationship. It refuses a second initialization. `update` commits a
 new temporal task version. `abort` opens and cancels an empty transaction.
+`read` captures the task query's committed cursor and uses that cursor for
+the project/relationship join at the same valid time. It rejects truncated
+results, row-count inconsistencies, foreign scope or differing cursor/schema
+stamps. `verify open|done` additionally checks the exact expected example task
+and its owning project relationship, independently of the returned values.
+Successful output retains both public query results and their read evidence,
+plus `verified_expected_status`; no credential is included. Running
+`verify open` after `update` must fail. The verifier is specific to this
+sample's one-task model, not a general health check for arbitrary user tables.
+
 Commit requests bind a payload digest, idempotency key and lease-bounded
 deadline. An unknown transport or storage outcome must be reconciled with its
 original identity; do not blindly retry a write with a new key.
@@ -157,7 +170,10 @@ original identity; do not blindly retry a write with a new key.
 The [real-server regression](../../../crates/transport/rrd-client/tests/rrflowdb_local.rs)
 tests schema preservation, parameterized joins, typed/unique rejection with
 no partial write, explicit abort, receipt replay, historical reads, scope and
-budget denial, closed-session denial, and disk reopen. Run it with:
+budget denial, closed-session denial, and disk reopen. It also checks an
+intervening commit between reads, rejects mixed snapshots and incomplete or
+unexpected sample data, and verifies initial/updated/aborted/reopened states.
+Run it with:
 
 ```text
 cargo test --locked -p rrd-client --test rrflowdb_local
