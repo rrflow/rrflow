@@ -975,3 +975,13 @@ point-read, backup scheduling, startup diagnostic and metadata-pressure repairs
 in one current-main landing PR. Its own complete candidate pipeline must pass;
 predecessor checks and short native characterizations cannot substitute.
 Full profile and actual 24-hour acceptance remain open.
+
+
+The [bounded allocation settlement package](../../evidence/change-journals/gate-c/c-07f-batched-allocation-settlement.md)
+records PR130's macOS candidate timeout before existing-project manifest
+creation: 693 metadata files, 260046848 data bytes and the shared 25-second
+limit. It batches disposable metadata settlement and separates periodic file
+barriers from final waited volume settlement, preserving all caps and the
+selected native-error/readback oracle. Local deterministic and installed crash
+checks pass; native APFS repetitions remain required. This fixture gap and the
+independent full-profile/actual 24-hour qualification remain open.
