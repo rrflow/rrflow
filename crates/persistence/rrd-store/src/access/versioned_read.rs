@@ -7,16 +7,18 @@
 //! change log is not a range source here; replay, changefeed, archive, and
 //! recovery keep their explicit paged-log APIs.
 
-use super::runtime_state::{read_accumulator_node, scan_space, validate_read_stamp, AccessRead};
+use super::runtime_state::{read_accumulator_node, validate_read_stamp, AccessRead};
+use crate::key_codec::{prefix_end, KeyCodec};
 use crate::keyspaces::{self, Space};
 use crate::{Error, Result};
 use rrd_core::{
-    Predicate, ReadStamp, RuntimeChange, RuntimeLogAccumulator, RuntimeLogicalModel,
+    Predicate, ReadStamp, RuntimeChange, RuntimeId, RuntimeLogAccumulator, RuntimeLogicalModel,
     RuntimeMutation, RuntimeReadValidation, RuntimeRef, RuntimeType,
 };
 use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
+use std::ops::Bound;
 
 pub const RUNTIME_VERSIONED_READ_CONTRACT_VERSION: u16 = 1;
 
@@ -109,6 +111,35 @@ pub enum RuntimeVersionedSource {
         model: RuntimeLogicalModel,
         reference: RuntimeRef,
     },
+    /// Complete histories for a lexical interval of IDs in one typed family.
+    /// Bounds select identities, never individual temporal versions. At least
+    /// one bound is required; use the family source for an unbounded scan.
+    IdentityRange {
+        model: RuntimeLogicalModel,
+        kind: RuntimeType,
+        lower: Bound<RuntimeId>,
+        upper: Bound<RuntimeId>,
+    },
+    /// Temporal adjacency history for one node and relation type: every
+    /// relation version that placed `node` at the `direction` endpoint, plus
+    /// every retirement of a relation while it did. The range selects the
+    /// relations incident to the node; each relation's identity history
+    /// remains authoritative for its state at a valid time.
+    Adjacency {
+        relation: RuntimeType,
+        node: RuntimeRef,
+        direction: RuntimeAdjacencyDirection,
+    },
+}
+
+/// Endpoint of a relation that an adjacency range is keyed by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeAdjacencyDirection {
+    /// Relations whose `from` endpoint is the node.
+    Outgoing,
+    /// Relations whose `to` endpoint is the node.
+    Incoming,
 }
 
 impl RuntimeVersionedSource {
@@ -137,7 +168,10 @@ impl RuntimeVersionedSource {
             Self::Series { .. } => Ok(RuntimeReadAccessPath::SeriesVersions),
             Self::Geo { .. } => Ok(RuntimeReadAccessPath::GeoVersions),
             Self::Objects { .. } => Ok(RuntimeReadAccessPath::ObjectVersions),
-            Self::Identity { model, .. } => access_path_for_model(*model),
+            Self::Identity { model, .. } | Self::IdentityRange { model, .. } => {
+                access_path_for_model(*model)
+            }
+            Self::Adjacency { .. } => Ok(RuntimeReadAccessPath::AdjacencyVersions),
         }
     }
 }
@@ -151,6 +185,7 @@ pub enum RuntimeReadAccessPath {
     ClaimVersions,
     RecordVersions,
     RelationVersions,
+    AdjacencyVersions,
     EventVersions,
     VectorVersions,
     SeriesVersions,
@@ -246,8 +281,30 @@ pub(crate) fn read_versioned(
     sources: &[RuntimeVersionedSource],
     budget: RuntimeReadBudget,
 ) -> Result<RuntimeVersionedRead> {
+    read_versioned_expanding(transaction, read, sources, budget, &mut |_| Vec::new())
+}
+
+/// Reads typed ranges in steps under one stamp validation, key budget, and
+/// accumulator. Every step's changes are key-validated and authenticated
+/// before `expand` sees them in global cursor order; `expand` returns the
+/// next step's ranges. A range already read is not read again, a range that
+/// overlaps a different read range is rejected, and an empty step ends the
+/// read.
+pub(crate) fn read_versioned_expanding(
+    transaction: &(impl AccessRead + ?Sized),
+    read: &ReadStamp,
+    sources: &[RuntimeVersionedSource],
+    budget: RuntimeReadBudget,
+    expand: &mut dyn FnMut(&[RuntimeChange]) -> Vec<RuntimeVersionedSource>,
+) -> Result<RuntimeVersionedRead> {
     budget.validate()?;
-    let sources = validate_sources(sources, &read.scope)?;
+    if sources.is_empty() {
+        return Err(Error::Substrate(
+            "runtime versioned read requires at least one typed source".into(),
+        ));
+    }
+    let mut ranges = SourceRanges::default();
+    let mut step = ranges.admit(sources, &read.scope)?;
     if read.accumulator_root.is_none() {
         return Err(Error::ReadStampMismatch(read.manifest_id.clone()));
     }
@@ -257,30 +314,43 @@ pub(crate) fn read_versioned(
         validate_read_stamp(&reader, read)
     });
     let stamp_validation = reader.preserve_budget_error(stamp_validation)?;
+    let mut accumulator = None;
     let mut changes = BTreeMap::<u64, RuntimeChange>::new();
-    for source in sources {
-        let path = source.path()?;
-        let encoded = reader.with_path(path, || scan_source(&reader, read, &source))?;
-        for (stored_key, bytes) in encoded {
-            let change: RuntimeChange = serde_json::from_slice(&bytes)?;
-            if change.cursor > read.commit_cursor {
-                continue;
-            }
-            validate_version_entry(&source, read, &stored_key, &change)?;
-            if let Some(prior) = changes.insert(change.cursor, change.clone()) {
-                if prior != change {
-                    return Err(Error::Substrate(format!(
-                        "runtime cursor {} resolved to conflicting semantic versions",
-                        change.cursor
-                    )));
+    while !step.is_empty() {
+        let mut selected = BTreeMap::<u64, RuntimeChange>::new();
+        for source in &step {
+            let path = source.path()?;
+            let encoded = reader.with_path(path, || scan_source(&reader, read, source))?;
+            for (stored_key, bytes) in encoded {
+                let change: RuntimeChange = serde_json::from_slice(&bytes)?;
+                if change.cursor > read.commit_cursor {
+                    continue;
                 }
+                validate_version_entry(source, read, &stored_key, &change)?;
+                insert_version(&mut selected, change)?;
             }
         }
+        let authentication = reader.with_path(RuntimeReadAccessPath::AccumulatorProof, || {
+            let accumulator = match &mut accumulator {
+                Some(accumulator) => accumulator,
+                empty => empty.insert(open_accumulator(&reader, read)?),
+            };
+            authenticate_changes(
+                &reader,
+                read,
+                accumulator,
+                selected
+                    .values()
+                    .filter(|change| !changes.contains_key(&change.cursor)),
+            )
+        });
+        reader.preserve_budget_error(authentication)?;
+        for change in selected.values() {
+            insert_version(&mut changes, change.clone())?;
+        }
+        let next = expand(&selected.into_values().collect::<Vec<_>>());
+        step = ranges.admit(&next, &read.scope)?;
     }
-    let authentication = reader.with_path(RuntimeReadAccessPath::AccumulatorProof, || {
-        authenticate_changes(&reader, read, changes.values())
-    });
-    reader.preserve_budget_error(authentication)?;
     let evidence = reader.finish(stamp_validation)?;
     let result = RuntimeVersionedRead {
         read: read.clone(),
@@ -289,6 +359,23 @@ pub(crate) fn read_versioned(
     };
     result.evidence.validate()?;
     Ok(result)
+}
+
+fn insert_version(changes: &mut BTreeMap<u64, RuntimeChange>, change: RuntimeChange) -> Result<()> {
+    match changes.entry(change.cursor) {
+        std::collections::btree_map::Entry::Vacant(entry) => {
+            entry.insert(change);
+        }
+        std::collections::btree_map::Entry::Occupied(entry) => {
+            if entry.get() != &change {
+                return Err(Error::Substrate(format!(
+                    "runtime cursor {} resolved to conflicting semantic versions",
+                    change.cursor
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn schema_at_read(
@@ -317,37 +404,58 @@ pub(crate) fn schema_at_read(
     Ok(schema)
 }
 
-fn validate_sources(
-    sources: &[RuntimeVersionedSource],
-    scope: &rrd_core::ScopeId,
-) -> Result<Vec<RuntimeVersionedSource>> {
-    if sources.is_empty() {
-        return Err(Error::Substrate(
-            "runtime versioned read requires at least one typed source".into(),
-        ));
-    }
-    let mut unique = Vec::with_capacity(sources.len());
-    for source in sources {
-        if !unique.contains(source) {
-            unique.push(source.clone());
-        }
-    }
-    for (left_index, left) in unique.iter().enumerate() {
-        for right in unique.iter().skip(left_index + 1) {
-            let (left_space, left_prefix) = source_range(left, scope)?;
-            let (right_space, right_prefix) = source_range(right, scope)?;
-            if left_space == right_space
-                && (left_prefix.starts_with(&right_prefix)
-                    || right_prefix.starts_with(&left_prefix))
-            {
-                return Err(Error::Substrate(format!(
-                    "runtime versioned read contains overlapping {:?} ranges",
-                    left.path()?
-                )));
+/// Every nonempty half-open physical interval admitted into one read. With
+/// no prior overlap, only its sorted neighbours can overlap a new interval.
+#[derive(Default)]
+struct SourceRanges {
+    admitted: BTreeMap<Vec<u8>, (Vec<u8>, RuntimeVersionedSource)>,
+}
+
+impl SourceRanges {
+    fn admit(
+        &mut self,
+        sources: &[RuntimeVersionedSource],
+        scope: &rrd_core::ScopeId,
+    ) -> Result<Vec<RuntimeVersionedSource>> {
+        let mut step = Vec::new();
+        for source in sources {
+            let (_, start, end) = source_interval(source, scope)?;
+            if start == end {
+                continue;
             }
+            if let Some((_, admitted)) = self.admitted.get(&start) {
+                if admitted == source {
+                    continue;
+                }
+                return Err(overlapping_ranges(source));
+            }
+            let previous = self
+                .admitted
+                .range::<[u8], _>((Bound::Unbounded, Bound::Excluded(start.as_slice())))
+                .next_back()
+                .is_some_and(|(_, (admitted_end, _))| admitted_end > &start);
+            let next = self
+                .admitted
+                .range::<[u8], _>((Bound::Excluded(start.as_slice()), Bound::Unbounded))
+                .next()
+                .is_some_and(|(admitted_start, _)| admitted_start < &end);
+            if previous || next {
+                return Err(overlapping_ranges(source));
+            }
+            self.admitted.insert(start, (end, source.clone()));
+            step.push(source.clone());
         }
+        Ok(step)
     }
-    Ok(unique)
+}
+
+fn overlapping_ranges(source: &RuntimeVersionedSource) -> Error {
+    match source.path() {
+        Ok(path) => Error::Substrate(format!(
+            "runtime versioned read contains overlapping {path:?} ranges"
+        )),
+        Err(error) => error,
+    }
 }
 
 fn scan_source(
@@ -355,8 +463,60 @@ fn scan_source(
     read: &ReadStamp,
     source: &RuntimeVersionedSource,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let (space, prefix) = source_range(source, &read.scope)?;
-    scan_space(reader, space, &prefix)
+    let (_, start, end) = source_interval(source, &read.scope)?;
+    reader.scan_range(&start, &end, usize::MAX)
+}
+
+fn source_interval(
+    source: &RuntimeVersionedSource,
+    scope: &rrd_core::ScopeId,
+) -> Result<(Space, Vec<u8>, Vec<u8>)> {
+    let end_of = |prefix: &[u8]| {
+        prefix_end(prefix)
+            .ok_or_else(|| Error::Substrate("version range has no upper bound".into()))
+    };
+    if let RuntimeVersionedSource::IdentityRange {
+        model,
+        kind,
+        lower,
+        upper,
+    } = source
+    {
+        if matches!((lower, upper), (Bound::Unbounded, Bound::Unbounded))
+            || matches!((lower, upper),
+                (Bound::Included(a) | Bound::Excluded(a), Bound::Included(b) | Bound::Excluded(b)) if a > b)
+        {
+            return Err(Error::Substrate("invalid runtime identity interval".into()));
+        }
+        let space = version_space_for_model(*model)?;
+        let family = keyspaces::runtime_kind_prefix(space, scope, kind);
+        let identity = |id: &RuntimeId| {
+            keyspaces::runtime_reference_prefix(
+                space,
+                scope,
+                &RuntimeRef {
+                    kind: kind.clone(),
+                    id: id.clone(),
+                },
+            )
+        };
+        let start = match lower {
+            Bound::Unbounded => family.clone(),
+            Bound::Included(id) => identity(id),
+            Bound::Excluded(id) => end_of(&identity(id))?,
+        };
+        let end = match upper {
+            Bound::Unbounded => end_of(&family)?,
+            Bound::Excluded(id) => identity(id),
+            Bound::Included(id) => end_of(&identity(id))?,
+        };
+        // Equal semantic endpoints with either strict side select no identity.
+        let start = start.min(end.clone());
+        return Ok((space, start, end));
+    }
+    let (space, prefix) = source_range(source, scope)?;
+    let end = end_of(&prefix)?;
+    Ok((space, prefix, end))
 }
 
 fn source_range(
@@ -403,7 +563,30 @@ fn source_range(
                 keyspaces::runtime_reference_prefix(space, scope, reference),
             )
         }
+        RuntimeVersionedSource::IdentityRange { .. } => {
+            return Err(Error::Substrate(
+                "identity interval is not a prefix source".into(),
+            ));
+        }
+        RuntimeVersionedSource::Adjacency {
+            relation,
+            node,
+            direction,
+        } => {
+            let space = adjacency_space(*direction);
+            (
+                space,
+                keyspaces::runtime_adjacency_prefix(space, scope, node, relation),
+            )
+        }
     })
+}
+
+const fn adjacency_space(direction: RuntimeAdjacencyDirection) -> Space {
+    match direction {
+        RuntimeAdjacencyDirection::Outgoing => keyspaces::RUNTIME_OUTGOING_EDGE_VERSIONS,
+        RuntimeAdjacencyDirection::Incoming => keyspaces::RUNTIME_INCOMING_EDGE_VERSIONS,
+    }
 }
 
 fn version_range(
@@ -433,10 +616,68 @@ fn validate_version_entry(
             change.cursor
         )));
     }
+    if let RuntimeVersionedSource::Adjacency {
+        relation,
+        node,
+        direction,
+    } = source
+    {
+        return validate_adjacency_entry(relation, node, *direction, stored_key, change);
+    }
     let expected = expected_version_key(source, change)?;
     if stored_key != expected {
         return Err(Error::Codec(format!(
             "runtime semantic version {} does not match its typed key",
+            change.cursor
+        )));
+    }
+    Ok(())
+}
+
+/// A relation version is re-keyed from its own endpoints. A retirement does
+/// not carry endpoints, so its strictly decoded key must name the selected
+/// node and relation type and the retirement's identity, time, and cursor.
+fn validate_adjacency_entry(
+    relation_kind: &RuntimeType,
+    node: &RuntimeRef,
+    direction: RuntimeAdjacencyDirection,
+    stored_key: &[u8],
+    change: &RuntimeChange,
+) -> Result<()> {
+    let space = adjacency_space(direction);
+    let matches = match &change.mutation {
+        RuntimeMutation::Relation { relation } => {
+            let near = match direction {
+                RuntimeAdjacencyDirection::Outgoing => &relation.from,
+                RuntimeAdjacencyDirection::Incoming => &relation.to,
+            };
+            &relation.reference.kind == relation_kind
+                && near == node
+                && stored_key
+                    == keyspaces::runtime_adjacency_version_key(
+                        space,
+                        &change.scope,
+                        relation,
+                        relation.valid_from,
+                        change.cursor,
+                    )
+        }
+        RuntimeMutation::Retire { retirement }
+            if retirement.model == RuntimeLogicalModel::GraphRelation =>
+        {
+            let key = keyspaces::parse_runtime_adjacency_version_key(KeyCodec, space, stored_key)?;
+            key.scope == change.scope
+                && &key.node == node
+                && &retirement.reference.kind == relation_kind
+                && key.relation == retirement.reference
+                && key.effective_at == retirement.effective_at
+                && key.cursor == change.cursor
+        }
+        _ => false,
+    };
+    if !matches {
+        return Err(Error::Codec(format!(
+            "runtime adjacency version {} does not match its typed key",
             change.cursor
         )));
     }
@@ -493,58 +734,49 @@ struct VersionAddress {
     space: Space,
     reference: RuntimeRef,
     effective_at: u64,
-    retirement_model: Option<RuntimeLogicalModel>,
 }
 
 fn version_address(change: &RuntimeChange) -> Result<VersionAddress> {
-    let (space, reference, effective_at, retirement_model) = match &change.mutation {
+    let (space, reference, effective_at) = match &change.mutation {
         RuntimeMutation::Record { record } => (
             keyspaces::RUNTIME_RECORD_VERSIONS,
             record.reference.clone(),
             record.valid_from,
-            None,
         ),
         RuntimeMutation::Relation { relation } => (
             keyspaces::RUNTIME_RELATION_VERSIONS,
             relation.reference.clone(),
             relation.valid_from,
-            None,
         ),
         RuntimeMutation::Event { event } => (
             keyspaces::RUNTIME_EVENT_VERSIONS,
             keyspaces::runtime_event_reference(event, change.cursor)?,
             change.at,
-            None,
         ),
         RuntimeMutation::Vector { vector } => (
             keyspaces::RUNTIME_VECTOR_VERSIONS,
             vector.reference.clone(),
             vector.valid_from,
-            None,
         ),
         RuntimeMutation::SeriesSample { sample } => (
             keyspaces::RUNTIME_SERIES_VERSIONS,
             sample.reference.clone(),
             sample.observed_at,
-            None,
         ),
         RuntimeMutation::Geo { geo } => (
             keyspaces::RUNTIME_GEO_VERSIONS,
             geo.reference.clone(),
             geo.valid_from,
-            None,
         ),
         RuntimeMutation::Object { object } => (
             keyspaces::RUNTIME_OBJECT_VERSIONS,
             object.reference.clone(),
             change.at,
-            None,
         ),
         RuntimeMutation::Retire { retirement } => (
             version_space_for_model(retirement.model)?,
             retirement.reference.clone(),
             retirement.effective_at,
-            Some(retirement.model),
         ),
         RuntimeMutation::Schema { .. } | RuntimeMutation::Claim { .. } => {
             return Err(Error::Codec(format!(
@@ -557,7 +789,6 @@ fn version_address(change: &RuntimeChange) -> Result<VersionAddress> {
         space,
         reference,
         effective_at,
-        retirement_model,
     })
 }
 
@@ -585,14 +816,38 @@ fn source_accepts_address(
         RuntimeVersionedSource::Objects { kind } => {
             (keyspaces::RUNTIME_OBJECT_VERSIONS, kind.as_ref())
         }
+        // One physical identity has one history. A retirement recorded under
+        // an earlier schema's logical model for the same family remains part
+        // of it, exactly as a family range would select it.
         RuntimeVersionedSource::Identity { model, reference } => {
             return Ok(version_space_for_model(*model)? == address.space
-                && reference == &address.reference
-                && address
-                    .retirement_model
-                    .is_none_or(|actual| actual == *model));
+                && reference == &address.reference);
         }
-        RuntimeVersionedSource::Schema | RuntimeVersionedSource::Claims { .. } => return Ok(false),
+        RuntimeVersionedSource::IdentityRange {
+            model,
+            kind,
+            lower,
+            upper,
+        } => {
+            let id = &address.reference.id;
+            let above = match lower {
+                Bound::Unbounded => true,
+                Bound::Included(lower) => id >= lower,
+                Bound::Excluded(lower) => id > lower,
+            };
+            let below = match upper {
+                Bound::Unbounded => true,
+                Bound::Included(upper) => id <= upper,
+                Bound::Excluded(upper) => id < upper,
+            };
+            return Ok(version_space_for_model(*model)? == address.space
+                && kind == &address.reference.kind
+                && above
+                && below);
+        }
+        RuntimeVersionedSource::Schema
+        | RuntimeVersionedSource::Claims { .. }
+        | RuntimeVersionedSource::Adjacency { .. } => return Ok(false),
     };
     Ok(space == address.space && kind.is_none_or(|expected| expected == &address.reference.kind))
 }
@@ -633,6 +888,7 @@ fn version_space_for_model(model: RuntimeLogicalModel) -> Result<Space> {
         RuntimeReadAccessPath::ReadStamp
         | RuntimeReadAccessPath::SchemaVersions
         | RuntimeReadAccessPath::ClaimVersions
+        | RuntimeReadAccessPath::AdjacencyVersions
         | RuntimeReadAccessPath::AccumulatorProof => {
             return Err(Error::Substrate(
                 "logical model has no identity-version space".into(),
@@ -641,19 +897,31 @@ fn version_space_for_model(model: RuntimeLogicalModel) -> Result<Space> {
     })
 }
 
+fn open_accumulator(
+    reader: &(impl AccessRead + ?Sized),
+    read: &ReadStamp,
+) -> Result<RuntimeLogAccumulator> {
+    let root = read
+        .accumulator_root
+        .as_deref()
+        .ok_or_else(|| Error::ReadStampMismatch(read.manifest_id.clone()))?;
+    Ok(RuntimeLogAccumulator::from_nodes(
+        read.commit_cursor,
+        root,
+        |level, index| read_accumulator_node(reader, level, index),
+    )?)
+}
+
 fn authenticate_changes<'a>(
     reader: &(impl AccessRead + ?Sized),
     read: &ReadStamp,
+    accumulator: &RuntimeLogAccumulator,
     changes: impl Iterator<Item = &'a RuntimeChange>,
 ) -> Result<()> {
     let root = read
         .accumulator_root
         .as_deref()
         .ok_or_else(|| Error::ReadStampMismatch(read.manifest_id.clone()))?;
-    let accumulator =
-        RuntimeLogAccumulator::from_nodes(read.commit_cursor, root, |level, index| {
-            read_accumulator_node(reader, level, index)
-        })?;
     for change in changes {
         let proof = accumulator.inclusion_proof(change.cursor - 1, |level, index| {
             read_accumulator_node(reader, level, index)
@@ -837,6 +1105,10 @@ fn checked_add(left: u64, right: u64) -> Result<u64> {
 }
 
 #[cfg(test)]
+#[path = "versioned_identity_ranges.rs"]
+mod identity_range_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use rrd_core::{RuntimeCommit, RuntimeSchemaRegistry, ScopeId};
@@ -900,31 +1172,218 @@ mod tests {
         ));
     }
 
+    fn admit(sources: &[RuntimeVersionedSource]) -> Result<Vec<RuntimeVersionedSource>> {
+        SourceRanges::default().admit(
+            sources,
+            &ScopeId::new("project:overlap-validation").unwrap(),
+        )
+    }
+
+    fn adjacency(node: &str, relation: &str) -> RuntimeVersionedSource {
+        RuntimeVersionedSource::Adjacency {
+            relation: RuntimeType::new(relation).unwrap(),
+            node: RuntimeRef::new("document", node).unwrap(),
+            direction: RuntimeAdjacencyDirection::Outgoing,
+        }
+    }
+
+    fn committed(mutation: RuntimeMutation, cursor: u64) -> RuntimeChange {
+        let commit = RuntimeCommit {
+            scope: ScopeId::new("project:adjacency-entry-validation").unwrap(),
+            at: 300,
+            actor: "test:adjacency-entry-validation".into(),
+            expected_cursor: cursor - 1,
+            mutations: vec![mutation],
+        };
+        RuntimeChange::committed(
+            cursor,
+            &commit,
+            &commit.digest(),
+            0,
+            commit.mutations[0].clone(),
+            None,
+        )
+    }
+
+    #[test]
+    fn an_adjacency_value_must_name_its_node_type_identity_time_and_cursor() {
+        let relation = rrd_core::RuntimeRelation {
+            reference: RuntimeRef::new("depends_on", "a-b").unwrap(),
+            from: RuntimeRef::new("document", "a").unwrap(),
+            to: RuntimeRef::new("document", "b").unwrap(),
+            valid_from: 100,
+            valid_to: None,
+            properties: Default::default(),
+        };
+        let depends_on = RuntimeType::new("depends_on").unwrap();
+        let outgoing = RuntimeAdjacencyDirection::Outgoing;
+        let space = adjacency_space(outgoing);
+        let put = committed(
+            RuntimeMutation::Relation {
+                relation: relation.clone(),
+            },
+            4,
+        );
+        let key = |relation: &rrd_core::RuntimeRelation, at: u64, cursor: u64| {
+            keyspaces::runtime_adjacency_version_key(space, &put.scope, relation, at, cursor)
+        };
+        let validate = |node: &RuntimeRef,
+                        direction: RuntimeAdjacencyDirection,
+                        stored: &[u8],
+                        change: &RuntimeChange| {
+            validate_adjacency_entry(&depends_on, node, direction, stored, change)
+        };
+        validate(&relation.from, outgoing, &key(&relation, 100, 4), &put).unwrap();
+        let mut moved = relation.clone();
+        moved.to = RuntimeRef::new("document", "c").unwrap();
+        for (node, direction, stored) in [
+            (&relation.from, outgoing, key(&moved, 100, 4)),
+            (&relation.from, outgoing, key(&relation, 101, 4)),
+            (&relation.from, outgoing, key(&relation, 100, 5)),
+            (&relation.to, outgoing, key(&relation, 100, 4)),
+            (
+                &relation.from,
+                RuntimeAdjacencyDirection::Incoming,
+                key(&relation, 100, 4),
+            ),
+        ] {
+            assert!(matches!(
+                validate(node, direction, &stored, &put),
+                Err(Error::Codec(_))
+            ));
+        }
+
+        let retirement = committed(
+            RuntimeMutation::Retire {
+                retirement: rrd_core::RuntimeRetirement {
+                    model: RuntimeLogicalModel::GraphRelation,
+                    reference: relation.reference.clone(),
+                    effective_at: 300,
+                },
+            },
+            5,
+        );
+        validate(
+            &relation.from,
+            outgoing,
+            &key(&relation, 300, 5),
+            &retirement,
+        )
+        .unwrap();
+        // The far endpoint is not part of a retirement and is not checked.
+        validate(&relation.from, outgoing, &key(&moved, 300, 5), &retirement).unwrap();
+        let mut renamed = relation.clone();
+        renamed.reference = RuntimeRef::new("depends_on", "a-c").unwrap();
+        let mut retyped = relation.clone();
+        retyped.reference = RuntimeRef::new("cites", "a-b").unwrap();
+        for stored in [
+            key(&relation, 299, 5),
+            key(&relation, 300, 6),
+            key(&renamed, 300, 5),
+            key(&retyped, 300, 5),
+        ] {
+            assert!(matches!(
+                validate(&relation.from, outgoing, &stored, &retirement),
+                Err(Error::Codec(_))
+            ));
+        }
+        assert!(validate(&relation.to, outgoing, &key(&relation, 300, 5), &retirement).is_err());
+        let record_retirement = committed(
+            RuntimeMutation::Retire {
+                retirement: rrd_core::RuntimeRetirement {
+                    model: RuntimeLogicalModel::Document,
+                    reference: relation.reference.clone(),
+                    effective_at: 300,
+                },
+            },
+            5,
+        );
+        assert!(matches!(
+            validate(
+                &relation.from,
+                outgoing,
+                &key(&relation, 300, 5),
+                &record_retirement
+            ),
+            Err(Error::Codec(_))
+        ));
+    }
+
     #[test]
     fn overlapping_family_ranges_are_rejected_before_storage_access() {
+        assert!(admit(&[
+            RuntimeVersionedSource::Records { kind: None },
+            RuntimeVersionedSource::Records {
+                kind: Some(RuntimeType::new("document").unwrap()),
+            },
+        ])
+        .is_err());
+        assert!(admit(&[
+            RuntimeVersionedSource::Records {
+                kind: Some(RuntimeType::new("document").unwrap()),
+            },
+            RuntimeVersionedSource::Identity {
+                model: RuntimeLogicalModel::Document,
+                reference: RuntimeRef::new("document", "readme").unwrap(),
+            },
+        ])
+        .is_err());
+        // One physical identity selected under two record-like models is one
+        // range, not two reads.
+        assert!(admit(&[
+            RuntimeVersionedSource::Identity {
+                model: RuntimeLogicalModel::Document,
+                reference: RuntimeRef::new("document", "readme").unwrap(),
+            },
+            RuntimeVersionedSource::Identity {
+                model: RuntimeLogicalModel::Relational,
+                reference: RuntimeRef::new("document", "readme").unwrap(),
+            },
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn admitted_ranges_deduplicate_and_find_overlap_in_any_order() {
+        let a = adjacency("a", "depends_on");
+        let ab = adjacency("ab", "depends_on");
+        let other_kind = adjacency("a", "depends_onx");
+        let incoming = RuntimeVersionedSource::Adjacency {
+            relation: RuntimeType::new("depends_on").unwrap(),
+            node: RuntimeRef::new("document", "a").unwrap(),
+            direction: RuntimeAdjacencyDirection::Incoming,
+        };
+        assert_eq!(
+            admit(&[
+                a.clone(),
+                ab.clone(),
+                a.clone(),
+                other_kind.clone(),
+                incoming.clone()
+            ])
+            .unwrap(),
+            vec![a.clone(), ab, other_kind, incoming]
+        );
+
         let scope = ScopeId::new("project:overlap-validation").unwrap();
-        assert!(validate_sources(
-            &[
-                RuntimeVersionedSource::Records { kind: None },
-                RuntimeVersionedSource::Records {
-                    kind: Some(RuntimeType::new("document").unwrap()),
-                },
-            ],
-            &scope,
-        )
-        .is_err());
-        assert!(validate_sources(
-            &[
-                RuntimeVersionedSource::Records {
-                    kind: Some(RuntimeType::new("document").unwrap()),
-                },
-                RuntimeVersionedSource::Identity {
-                    model: RuntimeLogicalModel::Document,
-                    reference: RuntimeRef::new("document", "readme").unwrap(),
-                },
-            ],
-            &scope,
-        )
-        .is_err());
+        let mut ranges = SourceRanges::default();
+        let family = RuntimeVersionedSource::Records {
+            kind: Some(RuntimeType::new("document").unwrap()),
+        };
+        let identity = RuntimeVersionedSource::Identity {
+            model: RuntimeLogicalModel::Document,
+            reference: RuntimeRef::new("document", "readme").unwrap(),
+        };
+        assert_eq!(
+            ranges
+                .admit(std::slice::from_ref(&identity), &scope)
+                .unwrap(),
+            vec![identity.clone()]
+        );
+        assert!(ranges
+            .admit(std::slice::from_ref(&identity), &scope)
+            .unwrap()
+            .is_empty());
+        assert!(ranges.admit(std::slice::from_ref(&family), &scope).is_err());
     }
 }

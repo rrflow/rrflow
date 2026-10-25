@@ -86,9 +86,11 @@ impl RrdEngine {
         let operation_sha256 = operation_digest(request)?;
         let key = knowledge_key(&request.project_id, &request.scope)?;
         let receipt_key = knowledge_receipt_key(&key, session_id, idempotency_key)?;
-        let _gate = self.transaction_gate.lock().map_err(|_| {
-            ServiceError::Storage("knowledge replacement transaction gate is poisoned".into())
-        })?;
+        let _gate = self.admit_transaction(
+            request,
+            context.request_id.as_str(),
+            context.operation_id.as_str(),
+        )?;
         if let Some(catalogue) = self.knowledge_receipt(
             &receipt_key,
             session_id,

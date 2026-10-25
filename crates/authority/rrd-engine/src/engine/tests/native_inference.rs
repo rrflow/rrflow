@@ -7,6 +7,8 @@ use rrd_contract::{
 };
 use std::collections::BTreeMap;
 
+mod admission;
+
 fn data_reference(kind: &str, value: &str) -> DataReference {
     DataReference {
         kind: CanonicalId::new(kind).unwrap(),

@@ -15,6 +15,130 @@ fn seed(database: &mut Database, entries: &[(&[u8], &[u8])]) {
 }
 
 #[test]
+fn aggregate_transaction_admission_preserves_buffers_and_releases_actual_owners() {
+    let parent = tempfile::tempdir().unwrap();
+    let root = parent.path().join("aggregate");
+    let options = rrd_lsm::DatabaseOptions {
+        transaction_limits: rrd_lsm::TransactionLimits {
+            active: 2,
+            buffered_bytes: 1024,
+        },
+        ..Default::default()
+    };
+    let mut database = Database::create_with_options(&root, options).unwrap();
+    let mut first = database.begin_transaction().unwrap();
+    let mut second = database.begin_transaction().unwrap();
+    assert!(matches!(
+        database.begin_transaction(),
+        Err(Error::TransactionLimit {
+            resource: rrd_lsm::TransactionResource::Active,
+            limit: 2,
+            observed: 3
+        })
+    ));
+    first.put(b"a".to_vec(), b"prior".to_vec()).unwrap();
+    let prior = database.transaction_ownership().unwrap();
+    let mut oversized_capacity = Vec::with_capacity(2048);
+    oversized_capacity.push(7);
+    assert!(matches!(
+        first.put(b"a".to_vec(), oversized_capacity),
+        Err(Error::TransactionLimit {
+            resource: rrd_lsm::TransactionResource::BufferedBytes,
+            ..
+        })
+    ));
+    assert_eq!(database.transaction_ownership().unwrap(), prior);
+    assert_eq!(first.get(&database, b"a").unwrap(), Some(b"prior".to_vec()));
+    first.put(b"a".to_vec(), vec![1; 512]).unwrap();
+    assert!(second.put(b"b".to_vec(), vec![2; 512]).is_err());
+    assert_eq!(second.write_count(), 0);
+    first.delete(b"a".to_vec()).unwrap();
+    second.put(b"b".to_vec(), vec![2; 512]).unwrap();
+    assert!(database.transaction_ownership().unwrap().1 <= 1024);
+    first.rollback().unwrap();
+    assert_eq!(database.transaction_ownership().unwrap().0, 1);
+    database
+        .commit_transaction(second, Durability::Authoritative)
+        .unwrap();
+    assert_eq!(database.transaction_ownership().unwrap(), (0, 0));
+    assert_eq!(
+        database.get(b"b", database.snapshot()).unwrap(),
+        Some(vec![2; 512])
+    );
+    drop(database);
+    let reopened = Database::open_with_options(&root, options).unwrap();
+    let first = reopened.begin_transaction().unwrap();
+    let second = reopened.begin_transaction().unwrap();
+    assert!(reopened.begin_transaction().is_err());
+    drop(first);
+    drop(second);
+    assert_eq!(reopened.transaction_ownership().unwrap(), (0, 0));
+}
+
+#[test]
+fn conflict_and_ordinary_drop_release_transaction_buffer_reservations() {
+    let parent = tempfile::tempdir().unwrap();
+    let mut database = create_database(&parent, "release");
+    let mut first = database.begin_transaction().unwrap();
+    let mut second = database.begin_transaction().unwrap();
+    first.put(b"same".to_vec(), b"accepted".to_vec()).unwrap();
+    second.put(b"same".to_vec(), b"conflict".to_vec()).unwrap();
+    database
+        .commit_transaction(first, Durability::Authoritative)
+        .unwrap();
+    assert_eq!(database.transaction_ownership().unwrap().0, 1);
+    assert!(matches!(
+        database.commit_transaction(second, Durability::Authoritative),
+        Err(Error::TransactionConflict { .. })
+    ));
+    assert_eq!(database.transaction_ownership().unwrap(), (0, 0));
+    let mut dropped = database.begin_transaction().unwrap();
+    dropped.put(b"abandoned".to_vec(), vec![3; 256]).unwrap();
+    drop(dropped);
+    assert_eq!(database.transaction_ownership().unwrap(), (0, 0));
+    assert!(database
+        .get(b"abandoned", database.snapshot())
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        database.get(b"same", database.snapshot()).unwrap(),
+        Some(b"accepted".to_vec())
+    );
+}
+
+#[test]
+fn pending_prefix_exposes_final_checkpoint_intent_without_other_keyspaces() {
+    let parent = tempfile::tempdir().unwrap();
+    let database = create_database(&parent, "intent");
+    let mut transaction = database.begin_transaction().unwrap();
+    transaction
+        .put(b"snapshot:z".to_vec(), b"old".to_vec())
+        .unwrap();
+    transaction
+        .put(b"other:a".to_vec(), b"outside".to_vec())
+        .unwrap();
+    transaction
+        .put(b"snapshot:a".to_vec(), b"removed".to_vec())
+        .unwrap();
+    transaction.delete(b"snapshot:a".to_vec()).unwrap();
+    transaction
+        .put(b"snapshot:z".to_vec(), b"final".to_vec())
+        .unwrap();
+    let before = database.transaction_ownership().unwrap();
+    assert_eq!(
+        transaction.pending_prefix(b"snapshot:").collect::<Vec<_>>(),
+        vec![
+            (b"snapshot:a".as_slice(), None),
+            (b"snapshot:z".as_slice(), Some(b"final".as_slice()))
+        ]
+    );
+    assert_eq!(database.transaction_ownership().unwrap(), before);
+    assert_eq!(transaction.pending_prefix(b"absent:").count(), 0);
+    transaction.rollback().unwrap();
+    assert_eq!(database.transaction_ownership().unwrap(), (0, 0));
+}
+
+#[test]
 fn point_and_bounded_range_reads_overlay_the_ordered_write_set() {
     let parent = tempfile::tempdir().unwrap();
     let mut database = create_database(&parent, "point-range");
@@ -314,4 +438,90 @@ fn authoritative_transaction_reopens_at_the_committed_value() {
         reopened.get(b"durable", reopened.snapshot()).unwrap(),
         Some(b"value".to_vec())
     );
+}
+
+#[test]
+fn conflict_validation_reads_only_version_spines_and_skips_shadowed_segments() {
+    use rrd_lsm::{DatabaseOptions, SegmentCompressionPolicy, SegmentIoMode, SegmentIoPolicy};
+    for mode in [SegmentIoMode::Bounded, SegmentIoMode::Mmap] {
+        for compression in [
+            SegmentCompressionPolicy::None,
+            SegmentCompressionPolicy::default(),
+        ] {
+            for immutable_winner in [false, true] {
+                for tombstone in [false, true] {
+                    let temp = tempfile::tempdir().unwrap();
+                    let root = temp.path().join("conflict-probe");
+                    let options = DatabaseOptions {
+                        page_cache_bytes: 0,
+                        segment_compression: compression,
+                        segment_io: SegmentIoPolicy {
+                            mode,
+                            allow_fallback: false,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+                    let mut database = Database::create_with_options(&root, options).unwrap();
+                    let old = vec![7; 64 * 1024];
+                    seed(&mut database, &[(b"shared", &old)]);
+                    database.flush_memtable(1).unwrap();
+                    // Reopen validates the complete persisted segment before
+                    // measuring conflict work with no resident page cache.
+                    drop(database);
+                    let mut database = Database::open_with_options(&root, options).unwrap();
+                    let mut stale = database.begin_transaction().unwrap();
+                    stale
+                        .put(b"shared".to_vec(), b"must-not-publish".to_vec())
+                        .unwrap();
+                    let mut winner = database.begin_transaction().unwrap();
+                    if tombstone {
+                        winner.delete(b"shared".to_vec()).unwrap();
+                    } else {
+                        winner.put(b"shared".to_vec(), vec![9; 64 * 1024]).unwrap();
+                    }
+                    database
+                        .commit_transaction(winner, Durability::Authoritative)
+                        .unwrap();
+                    if immutable_winner {
+                        database.flush_memtable(2).unwrap();
+                    }
+                    let snapshot = database.snapshot();
+                    let before = database.page_cache_stats();
+                    assert!(
+                        matches!(database.commit_transaction(stale, Durability::Authoritative),
+                        Err(Error::TransactionConflict { conflicting_sequence, .. }) if conflicting_sequence == snapshot.sequence)
+                    );
+                    let after = database.page_cache_stats();
+                    let loads = after.loads - before.loads;
+                    let bytes = after.bytes_read - before.bytes_read;
+                    println!("conflict_probe mode={mode:?} compression={compression:?} immutable={immutable_winner} tombstone={tombstone} loads={loads} bytes={bytes}");
+                    assert_eq!(loads, if immutable_winner {6} else {0},
+                        "conflict detection must not fetch value columns or shadowed immutable history");
+                    assert!(bytes < 1024, "version-only probe read payload bytes");
+                    assert_eq!(database.snapshot(), snapshot);
+                    assert_eq!(database.transaction_ownership().unwrap(), (0, 0));
+                    let expected = if tombstone {
+                        None
+                    } else {
+                        Some(vec![9; 64 * 1024])
+                    };
+                    assert_eq!(database.get(b"shared", snapshot).unwrap(), expected);
+                    let mut retry = database.begin_transaction().unwrap();
+                    retry
+                        .put(b"shared".to_vec(), b"accepted-retry".to_vec())
+                        .unwrap();
+                    database
+                        .commit_transaction(retry, Durability::Authoritative)
+                        .unwrap();
+                    drop(database);
+                    let reopened = Database::open_with_options(&root, options).unwrap();
+                    assert_eq!(
+                        reopened.get(b"shared", reopened.snapshot()).unwrap(),
+                        Some(b"accepted-retry".to_vec())
+                    );
+                }
+            }
+        }
+    }
 }

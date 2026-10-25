@@ -33,7 +33,7 @@ fn bind_project(engine: &mut RrdEngine, root: &Path) {
                 endpoint_presentation: EndpointPresentation::InProcess,
             },
             configuration,
-            root.to_owned(),
+            rrd_store::filesystem::AnchoredPath::from_path(root).unwrap(),
         )
         .unwrap();
 }
@@ -143,6 +143,52 @@ fn knowledge_catalogue_and_exact_receipt_survive_engine_restart() {
     assert!(replay.idempotent_replay);
     assert_eq!(replay.catalogue, result.catalogue);
     assert_eq!(reopened.storage.control().sequence().unwrap(), before);
+}
+
+#[test]
+fn knowledge_saturated_admission_preserves_catalogue_and_releases_for_retry() {
+    let (_root, mut engine, lease) = knowledge_engine();
+    engine
+        .estate_configuration
+        .storage
+        .transaction_admission_requests = 1;
+    let permit = engine
+        .admit_transaction(&(), "request-held", "operation-held")
+        .unwrap();
+    let request = replacement(0, "Admitted knowledge");
+    assert!(matches!(
+        write(&engine, &lease, &request, "bounded-knowledge"),
+        Err(ServiceError::StorageAdmission(_))
+    ));
+    assert_eq!(read(&engine, &lease).revision, 0);
+    assert!(engine
+        .storage
+        .control()
+        .journal_since(0, 128)
+        .unwrap()
+        .iter()
+        .all(|entry| !entry.action.starts_with("knowledge_trees.")));
+    assert_eq!(
+        engine
+            .transaction_admission_snapshot()
+            .unwrap()
+            .outstanding_requests,
+        1
+    );
+    drop(permit);
+    let saved = write(&engine, &lease, &request, "bounded-knowledge").unwrap();
+    assert!(!saved.idempotent_replay);
+    assert_eq!(read(&engine, &lease), saved.catalogue);
+    assert_eq!(
+        engine
+            .transaction_admission_snapshot()
+            .unwrap()
+            .outstanding_requests,
+        0
+    );
+    let replay = write(&engine, &lease, &request, "bounded-knowledge").unwrap();
+    assert!(replay.idempotent_replay);
+    assert_eq!(replay.catalogue, saved.catalogue);
 }
 
 #[test]
@@ -289,7 +335,7 @@ fn knowledge_external_path_persists_configuration_without_provider_execution() {
     let mut request = replacement(0, "Configured provider");
     request.trees[0].paths[0].binding = KnowledgePathBinding::External {
         provider_id: canonical("explicit-provider"),
-        endpoint: EndpointBinding {
+        endpoint: Box::new(EndpointBinding {
             id: canonical("provider-endpoint"),
             class: WorkloadClass::VectorStore,
             kind: BindingKind::SelfHosted,
@@ -312,7 +358,7 @@ fn knowledge_external_path_persists_configuration_without_provider_execution() {
                 timeout_ms: 1000,
                 max_input_bytes: 1024,
             },
-        },
+        }),
         namespace: Some("Research".into()),
         index: None,
         collection: Some("Documents".into()),

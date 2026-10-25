@@ -69,6 +69,7 @@ def render() -> str:
         "public enum OperationId {\n"
         + ",\n".join(constants)
         + ";\n\n"
+        f'    static final String OPENAPI_DOCUMENT_SHA256 = "{openapi_digest}";\n\n'
         "    public enum Authentication { PUBLIC, API_KEY, SESSION_BEARER }\n\n"
         "    private final String wireName;\n"
         "    private final String method;\n"
@@ -99,7 +100,7 @@ def main() -> None:
             raise SystemExit("generated Java RRD endpoint enum is stale; run python scripts/generate.py")
         return
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(generated)
+    OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

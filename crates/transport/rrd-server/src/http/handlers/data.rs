@@ -1,6 +1,33 @@
 use super::super::*;
 
 impl AppState {
+    pub(in crate::http) fn read_data_schema(
+        &self,
+        headers: &HeaderMap,
+        body: &[u8],
+        now: u64,
+    ) -> HttpResponse {
+        self.with_authenticated_envelope::<rrd_contract::ReadDataSchema, _, _>(
+            headers,
+            body,
+            now,
+            RrdOperation::DiagnosticsRead,
+            None,
+            |envelope, session, token| {
+                self.service
+                    .read_data_schema(
+                        session,
+                        token,
+                        &envelope.payload,
+                        now,
+                        envelope.context.request_id.as_str(),
+                        envelope.context.operation_id.as_str(),
+                    )
+                    .map_err(api_error)
+            },
+        )
+    }
+
     pub(in crate::http) fn read_estate(
         &self,
         headers: &HeaderMap,
@@ -64,6 +91,34 @@ impl AppState {
             |envelope, session, token| {
                 self.service
                     .execute_query_scoped(
+                        session,
+                        token,
+                        &envelope.payload,
+                        &envelope.resource,
+                        now,
+                        envelope.context.request_id.as_str(),
+                        envelope.context.operation_id.as_str(),
+                    )
+                    .map_err(api_error)
+            },
+        )
+    }
+
+    pub(in crate::http) fn export_query(
+        &self,
+        headers: &HeaderMap,
+        body: &[u8],
+        now: u64,
+    ) -> HttpResponse {
+        self.with_authenticated_envelope::<rrd_contract::ExportQuery, _, _>(
+            headers,
+            body,
+            now,
+            RrdOperation::QueryExecute,
+            None,
+            |envelope, session, token| {
+                self.service
+                    .export_query_scoped(
                         session,
                         token,
                         &envelope.payload,

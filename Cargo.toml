@@ -38,7 +38,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
 # Step T: spans at subsystem boundaries, zero-cost with no subscriber
-# installed. The kernel (rrd-core) stays out — serde is its only dependency.
+# installed. The kernel (rrd-core) stays out: serde and pure hashing only.
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 unicode-normalization = "0.1"
@@ -48,3 +48,15 @@ unicode-normalization = "0.1"
 # Thin LTO keeps codegen parallel; symbols and panic unwinding are unchanged.
 [profile.release]
 lto = "thin"
+
+# Native debug lifecycle fixtures still hash the entire actual executable.
+# Optimize the pinned compression implementation without disabling development
+# assertions, overflow checks, identity verification or application debugging.
+[profile.dev.package.sha2]
+opt-level = 3
+
+# Observation symbols only: semantic settings inherit release unchanged.
+[profile.diagnostic]
+inherits = "release"
+debug = "line-tables-only"
+strip = "none"

@@ -38,7 +38,7 @@ pub enum KnowledgePathBinding {
         /// Existing endpoint/credential-reference and admission-limit contract.
         /// API/subscription bindings require a credential reference; a declared
         /// local or self-hosted service may permit anonymous access.
-        endpoint: EndpointBinding,
+        endpoint: Box<EndpointBinding>,
         namespace: Option<String>,
         index: Option<String>,
         collection: Option<String>,
@@ -395,7 +395,7 @@ mod tests {
     fn external() -> KnowledgePathBinding {
         KnowledgePathBinding::External {
             provider_id: id("postgres-pgvector"),
-            endpoint: EndpointBinding {
+            endpoint: Box::new(EndpointBinding {
                 id: id("vector-postgres"),
                 class: WorkloadClass::VectorStore,
                 kind: BindingKind::SelfHosted,
@@ -418,7 +418,7 @@ mod tests {
                     timeout_ms: 1000,
                     max_input_bytes: 1024,
                 },
-            },
+            }),
             namespace: Some("Public".into()),
             index: None,
             collection: Some("ResearchDocuments".into()),

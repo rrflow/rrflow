@@ -32,7 +32,6 @@ pub struct Catalog {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceWatermarks {
     pub schema: u64,
-    pub any_record: u64,
     pub records: BTreeMap<RuntimeType, u64>,
     pub relations: BTreeMap<RuntimeType, u64>,
     pub events: BTreeMap<RuntimeType, u64>,
@@ -45,9 +44,6 @@ pub struct SourceWatermarks {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[doc(hidden)]
     pub schema_history: Vec<u64>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[doc(hidden)]
-    pub any_record_history: Vec<u64>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[doc(hidden)]
     pub record_history: BTreeMap<RuntimeType, Vec<u64>>,
@@ -76,9 +72,7 @@ impl SourceWatermarks {
                 self.schema_history.push(cursor);
             }
             RuntimeMutation::Record { record } => {
-                self.any_record = cursor;
                 self.records.insert(record.reference.kind.clone(), cursor);
-                self.any_record_history.push(cursor);
                 self.record_history
                     .entry(record.reference.kind.clone())
                     .or_default()
@@ -124,10 +118,8 @@ impl SourceWatermarks {
             }
             RuntimeMutation::Retire { retirement } => {
                 if retirement.model.is_record_like() {
-                    self.any_record = cursor;
                     self.records
                         .insert(retirement.reference.kind.clone(), cursor);
-                    self.any_record_history.push(cursor);
                     self.record_history
                         .entry(retirement.reference.kind.clone())
                         .or_default()
@@ -163,10 +155,6 @@ impl SourceWatermarks {
         }
     }
 
-    pub fn for_source(&self, source: &Source) -> u64 {
-        self.for_source_at(source, u64::MAX)
-    }
-
     /// Last source or schema change visible at `known_at_cursor`.
     ///
     /// A latest-only watermark is not a valid historical coordinate: a source
@@ -200,22 +188,10 @@ impl SourceWatermarks {
                 self.geo.get(kind).copied(),
                 known_at_cursor,
             ),
-            Source::Traversal { relation, .. } => self
-                .relation_history
-                .get(relation)
-                .map(|history| latest(history, known_at_cursor))
-                .unwrap_or_else(|| {
-                    self.relations
-                        .get(relation)
-                        .copied()
-                        .filter(|cursor| *cursor <= known_at_cursor)
-                        .unwrap_or(0)
-                })
-                .max(historical(
-                    Some(&self.any_record_history),
-                    Some(self.any_record),
-                    known_at_cursor,
-                )),
+            // No family-wide watermark is captured for a traversal: its
+            // source is the neighbourhood visited at execution, current
+            // through the requested known cursor.
+            Source::Traversal { .. } => known_at_cursor,
             Source::Claim {
                 predicate: Some(predicate),
             } => historical(
@@ -362,6 +338,14 @@ impl Catalog {
         Ok(())
     }
 
+    pub(crate) fn covers_version_sources(&self, required: &[RuntimeVersionedSource]) -> bool {
+        required.iter().all(|required| {
+            self.version_sources
+                .iter()
+                .any(|available| version_source_covers(available, required))
+        })
+    }
+
     pub fn schema_at(&self, cursor: u64) -> Option<&RuntimeSchemaRegistry> {
         self.schemas
             .iter()
@@ -371,7 +355,8 @@ impl Catalog {
     }
 
     pub fn source_cursor(&self, source: &Source) -> u64 {
-        self.source_watermarks.for_source(source)
+        self.source_watermarks
+            .for_source_at(source, self.read.commit_cursor)
     }
 }
 
@@ -402,12 +387,9 @@ fn version_sources_for_source(source: &Source) -> Vec<RuntimeVersionedSource> {
         Source::Geo { kind } => vec![RuntimeVersionedSource::Geo {
             kind: Some(kind.clone()),
         }],
-        Source::Traversal { relation, .. } => vec![
-            RuntimeVersionedSource::Relations {
-                kind: Some(relation.clone()),
-            },
-            RuntimeVersionedSource::Records { kind: None },
-        ],
+        // A bounded traversal reads its start identity and the adjacency of
+        // the nodes it visits at execution; its catalogue needs only schema.
+        Source::Traversal { .. } => Vec::new(),
         Source::Claim { predicate } => vec![RuntimeVersionedSource::Claims {
             predicate: predicate.clone(),
         }],
@@ -431,12 +413,13 @@ pub(crate) fn normalize_version_sources(
     normalized
 }
 
-fn version_source_covers(
+pub(crate) fn version_source_covers(
     available: &RuntimeVersionedSource,
     required: &RuntimeVersionedSource,
 ) -> bool {
     use RuntimeVersionedSource as Version;
     match (available, required) {
+        (Version::IdentityRange { .. }, Version::IdentityRange { .. }) => available == required,
         (Version::Schema, Version::Schema) => true,
         (
             Version::Claims {
@@ -474,6 +457,24 @@ fn version_source_covers(
             if *model == RuntimeLogicalModel::GraphRelation =>
         {
             kind.as_ref().is_none_or(|kind| kind == &reference.kind)
+        }
+        (
+            Version::Records { kind },
+            Version::IdentityRange {
+                model,
+                kind: selected,
+                ..
+            },
+        ) if model.is_record_like() => kind.as_ref().is_none_or(|kind| kind == selected),
+        (
+            Version::Relations { kind },
+            Version::IdentityRange {
+                model,
+                kind: selected,
+                ..
+            },
+        ) if *model == RuntimeLogicalModel::GraphRelation => {
+            kind.as_ref().is_none_or(|kind| kind == selected)
         }
         (Version::Events { kind }, Version::Identity { model, reference })
             if model.is_event_like() =>

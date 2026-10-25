@@ -70,7 +70,7 @@ now exports the direct client, endpoint, error, operation, retry, session, and
 transport responsibilities; it is not a forwarding copy of the old runtime.
 The client still exposes four ergonomic calls—capabilities, endpoint
 catalogue, OpenAPI, and session creation—and one generic
-`call<K extends OperationId>()`. The generic call can address all 33 current
+`call<K extends OperationId>()`. The generic call can address all 40 current
 HTTP operation identifiers because `OperationId` is the key set of the
 generated endpoint object. That is compile-time and routing coverage, not
 behavioral coverage. There is no `subscription.ts`, WebSocket implementation,
@@ -98,11 +98,11 @@ the TypeScript 7 API.
 
 The audited projection contains:
 
-- 33 HTTP operations;
+- 44 HTTP operations;
 - only `200` success envelopes plus the default error envelope;
 - `application/json` as the only declared response media type; and
 - OpenAPI SHA-256
-  `9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d`.
+  `ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65`.
 
 The generated `rrd-openapi.ts` is a compile-time projection of roughly 1.6
 MiB. Its `paths`, `components`, and `operations` types are valuable compile-time
@@ -180,7 +180,10 @@ A qualified connection performs these steps explicitly:
    digest, limits, and available capabilities; and
 6. authenticate an application session before protected work.
 
-The current fetch call does not set redirect mode, so Fetch's default `follow`
+The client invokes its Fetch transport as a free function, never as a method
+of the client, because a browser's `fetch` throws "Illegal invocation" when
+called with any other `this`; a unit test injects such a transport. The
+current fetch call does not set redirect mode, so Fetch's default `follow`
 policy applies. The target uses `redirect: "error"` and verifies the final
 response URL/transport identity. Network reachability, CORS success, browser
 origin, TLS, and mesh membership never grant RRFlow authorization or initialize
@@ -316,7 +319,7 @@ The current evidence is bounded:
 | `pnpm --dir sdks/typescript check` | generation check, Biome over 14 files, typecheck, and 4 tests passed | Generator freshness and selected mocked HTTP behavior; no browser, WebSocket, package-consumer, or fault matrix. |
 | Conformance entry with `RRD_SDK_CONFORMANCE_MANIFEST` absent | failed immediately with the required-manifest assertion | Correct fail-closed harness configuration; no scenario executed. |
 | Conformance entry against the live example harness | passed and reported corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2` | Real HTTP against the present direct-seeded rrflowKV fixture; not D-01 installation, rrflowMX parity, browser/HTTPS/WSS, or complete labelled behavior. |
-| Generated-surface parity | 33 HTTP endpoint descriptors matched the OpenAPI digest | Method/path/auth/mutation projection only; not runtime validation or semantic execution. |
+| Generated-surface parity | 40 HTTP endpoint descriptors matched the OpenAPI digest | Method/path/auth/mutation projection only; not runtime validation or semantic execution. |
 | Adversarial injected-fetch probe | retried one unpinned query, accepted `201 text/plain` and invalid payload, serialized synthetic bearer | Reproducible open H-04 security/correctness defects. |
 | `npm pack --dry-run --json` | raw-source/test/generator package, no JS/declarations | Packaging inventory only; not installability or publication. |
 

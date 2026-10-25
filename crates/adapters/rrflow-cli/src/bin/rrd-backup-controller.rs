@@ -1,7 +1,10 @@
 use rrd_contract::CanonicalId;
 use rrd_engine::RrdEngine;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+#[cfg(debug_assertions)]
+use std::path::Path;
+use std::path::PathBuf;
+#[cfg(debug_assertions)]
 use std::time::Duration;
 
 const HOLD_AFTER_EFFECT_ENV: &str = "RRD_BACKUP_TEST_HOLD_AFTER_EFFECT_FILE";

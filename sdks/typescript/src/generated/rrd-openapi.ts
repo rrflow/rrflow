@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
+// OpenAPI SHA-256: ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -136,6 +136,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/data/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD data-schema-read */
+        post: operations["data-schema-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/diagnostics/read": {
         parameters: {
             query?: never;
@@ -153,6 +170,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/diagnostics/storage/cursor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD diagnostics-storage-cursor */
+        post: operations["diagnostics-storage-cursor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/diagnostics/storage/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD diagnostics-storage-read */
+        post: operations["diagnostics-storage-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/estates/{estate}/read": {
         parameters: {
             query?: never;
@@ -164,6 +215,57 @@ export interface paths {
         put?: never;
         /** RRD estate-read */
         post: operations["estate-read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/flights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD flight-launch */
+        post: operations["flight-launch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/flights/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD flight-list */
+        post: operations["flight-list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/flights/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD flight-read */
+        post: operations["flight-read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -249,6 +351,23 @@ export interface paths {
         put?: never;
         /** RRD query-execute */
         post: operations["query-execute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/query/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD query-export */
+        post: operations["query-export"];
         delete?: never;
         options?: never;
         head?: never;
@@ -436,6 +555,74 @@ export interface paths {
         put?: never;
         /** RRD subscription-open */
         post: operations["subscription-open"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-open */
+        post: operations["task-open"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-close */
+        post: operations["task-close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-list */
+        post: operations["task-list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** RRD task-read */
+        post: operations["task-read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2470,7 +2657,7 @@ export interface operations {
                                 chain_head_sha256?: string | null;
                                 records: {
                                     /** @enum {string} */
-                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     /** Format: uint64 */
                                     at_unix_ms: number;
                                     /**
@@ -2560,7 +2747,7 @@ export interface operations {
                                 chain_head_sha256?: string | null;
                                 records: {
                                     /** @enum {string} */
-                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     /** Format: uint64 */
                                     at_unix_ms: number;
                                     /**
@@ -3139,6 +3326,17 @@ export interface operations {
                                  *     configure-plan/configure-apply operation.
                                  */
                                 configuration: {
+                                    /**
+                                     * @description Policy for wall-clock observations at governed durable-effect boundaries.
+                                     *
+                                     *     A value of zero is strict: any observed rollback from a persisted anchor is
+                                     *     rejected. A nonzero value is an explicit operator-selected allowance, not
+                                     *     evidence that the host clock is synchronized or trustworthy.
+                                     */
+                                    clock: {
+                                        /** Format: uint64 */
+                                        maximum_rollback_ms: number;
+                                    };
                                     configuration_sha256: string;
                                     /** Format: uint16 */
                                     format_version: number;
@@ -3191,6 +3389,98 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Aggregate live physical read owners and charged pinned bytes; restart required.
+                                         */
+                                        active_read_views: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Named checkpoint-directory entry ceiling; restart required.
+                                         */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Native transaction owner count and logical buffer capacity; restart required.
+                                         */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Bytes to keep available beyond each native WAL/immutable allocation.
+                                         *     Requires restart; racy admission cannot replace actual I/O error handling.
+                                         */
+                                        recovery_reserve_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one
@@ -3330,6 +3620,17 @@ export interface operations {
                                  *     configure-plan/configure-apply operation.
                                  */
                                 configuration: {
+                                    /**
+                                     * @description Policy for wall-clock observations at governed durable-effect boundaries.
+                                     *
+                                     *     A value of zero is strict: any observed rollback from a persisted anchor is
+                                     *     rejected. A nonzero value is an explicit operator-selected allowance, not
+                                     *     evidence that the host clock is synchronized or trustworthy.
+                                     */
+                                    clock: {
+                                        /** Format: uint64 */
+                                        maximum_rollback_ms: number;
+                                    };
                                     configuration_sha256: string;
                                     /** Format: uint16 */
                                     format_version: number;
@@ -3382,6 +3683,98 @@ export interface operations {
                                     };
                                     /** Format: uint64 */
                                     revision: number;
+                                    /**
+                                     * @description Installed native storage limits. These bound separately accounted owners,
+                                     *     not total process RSS. Changing them requires a new governed configuration
+                                     *     and reopening storage; they are never hot-applied by a client.
+                                     */
+                                    storage: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Aggregate live physical read owners and charged pinned bytes; restart required.
+                                         */
+                                        active_read_views: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Named checkpoint-directory entry ceiling; restart required.
+                                         */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        compaction_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_logical_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_versions: number;
+                                        /** Format: uint64 */
+                                        compaction_l0_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_output_segments: number;
+                                        /** Format: uint64 */
+                                        memtable_flush_target_versions: number;
+                                        /** Format: uint64 */
+                                        mutable_accounted_bytes: number;
+                                        /** Format: uint64 */
+                                        mutable_versions: number;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Native transaction owner count and logical buffer capacity; restart required.
+                                         */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        page_cache_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        projected_output_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_bytes: number;
+                                        /** Format: uint64 */
+                                        reclamation_delete_files: number;
+                                        /** Format: uint64 */
+                                        reclamation_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        reclamation_inventory_entries: number;
+                                        /** Format: uint64 */
+                                        reclamation_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_elapsed_ms: number;
+                                        /** Format: uint64 */
+                                        recovery_files: number;
+                                        /** Format: uint64 */
+                                        recovery_metadata_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_read_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Bytes to keep available beyond each native WAL/immutable allocation.
+                                         *     Requires restart; racy admission cannot replace actual I/O error handling.
+                                         */
+                                        recovery_reserve_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_bytes: number;
+                                        /** Format: uint64 */
+                                        recovery_wal_frames: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_generations: number;
+                                        /** Format: uint64 */
+                                        retained_mutable_versions: number;
+                                        /** Format: uint64 */
+                                        source_page_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_bytes: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_requests: number;
+                                        /** Format: uint64 */
+                                        transaction_admission_wait_ms: number;
+                                        /** Format: uint64 */
+                                        wal_flush_target_bytes: number;
+                                    };
                                 };
                                 /**
                                  * @description Actual service composition. The three axes cannot be collapsed into one
@@ -7789,7 +8182,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -8000,7 +8393,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -8036,6 +8429,437 @@ export interface operations {
                                 truncated: boolean;
                                 /** Format: uint64 */
                                 valid_at: number;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "data-schema-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /** @description Bounded, authenticated catalogue discovery for database administration. */
+                    payload: {
+                        /** Format: uint32 */
+                        max_storage_keys: number;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint64 */
+                                known_at_cursor: number;
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                read_manifest_sha256: string;
+                                schema?: {
+                                    catalogue?: {
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        database: string;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        namespace: string;
+                                    };
+                                    /** @default {} */
+                                    events: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                            /** @default false */
+                                            subject_required: boolean;
+                                            /** @default [] */
+                                            subject_types: string[];
+                                        };
+                                    };
+                                    migration: string;
+                                    /** @default {} */
+                                    records: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                            /** @default [] */
+                                            unique_properties: string[];
+                                        };
+                                    };
+                                    /** @default {} */
+                                    relations: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @default [] */
+                                            from: string[];
+                                            /** Format: uint64 */
+                                            max_incoming?: number | null;
+                                            /** Format: uint64 */
+                                            max_outgoing?: number | null;
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                            /** @default [] */
+                                            to: string[];
+                                            /** @default false */
+                                            unique_pair: boolean;
+                                        };
+                                    };
+                                    /** Format: uint64 */
+                                    revision: number;
+                                    tables: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @enum {string} */
+                                            mode: "strict" | "schemaless";
+                                            /** @enum {string} */
+                                            model: "document" | "relational" | "graph_node" | "graph_relation" | "key_value" | "vector" | "event" | "time_series" | "geo" | "object" | "reasoning_claim" | "reasoning_record" | "reasoning_event" | "lifecycle_record" | "lifecycle_event";
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                        };
+                                    };
+                                } | null;
+                                scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint64 */
+                                known_at_cursor: number;
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                read_manifest_sha256: string;
+                                schema?: {
+                                    catalogue?: {
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        database: string;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        namespace: string;
+                                    };
+                                    /** @default {} */
+                                    events: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                            /** @default false */
+                                            subject_required: boolean;
+                                            /** @default [] */
+                                            subject_types: string[];
+                                        };
+                                    };
+                                    migration: string;
+                                    /** @default {} */
+                                    records: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                            /** @default [] */
+                                            unique_properties: string[];
+                                        };
+                                    };
+                                    /** @default {} */
+                                    relations: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @default [] */
+                                            from: string[];
+                                            /** Format: uint64 */
+                                            max_incoming?: number | null;
+                                            /** Format: uint64 */
+                                            max_outgoing?: number | null;
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                            /** @default [] */
+                                            to: string[];
+                                            /** @default false */
+                                            unique_pair: boolean;
+                                        };
+                                    };
+                                    /** Format: uint64 */
+                                    revision: number;
+                                    tables: {
+                                        [key: string]: {
+                                            /** @default false */
+                                            allow_additional_properties: boolean;
+                                            /** @enum {string} */
+                                            mode: "strict" | "schemaless";
+                                            /** @enum {string} */
+                                            model: "document" | "relational" | "graph_node" | "graph_relation" | "key_value" | "vector" | "event" | "time_series" | "geo" | "object" | "reasoning_claim" | "reasoning_record" | "reasoning_event" | "lifecycle_record" | "lifecycle_event";
+                                            /** @default {} */
+                                            properties: {
+                                                [key: string]: {
+                                                    /** @default false */
+                                                    required: boolean;
+                                                    /** @enum {string} */
+                                                    value_type: "null" | "bool" | "integer" | "unsigned" | "decimal" | "string" | "digest" | "list" | "map";
+                                                };
+                                            };
+                                        };
+                                    };
+                                } | null;
+                                scope: string;
                             };
                             /** @constant */
                             status: "ok";
@@ -8148,7 +8972,7 @@ export interface operations {
                                     chain_head_sha256?: string | null;
                                     records: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** Format: uint64 */
                                         at_unix_ms: number;
                                         /**
@@ -10375,13 +11199,57 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
-                                /**
-                                 * @description Process-local physical storage observation for the instance's storage
-                                 *     profile. It carries `observation` authority: counters are measured at
-                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
-                                 *     process reopens its store.
-                                 */
                                 storage: {
+                                    /**
+                                     * @description Process-local physical storage observation for the instance's storage
+                                     *     profile. It carries `observation` authority: counters are measured at
+                                     *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                     *     process reopens its store.
+                                     */
+                                    admission?: {
+                                        active: boolean;
+                                        /**
+                                         * Format: uint64
+                                         * @description Actual live physical read views and conservative aggregate pin charge.
+                                         */
+                                        active_read_views: number;
+                                        /** Format: uint64 */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
+                                        fenced: boolean;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /** Format: uint64 */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        outstanding_logical_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Includes the active request plus admitted waiters, matching admission.
+                                         */
+                                        outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        queued_requests: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                         */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
+                                    } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
                                     /** Format: uint64 */
@@ -10696,7 +11564,7 @@ export interface operations {
                                     chain_head_sha256?: string | null;
                                     records: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** Format: uint64 */
                                         at_unix_ms: number;
                                         /**
@@ -12923,13 +13791,57 @@ export interface operations {
                                     /** Format: uint64 */
                                     row_count: number;
                                 }[];
-                                /**
-                                 * @description Process-local physical storage observation for the instance's storage
-                                 *     profile. It carries `observation` authority: counters are measured at
-                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
-                                 *     process reopens its store.
-                                 */
                                 storage: {
+                                    /**
+                                     * @description Process-local physical storage observation for the instance's storage
+                                     *     profile. It carries `observation` authority: counters are measured at
+                                     *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                     *     process reopens its store.
+                                     */
+                                    admission?: {
+                                        active: boolean;
+                                        /**
+                                         * Format: uint64
+                                         * @description Actual live physical read views and conservative aggregate pin charge.
+                                         */
+                                        active_read_views: number;
+                                        /** Format: uint64 */
+                                        checkpoint_entries: number;
+                                        /** Format: uint64 */
+                                        checkpoint_limit: number;
+                                        /** Format: uint64 */
+                                        denied_source_allocations: number;
+                                        fenced: boolean;
+                                        /** Format: uint64 */
+                                        native_transaction_bytes: number;
+                                        /** Format: uint64 */
+                                        native_transactions: number;
+                                        /** Format: uint64 */
+                                        outstanding_logical_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Includes the active request plus admitted waiters, matching admission.
+                                         */
+                                        outstanding_requests: number;
+                                        /** Format: uint64 */
+                                        peak_source_bytes: number;
+                                        /** Format: uint64 */
+                                        pinned_read_bytes: number;
+                                        /** Format: uint64 */
+                                        queued_requests: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                         */
+                                        retained_mutable_bytes: number;
+                                        /** Format: uint64 */
+                                        retained_projected_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                         */
+                                        retained_source_bytes: number;
+                                    } | null;
                                     /** @description How much physical evidence the instance's storage profile reports. */
                                     evidence_level: "logical_only" | "rrflow_kv_counters";
                                     /** Format: uint64 */
@@ -13200,6 +14112,707 @@ export interface operations {
                                     revision: number;
                                     scope: string;
                                 };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "diagnostics-storage-cursor": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        action: {
+                            /** Format: uint32 */
+                            batch_bytes: number;
+                            /** Format: uint16 */
+                            batch_rows: number;
+                            /** @constant */
+                            kind: "open";
+                            /** Format: uint32 */
+                            lifetime_ms: number;
+                        } | {
+                            /** @constant */
+                            kind: "observe";
+                        } | {
+                            /** Format: uint64 */
+                            expected_ordinal: number;
+                            /** @constant */
+                            kind: "advance";
+                        } | {
+                            /** @constant */
+                            kind: "cancel_source";
+                        } | {
+                            /** @constant */
+                            kind: "release";
+                        };
+                        cursor_id: string;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint64 */
+                                allocated_bytes: number;
+                                cursor_id: string;
+                                /** Format: uint64 */
+                                page_ordinal: number;
+                                page_sha256: string;
+                                released: boolean;
+                                /** Format: uint64 */
+                                rows: number;
+                                /** Format: uint64 */
+                                snapshot_sequence: number;
+                                source_open: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /** Format: uint64 */
+                                allocated_bytes: number;
+                                cursor_id: string;
+                                /** Format: uint64 */
+                                page_ordinal: number;
+                                page_sha256: string;
+                                released: boolean;
+                                /** Format: uint64 */
+                                rows: number;
+                                /** Format: uint64 */
+                                snapshot_sequence: number;
+                                source_open: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "diagnostics-storage-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /**
+                     * @description Physical process-local counters only; no graph/history assembly or claim
+                     *     that independently sampled counters form an authoritative read stamp.
+                     */
+                    payload: {
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                admission?: {
+                                    active: boolean;
+                                    /**
+                                     * Format: uint64
+                                     * @description Actual live physical read views and conservative aggregate pin charge.
+                                     */
+                                    active_read_views: number;
+                                    /** Format: uint64 */
+                                    checkpoint_entries: number;
+                                    /** Format: uint64 */
+                                    checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
+                                    fenced: boolean;
+                                    /** Format: uint64 */
+                                    native_transaction_bytes: number;
+                                    /** Format: uint64 */
+                                    native_transactions: number;
+                                    /** Format: uint64 */
+                                    outstanding_logical_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Includes the active request plus admitted waiters, matching admission.
+                                     */
+                                    outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
+                                    pinned_read_bytes: number;
+                                    /** Format: uint64 */
+                                    queued_requests: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                     */
+                                    retained_mutable_bytes: number;
+                                    /** Format: uint64 */
+                                    retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
+                                } | null;
+                                /** @description How much physical evidence the instance's storage profile reports. */
+                                evidence_level: "logical_only" | "rrflow_kv_counters";
+                                /** Format: uint64 */
+                                observed_at_unix_ms: number;
+                                /** @enum {string} */
+                                profile: "rrflow_mx" | "rrflow_kv";
+                                /** @description rrflowKV physical state and counters. */
+                                rrflow_kv?: {
+                                    /** Format: uint64 */
+                                    durable_sequence: number;
+                                    /** @description Cumulative flush and compaction work since the process opened the store. */
+                                    maintenance: {
+                                        /** Format: uint64 */
+                                        automatic_compactions: number;
+                                        /** Format: uint64 */
+                                        automatic_flushes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_output_bytes: number;
+                                        /** Format: uint64 */
+                                        failed_compactions: number;
+                                        /** Format: uint64 */
+                                        failed_flushes: number;
+                                        /** Format: uint64 */
+                                        oversized_batches: number;
+                                        /** Format: uint64 */
+                                        peak_compaction_buffer_bytes: number;
+                                        /** Format: uint64 */
+                                        write_stalls: number;
+                                    };
+                                    /** Format: uint64 */
+                                    manifest_generation: number;
+                                    /** @description The rrflowKV mutable write buffer. */
+                                    memtable: {
+                                        /** Format: uint64 */
+                                        approximate_bytes: number;
+                                        /** Format: uint64 */
+                                        key_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        keys: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Version count that triggers an automatic flush.
+                                         */
+                                        max_versions: number;
+                                        /** Format: uint64 */
+                                        owned_bytes_lower_bound: number;
+                                        /** Format: uint64 */
+                                        spilled_chains: number;
+                                        /** Format: uint64 */
+                                        spilled_version_capacity: number;
+                                        /** Format: uint64 */
+                                        tombstones: number;
+                                        /** Format: uint64 */
+                                        value_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        version_record_bytes: number;
+                                        /** Format: uint64 */
+                                        versions: number;
+                                    };
+                                    /**
+                                     * @description The bounded decoded-page cache and the page reads it served or missed.
+                                     *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                     *     the process opened the store.
+                                     */
+                                    page_cache: {
+                                        /** Format: uint64 */
+                                        bytes_allocated: number;
+                                        /** Format: uint64 */
+                                        bytes_borrowed: number;
+                                        /** Format: uint64 */
+                                        bytes_copied: number;
+                                        /** Format: uint64 */
+                                        bytes_decoded: number;
+                                        /** Format: uint64 */
+                                        bytes_decompressed: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        capacity_bytes: number;
+                                        /** Format: uint64 */
+                                        entries: number;
+                                        /** Format: uint64 */
+                                        evictions: number;
+                                        /** Format: uint64 */
+                                        filter_checks: number;
+                                        /** Format: uint64 */
+                                        filter_negatives: number;
+                                        /** Format: uint64 */
+                                        hits: number;
+                                        /** Format: uint64 */
+                                        misses: number;
+                                        /** Format: uint64 */
+                                        page_loads: number;
+                                        /** Format: uint64 */
+                                        resident_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    physical_sequence: number;
+                                    /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                    segment_io: {
+                                        /** Format: uint64 */
+                                        bounded_reads: number;
+                                        /** Format: uint64 */
+                                        bounded_segments: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        fallbacks: number;
+                                        /** Format: uint64 */
+                                        io_uring_reads: number;
+                                        /** Format: uint64 */
+                                        io_uring_segments: number;
+                                        last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_request_bytes: number;
+                                        /** Format: uint64 */
+                                        mmap_reads: number;
+                                        /** Format: uint64 */
+                                        mmap_segments: number;
+                                        /** Format: uint64 */
+                                        peak_request_bytes: number;
+                                        /** Format: uint64 */
+                                        read_operations: number;
+                                        /**
+                                         * @description The segment read path rrflowKV requested.
+                                         * @enum {string}
+                                         */
+                                        requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                    };
+                                    /** @description The persisted segment set named by the current manifest. */
+                                    segment_set: {
+                                        /** Format: uint64 */
+                                        compaction_debt_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_target_segment_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description L0 segment count that triggers compaction.
+                                         */
+                                        l0_compaction_trigger: number;
+                                        /** Format: uint64 */
+                                        l0_segments: number;
+                                        /** Format: uint64 */
+                                        segment_bytes: number;
+                                        /** Format: uint64 */
+                                        segments: number;
+                                    };
+                                    /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                    write_ahead_log: {
+                                        /** Format: uint64 */
+                                        payload_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Payload size that triggers an automatic flush.
+                                         */
+                                        payload_max_bytes: number;
+                                    };
+                                } | null;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description Process-local physical storage observation for the instance's storage
+                                 *     profile. It carries `observation` authority: counters are measured at
+                                 *     `observed_at_unix_ms`, are not bound to the read stamp, and reset when the
+                                 *     process reopens its store.
+                                 */
+                                admission?: {
+                                    active: boolean;
+                                    /**
+                                     * Format: uint64
+                                     * @description Actual live physical read views and conservative aggregate pin charge.
+                                     */
+                                    active_read_views: number;
+                                    /** Format: uint64 */
+                                    checkpoint_entries: number;
+                                    /** Format: uint64 */
+                                    checkpoint_limit: number;
+                                    /** Format: uint64 */
+                                    denied_source_allocations: number;
+                                    fenced: boolean;
+                                    /** Format: uint64 */
+                                    native_transaction_bytes: number;
+                                    /** Format: uint64 */
+                                    native_transactions: number;
+                                    /** Format: uint64 */
+                                    outstanding_logical_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Includes the active request plus admitted waiters, matching admission.
+                                     */
+                                    outstanding_requests: number;
+                                    /** Format: uint64 */
+                                    peak_source_bytes: number;
+                                    /** Format: uint64 */
+                                    pinned_read_bytes: number;
+                                    /** Format: uint64 */
+                                    queued_requests: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Logical owner charges; these are not allocator or process RSS bytes.
+                                     */
+                                    retained_mutable_bytes: number;
+                                    /** Format: uint64 */
+                                    retained_projected_bytes: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Owned source-page allocation charges; excludes borrowed mmap residency.
+                                     */
+                                    retained_source_bytes: number;
+                                } | null;
+                                /** @description How much physical evidence the instance's storage profile reports. */
+                                evidence_level: "logical_only" | "rrflow_kv_counters";
+                                /** Format: uint64 */
+                                observed_at_unix_ms: number;
+                                /** @enum {string} */
+                                profile: "rrflow_mx" | "rrflow_kv";
+                                /** @description rrflowKV physical state and counters. */
+                                rrflow_kv?: {
+                                    /** Format: uint64 */
+                                    durable_sequence: number;
+                                    /** @description Cumulative flush and compaction work since the process opened the store. */
+                                    maintenance: {
+                                        /** Format: uint64 */
+                                        automatic_compactions: number;
+                                        /** Format: uint64 */
+                                        automatic_flushes: number;
+                                        /** Format: uint64 */
+                                        compaction_input_bytes: number;
+                                        /** Format: uint64 */
+                                        compaction_output_bytes: number;
+                                        /** Format: uint64 */
+                                        failed_compactions: number;
+                                        /** Format: uint64 */
+                                        failed_flushes: number;
+                                        /** Format: uint64 */
+                                        oversized_batches: number;
+                                        /** Format: uint64 */
+                                        peak_compaction_buffer_bytes: number;
+                                        /** Format: uint64 */
+                                        write_stalls: number;
+                                    };
+                                    /** Format: uint64 */
+                                    manifest_generation: number;
+                                    /** @description The rrflowKV mutable write buffer. */
+                                    memtable: {
+                                        /** Format: uint64 */
+                                        approximate_bytes: number;
+                                        /** Format: uint64 */
+                                        key_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        keys: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Version count that triggers an automatic flush.
+                                         */
+                                        max_versions: number;
+                                        /** Format: uint64 */
+                                        owned_bytes_lower_bound: number;
+                                        /** Format: uint64 */
+                                        spilled_chains: number;
+                                        /** Format: uint64 */
+                                        spilled_version_capacity: number;
+                                        /** Format: uint64 */
+                                        tombstones: number;
+                                        /** Format: uint64 */
+                                        value_payload_bytes: number;
+                                        /** Format: uint64 */
+                                        version_record_bytes: number;
+                                        /** Format: uint64 */
+                                        versions: number;
+                                    };
+                                    /**
+                                     * @description The bounded decoded-page cache and the page reads it served or missed.
+                                     *     Hit, miss, eviction, load, byte, and filter counters are cumulative since
+                                     *     the process opened the store.
+                                     */
+                                    page_cache: {
+                                        /** Format: uint64 */
+                                        bytes_allocated: number;
+                                        /** Format: uint64 */
+                                        bytes_borrowed: number;
+                                        /** Format: uint64 */
+                                        bytes_copied: number;
+                                        /** Format: uint64 */
+                                        bytes_decoded: number;
+                                        /** Format: uint64 */
+                                        bytes_decompressed: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        capacity_bytes: number;
+                                        /** Format: uint64 */
+                                        entries: number;
+                                        /** Format: uint64 */
+                                        evictions: number;
+                                        /** Format: uint64 */
+                                        filter_checks: number;
+                                        /** Format: uint64 */
+                                        filter_negatives: number;
+                                        /** Format: uint64 */
+                                        hits: number;
+                                        /** Format: uint64 */
+                                        misses: number;
+                                        /** Format: uint64 */
+                                        page_loads: number;
+                                        /** Format: uint64 */
+                                        resident_bytes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    physical_sequence: number;
+                                    /** @description Segment file I/O by access path, cumulative since the store opened. */
+                                    segment_io: {
+                                        /** Format: uint64 */
+                                        bounded_reads: number;
+                                        /** Format: uint64 */
+                                        bounded_segments: number;
+                                        /** Format: uint64 */
+                                        bytes_read: number;
+                                        /** Format: uint64 */
+                                        fallbacks: number;
+                                        /** Format: uint64 */
+                                        io_uring_reads: number;
+                                        /** Format: uint64 */
+                                        io_uring_segments: number;
+                                        last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_request_bytes: number;
+                                        /** Format: uint64 */
+                                        mmap_reads: number;
+                                        /** Format: uint64 */
+                                        mmap_segments: number;
+                                        /** Format: uint64 */
+                                        peak_request_bytes: number;
+                                        /** Format: uint64 */
+                                        read_operations: number;
+                                        /**
+                                         * @description The segment read path rrflowKV requested.
+                                         * @enum {string}
+                                         */
+                                        requested_mode: "auto" | "mmap" | "io_uring" | "bounded";
+                                    };
+                                    /** @description The persisted segment set named by the current manifest. */
+                                    segment_set: {
+                                        /** Format: uint64 */
+                                        compaction_debt_segments: number;
+                                        /** Format: uint64 */
+                                        compaction_target_segment_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description L0 segment count that triggers compaction.
+                                         */
+                                        l0_compaction_trigger: number;
+                                        /** Format: uint64 */
+                                        l0_segments: number;
+                                        /** Format: uint64 */
+                                        segment_bytes: number;
+                                        /** Format: uint64 */
+                                        segments: number;
+                                    };
+                                    /** @description The rrflowKV write-ahead log tail not yet flushed into segments. */
+                                    write_ahead_log: {
+                                        /** Format: uint64 */
+                                        payload_bytes: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Payload size that triggers an automatic flush.
+                                         */
+                                        payload_max_bytes: number;
+                                    };
+                                } | null;
                             };
                             /** @constant */
                             status: "ok";
@@ -13712,6 +15325,1938 @@ export interface operations {
                                 revision: number;
                                 /** Format: uint64 */
                                 updated_at_unix_ms: number;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "flight-launch": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /** @description One governed request to record a prompt flight. */
+                    payload: {
+                        acceptance_marker?: string | null;
+                        /**
+                         * @description The exact context budget a flight declares. It is the same bounded request
+                         *     the public `context-assemble` operation accepts, minus the scope and the
+                         *     query, which the flight supplies from its own coordinates.
+                         */
+                        context: {
+                            /** Format: uint8 */
+                            max_graph_depth: number;
+                            /** Format: uint64 */
+                            max_items: number;
+                            /** Format: uint64 */
+                            max_output_bytes: number;
+                            /** Format: uint64 */
+                            max_storage_keys: number;
+                            seeds?: {
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                id: string;
+                                /**
+                                 * @description A canonical public identifier component.
+                                 *
+                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                 *     labels are separate data and may use arbitrary Unicode.
+                                 */
+                                kind: string;
+                            }[];
+                            /** Format: uint64 */
+                            valid_at: number;
+                        };
+                        /**
+                         * @description How much canonical context the flight injects ahead of the prompt.
+                         *
+                         *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                         *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                         *     the declared budget. Both arms read history; neither mutates it.
+                         * @enum {string}
+                         */
+                        context_mode: "fresh" | "pruned";
+                        prompt: string;
+                        /**
+                         * @description The arm that receives the prepared prompt packet.
+                         *
+                         *     `observe` prepares the packet inside the engine and launches nothing. Model
+                         *     providers remain explicit opt-in adapters; one is added to this closed
+                         *     vocabulary only together with its governed adapter, budget, and audit
+                         *     evidence.
+                         * @enum {string}
+                         */
+                        provider: "observe";
+                        scope: string;
+                        /**
+                         * @description The open task this flight joins. The engine writes one
+                         *     `rrflow-task-includes` edge from the task to the flight in the
+                         *     flight's own commit.
+                         */
+                        task_id?: string | null;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
+                                flight: {
+                                    events: {
+                                        /** Format: uint64 */
+                                        at_unix_ms: number;
+                                        data?: {
+                                            [key: string]: {
+                                                /** @constant */
+                                                type: "null";
+                                            } | {
+                                                /** @constant */
+                                                type: "bool";
+                                                value: boolean;
+                                            } | {
+                                                /** @constant */
+                                                type: "integer";
+                                                /** Format: int64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "unsigned";
+                                                /** Format: uint64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "decimal";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "string";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "digest";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "list";
+                                                value: components["schemas"]["QueryValue"][];
+                                            } | {
+                                                /** @constant */
+                                                type: "map";
+                                                value: {
+                                                    [key: string]: components["schemas"]["QueryValue"];
+                                                };
+                                            };
+                                        };
+                                        detail: string;
+                                        /** Format: uint64 */
+                                        elapsed_ms: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        kind: string;
+                                        label: string;
+                                        /** Format: uint64 */
+                                        ordinal: number;
+                                        /**
+                                         * @description Runtime lane of one flight event. The vocabulary is closed so a client
+                                         *     cannot invent a lane; provider arms add `model` and `tool` lanes together
+                                         *     with their adapters.
+                                         * @enum {string}
+                                         */
+                                        stage: "prompt" | "context" | "outcome";
+                                    }[];
+                                    /**
+                                     * @description The durable flight row. Every field is a typed property of the engine-owned
+                                     *     `rrflow-prompt-flight` record; nothing is a serialized blob.
+                                     */
+                                    record: {
+                                        acceptance_marker?: string | null;
+                                        cohort_sha256: string;
+                                        /**
+                                         * @description Digest coordinates of the engine-assembled context packet a flight used.
+                                         *     The packet itself is reproducible from the request at the recorded stamp;
+                                         *     the flight retains its identity, not a second copy of the items.
+                                         */
+                                        context?: {
+                                            /** Format: uint64 */
+                                            items: number;
+                                            /** Format: uint64 */
+                                            output_bytes: number;
+                                            packet_sha256: string;
+                                            plan_sha256: string;
+                                            request_sha256: string;
+                                            /** Format: uint64 */
+                                            selected_versions: number;
+                                            truncated: boolean;
+                                        } | null;
+                                        /**
+                                         * @description How much canonical context the flight injects ahead of the prompt.
+                                         *
+                                         *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                                         *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                                         *     the declared budget. Both arms read history; neither mutates it.
+                                         * @enum {string}
+                                         */
+                                        context_mode: "fresh" | "pruned";
+                                        /**
+                                         * @description The exact context budget a flight declares. It is the same bounded request
+                                         *     the public `context-assemble` operation accepts, minus the scope and the
+                                         *     query, which the flight supplies from its own coordinates.
+                                         */
+                                        context_request: {
+                                            /** Format: uint8 */
+                                            max_graph_depth: number;
+                                            /** Format: uint64 */
+                                            max_items: number;
+                                            /** Format: uint64 */
+                                            max_output_bytes: number;
+                                            /** Format: uint64 */
+                                            max_storage_keys: number;
+                                            seeds?: {
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                id: string;
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                kind: string;
+                                            }[];
+                                            /** Format: uint64 */
+                                            valid_at: number;
+                                        };
+                                        /** Format: uint64 */
+                                        created_at_unix_ms: number;
+                                        /** Format: uint64 */
+                                        event_count: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the flight's first committed version; stable creation order.
+                                         */
+                                        flight_cursor: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        flight_id: string;
+                                        /** Format: uint16 */
+                                        format_version: number;
+                                        /**
+                                         * @description The caller's replay coordinate. The same key with the same operation
+                                         *     digest returns this flight; a different digest is a conflict.
+                                         */
+                                        idempotency_key: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the version this projection was read from.
+                                         */
+                                        known_at_cursor: number;
+                                        /** @description Observed, non-authoritative measurements of one flight. */
+                                        metrics: {
+                                            /** Format: uint64 */
+                                            context_items: number;
+                                            /** Format: uint64 */
+                                            context_output_bytes: number;
+                                            /** Format: uint64 */
+                                            elapsed_ms: number;
+                                        };
+                                        operation_sha256: string;
+                                        prompt: string;
+                                        /**
+                                         * @description The arm that receives the prepared prompt packet.
+                                         *
+                                         *     `observe` prepares the packet inside the engine and launches nothing. Model
+                                         *     providers remain explicit opt-in adapters; one is added to this closed
+                                         *     vocabulary only together with its governed adapter, budget, and audit
+                                         *     evidence.
+                                         * @enum {string}
+                                         */
+                                        provider: "observe";
+                                        /** @description The authenticated runtime coordinate the flight was prepared at. */
+                                        read: {
+                                            /** Format: uint64 */
+                                            catalogue_revision: number;
+                                            /** Format: uint64 */
+                                            runtime_cursor: number;
+                                            runtime_manifest_sha256: string;
+                                            /** Format: uint64 */
+                                            schema_revision?: number | null;
+                                        };
+                                        scope: string;
+                                        /**
+                                         * @description Terminal state of the recorded flight. The `observe` provider completes a
+                                         *     flight synchronously as `prepared`; provider arms extend this vocabulary
+                                         *     together with their adapters.
+                                         * @enum {string}
+                                         */
+                                        status: "prepared";
+                                        /** @description The task the flight joined at launch, if any. */
+                                        task_id?: string | null;
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
+                                    };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
+                                };
+                                idempotent_replay: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
+                                flight: {
+                                    events: {
+                                        /** Format: uint64 */
+                                        at_unix_ms: number;
+                                        data?: {
+                                            [key: string]: {
+                                                /** @constant */
+                                                type: "null";
+                                            } | {
+                                                /** @constant */
+                                                type: "bool";
+                                                value: boolean;
+                                            } | {
+                                                /** @constant */
+                                                type: "integer";
+                                                /** Format: int64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "unsigned";
+                                                /** Format: uint64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "decimal";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "string";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "digest";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "list";
+                                                value: components["schemas"]["QueryValue"][];
+                                            } | {
+                                                /** @constant */
+                                                type: "map";
+                                                value: {
+                                                    [key: string]: components["schemas"]["QueryValue"];
+                                                };
+                                            };
+                                        };
+                                        detail: string;
+                                        /** Format: uint64 */
+                                        elapsed_ms: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        kind: string;
+                                        label: string;
+                                        /** Format: uint64 */
+                                        ordinal: number;
+                                        /**
+                                         * @description Runtime lane of one flight event. The vocabulary is closed so a client
+                                         *     cannot invent a lane; provider arms add `model` and `tool` lanes together
+                                         *     with their adapters.
+                                         * @enum {string}
+                                         */
+                                        stage: "prompt" | "context" | "outcome";
+                                    }[];
+                                    /**
+                                     * @description The durable flight row. Every field is a typed property of the engine-owned
+                                     *     `rrflow-prompt-flight` record; nothing is a serialized blob.
+                                     */
+                                    record: {
+                                        acceptance_marker?: string | null;
+                                        cohort_sha256: string;
+                                        /**
+                                         * @description Digest coordinates of the engine-assembled context packet a flight used.
+                                         *     The packet itself is reproducible from the request at the recorded stamp;
+                                         *     the flight retains its identity, not a second copy of the items.
+                                         */
+                                        context?: {
+                                            /** Format: uint64 */
+                                            items: number;
+                                            /** Format: uint64 */
+                                            output_bytes: number;
+                                            packet_sha256: string;
+                                            plan_sha256: string;
+                                            request_sha256: string;
+                                            /** Format: uint64 */
+                                            selected_versions: number;
+                                            truncated: boolean;
+                                        } | null;
+                                        /**
+                                         * @description How much canonical context the flight injects ahead of the prompt.
+                                         *
+                                         *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                                         *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                                         *     the declared budget. Both arms read history; neither mutates it.
+                                         * @enum {string}
+                                         */
+                                        context_mode: "fresh" | "pruned";
+                                        /**
+                                         * @description The exact context budget a flight declares. It is the same bounded request
+                                         *     the public `context-assemble` operation accepts, minus the scope and the
+                                         *     query, which the flight supplies from its own coordinates.
+                                         */
+                                        context_request: {
+                                            /** Format: uint8 */
+                                            max_graph_depth: number;
+                                            /** Format: uint64 */
+                                            max_items: number;
+                                            /** Format: uint64 */
+                                            max_output_bytes: number;
+                                            /** Format: uint64 */
+                                            max_storage_keys: number;
+                                            seeds?: {
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                id: string;
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                kind: string;
+                                            }[];
+                                            /** Format: uint64 */
+                                            valid_at: number;
+                                        };
+                                        /** Format: uint64 */
+                                        created_at_unix_ms: number;
+                                        /** Format: uint64 */
+                                        event_count: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the flight's first committed version; stable creation order.
+                                         */
+                                        flight_cursor: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        flight_id: string;
+                                        /** Format: uint16 */
+                                        format_version: number;
+                                        /**
+                                         * @description The caller's replay coordinate. The same key with the same operation
+                                         *     digest returns this flight; a different digest is a conflict.
+                                         */
+                                        idempotency_key: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the version this projection was read from.
+                                         */
+                                        known_at_cursor: number;
+                                        /** @description Observed, non-authoritative measurements of one flight. */
+                                        metrics: {
+                                            /** Format: uint64 */
+                                            context_items: number;
+                                            /** Format: uint64 */
+                                            context_output_bytes: number;
+                                            /** Format: uint64 */
+                                            elapsed_ms: number;
+                                        };
+                                        operation_sha256: string;
+                                        prompt: string;
+                                        /**
+                                         * @description The arm that receives the prepared prompt packet.
+                                         *
+                                         *     `observe` prepares the packet inside the engine and launches nothing. Model
+                                         *     providers remain explicit opt-in adapters; one is added to this closed
+                                         *     vocabulary only together with its governed adapter, budget, and audit
+                                         *     evidence.
+                                         * @enum {string}
+                                         */
+                                        provider: "observe";
+                                        /** @description The authenticated runtime coordinate the flight was prepared at. */
+                                        read: {
+                                            /** Format: uint64 */
+                                            catalogue_revision: number;
+                                            /** Format: uint64 */
+                                            runtime_cursor: number;
+                                            runtime_manifest_sha256: string;
+                                            /** Format: uint64 */
+                                            schema_revision?: number | null;
+                                        };
+                                        scope: string;
+                                        /**
+                                         * @description Terminal state of the recorded flight. The `observe` provider completes a
+                                         *     flight synchronously as `prepared`; provider arms extend this vocabulary
+                                         *     together with their adapters.
+                                         * @enum {string}
+                                         */
+                                        status: "prepared";
+                                        /** @description The task the flight joined at launch, if any. */
+                                        task_id?: string | null;
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
+                                    };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
+                                };
+                                idempotent_replay: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "flight-list": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /** @description Bounded, cursor-ordered page of flight records at one read stamp. */
+                    payload: {
+                        /**
+                         * Format: uint64
+                         * @description Return flights whose first committed version is after this cursor.
+                         */
+                        after_cursor: number;
+                        /** Format: uint16 */
+                        limit: number;
+                        /** Format: uint64 */
+                        max_storage_keys: number;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                flights: {
+                                    acceptance_marker?: string | null;
+                                    cohort_sha256: string;
+                                    /**
+                                     * @description Digest coordinates of the engine-assembled context packet a flight used.
+                                     *     The packet itself is reproducible from the request at the recorded stamp;
+                                     *     the flight retains its identity, not a second copy of the items.
+                                     */
+                                    context?: {
+                                        /** Format: uint64 */
+                                        items: number;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        packet_sha256: string;
+                                        plan_sha256: string;
+                                        request_sha256: string;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    } | null;
+                                    /**
+                                     * @description How much canonical context the flight injects ahead of the prompt.
+                                     *
+                                     *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                                     *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                                     *     the declared budget. Both arms read history; neither mutates it.
+                                     * @enum {string}
+                                     */
+                                    context_mode: "fresh" | "pruned";
+                                    /**
+                                     * @description The exact context budget a flight declares. It is the same bounded request
+                                     *     the public `context-assemble` operation accepts, minus the scope and the
+                                     *     query, which the flight supplies from its own coordinates.
+                                     */
+                                    context_request: {
+                                        /** Format: uint8 */
+                                        max_graph_depth: number;
+                                        /** Format: uint64 */
+                                        max_items: number;
+                                        /** Format: uint64 */
+                                        max_output_bytes: number;
+                                        /** Format: uint64 */
+                                        max_storage_keys: number;
+                                        seeds?: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        }[];
+                                        /** Format: uint64 */
+                                        valid_at: number;
+                                    };
+                                    /** Format: uint64 */
+                                    created_at_unix_ms: number;
+                                    /** Format: uint64 */
+                                    event_count: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the flight's first committed version; stable creation order.
+                                     */
+                                    flight_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    flight_id: string;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description The caller's replay coordinate. The same key with the same operation
+                                     *     digest returns this flight; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** @description Observed, non-authoritative measurements of one flight. */
+                                    metrics: {
+                                        /** Format: uint64 */
+                                        context_items: number;
+                                        /** Format: uint64 */
+                                        context_output_bytes: number;
+                                        /** Format: uint64 */
+                                        elapsed_ms: number;
+                                    };
+                                    operation_sha256: string;
+                                    prompt: string;
+                                    /**
+                                     * @description The arm that receives the prepared prompt packet.
+                                     *
+                                     *     `observe` prepares the packet inside the engine and launches nothing. Model
+                                     *     providers remain explicit opt-in adapters; one is added to this closed
+                                     *     vocabulary only together with its governed adapter, budget, and audit
+                                     *     evidence.
+                                     * @enum {string}
+                                     */
+                                    provider: "observe";
+                                    /** @description The authenticated runtime coordinate the flight was prepared at. */
+                                    read: {
+                                        /** Format: uint64 */
+                                        catalogue_revision: number;
+                                        /** Format: uint64 */
+                                        runtime_cursor: number;
+                                        runtime_manifest_sha256: string;
+                                        /** Format: uint64 */
+                                        schema_revision?: number | null;
+                                    };
+                                    scope: string;
+                                    /**
+                                     * @description Terminal state of the recorded flight. The `observe` provider completes a
+                                     *     flight synchronously as `prepared`; provider arms extend this vocabulary
+                                     *     together with their adapters.
+                                     * @enum {string}
+                                     */
+                                    status: "prepared";
+                                    /** @description The task the flight joined at launch, if any. */
+                                    task_id?: string | null;
+                                    /**
+                                     * Format: uint64
+                                     * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                     *     one per context item that is a canonical record. Claims are not graph
+                                     *     nodes and are counted only in the context summary.
+                                     */
+                                    use_count: number;
+                                }[];
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                requested_after_cursor: number;
+                                scope: string;
+                                /** Format: uint64 */
+                                selected_versions: number;
+                                /** @description True when more flights follow the last returned `flight_cursor`. */
+                                truncated: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                flights: {
+                                    acceptance_marker?: string | null;
+                                    cohort_sha256: string;
+                                    /**
+                                     * @description Digest coordinates of the engine-assembled context packet a flight used.
+                                     *     The packet itself is reproducible from the request at the recorded stamp;
+                                     *     the flight retains its identity, not a second copy of the items.
+                                     */
+                                    context?: {
+                                        /** Format: uint64 */
+                                        items: number;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        packet_sha256: string;
+                                        plan_sha256: string;
+                                        request_sha256: string;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    } | null;
+                                    /**
+                                     * @description How much canonical context the flight injects ahead of the prompt.
+                                     *
+                                     *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                                     *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                                     *     the declared budget. Both arms read history; neither mutates it.
+                                     * @enum {string}
+                                     */
+                                    context_mode: "fresh" | "pruned";
+                                    /**
+                                     * @description The exact context budget a flight declares. It is the same bounded request
+                                     *     the public `context-assemble` operation accepts, minus the scope and the
+                                     *     query, which the flight supplies from its own coordinates.
+                                     */
+                                    context_request: {
+                                        /** Format: uint8 */
+                                        max_graph_depth: number;
+                                        /** Format: uint64 */
+                                        max_items: number;
+                                        /** Format: uint64 */
+                                        max_output_bytes: number;
+                                        /** Format: uint64 */
+                                        max_storage_keys: number;
+                                        seeds?: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        }[];
+                                        /** Format: uint64 */
+                                        valid_at: number;
+                                    };
+                                    /** Format: uint64 */
+                                    created_at_unix_ms: number;
+                                    /** Format: uint64 */
+                                    event_count: number;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the flight's first committed version; stable creation order.
+                                     */
+                                    flight_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    flight_id: string;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    /**
+                                     * @description The caller's replay coordinate. The same key with the same operation
+                                     *     digest returns this flight; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** @description Observed, non-authoritative measurements of one flight. */
+                                    metrics: {
+                                        /** Format: uint64 */
+                                        context_items: number;
+                                        /** Format: uint64 */
+                                        context_output_bytes: number;
+                                        /** Format: uint64 */
+                                        elapsed_ms: number;
+                                    };
+                                    operation_sha256: string;
+                                    prompt: string;
+                                    /**
+                                     * @description The arm that receives the prepared prompt packet.
+                                     *
+                                     *     `observe` prepares the packet inside the engine and launches nothing. Model
+                                     *     providers remain explicit opt-in adapters; one is added to this closed
+                                     *     vocabulary only together with its governed adapter, budget, and audit
+                                     *     evidence.
+                                     * @enum {string}
+                                     */
+                                    provider: "observe";
+                                    /** @description The authenticated runtime coordinate the flight was prepared at. */
+                                    read: {
+                                        /** Format: uint64 */
+                                        catalogue_revision: number;
+                                        /** Format: uint64 */
+                                        runtime_cursor: number;
+                                        runtime_manifest_sha256: string;
+                                        /** Format: uint64 */
+                                        schema_revision?: number | null;
+                                    };
+                                    scope: string;
+                                    /**
+                                     * @description Terminal state of the recorded flight. The `observe` provider completes a
+                                     *     flight synchronously as `prepared`; provider arms extend this vocabulary
+                                     *     together with their adapters.
+                                     * @enum {string}
+                                     */
+                                    status: "prepared";
+                                    /** @description The task the flight joined at launch, if any. */
+                                    task_id?: string | null;
+                                    /**
+                                     * Format: uint64
+                                     * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                     *     one per context item that is a canonical record. Claims are not graph
+                                     *     nodes and are counted only in the context summary.
+                                     */
+                                    use_count: number;
+                                }[];
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                requested_after_cursor: number;
+                                scope: string;
+                                /** Format: uint64 */
+                                selected_versions: number;
+                                /** @description True when more flights follow the last returned `flight_cursor`. */
+                                truncated: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "flight-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        flight_id: string;
+                        /** Format: uint64 */
+                        max_storage_keys: number;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
+                                flight: {
+                                    events: {
+                                        /** Format: uint64 */
+                                        at_unix_ms: number;
+                                        data?: {
+                                            [key: string]: {
+                                                /** @constant */
+                                                type: "null";
+                                            } | {
+                                                /** @constant */
+                                                type: "bool";
+                                                value: boolean;
+                                            } | {
+                                                /** @constant */
+                                                type: "integer";
+                                                /** Format: int64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "unsigned";
+                                                /** Format: uint64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "decimal";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "string";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "digest";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "list";
+                                                value: components["schemas"]["QueryValue"][];
+                                            } | {
+                                                /** @constant */
+                                                type: "map";
+                                                value: {
+                                                    [key: string]: components["schemas"]["QueryValue"];
+                                                };
+                                            };
+                                        };
+                                        detail: string;
+                                        /** Format: uint64 */
+                                        elapsed_ms: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        kind: string;
+                                        label: string;
+                                        /** Format: uint64 */
+                                        ordinal: number;
+                                        /**
+                                         * @description Runtime lane of one flight event. The vocabulary is closed so a client
+                                         *     cannot invent a lane; provider arms add `model` and `tool` lanes together
+                                         *     with their adapters.
+                                         * @enum {string}
+                                         */
+                                        stage: "prompt" | "context" | "outcome";
+                                    }[];
+                                    /**
+                                     * @description The durable flight row. Every field is a typed property of the engine-owned
+                                     *     `rrflow-prompt-flight` record; nothing is a serialized blob.
+                                     */
+                                    record: {
+                                        acceptance_marker?: string | null;
+                                        cohort_sha256: string;
+                                        /**
+                                         * @description Digest coordinates of the engine-assembled context packet a flight used.
+                                         *     The packet itself is reproducible from the request at the recorded stamp;
+                                         *     the flight retains its identity, not a second copy of the items.
+                                         */
+                                        context?: {
+                                            /** Format: uint64 */
+                                            items: number;
+                                            /** Format: uint64 */
+                                            output_bytes: number;
+                                            packet_sha256: string;
+                                            plan_sha256: string;
+                                            request_sha256: string;
+                                            /** Format: uint64 */
+                                            selected_versions: number;
+                                            truncated: boolean;
+                                        } | null;
+                                        /**
+                                         * @description How much canonical context the flight injects ahead of the prompt.
+                                         *
+                                         *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                                         *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                                         *     the declared budget. Both arms read history; neither mutates it.
+                                         * @enum {string}
+                                         */
+                                        context_mode: "fresh" | "pruned";
+                                        /**
+                                         * @description The exact context budget a flight declares. It is the same bounded request
+                                         *     the public `context-assemble` operation accepts, minus the scope and the
+                                         *     query, which the flight supplies from its own coordinates.
+                                         */
+                                        context_request: {
+                                            /** Format: uint8 */
+                                            max_graph_depth: number;
+                                            /** Format: uint64 */
+                                            max_items: number;
+                                            /** Format: uint64 */
+                                            max_output_bytes: number;
+                                            /** Format: uint64 */
+                                            max_storage_keys: number;
+                                            seeds?: {
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                id: string;
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                kind: string;
+                                            }[];
+                                            /** Format: uint64 */
+                                            valid_at: number;
+                                        };
+                                        /** Format: uint64 */
+                                        created_at_unix_ms: number;
+                                        /** Format: uint64 */
+                                        event_count: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the flight's first committed version; stable creation order.
+                                         */
+                                        flight_cursor: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        flight_id: string;
+                                        /** Format: uint16 */
+                                        format_version: number;
+                                        /**
+                                         * @description The caller's replay coordinate. The same key with the same operation
+                                         *     digest returns this flight; a different digest is a conflict.
+                                         */
+                                        idempotency_key: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the version this projection was read from.
+                                         */
+                                        known_at_cursor: number;
+                                        /** @description Observed, non-authoritative measurements of one flight. */
+                                        metrics: {
+                                            /** Format: uint64 */
+                                            context_items: number;
+                                            /** Format: uint64 */
+                                            context_output_bytes: number;
+                                            /** Format: uint64 */
+                                            elapsed_ms: number;
+                                        };
+                                        operation_sha256: string;
+                                        prompt: string;
+                                        /**
+                                         * @description The arm that receives the prepared prompt packet.
+                                         *
+                                         *     `observe` prepares the packet inside the engine and launches nothing. Model
+                                         *     providers remain explicit opt-in adapters; one is added to this closed
+                                         *     vocabulary only together with its governed adapter, budget, and audit
+                                         *     evidence.
+                                         * @enum {string}
+                                         */
+                                        provider: "observe";
+                                        /** @description The authenticated runtime coordinate the flight was prepared at. */
+                                        read: {
+                                            /** Format: uint64 */
+                                            catalogue_revision: number;
+                                            /** Format: uint64 */
+                                            runtime_cursor: number;
+                                            runtime_manifest_sha256: string;
+                                            /** Format: uint64 */
+                                            schema_revision?: number | null;
+                                        };
+                                        scope: string;
+                                        /**
+                                         * @description Terminal state of the recorded flight. The `observe` provider completes a
+                                         *     flight synchronously as `prepared`; provider arms extend this vocabulary
+                                         *     together with their adapters.
+                                         * @enum {string}
+                                         */
+                                        status: "prepared";
+                                        /** @description The task the flight joined at launch, if any. */
+                                        task_id?: string | null;
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
+                                    };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
+                                };
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                selected_versions: number;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                /**
+                                 * @description One complete flight: its record, the records its context used, and every
+                                 *     event in ordinal order.
+                                 */
+                                flight: {
+                                    events: {
+                                        /** Format: uint64 */
+                                        at_unix_ms: number;
+                                        data?: {
+                                            [key: string]: {
+                                                /** @constant */
+                                                type: "null";
+                                            } | {
+                                                /** @constant */
+                                                type: "bool";
+                                                value: boolean;
+                                            } | {
+                                                /** @constant */
+                                                type: "integer";
+                                                /** Format: int64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "unsigned";
+                                                /** Format: uint64 */
+                                                value: number;
+                                            } | {
+                                                /** @constant */
+                                                type: "decimal";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "string";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "digest";
+                                                value: string;
+                                            } | {
+                                                /** @constant */
+                                                type: "list";
+                                                value: components["schemas"]["QueryValue"][];
+                                            } | {
+                                                /** @constant */
+                                                type: "map";
+                                                value: {
+                                                    [key: string]: components["schemas"]["QueryValue"];
+                                                };
+                                            };
+                                        };
+                                        detail: string;
+                                        /** Format: uint64 */
+                                        elapsed_ms: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        kind: string;
+                                        label: string;
+                                        /** Format: uint64 */
+                                        ordinal: number;
+                                        /**
+                                         * @description Runtime lane of one flight event. The vocabulary is closed so a client
+                                         *     cannot invent a lane; provider arms add `model` and `tool` lanes together
+                                         *     with their adapters.
+                                         * @enum {string}
+                                         */
+                                        stage: "prompt" | "context" | "outcome";
+                                    }[];
+                                    /**
+                                     * @description The durable flight row. Every field is a typed property of the engine-owned
+                                     *     `rrflow-prompt-flight` record; nothing is a serialized blob.
+                                     */
+                                    record: {
+                                        acceptance_marker?: string | null;
+                                        cohort_sha256: string;
+                                        /**
+                                         * @description Digest coordinates of the engine-assembled context packet a flight used.
+                                         *     The packet itself is reproducible from the request at the recorded stamp;
+                                         *     the flight retains its identity, not a second copy of the items.
+                                         */
+                                        context?: {
+                                            /** Format: uint64 */
+                                            items: number;
+                                            /** Format: uint64 */
+                                            output_bytes: number;
+                                            packet_sha256: string;
+                                            plan_sha256: string;
+                                            request_sha256: string;
+                                            /** Format: uint64 */
+                                            selected_versions: number;
+                                            truncated: boolean;
+                                        } | null;
+                                        /**
+                                         * @description How much canonical context the flight injects ahead of the prompt.
+                                         *
+                                         *     `fresh` injects nothing and records a zero-context baseline. `pruned`
+                                         *     injects only the engine-assembled, prompt-matched `ContextPacket` within
+                                         *     the declared budget. Both arms read history; neither mutates it.
+                                         * @enum {string}
+                                         */
+                                        context_mode: "fresh" | "pruned";
+                                        /**
+                                         * @description The exact context budget a flight declares. It is the same bounded request
+                                         *     the public `context-assemble` operation accepts, minus the scope and the
+                                         *     query, which the flight supplies from its own coordinates.
+                                         */
+                                        context_request: {
+                                            /** Format: uint8 */
+                                            max_graph_depth: number;
+                                            /** Format: uint64 */
+                                            max_items: number;
+                                            /** Format: uint64 */
+                                            max_output_bytes: number;
+                                            /** Format: uint64 */
+                                            max_storage_keys: number;
+                                            seeds?: {
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                id: string;
+                                                /**
+                                                 * @description A canonical public identifier component.
+                                                 *
+                                                 *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                                 *     labels are separate data and may use arbitrary Unicode.
+                                                 */
+                                                kind: string;
+                                            }[];
+                                            /** Format: uint64 */
+                                            valid_at: number;
+                                        };
+                                        /** Format: uint64 */
+                                        created_at_unix_ms: number;
+                                        /** Format: uint64 */
+                                        event_count: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the flight's first committed version; stable creation order.
+                                         */
+                                        flight_cursor: number;
+                                        /**
+                                         * @description A canonical public identifier component.
+                                         *
+                                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                         *     labels are separate data and may use arbitrary Unicode.
+                                         */
+                                        flight_id: string;
+                                        /** Format: uint16 */
+                                        format_version: number;
+                                        /**
+                                         * @description The caller's replay coordinate. The same key with the same operation
+                                         *     digest returns this flight; a different digest is a conflict.
+                                         */
+                                        idempotency_key: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Cursor of the version this projection was read from.
+                                         */
+                                        known_at_cursor: number;
+                                        /** @description Observed, non-authoritative measurements of one flight. */
+                                        metrics: {
+                                            /** Format: uint64 */
+                                            context_items: number;
+                                            /** Format: uint64 */
+                                            context_output_bytes: number;
+                                            /** Format: uint64 */
+                                            elapsed_ms: number;
+                                        };
+                                        operation_sha256: string;
+                                        prompt: string;
+                                        /**
+                                         * @description The arm that receives the prepared prompt packet.
+                                         *
+                                         *     `observe` prepares the packet inside the engine and launches nothing. Model
+                                         *     providers remain explicit opt-in adapters; one is added to this closed
+                                         *     vocabulary only together with its governed adapter, budget, and audit
+                                         *     evidence.
+                                         * @enum {string}
+                                         */
+                                        provider: "observe";
+                                        /** @description The authenticated runtime coordinate the flight was prepared at. */
+                                        read: {
+                                            /** Format: uint64 */
+                                            catalogue_revision: number;
+                                            /** Format: uint64 */
+                                            runtime_cursor: number;
+                                            runtime_manifest_sha256: string;
+                                            /** Format: uint64 */
+                                            schema_revision?: number | null;
+                                        };
+                                        scope: string;
+                                        /**
+                                         * @description Terminal state of the recorded flight. The `observe` provider completes a
+                                         *     flight synchronously as `prepared`; provider arms extend this vocabulary
+                                         *     together with their adapters.
+                                         * @enum {string}
+                                         */
+                                        status: "prepared";
+                                        /** @description The task the flight joined at launch, if any. */
+                                        task_id?: string | null;
+                                        /**
+                                         * Format: uint64
+                                         * @description Number of `rrflow-prompt-flight-used` edges written with the flight:
+                                         *     one per context item that is a canonical record. Claims are not graph
+                                         *     nodes and are counted only in the context summary.
+                                         */
+                                        use_count: number;
+                                    };
+                                    uses: {
+                                        /** @description The context avenues that produced the item, sorted and unique. */
+                                        evidence: ("seed" | "text" | "graph" | "vector")[];
+                                        /**
+                                         * Format: uint64
+                                         * @description One-based position of the item in the flight's context packet.
+                                         */
+                                        rank: number;
+                                        reference: {
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            id: string;
+                                            /**
+                                             * @description A canonical public identifier component.
+                                             *
+                                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                             *     labels are separate data and may use arbitrary Unicode.
+                                             */
+                                            kind: string;
+                                        };
+                                        /**
+                                         * Format: double
+                                         * @description The fused context score the item carried in the packet.
+                                         */
+                                        score: number;
+                                    }[];
+                                };
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                selected_versions: number;
                             };
                             /** @constant */
                             status: "ok";
@@ -15235,7 +18780,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -15425,7 +18970,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -15531,6 +19076,467 @@ export interface operations {
                                 /** Format: uint64 */
                                 schema_revision: number;
                                 scope: string;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "query-export": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /** Format: uint64 */
+                        max_output_bytes: number;
+                        query: {
+                            /**
+                             * @default {
+                             *       "max_batch_rows": 256,
+                             *       "max_elapsed_ms": 30000,
+                             *       "max_memory_bytes": 67108864,
+                             *       "max_output_bytes": 524288,
+                             *       "max_rows": 10000,
+                             *       "max_spill_bytes": 268435456,
+                             *       "max_storage_keys": 100000
+                             *     }
+                             */
+                            budget?: {
+                                /** Format: uint64 */
+                                max_batch_rows: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 30000
+                                 */
+                                max_elapsed_ms?: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 67108864
+                                 */
+                                max_memory_bytes?: number;
+                                /** Format: uint64 */
+                                max_output_bytes: number;
+                                /** Format: uint64 */
+                                max_rows: number;
+                                /**
+                                 * Format: uint64
+                                 * @default 268435456
+                                 */
+                                max_spill_bytes?: number;
+                                /** Format: uint64 */
+                                max_storage_keys: number;
+                            };
+                            parameters?: {
+                                [key: string]: {
+                                    /** @constant */
+                                    type: "null";
+                                } | {
+                                    /** @constant */
+                                    type: "bool";
+                                    value: boolean;
+                                } | {
+                                    /** @constant */
+                                    type: "integer";
+                                    /** Format: int64 */
+                                    value: number;
+                                } | {
+                                    /** @constant */
+                                    type: "unsigned";
+                                    /** Format: uint64 */
+                                    value: number;
+                                } | {
+                                    /** @constant */
+                                    type: "decimal";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "string";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "digest";
+                                    value: string;
+                                } | {
+                                    /** @constant */
+                                    type: "list";
+                                    value: components["schemas"]["QueryValue"][];
+                                } | {
+                                    /** @constant */
+                                    type: "map";
+                                    value: {
+                                        [key: string]: components["schemas"]["QueryValue"];
+                                    };
+                                };
+                            };
+                            query: string;
+                            scope: string;
+                        };
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                artifact_base64: string;
+                                /** Format: uint64 */
+                                artifact_bytes: number;
+                                artifact_sha256: string;
+                                /** Format: uint64 */
+                                columns: number;
+                                /** Format: uint64 */
+                                elapsed_micros: number;
+                                /** Format: uint64 */
+                                input_bytes: number;
+                                media_type: string;
+                                /** Format: uint64 */
+                                observed_writer_bytes: number;
+                                profile: string;
+                                /** Format: uint64 */
+                                reserved_working_bytes: number;
+                                /** Format: uint64 */
+                                row_groups: number;
+                                source: {
+                                    canonical_query: string;
+                                    execution: {
+                                        analysis?: {
+                                            /** Format: uint64 */
+                                            elapsed_micros: number;
+                                            engine: string;
+                                            filter_pushdown: string;
+                                            /** Format: uint64 */
+                                            input_batches: number;
+                                            /** Format: uint64 */
+                                            input_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            input_rows: number;
+                                            limit_pushdown: string;
+                                            /** Format: uint64 */
+                                            output_batches: number;
+                                            /** Format: uint64 */
+                                            peak_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            physical_operators: number;
+                                            projection_pushdown: string;
+                                            /** Format: uint64 */
+                                            provider_scans: number;
+                                            /** Format: uint64 */
+                                            spill_count: number;
+                                            /** Format: uint64 */
+                                            spilled_bytes: number;
+                                            /** Format: uint64 */
+                                            spilled_rows: number;
+                                        } | null;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                        read_evidence: {
+                                            /** Format: uint16 */
+                                            contract_version: number;
+                                            /** Format: uint64 */
+                                            decoded_bytes: number;
+                                            /** Format: uint64 */
+                                            key_budget: number;
+                                            /** Format: uint64 */
+                                            keys_examined: number;
+                                            paths: {
+                                                /** Format: uint64 */
+                                                decoded_bytes: number;
+                                                /** Format: uint64 */
+                                                keys_examined: number;
+                                                /**
+                                                 * @description The semantic physical path charged during a normal state read.
+                                                 * @enum {string}
+                                                 */
+                                                path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                                /** Format: uint64 */
+                                                point_reads: number;
+                                                /** Format: uint64 */
+                                                range_scans: number;
+                                                /** Format: uint64 */
+                                                values_decoded: number;
+                                            }[];
+                                            /** Format: uint64 */
+                                            point_reads: number;
+                                            /** Format: uint64 */
+                                            range_scans: number;
+                                            stamp_validation: {
+                                                /**
+                                                 * Format: uint64
+                                                 * @description Authenticated log-head/schema changes needed only to prove a retained
+                                                 *     historical stamp. This is not the source of normal query rows.
+                                                 */
+                                                change_reads: number;
+                                                /**
+                                                 * @description The authentication strategy applied to the requested read stamp.
+                                                 * @enum {string}
+                                                 */
+                                                method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                                /** Format: uint16 */
+                                                proof_nodes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            values_decoded: number;
+                                        };
+                                        /** Format: uint64 */
+                                        returned_rows: number;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    };
+                                    /** Format: uint64 */
+                                    known_at_cursor: number;
+                                    plan: {
+                                        authorization_boundary: string;
+                                        authorization_sha256: string;
+                                        candidates: {
+                                            exact: boolean;
+                                            name: string;
+                                            reason: string;
+                                            selected: boolean;
+                                        }[];
+                                        deterministic_order: string;
+                                        exact: boolean;
+                                        plan_sha256: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Revision of the security authority compiled before query binding. Zero
+                                         *     denotes an explicitly unsecured loopback development engine.
+                                         */
+                                        security_policy_revision: number;
+                                    };
+                                    read_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision: number;
+                                    scope: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                artifact_base64: string;
+                                /** Format: uint64 */
+                                artifact_bytes: number;
+                                artifact_sha256: string;
+                                /** Format: uint64 */
+                                columns: number;
+                                /** Format: uint64 */
+                                elapsed_micros: number;
+                                /** Format: uint64 */
+                                input_bytes: number;
+                                media_type: string;
+                                /** Format: uint64 */
+                                observed_writer_bytes: number;
+                                profile: string;
+                                /** Format: uint64 */
+                                reserved_working_bytes: number;
+                                /** Format: uint64 */
+                                row_groups: number;
+                                source: {
+                                    canonical_query: string;
+                                    execution: {
+                                        analysis?: {
+                                            /** Format: uint64 */
+                                            elapsed_micros: number;
+                                            engine: string;
+                                            filter_pushdown: string;
+                                            /** Format: uint64 */
+                                            input_batches: number;
+                                            /** Format: uint64 */
+                                            input_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            input_rows: number;
+                                            limit_pushdown: string;
+                                            /** Format: uint64 */
+                                            output_batches: number;
+                                            /** Format: uint64 */
+                                            peak_memory_bytes: number;
+                                            /** Format: uint64 */
+                                            physical_operators: number;
+                                            projection_pushdown: string;
+                                            /** Format: uint64 */
+                                            provider_scans: number;
+                                            /** Format: uint64 */
+                                            spill_count: number;
+                                            /** Format: uint64 */
+                                            spilled_bytes: number;
+                                            /** Format: uint64 */
+                                            spilled_rows: number;
+                                        } | null;
+                                        /** Format: uint64 */
+                                        output_bytes: number;
+                                        /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                        read_evidence: {
+                                            /** Format: uint16 */
+                                            contract_version: number;
+                                            /** Format: uint64 */
+                                            decoded_bytes: number;
+                                            /** Format: uint64 */
+                                            key_budget: number;
+                                            /** Format: uint64 */
+                                            keys_examined: number;
+                                            paths: {
+                                                /** Format: uint64 */
+                                                decoded_bytes: number;
+                                                /** Format: uint64 */
+                                                keys_examined: number;
+                                                /**
+                                                 * @description The semantic physical path charged during a normal state read.
+                                                 * @enum {string}
+                                                 */
+                                                path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                                /** Format: uint64 */
+                                                point_reads: number;
+                                                /** Format: uint64 */
+                                                range_scans: number;
+                                                /** Format: uint64 */
+                                                values_decoded: number;
+                                            }[];
+                                            /** Format: uint64 */
+                                            point_reads: number;
+                                            /** Format: uint64 */
+                                            range_scans: number;
+                                            stamp_validation: {
+                                                /**
+                                                 * Format: uint64
+                                                 * @description Authenticated log-head/schema changes needed only to prove a retained
+                                                 *     historical stamp. This is not the source of normal query rows.
+                                                 */
+                                                change_reads: number;
+                                                /**
+                                                 * @description The authentication strategy applied to the requested read stamp.
+                                                 * @enum {string}
+                                                 */
+                                                method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                                /** Format: uint16 */
+                                                proof_nodes: number;
+                                            };
+                                            /** Format: uint64 */
+                                            values_decoded: number;
+                                        };
+                                        /** Format: uint64 */
+                                        returned_rows: number;
+                                        /** Format: uint64 */
+                                        selected_versions: number;
+                                        truncated: boolean;
+                                    };
+                                    /** Format: uint64 */
+                                    known_at_cursor: number;
+                                    plan: {
+                                        authorization_boundary: string;
+                                        authorization_sha256: string;
+                                        candidates: {
+                                            exact: boolean;
+                                            name: string;
+                                            reason: string;
+                                            selected: boolean;
+                                        }[];
+                                        deterministic_order: string;
+                                        exact: boolean;
+                                        plan_sha256: string;
+                                        /**
+                                         * Format: uint64
+                                         * @description Revision of the security authority compiled before query binding. Zero
+                                         *     denotes an explicitly unsecured loopback development engine.
+                                         */
+                                        security_policy_revision: number;
+                                    };
+                                    read_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision: number;
+                                    scope: string;
+                                };
                             };
                             /** @constant */
                             status: "ok";
@@ -15812,7 +19818,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -15985,7 +19991,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -17129,7 +21135,7 @@ export interface operations {
                                 endpoints: {
                                     action: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** @constant */
                                         source: "fixed";
                                     };
@@ -17156,7 +21162,7 @@ export interface operations {
                                     /** @enum {string} */
                                     authentication: "public" | "api_key" | "session_bearer";
                                     /** @enum {string} */
-                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     frame_type: string;
                                     /**
                                      * @description A canonical public identifier component.
@@ -17203,7 +21209,7 @@ export interface operations {
                                 endpoints: {
                                     action: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** @constant */
                                         source: "fixed";
                                     };
@@ -17230,7 +21236,7 @@ export interface operations {
                                     /** @enum {string} */
                                     authentication: "public" | "api_key" | "session_bearer";
                                     /** @enum {string} */
-                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "knowledge_tree_read" | "knowledge_tree_write";
                                     frame_type: string;
                                     /**
                                      * @description A canonical public identifier component.
@@ -18191,6 +22197,1114 @@ export interface operations {
                                     status: "open" | "closed";
                                     stream_sha256: string;
                                     subscription_id: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-open": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /** @description One governed request to open a named task. */
+                    payload: {
+                        goal: string;
+                        scope: string;
+                        title: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                idempotent_replay: boolean;
+                                /**
+                                 * @description The durable task row. Every field is a typed property of the engine-owned
+                                 *     `rrflow-task` record; nothing is a serialized blob.
+                                 */
+                                task: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                idempotent_replay: boolean;
+                                /**
+                                 * @description The durable task row. Every field is a typed property of the engine-owned
+                                 *     `rrflow-task` record; nothing is a serialized blob.
+                                 */
+                                task: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-close": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /** @description One governed request to close an open task. */
+                    payload: {
+                        outcome?: string | null;
+                        scope: string;
+                        /**
+                         * @description `completed` or `abandoned`.
+                         * @enum {string}
+                         */
+                        status: "open" | "completed" | "abandoned";
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                idempotent_replay: boolean;
+                                /**
+                                 * @description The durable task row. Every field is a typed property of the engine-owned
+                                 *     `rrflow-task` record; nothing is a serialized blob.
+                                 */
+                                task: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                idempotent_replay: boolean;
+                                /**
+                                 * @description The durable task row. Every field is a typed property of the engine-owned
+                                 *     `rrflow-task` record; nothing is a serialized blob.
+                                 */
+                                task: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-list": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    /** @description Bounded, cursor-ordered page of task records at one read stamp. */
+                    payload: {
+                        /**
+                         * Format: uint64
+                         * @description Return tasks whose first committed version is after this cursor.
+                         */
+                        after_cursor: number;
+                        /** Format: uint16 */
+                        limit: number;
+                        /** Format: uint64 */
+                        max_storage_keys: number;
+                        scope: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                requested_after_cursor: number;
+                                scope: string;
+                                /** Format: uint64 */
+                                selected_versions: number;
+                                tasks: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                }[];
+                                /** @description True when more tasks follow the last returned `task_cursor`. */
+                                truncated: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            payload: {
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                requested_after_cursor: number;
+                                scope: string;
+                                /** Format: uint64 */
+                                selected_versions: number;
+                                tasks: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                }[];
+                                /** @description True when more tasks follow the last returned `task_cursor`. */
+                                truncated: boolean;
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+        };
+    };
+    "task-read": {
+        parameters: {
+            query?: never;
+            header: {
+                "X-RRD-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    context: {
+                        /** Format: uint64 */
+                        deadline_unix_ms?: number | null;
+                        idempotency_key?: string | null;
+                        operation_id: string;
+                        request_id: string;
+                    };
+                    payload: {
+                        /** Format: uint64 */
+                        max_storage_keys: number;
+                        scope: string;
+                        /**
+                         * @description A canonical public identifier component.
+                         *
+                         *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                         *     labels are separate data and may use arbitrary Unicode.
+                         */
+                        task_id: string;
+                    };
+                    protocol: string;
+                    /** Format: uint16 */
+                    protocol_version: number;
+                    /**
+                     * @description A fully explicit hierarchical identity. No field is inferred from process
+                     *     cwd, connection state, or a human label.
+                     */
+                    resource: {
+                        segments: {
+                            /**
+                             * @description A canonical public identifier component.
+                             *
+                             *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                             *     labels are separate data and may use arbitrary Unicode.
+                             */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                        }[];
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Typed RRD response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            /**
+                             * @description One task at one read stamp. Its flights are graph neighbours: rrflowQL
+                             *     traverses `rrflow-task-includes` from the task, so this result carries no
+                             *     second copy of the edge list.
+                             */
+                            payload: {
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                selected_versions: number;
+                                /**
+                                 * @description The durable task row. Every field is a typed property of the engine-owned
+                                 *     `rrflow-task` record; nothing is a serialized blob.
+                                 */
+                                task: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
+                                };
+                            };
+                            /** @constant */
+                            status: "ok";
+                        } | {
+                            error: {
+                                /** @enum {string} */
+                                code: "invalid_argument" | "not_found" | "already_exists" | "conflict" | "failed_precondition" | "unauthenticated" | "permission_denied" | "resource_exhausted" | "deadline_exceeded" | "cancelled" | "unavailable" | "corruption" | "unsupported_version" | "internal";
+                                details?: {
+                                    [key: string]: string;
+                                };
+                                message: string;
+                                retryable: boolean;
+                            };
+                            /** @constant */
+                            status: "error";
+                        };
+                        protocol: string;
+                        /** Format: uint16 */
+                        protocol_version: number;
+                        request_id: string;
+                    };
+                };
+            };
+            /** @description Typed RRD error response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        operation_id: string;
+                        outcome: {
+                            /**
+                             * @description One task at one read stamp. Its flights are graph neighbours: rrflowQL
+                             *     traverses `rrflow-task-includes` from the task, so this result carries no
+                             *     second copy of the edge list.
+                             */
+                            payload: {
+                                read: {
+                                    /** Format: uint64 */
+                                    catalogue_revision: number;
+                                    /** Format: uint64 */
+                                    runtime_cursor: number;
+                                    runtime_manifest_sha256: string;
+                                    /** Format: uint64 */
+                                    schema_revision?: number | null;
+                                };
+                                /** @description Complete logical I/O evidence for normal semantic reads at one stamp. */
+                                read_evidence: {
+                                    /** Format: uint16 */
+                                    contract_version: number;
+                                    /** Format: uint64 */
+                                    decoded_bytes: number;
+                                    /** Format: uint64 */
+                                    key_budget: number;
+                                    /** Format: uint64 */
+                                    keys_examined: number;
+                                    paths: {
+                                        /** Format: uint64 */
+                                        decoded_bytes: number;
+                                        /** Format: uint64 */
+                                        keys_examined: number;
+                                        /**
+                                         * @description The semantic physical path charged during a normal state read.
+                                         * @enum {string}
+                                         */
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        /** Format: uint64 */
+                                        point_reads: number;
+                                        /** Format: uint64 */
+                                        range_scans: number;
+                                        /** Format: uint64 */
+                                        values_decoded: number;
+                                    }[];
+                                    /** Format: uint64 */
+                                    point_reads: number;
+                                    /** Format: uint64 */
+                                    range_scans: number;
+                                    stamp_validation: {
+                                        /**
+                                         * Format: uint64
+                                         * @description Authenticated log-head/schema changes needed only to prove a retained
+                                         *     historical stamp. This is not the source of normal query rows.
+                                         */
+                                        change_reads: number;
+                                        /**
+                                         * @description The authentication strategy applied to the requested read stamp.
+                                         * @enum {string}
+                                         */
+                                        method: "authenticated_current_head" | "rfc9162_direct_versions";
+                                        /** Format: uint16 */
+                                        proof_nodes: number;
+                                    };
+                                    /** Format: uint64 */
+                                    values_decoded: number;
+                                };
+                                /** Format: uint64 */
+                                selected_versions: number;
+                                /**
+                                 * @description The durable task row. Every field is a typed property of the engine-owned
+                                 *     `rrflow-task` record; nothing is a serialized blob.
+                                 */
+                                task: {
+                                    /** Format: uint64 */
+                                    closed_at_unix_ms?: number | null;
+                                    /** Format: uint16 */
+                                    format_version: number;
+                                    goal: string;
+                                    /**
+                                     * @description The opening caller's replay coordinate. The same key with the same
+                                     *     operation digest returns this task; a different digest is a conflict.
+                                     */
+                                    idempotency_key: string;
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the version this projection was read from.
+                                     */
+                                    known_at_cursor: number;
+                                    /** Format: uint64 */
+                                    opened_at_unix_ms: number;
+                                    operation_sha256: string;
+                                    outcome?: string | null;
+                                    scope: string;
+                                    /**
+                                     * @description Lifecycle state of a task. A task opens as `open` and closes exactly once
+                                     *     as `completed` or `abandoned`; only an open task accepts new flights.
+                                     * @enum {string}
+                                     */
+                                    status: "open" | "completed" | "abandoned";
+                                    /**
+                                     * Format: uint64
+                                     * @description Cursor of the task's first committed version; stable creation order.
+                                     */
+                                    task_cursor: number;
+                                    /**
+                                     * @description A canonical public identifier component.
+                                     *
+                                     *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
+                                     *     labels are separate data and may use arbitrary Unicode.
+                                     */
+                                    task_id: string;
+                                    title: string;
                                 };
                             };
                             /** @constant */
@@ -22374,7 +27488,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -24306,7 +29420,7 @@ export interface operations {
                                              * @description The semantic physical path charged during a normal state read.
                                              * @enum {string}
                                              */
-                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                            path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                             /** Format: uint64 */
                                             point_reads: number;
                                             /** Format: uint64 */
@@ -25182,7 +30296,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -25448,7 +30562,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -26120,7 +31234,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -26387,7 +31501,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -26979,7 +32093,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */
@@ -27146,7 +32260,7 @@ export interface operations {
                                          * @description The semantic physical path charged during a normal state read.
                                          * @enum {string}
                                          */
-                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
+                                        path: "read_stamp" | "schema_versions" | "claim_versions" | "record_versions" | "relation_versions" | "adjacency_versions" | "event_versions" | "vector_versions" | "series_versions" | "geo_versions" | "object_versions" | "accumulator_proof";
                                         /** Format: uint64 */
                                         point_reads: number;
                                         /** Format: uint64 */

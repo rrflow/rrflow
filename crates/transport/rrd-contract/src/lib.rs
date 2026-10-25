@@ -9,7 +9,10 @@ mod attunement;
 mod capability_surface;
 mod deployment;
 mod diagnostic;
+mod storage_cursor;
+pub use storage_cursor::{InspectStorageCursor, StorageCursorAction, StorageCursorSnapshot};
 mod endpoint_binding;
+mod flight;
 mod function;
 #[path = "generated/signal_catalogue.rs"]
 mod generated_signal_catalogue;
@@ -20,11 +23,13 @@ mod memory_context;
 mod memory_estate;
 mod model_manifest;
 mod platform;
+mod query_export;
 mod read;
 mod reasoning_tree;
 mod restore_publication;
 mod router;
 mod sdk_conformance;
+mod task;
 mod websocket;
 
 pub use attunement::{
@@ -34,22 +39,26 @@ pub use attunement::{
     AttunementPhasePlan, AttunementPlan, AttunementRuntimeCoordinates, AttunementStatus,
     AttunementVerification, AttunementVerificationCheck, AttunementVerificationStatus,
     CancelAttunement, InstallationActionDisposition, InstallationActionKind,
-    InstallationActionResult, InstallationManagedPath, InstallationManagedPathKind,
-    InstallationPlan, InstallationPlanAction, InstallationRemovalRule, InstallationResult,
-    InstallationTargetKind, ResumeAttunement, ATTUNEMENT_PHASES,
+    InstallationActionResult, InstallationBootstrap, InstallationBootstrapPolicy,
+    InstallationManagedPath, InstallationManagedPathKind, InstallationPlan, InstallationPlanAction,
+    InstallationRecordKind, InstallationRemovalRule, InstallationResult,
+    InstallationSpecialization, InstallationStorageGeneration, InstallationTargetKind,
+    ResumeAttunement, ATTUNEMENT_PHASES, INSTALLATION_BOOTSTRAP_VERSION, INSTALLATION_LEASE_PATH,
+    INSTALLATION_LEASE_PRECONDITION, INSTALLATION_PLAN_CONTRACT_VERSION,
     INSTALL_ATTUNEMENT_CONTRACT_VERSION, MAX_ATTUNEMENT_CANCEL_REASON_BYTES,
     MAX_ATTUNEMENT_FAILURE_BYTES, MAX_ATTUNEMENT_PHASES, MAX_ATTUNEMENT_VERIFICATION_CHECKS,
-    MAX_INSTALLATION_ACTIONS,
+    MAX_BOOTSTRAP_RECORD_BYTES, MAX_BOOTSTRAP_TEXT_BYTES, MAX_INSTALLATION_ACTIONS,
 };
 pub use capability_surface::{
     ProductCapability, ProductCapabilityCatalogue, ProductSurface, SurfaceBinding,
     SurfaceDisposition,
 };
 pub use deployment::{
-    estate_configuration_sha256, DeploymentForm, DeploymentProfile, EndpointPresentation,
-    EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity, ReasoningLimits,
-    RecallLimits, StorageProfileKind, DEPLOYMENT_PROFILE_CONTRACT_VERSION,
-    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_REASONING_RUN_ELAPSED_MS, MAX_REASONING_STEPS,
+    estate_configuration_sha256, ClockPolicy, DeploymentForm, DeploymentProfile,
+    EndpointPresentation, EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity,
+    ReasoningLimits, RecallLimits, StorageLimits, StorageProfileKind,
+    DEPLOYMENT_PROFILE_CONTRACT_VERSION, ESTATE_CONFIGURATION_FORMAT_VERSION,
+    MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS, MAX_REASONING_STEPS,
     MAX_REASONING_STEP_ELAPSED_MS,
 };
 pub use diagnostic::{
@@ -61,9 +70,10 @@ pub use diagnostic::{
     DiagnosticRetentionPin, DiagnosticRetentionSnapshot, DiagnosticRrflowKvSnapshot,
     DiagnosticRuntimeReference, DiagnosticSectionSnapshot, DiagnosticSegmentIoMode,
     DiagnosticSegmentIoSnapshot, DiagnosticSegmentSetSnapshot, DiagnosticSnapshot,
-    DiagnosticSnapshotLease, DiagnosticStorageEvidenceLevel, DiagnosticStorageSnapshot,
-    DiagnosticVectorArtifactCatalogueSnapshot, DiagnosticVectorArtifactKind,
-    DiagnosticVectorArtifactSnapshot, DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot,
+    DiagnosticSnapshotLease, DiagnosticStorageAdmission, DiagnosticStorageEvidenceLevel,
+    DiagnosticStorageSnapshot, DiagnosticVectorArtifactCatalogueSnapshot,
+    DiagnosticVectorArtifactKind, DiagnosticVectorArtifactSnapshot,
+    DiagnosticWriteAheadLogSnapshot, ReadDiagnosticSnapshot, ReadStorageDiagnostics,
     DIAGNOSTIC_SNAPSHOT_FORMAT_VERSION, MAX_DIAGNOSTIC_AUDIT_RECORDS,
     MAX_DIAGNOSTIC_RUNTIME_SCANNED_CHANGES,
 };
@@ -75,6 +85,18 @@ pub use endpoint_binding::{
     MAX_BINDING_CONCURRENCY, MAX_BINDING_INPUT_BYTES, MAX_BINDING_TIMEOUT_MS,
     MAX_CREDENTIAL_NAME_BYTES, MAX_DECLARED_BYTES, MAX_ENDPOINT_URL_BYTES, MAX_INVENTORY_MACHINES,
     MAX_PROFILE_BINDINGS,
+};
+pub use flight::{
+    prompt_cohort_sha256, LaunchPromptFlight, LaunchPromptFlightResult, ListPromptFlights,
+    PromptFlight, PromptFlightContextMode, PromptFlightContextRequest, PromptFlightContextSummary,
+    PromptFlightEvent, PromptFlightMetrics, PromptFlightPage, PromptFlightProvider,
+    PromptFlightReadResult, PromptFlightRecord, PromptFlightStage, PromptFlightStatus,
+    PromptFlightUse, ReadPromptFlight, MAX_PROMPT_FLIGHT_ACCEPTANCE_MARKER_BYTES,
+    MAX_PROMPT_FLIGHT_EVENTS, MAX_PROMPT_FLIGHT_EVENT_DATA_BYTES,
+    MAX_PROMPT_FLIGHT_EVENT_DETAIL_BYTES, MAX_PROMPT_FLIGHT_EVENT_KIND_BYTES,
+    MAX_PROMPT_FLIGHT_EVENT_LABEL_BYTES, MAX_PROMPT_FLIGHT_PAGE, MAX_PROMPT_FLIGHT_PROMPT_BYTES,
+    MAX_PROMPT_FLIGHT_STORAGE_KEYS, PROMPT_FLIGHT_EVENT_KIND, PROMPT_FLIGHT_FORMAT_VERSION,
+    PROMPT_FLIGHT_KIND, PROMPT_FLIGHT_USE_KIND,
 };
 pub use function::{
     validate_function_value, ExecuteFunction, FunctionArtifact, FunctionArtifactMediaType,
@@ -135,6 +157,11 @@ pub use model_manifest::{
     ROUTER_MODEL_MANIFEST_CONTRACT_VERSION,
 };
 pub use platform::{PlatformTermDefinition, PlatformTermRole, PLATFORM_TERMS};
+pub use query_export::{
+    ExportQuery, QueryExport, QueryExportSource, MAX_PARQUET_EXPORT_BYTES,
+    MAX_PARQUET_EXPORT_COLUMNS, MAX_PARQUET_EXPORT_INPUT_BYTES, MAX_PARQUET_EXPORT_ROWS,
+    MAX_PARQUET_ROW_GROUP_ROWS, PARQUET_EXPORT_PROFILE,
+};
 pub use read::{
     ReadAccessPath, ReadEvidence, ReadPathEvidence, ReadStampValidationEvidence,
     ReadStampValidationMethod, READ_EVIDENCE_CONTRACT_VERSION,
@@ -170,6 +197,11 @@ pub use sdk_conformance::{
     SdkConformanceIdentity, SdkConformanceSession, SdkConformanceTransaction, SdkConformanceVector,
     SDK_CONFORMANCE_FORMAT_VERSION,
 };
+pub use task::{
+    CloseTask, ListTasks, OpenTask, ReadTask, TaskPage, TaskReadResult, TaskRecord, TaskResult,
+    TaskStatus, MAX_TASK_GOAL_BYTES, MAX_TASK_OUTCOME_BYTES, MAX_TASK_PAGE, MAX_TASK_STORAGE_KEYS,
+    MAX_TASK_TITLE_BYTES, TASK_FORMAT_VERSION, TASK_INCLUDES_KIND, TASK_KIND,
+};
 pub use websocket::{
     decode_websocket_frame, encode_websocket_frame, validate_subscription_snapshot,
     validate_websocket_cancellation_correlation, validate_websocket_response_correlation,
@@ -197,7 +229,7 @@ use std::fmt;
 pub const PROTOCOL: &str = "rrd";
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const OPENAPI_DOCUMENT_SHA256: &str =
-    "9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d";
+    "ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65";
 pub const MAX_ID_BYTES: usize = 128;
 pub const MAX_MESSAGE_BYTES: usize = 4_096;
 pub const MAX_CAPABILITIES: usize = 512;
@@ -2974,6 +3006,10 @@ pub enum SecurityAction {
     FunctionCatalogueWrite,
     FunctionExecute,
     DiagnosticsRead,
+    FlightLaunch,
+    FlightRead,
+    TaskWrite,
+    TaskRead,
     SecurityAdmin,
     MemoryContextRead,
     ReasoningRead,
@@ -2985,7 +3021,7 @@ pub enum SecurityAction {
 impl SecurityAction {
     /// Canonical policy-action catalogue. Installation profiles and other
     /// projections consume this list instead of maintaining parallel copies.
-    pub const ALL: [Self; 49] = [
+    pub const ALL: [Self; 53] = [
         Self::ServiceInspect,
         Self::UnknownRequest,
         Self::SessionCreate,
@@ -3029,6 +3065,10 @@ impl SecurityAction {
         Self::FunctionCatalogueWrite,
         Self::FunctionExecute,
         Self::DiagnosticsRead,
+        Self::FlightLaunch,
+        Self::FlightRead,
+        Self::TaskWrite,
+        Self::TaskRead,
         Self::SecurityAdmin,
         Self::MemoryContextRead,
         Self::ReasoningRead,
@@ -3512,6 +3552,26 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             "ContextPacket",
         ),
         endpoint(
+            "diagnostics-storage-cursor",
+            HttpMethod::Post,
+            "/v1/diagnostics/storage/cursor",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "InspectStorageCursor",
+            "StorageCursorSnapshot",
+        ),
+        endpoint(
+            "diagnostics-storage-read",
+            HttpMethod::Post,
+            "/v1/diagnostics/storage/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "ReadStorageDiagnostics",
+            "DiagnosticStorageSnapshot",
+        ),
+        endpoint(
             "diagnostics-read",
             HttpMethod::Post,
             "/v1/diagnostics/read",
@@ -3520,6 +3580,36 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::DiagnosticsRead,
             "ReadDiagnosticSnapshot",
             "DiagnosticSnapshot",
+        ),
+        endpoint(
+            "flight-launch",
+            HttpMethod::Post,
+            "/v1/flights",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::FlightLaunch,
+            "LaunchPromptFlight",
+            "LaunchPromptFlightResult",
+        ),
+        endpoint(
+            "flight-list",
+            HttpMethod::Post,
+            "/v1/flights/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::FlightRead,
+            "ListPromptFlights",
+            "PromptFlightPage",
+        ),
+        endpoint(
+            "flight-read",
+            HttpMethod::Post,
+            "/v1/flights/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::FlightRead,
+            "ReadPromptFlight",
+            "PromptFlightReadResult",
         ),
         endpoint(
             "estate-read",
@@ -3590,6 +3680,26 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::ServiceInspect,
             "Empty",
             "OpenApiDocument",
+        ),
+        endpoint(
+            "data-schema-read",
+            HttpMethod::Post,
+            "/v1/data/schema",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::DiagnosticsRead,
+            "ReadDataSchema",
+            "DataSchemaSnapshot",
+        ),
+        endpoint(
+            "query-export",
+            HttpMethod::Post,
+            "/v1/query/export",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::QueryExecute,
+            "ExportQuery",
+            "QueryExport",
         ),
         endpoint(
             "query-execute",
@@ -3690,6 +3800,46 @@ pub fn endpoint_catalogue() -> EndpointCatalogue {
             SecurityAction::SubscriptionOpen,
             "OpenSubscription",
             "OpenSubscriptionResult",
+        ),
+        endpoint(
+            "task-close",
+            HttpMethod::Post,
+            "/v1/tasks/close",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::TaskWrite,
+            "CloseTask",
+            "TaskResult",
+        ),
+        endpoint(
+            "task-list",
+            HttpMethod::Post,
+            "/v1/tasks/list",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::TaskRead,
+            "ListTasks",
+            "TaskPage",
+        ),
+        endpoint(
+            "task-open",
+            HttpMethod::Post,
+            "/v1/tasks",
+            EndpointAuthentication::SessionBearer,
+            true,
+            SecurityAction::TaskWrite,
+            "OpenTask",
+            "TaskResult",
+        ),
+        endpoint(
+            "task-read",
+            HttpMethod::Post,
+            "/v1/tasks/read",
+            EndpointAuthentication::SessionBearer,
+            false,
+            SecurityAction::TaskRead,
+            "ReadTask",
+            "TaskReadResult",
         ),
         endpoint(
             "transaction-abort",
@@ -4096,6 +4246,7 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "CreateInstanceBackup" => schema_json::<RequestEnvelope<CreateInstanceBackup>>(),
         "CreateSession" => schema_json::<RequestEnvelope<CreateSession>>(),
         "ExecuteQuery" => schema_json::<RequestEnvelope<ExecuteQuery>>(),
+        "ExportQuery" => schema_json::<RequestEnvelope<ExportQuery>>(),
         "ExportAudit" => schema_json::<RequestEnvelope<ExportAudit>>(),
         "EnsureQueryIndex" => schema_json::<RequestEnvelope<EnsureQueryIndex>>(),
         "EnsureVectorCollection" => schema_json::<RequestEnvelope<EnsureVectorCollection>>(),
@@ -4111,6 +4262,16 @@ fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "ReadAudit" => schema_json::<RequestEnvelope<ReadAudit>>(),
         "ReadChangefeed" => schema_json::<RequestEnvelope<ReadChangefeed>>(),
         "ReadDiagnosticSnapshot" => schema_json::<RequestEnvelope<ReadDiagnosticSnapshot>>(),
+        "InspectStorageCursor" => schema_json::<RequestEnvelope<InspectStorageCursor>>(),
+        "ReadStorageDiagnostics" => schema_json::<RequestEnvelope<ReadStorageDiagnostics>>(),
+        "ReadDataSchema" => schema_json::<RequestEnvelope<ReadDataSchema>>(),
+        "LaunchPromptFlight" => schema_json::<RequestEnvelope<LaunchPromptFlight>>(),
+        "ListPromptFlights" => schema_json::<RequestEnvelope<ListPromptFlights>>(),
+        "ReadPromptFlight" => schema_json::<RequestEnvelope<ReadPromptFlight>>(),
+        "OpenTask" => schema_json::<RequestEnvelope<OpenTask>>(),
+        "CloseTask" => schema_json::<RequestEnvelope<CloseTask>>(),
+        "ListTasks" => schema_json::<RequestEnvelope<ListTasks>>(),
+        "ReadTask" => schema_json::<RequestEnvelope<ReadTask>>(),
         "ReadEstate" => schema_json::<RequestEnvelope<ReadEstate>>(),
         "RenewSession" => schema_json::<RequestEnvelope<RenewSession>>(),
         "RestoreInstanceBackup" => schema_json::<RequestEnvelope<RestoreInstanceBackup>>(),
@@ -4136,6 +4297,15 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
             schema_json::<ResponseEnvelope<CreateInstanceBackupResult>>()
         }
         "DiagnosticSnapshot" => schema_json::<ResponseEnvelope<DiagnosticSnapshot>>(),
+        "StorageCursorSnapshot" => schema_json::<ResponseEnvelope<StorageCursorSnapshot>>(),
+        "DiagnosticStorageSnapshot" => schema_json::<ResponseEnvelope<DiagnosticStorageSnapshot>>(),
+        "DataSchemaSnapshot" => schema_json::<ResponseEnvelope<DataSchemaSnapshot>>(),
+        "LaunchPromptFlightResult" => schema_json::<ResponseEnvelope<LaunchPromptFlightResult>>(),
+        "PromptFlightPage" => schema_json::<ResponseEnvelope<PromptFlightPage>>(),
+        "PromptFlightReadResult" => schema_json::<ResponseEnvelope<PromptFlightReadResult>>(),
+        "TaskResult" => schema_json::<ResponseEnvelope<TaskResult>>(),
+        "TaskPage" => schema_json::<ResponseEnvelope<TaskPage>>(),
+        "TaskReadResult" => schema_json::<ResponseEnvelope<TaskReadResult>>(),
         "EndpointCatalogue" => schema_json::<ResponseEnvelope<EndpointCatalogue>>(),
         "EstateSnapshot" => schema_json::<ResponseEnvelope<EstateSnapshot>>(),
         "InstanceBackupCatalogueSnapshot" => {
@@ -4150,6 +4320,7 @@ fn response_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "OpenApiDocument" => schema_json::<ResponseEnvelope<serde_json::Value>>(),
         "OpenSubscriptionResult" => schema_json::<ResponseEnvelope<OpenSubscriptionResult>>(),
         "QueryResult" => schema_json::<ResponseEnvelope<QueryResult>>(),
+        "QueryExport" => schema_json::<ResponseEnvelope<QueryExport>>(),
         "EnsureQueryIndexResult" => schema_json::<ResponseEnvelope<EnsureQueryIndexResult>>(),
         "EnsureVectorCollectionResult" => {
             schema_json::<ResponseEnvelope<EnsureVectorCollectionResult>>()
@@ -5528,6 +5699,58 @@ pub struct DataSchemaRegistry {
     pub relations: BTreeMap<CanonicalId, DataRelationSchema>,
     #[serde(default)]
     pub events: BTreeMap<CanonicalId, DataEventSchema>,
+}
+
+/// Bounded, authenticated catalogue discovery for database administration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReadDataSchema {
+    pub scope: String,
+    pub max_storage_keys: u32,
+}
+
+impl ReadDataSchema {
+    pub fn validate(&self) -> Result<()> {
+        if self.scope.is_empty() || self.scope.len() > MAX_ID_BYTES || self.scope.contains('\0') {
+            return invalid("data schema scope is invalid");
+        }
+        if self.max_storage_keys == 0 || self.max_storage_keys > MAX_DATA_SNAPSHOT_STORAGE_KEYS {
+            return invalid("data schema storage key budget is out of bounds");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DataSchemaSnapshot {
+    pub scope: String,
+    pub known_at_cursor: u64,
+    pub read_manifest_sha256: String,
+    pub schema: Option<DataSchemaRegistry>,
+    pub read_evidence: ReadEvidence,
+}
+
+impl DataSchemaSnapshot {
+    pub fn validate(&self) -> Result<()> {
+        ReadDataSchema {
+            scope: self.scope.clone(),
+            max_storage_keys: 1,
+        }
+        .validate()?;
+        validate_sha256(&self.read_manifest_sha256, "schema read manifest")?;
+        self.read_evidence.validate()?;
+        if let Some(schema) = &self.schema {
+            if schema.revision == 0 {
+                return invalid("schema revision must be non-zero");
+            }
+            TransactionMutation::PutSchema {
+                registry: schema.clone(),
+            }
+            .validate()?;
+        }
+        Ok(())
+    }
 }
 
 /// Bounded request for one all-model snapshot at the engine's current

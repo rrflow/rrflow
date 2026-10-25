@@ -184,6 +184,25 @@ pub(super) fn capabilities(
             ),
         },
         CapabilityDescriptor {
+            name: CanonicalId::new(rrd_contract::PARQUET_EXPORT_PROFILE).unwrap(),
+            contract_version: 1,
+            status: CapabilityStatus::Experimental,
+            limits: BTreeMap::from([
+                (CanonicalId::new("max-rows").unwrap(),
+                    configuration.query.max_rows.min(rrd_contract::MAX_PARQUET_EXPORT_ROWS as u64)),
+                (CanonicalId::new("max-fields").unwrap(), rrd_contract::MAX_PARQUET_EXPORT_COLUMNS as u64),
+                (CanonicalId::new("max-source-bytes").unwrap(), rrd_contract::MAX_PARQUET_EXPORT_INPUT_BYTES as u64),
+                (CanonicalId::new("max-output-bytes").unwrap(),
+                    configuration.query.max_output_bytes.min(rrd_contract::MAX_PARQUET_EXPORT_BYTES as u64)),
+                (CanonicalId::new("row-group-rows").unwrap(), rrd_contract::MAX_PARQUET_ROW_GROUP_ROWS as u64),
+                (CanonicalId::new("max-memory-bytes").unwrap(), configuration.query.max_memory_bytes),
+                (CanonicalId::new("max-elapsed-ms").unwrap(), configuration.query.max_elapsed_ms),
+            ]),
+            limitation: Some(
+                "authenticated bounded query-result export only; uncompressed typed Arrow profile; no import, streaming, destination writes or global allocator qualification".into(),
+            ),
+        },
+        CapabilityDescriptor {
             name: CanonicalId::new("estate-authority-read").unwrap(),
             contract_version: 1,
             status: CapabilityStatus::Experimental,

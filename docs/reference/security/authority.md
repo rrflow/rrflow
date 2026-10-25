@@ -227,8 +227,16 @@ by the final typed verifier contract before security qualification.
 
 ### Commit, replay, and failure boundaries
 
-The target `RrdEngine` obtains installation time from a versioned trusted-clock
-capability; ordinary callers do not supply credential-validity or audit time.
+`RrdEngine` obtains installation time through one engine-owned, versioned clock
+boundary; public installation callers do not supply that time. Other runtime
+operation timestamps remain a separate convergence problem and are not claimed
+by this package as engine-owned.
+The implemented source is deliberately classified `host_system_time` /
+`unverified`. Its first fallible observation is sealed before project effects,
+and recovery, replay, and installed open reject an unavailable observation or
+rollback beyond the installed configuration's explicit bound. This provides a
+relative rollback guard; it is not proof of correct UTC or authenticated
+synchronization.
 The accepted installation transaction atomically commits the installed-estate
 binding, initial policy/verifier metadata, exact plan/action identity,
 installation checkpoint, security-administration audit, outbox/commit evidence,
@@ -256,32 +264,44 @@ and mount escape, oversized/empty/non-regular inputs, Unix modes, Windows ACLs,
 Kubernetes projected volumes, provider revision drift, cancellation, and
 revocation.
 
+Clock diagnosis does not authorize clock correction. A future correction
+operation must be a separately named governed external effect: preview the
+platform command or service, time source and trust, network use, required
+privilege, maximum step/slew and rollback impact; require an applicable grant;
+then bind observation and result into a receipt. Unknown sources or effects
+remain representable for analysis but cannot execute. Durable ordering and
+authorization continue to rely on engine transaction/read/journal coordinates,
+not on a model-authored timestamp or a silently adjusted host clock.
+
 ### Current installation disposition
 
 The standalone `rrd-security-bootstrap` helper/binary, its manifest shape and
 tests, the CLI supervisor call, and the Kubernetes bootstrap container are
 removed. The canonical local installer now generates one high-entropy API key
-and token key, freezes their exact bytes plus first-apply time in an owner-only,
+and token key, freezes their exact bytes plus the first engine-owned clock
+observation in an owner-only,
 plan-addressed recovery intent, creates or verifies their owner-only files, and
 atomically commits `SecurityState`, security audit, installed binding,
 configuration, install checkpoint, attunement plan/job, outbox, and cursor
 before publishing the locator. Deterministic failure injection at the intent,
 directory, store, token, credential, commit, locator, and acknowledgement
 stages proves exact retry without another credential, policy, or audit outcome.
-Malformed, foreign, mismatched, symbolic, partly committed, or missing-secret
-state fails closed.
+Malformed, foreign, mismatched, symbolic, partly committed, missing-secret, or
+unsafe-time state fails closed.
 
 That is a bounded local pre-release result, not final secret qualification. The
 recovery intent necessarily contains serialized raw secret staging bytes until
 acknowledgement; it is private, size-bounded, digest-bound, redacted from
 `Debug`, and removed on success, but it has not passed native Windows ACL,
 crash-residue secret accounting, memory zeroization, provider handoff, rotation,
-or handle-relative path-replacement proof. In addition, the current public
-apply method accepts an injected `at_unix_ms`; the primary CLI supplies its host
-wall clock, but the trusted-clock capability and rollback/skew/failure tests in
-the target contract are not implemented. The target capability-scoped secret
-source/sink, clock, and prepared-effect receipt rules above still govern
-D-02/D-06/J.
+or handle-relative path-replacement proof. Public installation no longer
+accepts `at_unix_ms`: the engine persists a format/source/trust/coordinate
+observation, deterministic private tests cover unavailable, strict, tolerated,
+and exceeded rollback, and read-only inspection preserves the diagnostic even
+when open must fail. Absolute trust, platform synchronization/correction,
+runtime-wide temporal high-water rules, and native qualification remain open.
+The target capability-scoped secret source/sink, trusted-time upgrade, and
+prepared-effect receipt rules above still govern D-02/D-06/J.
 
 ## Policy and data stamp
 
@@ -411,7 +431,7 @@ pre-release security mode.
 | Server/client real-process tests | Current API-key sessions, denials, redaction, audit read/export, TLS 1.3 mTLS identity, authenticated HTTP/WSS, and selected reopen behavior. They do not qualify every adapter, provider, rotation mode, or deployment. |
 | A-07 | Remove the direct-store/public-repository authority, the retired provisioning-role vocabulary, ambiguous action vocabulary, and dependency-direction conflicts while mapping every retained invariant to its one owner. |
 | C-01 through C-04 | Encode and transact security/audit state through the one accepted rrflowMX/rrflowKV substrate; bind policy and data observations; atomically include audit with accepted writes. |
-| D-01/D-02/D-06 | D-01 now proves exact local preview/apply, fresh-target checks, one engine-generated credential/token, atomic binding/policy/audit/checkpoint commit, and eight-stage same-plan replay. Complete capability-scoped secret I/O, typed verifiers, delivery/rotation receipts, native ACLs, external identity providers, and optional adapters without copying credentials into canonical state. |
+| D-01/D-02/D-06 | D-01 now proves exact local preview/apply, fresh-target checks, one engine-generated credential/token, atomic binding/policy/audit/checkpoint commit, eight-stage same-plan replay, and an engine-owned unverified clock anchor with bounded rollback diagnosis/enforcement. Complete capability-scoped secret I/O, typed verifiers, delivery/rotation receipts, native ACLs, trusted-time/correction qualification, external identity providers, and optional adapters without copying credentials into canonical state. |
 | F-01 through F-05 | Prove native and DataFusion plans see only authorized stamped batches, enforce budgets, and never return stale authorization-scoped cache entries. |
 | H-04/H-05/H-07 | Prove cross-surface authorization equivalence, complete redacted causal evidence, RRD TLS identity, and mesh independence. |
 | J-01 through J-05 | Remove superseded branches and pass denial, crash/reopen, resource, clean-install, secret-accounting, and deployment qualification before release. |
@@ -450,6 +470,9 @@ The target requirements above are grounded in the
 [cap-std capability-relative filesystem model](https://docs.rs/cap-std/latest/cap_std/),
 [Linux `openat2` resolution controls](https://man7.org/linux/man-pages/man2/openat2.2.html),
 [RustCrypto zeroization guarantees and limits](https://docs.rs/zeroize/latest/zeroize/),
+[Rust `SystemTime` fallibility](https://doc.rust-lang.org/stable/std/time/struct.SystemTime.html),
+[NTP deployment guidance in RFC 8633](https://www.rfc-editor.org/rfc/rfc8633.html),
+[Network Time Security in RFC 8915](https://www.rfc-editor.org/rfc/rfc8915.html),
 and
 [Kubernetes Secret least-privilege guidance](https://kubernetes.io/docs/concepts/security/secrets-good-practices/).
 These sources constrain implementation and tests; none is imported as an

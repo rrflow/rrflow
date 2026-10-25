@@ -19,6 +19,15 @@ use rrd_store::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "query/adjacency_reads.rs"]
+mod adjacency_reads;
+#[path = "query/identity_ranges.rs"]
+mod identity_ranges;
+#[path = "query/identity_reads.rs"]
+mod identity_reads;
+#[path = "query/stamped_admission.rs"]
+mod stamped_admission;
+
 fn value(value: &str) -> RuntimeValue {
     RuntimeValue::String(value.into())
 }
@@ -453,7 +462,30 @@ fn stamped_pipeline_matches_manual_execution_and_retains_its_read_coordinate() {
     assert_eq!(pipeline.read(), &read);
     assert_eq!(stamped.bound, manual_bound);
     assert_eq!(stamped.plan, manual_plan);
-    assert_eq!(stamped.execution, manual_execution);
+    // The public pipeline also admits and reports both catalogue phases.
+    // Standalone execution reports only the executor's semantic read work.
+    let schema_catalog =
+        Catalog::capture_for_sources_at(&engine, read.clone(), &[], read_budget()).unwrap();
+    assert_eq!(
+        stamped.execution.read_evidence.keys_examined,
+        schema_catalog.read_evidence.keys_examined
+            + catalog.read_evidence.keys_examined
+            + manual_execution.read_evidence.keys_examined
+    );
+    assert_eq!(
+        stamped.execution.read_evidence.values_decoded,
+        schema_catalog.read_evidence.values_decoded
+            + catalog.read_evidence.values_decoded
+            + manual_execution.read_evidence.values_decoded
+    );
+    assert_eq!(
+        stamped.execution.read_evidence.key_budget,
+        budget.max_storage_keys
+    );
+    stamped.execution.read_evidence.validate().unwrap();
+    let mut expected = manual_execution;
+    expected.read_evidence = stamped.execution.read_evidence.clone();
+    assert_eq!(stamped.execution, expected);
     assert_eq!(stamped.bound.read, read);
     assert_eq!(stamped.plan.logical.read, read);
     assert_eq!(stamped.execution.read_manifest, read.manifest_id);
@@ -674,7 +706,9 @@ fn valid_time_and_known_at_are_stable_across_profiles_and_rrflow_kv_reopen() {
             "ready".into(),
             "corrected".into(),
             10,
-            3,
+            // An addressed direct read is current through its requested
+            // known prefix; it no longer acquires a family watermark.
+            10,
         )
     );
 }
@@ -1112,4 +1146,85 @@ fn event_queries_honor_cursor_typed_retirement_at_valid_time() {
     .1;
     assert_eq!(before.returned_rows, 1);
     assert_eq!(after.returned_rows, 0);
+}
+
+#[test]
+fn a_schemaless_record_table_can_start_a_traversal() {
+    // A strict relation may point into a schemaless record table; that table's
+    // records are graph nodes and must be traversal starts like strict ones.
+    let mut registry = RuntimeSchemaRegistry::empty(1, "schemaless traversal fixture");
+    let note = RuntimeType::new("note").unwrap();
+    let cites = RuntimeType::new("cites").unwrap();
+    registry.tables.insert(
+        note.clone(),
+        RuntimeTableSchema::schemaless(RuntimeLogicalModel::Document),
+    );
+    registry
+        .define_relation_table(
+            cites.clone(),
+            RuntimeRelationSchema {
+                from: BTreeSet::from([note.clone()]),
+                to: BTreeSet::from([note.clone()]),
+                ..RuntimeRelationSchema::default()
+            },
+        )
+        .unwrap();
+    let first = RuntimeRef::new("note", "a").unwrap();
+    let second = RuntimeRef::new("note", "b").unwrap();
+    let record = |reference: &RuntimeRef| RuntimeMutation::Record {
+        record: RuntimeRecord {
+            reference: reference.clone(),
+            valid_from: 10,
+            valid_to: None,
+            properties: properties(&[("title", "note")]),
+        },
+    };
+    let scope = ScopeId::new("instance:test").unwrap();
+    let engine = RrflowMxStore::new();
+    engine
+        .runtime()
+        .commit(&RuntimeCommit {
+            scope: scope.clone(),
+            at: 100,
+            actor: "agent:test".into(),
+            expected_cursor: 0,
+            mutations: vec![
+                RuntimeMutation::Schema { registry },
+                record(&first),
+                record(&second),
+                RuntimeMutation::Relation {
+                    relation: RuntimeRelation {
+                        reference: RuntimeRef::new("cites", "a-b").unwrap(),
+                        from: first,
+                        to: second.clone(),
+                        valid_from: 10,
+                        valid_to: None,
+                        properties: RuntimeProperties::new(),
+                    },
+                },
+            ],
+        })
+        .unwrap();
+    let text = "FROM traverse:cites START note:b DIRECTION INCOMING DEPTH 1 AT VALID 100 KNOWN HEAD PROJECT node_id";
+    let query = parse(text).unwrap();
+    let catalog = Catalog::capture_for_sources(
+        &engine,
+        &scope,
+        &[Source::Traversal {
+            relation: cites,
+            start: second,
+            direction: rrd_query::TraversalDirection::Incoming,
+            max_depth: 1,
+        }],
+        read_budget(),
+    )
+    .unwrap();
+    let execution = execute(
+        &engine,
+        &plan(&bind(&query, &Parameters::new(), &catalog).unwrap()).unwrap(),
+        &ExecutionBudget::default(),
+    )
+    .unwrap();
+    assert_eq!(execution.returned_rows, 1);
+    assert_eq!(execution.batches[0].rows[0].values["node_id"], value("a"));
 }

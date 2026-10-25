@@ -17,12 +17,26 @@ RRFlow has one candidate CI chain. The thin caller is
 `.github/workflows/ci.yml`; `.github/workflows/ci-reusable.yml` owns every
 check. A branch push does not start a second copy of the same work.
 
-The caller accepts pull requests, merge-queue candidates, and explicit manual
-dispatches. Its concurrency key cancels stale executions for the same pull
-request or ref. The reusable workflow reduces every partition into one stable
-`ci-gate` check for branch protection:
+The caller accepts ready pull requests, merge-queue candidates, and explicit
+manual dispatches. Draft PRs remain reviewable packages without automatically
+launching the full pipeline. `opened`, `synchronize`, `reopened`,
+`ready_for_review`, and `converted_to_draft` are explicit PR activities.
+Becoming ready starts candidate CI even without a new commit; returning to
+draft cancels obsolete work through the same PR/ref concurrency key and skips
+the reusable caller. Other PRs' runs are unaffected. A skipped draft run is
+not candidate acceptance. Manual dispatch intentionally remains available for
+an explicitly requested full run on a draft branch.
 
-- supervised RRD daemon smoke on the standard Linux runner;
+This uses GitHub's documented [pull-request activity types](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request);
+the default activity list does not include readiness transitions. The local
+`test_candidate_admission.py` corpus verifies the checked-in admission shape
+and rejects missing transitions, filters and lost merge/manual coverage; it
+does not emulate GitHub execution. Full checks still run for merge groups.
+No path filter or reduced ready-candidate lane substitutes for acceptance.
+The reusable workflow reduces every partition into one stable `ci-gate`
+check for branch protection:
+
+- installed primary-executable lifecycle on the standard Linux runner;
 - repository policy, formatting, architecture, evaluation, dependency, and
   binary-budget gates on a heavy Linux runner;
 - five default-feature engine suites on isolated heavy Linux runners:
@@ -30,24 +44,255 @@ request or ref. The reusable workflow reduces every partition into one stable
   and `product-operations`;
 - one current shared SDK harness, isolated optional-feature checks, and a real
   PostgreSQL/pgvector integration;
-- daemon portability on GitHub-hosted Windows and macOS runners; and
+- installed lifecycle and daemon portability on GitHub-hosted Windows and
+  macOS runners;
+- separately identified installed domain-crash diagnostics and ordinary-build
+  exclusion on GitHub-hosted Linux, macOS and Windows;
+- ordinary-primary fresh/existing 100-cycle acknowledged kill/reopen histories
+  on those same three native platforms; and
 - one always-evaluated gate which fails unless every partition succeeded.
 
-The topology job starts one local RRD daemon and checks readiness and
-capabilities. It does not start Connectome or prove installation, rrflowMX and
-rrflowKV semantic equivalence, native graph/BM25/vector projections, streamed
-Arrow/DataFusion execution, persistent reasoning/context, or restart recovery.
+The Linux topology and Windows/macOS estate partitions also require
+`projected_lifetime` and `reader::lifetime_tests`: overlapping empty-reader
+admission, mixed generations and terminal source-owner release, with copied
+output surviving database/stream disposal. Weak-owner and registry checks
+cover memtable, raw mmap, raw bounded and adaptive-LZ4 paths. These are native
+ownership regressions, not aggregate RSS, installed reclamation or soak proof.
+
+The native partitions also require `mutable_admission`: configured writer and
+read-only reopen denial preserves typed byte/version errors and existing file
+bytes; admitted inspection recovers exact semantic and control identities. The
+existing semantic and engine admission suites include both native mutable
+resources through prior-ACK/rejection/reopen/replay/abort/next-work histories.
+These component tests do not qualify installed configuration.
+
+The native partitions also require the `configured_` histories in
+`logical_archive_resilience` and `backup_catalogue`: one native policy follows
+logical/application restore, partial-prefix resume, catalogue/control replay
+and verification reopens. Rejected work stays private; an adequate policy
+resumes exact runtime/control/object evidence without duplicate effects.
+Denied replay preserves file bytes. These are component restore limits, not
+installed configuration binding, aggregate recovery memory or capacity proof.
+
+Those same partitions separately require `projected_output_limits` and
+`segment::output::tests`. These qualify output-byte admission before allocation,
+last-owner release through buffer clones/slices, concurrent readers, failed
+batch construction and retained output through reclamation/reopen. The native
+pool is scoped to one database-open instance and excludes source pages, caller
+copies and allocator metadata; these checks do not establish total-memory or
+installed capacity limits.
+
+The same native partitions require the `interleaved` filter in
+`projected_read_adversarial`, with a five-minute step limit. Nine fixed histories
+combine two reader stamps, a pinned transaction, mixed-family writes/deletes,
+checkpoint release, compaction, actual GC and reopen. A joined reader thread
+uses capacity-one channels and 30-second receive deadlines. Independent model
+rows and physical-file checks require retention before terminal release and
+reclamation afterward; copied Arrow batches and individual buffer clones
+survive database close and disposable-directory removal. Mapped raw, bounded
+raw and bounded adaptive-LZ4 paths must report that they were exercised. This
+is native component lifetime evidence, not installed reclamation or memory
+capacity qualification.
+
+The same three native partitions require `mutable_limits`: hard active-state
+byte/version admission, pre-effect rejection, hot-key pressure with held
+history, and writer/read-only WAL replay denial followed by exact recovery.
+This accounts active key/value/version charges; it does not establish aggregate
+heap/RSS, installed configuration binding or whole-startup work limits.
+
+The same three native partitions require `write_diagnostics` and
+`rrflow_kv_operator`. Uncontended timing may be zero; measured phases/waits
+must fit their independent outer duration and supplied lock context survives
+exactly, including zero and saturating values. Bounded sample/drop accounting,
+maintenance counters and durable readback remain required. Positive timing is
+not evidence of physical synchronization; the native durability/I/O suites
+retain that responsibility.
+
+The topology and native portability jobs run `installed_lifecycle` against the
+actual primary executable, without a surrogate executable-identity fixture.
+Those jobs omit dev/test debug symbols and log executable size; executable
+identity still binds the actual tested bytes. Startup retains a 60-second
+bound. The backup/restore lifecycle client uses an explicit 60-second request
+timeout; this does not qualify the default short-request timeout for heavy
+physical verification or generic uncertain-outcome recovery.
+Fresh and existing projects cover no-write deterministic plan, exact apply,
+authenticated discovery, commit/query, backup, termination, restarted query,
+offline verification, and restore publication/readback. All native platforms terminate the initial owned child after acknowledged work;
+subsequent Unix shutdowns check graceful SIGINT. Restart discovery verifies the
+installed instance and closed authentication session; restored readback compares
+query, scope, schema, read-manifest and row identity with the original result.
+This bounded corpus does not prove graceful Windows shutdown, a complete
+crash matrix, clean-machine distribution, rrflowMX/rrflowKV equivalence, native
+graph/BM25/vector projections, streamed Arrow/DataFusion, or model reasoning.
 The shared SDK harness is also current characterization: the deficiencies and
 real-process corpus required for H-04 remain open. Neither job may be cited as
 complete-engine evidence.
 
+The native lifecycle harness stages a copy of the actual primary executable
+in a temporary directory containing spaces and gives each product child an
+empty working directory, isolated home/temp directories and an empty executable
+search directory. Only Windows OS-discovery variables survive from the parent;
+provider credentials, proxy settings and Cargo/developer configuration do not.
+Its child guards retain the fixture until the process is reaped.
+
+All three native lanes require `python scripts/ci/run_offline_lifecycle.py
+--receipt <runner-temp>/rrflow-offline.json` (Linux uses `python3`). The runner
+requires exactly five declared cases and exactly five passing results with no
+ignored or filtered cases. Fresh/existing receipts bind the actual executable,
+build metadata, public-contract and signal digests, installation/restore plans,
+backup, read manifest and asserted durable cursors. Unknown receipt fields are
+rejected. Retained artifacts contain these bounded, non-secret receipts and
+sanitized failure status; raw estates and credential-bearing output are never
+uploaded. The [D-01 acceptance record](../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+binds the first accepted three-platform result to its exact candidate. Later
+changes still require their own candidate CI; this result cannot qualify a
+different revision or a signed platform bundle.
+The C-07c client-history extension runs after each fresh/existing restore
+fixture. A bounded test-owned relay forwards one commit and suppresses its
+entire response. The public client records uncertainty; three forced native
+kill/reopens require stable exact retries, six predeclared claim values, no
+rejected effects, quota recovery and an unchanged runtime head. Each mode
+retains four logical commit identities and 13 attempts (11 acknowledged,
+one rejected, one initially uncertain) checked by the existing `rrflow-eval`
+ledger. The runner requires both closed, build-bound `storage_histories`
+receipts and rejects omitted schedules or unknown nested fields. Production
+engine bytes have no fault switch. These three-cycle response-boundary cases
+do not replace C-07c's internal WAL/publication pauses or dedicated 100-cycle
+profile corpus, and do not qualify power loss or real capacity exhaustion.
+
+The separate `installed-reopen` job explicitly selects both ignored long tests
+in `installed_reopen` with default features and the existing optimized
+`--release` Cargo profile. This is a source-built ordinary artifact, not a
+signed distribution or an official release. Each test freezes 100 independent
+two-claim requests before execution. Every ACK is followed by an owned process
+kill and reopen, exact full-history readback before retry, replay of every
+previous transaction with stable receipts, and another cursor/readback check.
+Each mode reconciles 5,150 attempts and records 100 kill/reap/restart chains
+plus final cleanup. Startup and request deadlines remain 60 seconds; the
+corpus has a one-hour deadline, each child a three-minute deadline, and bounded
+capture. The job's 90-minute budget includes compilation and qualification;
+it does not change the existing lifecycle or diagnostic job budgets.
+
+The actual ordinary artifact must exclude the diagnostic protocol marker.
+Build, installation-plan and effective configuration identities accompany the
+sanitized receipts. CI requires both complete receipts and retains them as
+artifacts; default-suite ignored results are not qualification. This is a
+small fixed correctness workload under default installed settings. It does
+not qualify J-04 constrained allocations, publication/reclamation boundaries,
+power loss, hard resource limits, disk exhaustion or a 24-hour soak.
+The existing `lifecycle_process` target also qualifies the relay with forced
+nonblocking accepted sockets, fragmented header/body input, interrupted I/O,
+native read expiry, bounded malformed-input denial, redacted errors and idle
+guard cleanup. These helper cases preserve the five-case installed corpus.
+
+Preflight failures retain a bounded failed receipt even before build hashes are
+available; cleanup failure always overrides any prior passed receipt.
+
+Linux copies the binary, test harness and isolation helper into `/tmp`.
+Noninteractive sudo creates private mount, network and PID namespaces, masks
+the checkout parent (including siblings) and Cargo/Rustup roots, and enables
+only loopback. Namespace separation, empty masked directories, known source
+file absence, absent default routes and IPv4/IPv6 `ENETUNREACH` are required.
+The actual product runs as the original non-root user. Privileged timeout and
+PID-namespace teardown cover descendants. util-linux, iproute2, Python and sudo
+are qualification infrastructure, not product dependencies.
+
+macOS requires an inherited `sandbox-exec` profile. Directory listing and
+known-source read/write probes must deny; direct and descendant IPv4/IPv6
+connections must return permission denial while loopback works. The fixed
+profile receives source roots as parameters. Missing enforcement fails; it
+cannot downgrade to an ordinary staged test. An owned process group bounds
+cleanup. This deprecated OS utility is a test prerequisite, not an RRFlow
+installation dependency.
+
+The filesystem runner also requires a macOS APFS image mounted below a retained
+project anchor. It asserts a changed device identity and denial of read,
+truncate, create, publication and removal. The runner detaches only its exact
+owned image before removing the fixture, including after bounded child failure.
+Linux keeps the private-namespace bind-mount adversary; Windows keeps the native
+junction corpus. These cases require their respective native CI results.
+
+Windows enforcement runs only on ephemeral GitHub-hosted runners. A disposable
+principal uses an owned noninteractive window station/desktop with explicit
+access; token-owned runtime-file probes precede launch. Those objects are
+qualification infrastructure, not product UI or installation dependencies.
+Inherited deny ACLs cover only that standard principal in declared source trees.
+A no-reparse inventory bounds each tree to 200,000 objects and 120 seconds;
+native access checks verify denial on every object before launch. Native fixtures
+require inherited denial, protected-child bypass rejection and exact ACL
+restoration. A complete post-cleanup inventory verifies original ACL digests.
+Traversal bypass is retained for Windows process startup; source isolation
+depends on verified object ACLs, never a root-only deny. A dynamic WFP session denies
+its non-loopback IPv4/IPv6 connections. The Windows IPv6 probe uses a preferred
+link-local address scope from a connected native interface, discovered read-only,
+so missing global IPv6 routing cannot substitute for a permission-denial result.
+No route or address is changed. The child starts suspended and enters a
+kill-on-close job before execution. After all owned descendants terminate, the
+same principal removes its private test home/temp trees; exact source ACLs,
+WFP objects and account are cleaned up. Missing privilege, blocked cleanup or
+failed direct/descendant probes fail qualification. No policy/account changes
+run on the developer workstation.
+
+The CLI qualification helper bounds ordinary commands to 120 seconds, service
+lifetime to 480 seconds, readiness to 60 seconds/64 KiB, each output stream to
+16 MiB and each lifecycle's collected output to 128 MiB. The discovery catalogue
+currently exceeds 4 MiB; the measured Windows response is 5,598,305 bytes.
+Real helper cases exercise timeout, output flood, oversized readiness, finite
+capture and concurrent copy/launch. One short admission lock covers executable
+copy and every child spawn, while lifecycle tests continue concurrently. This
+addresses the documented inherited writable-descriptor mechanism without a
+retry sleep; it does not by itself prove the cause of an earlier CI failure.
+
+`python scripts/ci/run_private_owner.py` explicitly executes the privileged
+foreign-owner file/directory case on each OS. Unix requires root; Windows
+requires `SeRestorePrivilege` and restores the previous token state. Missing
+privilege fails, and the ordinary suite's ignored marker is never acceptance.
+Native installation suites include bootstrap, concurrency and recovery together.
+OS libraries remain available. These checks do not prove hostile-code
+containment, a signed clean-machine bundle, graph/vector scale or alpha.
+
+The Linux installed-lifecycle job also runs the
+[primary build-provenance helper](../reference/release/build-identity.md) on
+clean candidate source. It observes Cargo's actual first-party compilation
+units, embeds their declared provenance, rebuilds, and rejects changed source,
+feature/semantic-profile closure or executable identity. Repository verification
+runs the helper's dirty-source, drift, environment-digest and diagnostic-profile
+policy tests. These are build-provenance checks; actual release/diagnostic
+semantic parity remains open under H-05a.
+
+Native filesystem containment runs the LSM filesystem and manifest fixtures
+on Linux, Windows and macOS, plus installation ancestor-replacement cases.
+Linux additionally runs `python3 scripts/ci/run_filesystem_containment.py`:
+Cargo identifies the exact test executable, and noninteractive sudo launches
+the required bind-mount adversary in a private mount namespace with private
+propagation. Its 60-second timeout and 5-second kill bound prevent a stalled
+fixture from holding the runner indefinitely. The test asserts namespace
+separation and unchanged outside bytes after denied read, truncate, create,
+publication and cleanup. Missing privileges or namespace support fails the
+candidate. The ordinary suite's ignored privileged case is not acceptance;
+the explicit isolated invocation must pass. This bounded fixture does not
+replace D-01.5's wider native filesystem and offline qualification.
+
 The repository-policy partition also verifies the generated
 `docs/roadmap/rrflow-1.0-file-plan.jsonl`. That inventory must match every
 tracked or non-ignored path and every long-lived future path registered by its
-generator. Immediate absent paths are authorized by the earlier active change
-package and become current inventory records when created. Regenerate the
-inventory with `python3 scripts/ci/build_execution_inventory.py` after an
-accepted path or content change.
+generator. Newly created paths become current inventory records; the pull
+request description binds their intended scope. Regenerate the inventory with
+`python3 scripts/ci/build_execution_inventory.py` after an accepted path or
+content change.
+
+The Connectome UI is optional for engine operation, while candidate CI follows
+repository policy and recursively materializes every declared submodule. The
+Connectome development repository is public and can be acquired anonymously.
+The [publication receipt](../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records successful recursive checkout after the visibility change; the full
+candidate pipeline remains required before merge.
+The architecture suite checks the exact Connectome source identity and denies
+engine dependencies or targets inside it, alongside the general pinned-source
+validator. The inventory records the parent gitlink without traversing child
+files. `python3 scripts/ci/test_execution_inventory.py` proves parity across
+absent/populated/edited child files, pin-sensitive identity, and conflict
+rejection. UI builds and real-engine conformance remain separate H-06 evidence.
 
 Marked documentation indexes are derived from their immediate coordinated
 children. Run `python3 scripts/knowledge/render_navigation.py` after adding,
@@ -110,6 +355,69 @@ not authority. RRFlow deliberately has no installed Git/editor/provider hook:
 client Git hooks are not distributed by clone, can be skipped, and would create
 the exact provider-owned lifecycle behavior prohibited by `AGENTS.md`.
 
+## Local development container
+
+`.devcontainer/` reproduces the candidate-CI toolchain on any host that runs
+rootless Podman (or Docker) on amd64 Linux, including Podman machine on
+Windows. It is local reproduction and early feedback only: a container run is
+not candidate-CI, J-02, POAM-027, alpha, or release evidence, it is not a
+hook, and it declares no editor lifecycle command.
+
+| Target | Contents | Use |
+|---|---|---|
+| `rust` | snapshot-pinned Ubuntu 24.04 build dependencies, rustup 1.29.1, Rust from `rust-toolchain.toml`, uv, and the `actions/python-versions` CPython build that `setup-python` installs as `python3` | engine work, policy scripts, focused tests; the VS Code default |
+| `full` | `rust` plus Node, pnpm, Go, Temurin, Maven, and the .NET SDK | TypeScript/SDK work and `scripts/ci/run_sdk_conformance.py` |
+
+Every base image is digest pinned, every apt package resolves from one fixed
+Ubuntu snapshot, and every downloaded toolchain is verified with
+`sha256sum`/`sha512sum --check --strict` against a checksum in the
+Containerfile. Certificate bootstrap extracts trust roots from an Apt-authenticated
+package without installing a moving OpenSSL dependency; installed packages
+then resolve from the fixed snapshot. The Temurin download tag is recorded
+separately from the equivalent SemVer selector used by `setup-java`.
+`scripts/ci/check_workflow.py` fails when a container version,
+checksum, or image digest diverges from `rust-toolchain.toml` or
+`.github/workflows/ci-reusable.yml`, or when `devcontainer.json` declares a
+lifecycle command. Build steps are POSIX `sh` because Podman's default OCI
+image format ignores `SHELL`.
+
+Keep the source on a Linux filesystem; a Windows bind mount is slow and
+reintroduces executable-bit and line-ending drift. Two entry points share the
+`rrflow-cache` volume (Cargo registry, target directory, and language caches):
+
+- **VS Code:** set `dev.containers.dockerPath` to `podman`, then run
+  *Dev Containers: Clone Repository in Named Container Volume* for the
+  development repository. VS Code builds the `rust` target.
+- **Podman CLI:** from an existing checkout, with a compose provider such as
+  `podman-compose` on `PATH`:
+
+```bash
+podman compose -f .devcontainer/compose.yaml build
+podman compose -f .devcontainer/compose.yaml run --rm workspace \
+  /seed/.devcontainer/seed-workspace.sh
+podman compose -f .devcontainer/compose.yaml run --rm workspace
+```
+
+The seed script clones committed history from the read-only `/seed` mount of
+the invoking checkout into the `rrflow-src` volume and restores its remote
+names, URLs, and upstream. It copies no credentials, hooks, local Git
+configuration, or uncommitted files, and it refuses a non-empty volume. Set
+`RRFLOW_DEV_TARGET=full` to build and enter the SDK image.
+
+The optional pgvector service uses the candidate-CI image digest, database,
+and credentials on host networking, so the CI test URL works unchanged:
+
+```bash
+podman compose -f .devcontainer/compose.yaml --profile pgvector up -d pgvector
+RRFLOW_PGVECTOR_TEST_URL='postgresql://rrflow_test:rrflow_test_password@127.0.0.1:5432/rrd_operator_knowledge_test?sslmode=disable' \
+  RRFLOW_PGVECTOR_TEST_DISPOSABLE=1 \
+  cargo test -p rrd-operator-knowledge --all-targets --all-features --locked
+```
+
+Toolchain downloads are development build inputs, like the CI setup actions;
+they are never RRFlow install-time or runtime fetches. Only amd64 is
+supported; the checked-in digests and checksums name amd64 artifacts.
+
 The documentation policy machine-checks the owner chain, required
 change-authoring procedure/evidence fields, generated-index freshness,
 active-record classification, knowledge-package determinism, and local links.
@@ -128,11 +436,22 @@ supply-chain checks. It requires:
 
 - every external action to use a full 40-character commit SHA;
 - every workflow service image to use a SHA-256 digest;
-- every checkout step to set `persist-credentials: false`;
+- every checkout step to set `persist-credentials: false`, and to set
+  `submodules: recursive` whenever `.gitmodules` exists;
 - top-level read-only contents permission and no `pull_request_target` in any
   workflow; and
 - complete candidate-suite/default-feature/optional-feature coverage, bounded
-  candidate jobs, safe fork routing, and exact final-gate reduction.
+  candidate jobs, safe fork routing, and exact final-gate reduction; and
+- development-container toolchain, checksum, image, and pgvector parity with
+  candidate CI, strict download verification, and no editor lifecycle command.
+
+A Git submodule is a pinned source input, not an install-time fetch. The
+workspace architecture test accepts a gitlink only when `.gitmodules` declares
+it exactly once at a normalized repository-relative path with a
+credential-free `https://` URL, so an anonymous clean clone and candidate CI
+reproduce the same tree. Cargo workspace members remain tracked in this
+repository, and the signed default distribution must still contain every byte
+it needs after acquisition.
 
 Workflow ownership is directory-wide in `.github/CODEOWNERS`, so adding a new
 workflow does not bypass the existing workflow review boundary. Repository or
@@ -154,6 +473,101 @@ quality/failure corpus required by J-04; scheduling and artifact upload cannot
 turn it into performance or competitive evidence.
 
 ## Diagnostic, performance, and fault lanes
+
+The Linux installed lane and Windows/macOS portability lanes run
+`cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture` with a five-minute
+step limit. This C-07b unit corpus wraps native file calls with deterministic
+faults, then reconstructs a temporary estate from an independent stable-byte
+and directory-entry model. Logs retain call/case counts and failing ordinals.
+The model has fixed byte/file/event bounds and exercises compound recovery
+failures. It is I/O-model evidence on each host, not native process-death,
+ENOSPC, OS-crash, device-cache or physical power-loss qualification. The fault
+controller is compiled only into `rrd-lsm` unit tests; no product feature or
+runtime setting enables it.
+
+The same filter also executes C-07c's `fault_io::crash` native process corpus.
+Its owned unit-test child pauses at a nonce/PID-bound native boundary, then
+the parent kills and reaps that exact handle. Forty borrowed/owned,
+WAL-only/published-segment cases cover write, complete append, sync,
+visibility, flush publication and reclamation; eighty additional kills interrupt
+WAL replay. Two separate 100-cycle histories prove exact acknowledged values
+and sequences through repeated reopen. Logs retain the test executable digest,
+native OS, boundary, run identity and hit/reap timings. The one ignored child
+fixture is explicitly invoked by these parent tests; no required parent is
+ignored. The child accepts at most 4 KiB through its parent-owned stdin, emits
+bounded identity-only receipts, and has a 30-second pause deadline. The parent
+has a 20-second rendezvous deadline and 8 KiB per-stream capture bounds.
+
+This corpus is instrumented native **storage-component** process-death proof.
+It is not the installed primary binary, a loss of OS/device caches, native
+ENOSPC, resource-envelope or sustained-load proof. The independent installed
+client histories and the remaining C-07c composition/profile requirements stay
+distinct. The I/O model remains entirely under `cfg(test)`. The owned process
+rendezvous source is also reused by the explicit diagnostic primary below;
+ordinary dependency builds exclude it.
+
+The required `installed-crash` matrix runs on Linux, macOS and Windows. It
+first builds the **ordinary** primary and streams its bytes to verify absence
+of the crash protocol marker, retaining its SHA-256 and byte count in the log.
+It then builds `rrflow-cli --features crash-test` and runs:
+
+```text
+cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2
+cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked
+cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
+```
+
+This separately identified diagnostic artifact requires a bounded private stdin
+schedule (or explicit null for an unarmed run). The root comes from the installed
+locator, and only the exact authorized operation digest arms the domain scope
+after intent persistence. Five points cover pre-WAL, complete append, native
+sync, visibility and persisted receipt before response. Each fresh/existing
+case also kills reopen before the first WAL frame is applied. Independent rows,
+cursors, prior ACK receipts and exact retries reconcile uncertainty without
+double application. Negative controls reject inadmissible schedules and prove
+an unrelated operation cannot trigger the selected boundary.
+
+The two estate histories retain six logical calls and 21 attempts each,
+including five uncertain client results; ten point/recovery hits per estate
+bind PID, nonce, point and build identity. The third parent test qualifies
+schedule admission. No parent is ignored. Native stdout/stderr capture is
+bounded to 1 MiB per stream, input to 4 KiB, observed event lines to 64 KiB and
+the event queue to four entries. Parent readiness/event waits are 60 seconds,
+child lifetimes 180 seconds, diagnostic admission 180 seconds and the armed
+native pause 30 seconds. The job allows 45 minutes including builds; the warm
+test step allows 20 minutes and two test threads. Existing ordinary lane
+limits are unchanged. `ci-gate` requires all three diagnostic jobs.
+
+The same required native job now invokes
+`python3 scripts/ci/run_native_capacity.py` for fresh/existing estates at WAL,
+segment, manifest and CURRENT-write boundaries. It creates a capped ext4 loop
+image in a private mount namespace, fixed APFS image, or NTFS VHD. The harness
+requires a separately enumerated small volume, an exact owner marker, a private
+one-use pause/resume, and an actual native capacity error at the selected
+phase. It preserves every acknowledged value/receipt, resolves the uncertain
+call, explicitly publishes a repaired candidate when a final WAL frame is
+incomplete, admits distinct new work, and reopens again. These are actual
+filesystem-failure checks; they do not establish OS power-cut safety or a
+24-hour operating envelope. Missing facilities report not-run with nonzero
+exit; any failed cleanup fails qualification. The normal binary must contain
+neither diagnostic marker. The job's 75-minute bound includes the existing
+corpus and a 30-minute native capacity step. Local execution remains explicit:
+this runner must never be pointed at an existing disk or mount.
+
+The nondefault four-crate `crash-test` composition is owned by this dedicated
+job; other optional features retain their existing matrix. It must never be
+used to assemble the normal distribution. These tests do not close installed
+publication/GC composition, 100-cycle operating profiles, resource limits,
+retained buffers, real exhaustion, sustained capacity or the 24-hour soak.
+
+The installed domain-crash job also runs the
+[publication and reclamation corpus](../evidence/change-journals/gate-c/c-07c-installed-publication.md)
+separately for fresh/existing estates. It retains two bounded native receipts,
+requires all six maintenance boundaries and their compound manifest-recovery
+kills, and reconciles prior ACKs before retrying each uncertain target. The
+ordinary domain step excludes these cases to avoid duplicate execution. Native
+acceptance requires the explicit execution and receipt-validation steps;
+component histories and a successful older job cannot replace them.
 
 The
 [engine observability contract](../architecture/engine-data-flow.md#runtime-modes-build-profiles-and-build-identity)

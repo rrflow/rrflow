@@ -1,5 +1,7 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
+// OpenAPI SHA-256: ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65" as const;
+
 export const endpoints = {
   "audit-export": {
     "method": "POST",
@@ -49,15 +51,51 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": false
   },
+  "data-schema-read": {
+    "method": "POST",
+    "path": "/v1/data/schema",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
   "diagnostics-read": {
     "method": "POST",
     "path": "/v1/diagnostics/read",
     "authentication": "session_bearer",
     "mutation": false
   },
+  "diagnostics-storage-cursor": {
+    "method": "POST",
+    "path": "/v1/diagnostics/storage/cursor",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "diagnostics-storage-read": {
+    "method": "POST",
+    "path": "/v1/diagnostics/storage/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
   "estate-read": {
     "method": "POST",
     "path": "/v1/estates/{estate}/read",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-launch": {
+    "method": "POST",
+    "path": "/v1/flights",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "flight-list": {
+    "method": "POST",
+    "path": "/v1/flights/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "flight-read": {
+    "method": "POST",
+    "path": "/v1/flights/read",
     "authentication": "session_bearer",
     "mutation": false
   },
@@ -88,6 +126,12 @@ export const endpoints = {
   "query-execute": {
     "method": "POST",
     "path": "/v1/query",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "query-export": {
+    "method": "POST",
+    "path": "/v1/query/export",
     "authentication": "session_bearer",
     "mutation": false
   },
@@ -156,6 +200,30 @@ export const endpoints = {
     "path": "/v1/subscriptions/open",
     "authentication": "session_bearer",
     "mutation": true
+  },
+  "task-open": {
+    "method": "POST",
+    "path": "/v1/tasks",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-close": {
+    "method": "POST",
+    "path": "/v1/tasks/close",
+    "authentication": "session_bearer",
+    "mutation": true
+  },
+  "task-list": {
+    "method": "POST",
+    "path": "/v1/tasks/list",
+    "authentication": "session_bearer",
+    "mutation": false
+  },
+  "task-read": {
+    "method": "POST",
+    "path": "/v1/tasks/read",
+    "authentication": "session_bearer",
+    "mutation": false
   },
   "transaction-begin": {
     "method": "POST",

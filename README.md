@@ -5,11 +5,23 @@ bounded context assembly. RRD is its embedded and daemon runtime; rrflowDB,
 rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, graph, lexical, vector,
 inference, and client capabilities remain parts of that one system.
 
-The owner controls `rrflow.ai` for the reasoning engine and `rroflow.ai` for
-RROFLOW's recursive-learning aspects. Connectome is the shared UI for both,
-operating through the same RRFlow authority. The
-[system overview](docs/architecture/system-overview.md#canonical-component-terminology)
-owns that distinction and the current design intent.
+RRFlow is being built as an open-source reasoning engine for people building
+with AI, including vibe coders learning professional development practices.
+Connectome should make project context, evidence, change previews, verification
+and review understandable without hiding their limits. The existing roadmap's
+[project-to-learning journey](docs/roadmap/rrflow-1.0/executable-dependency-spine.md#project-to-learning-acceptance-journey)
+maps that experience to its implementation dependencies and real-world tests.
+
+**rrflowDB is the database within RRFlow: a pure Rust, PostgreSQL-inspired
+database dedicated to AI and designed for AI use, with PostgreSQL compatibility
+as a product requirement.** It stores the knowledge, memory, reasoning state,
+and evidence of each project estate. The [database identity and compatibility
+boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary)
+separates that target from current implementation and compatibility evidence.
+The [PostgreSQL compatibility and independent database contract](docs/reference/protocol/postgresql.md)
+defines the first SQL/client profile, native-engine integration, Turso exit,
+data portability and qualification. [H-08](docs/roadmap/rrflow-1.0/gate-h.md#h-08-postgresql-compatibility-packages)
+owns its implementation packages; compatibility is not yet implemented.
 
 This README is the bootstrap product entry point and knowledge map. It owns
 RRFlow's identity, non-negotiable architecture invariants, and current status;
@@ -23,50 +35,67 @@ baseline is established. Current maturity is **pre-alpha**. The version is a
 contract line, not a claim that the complete system is stable, optimized, or
 release-ready.
 
-## Connectome management UI
+## Engine, UI, cloud, and desktop
 
-Connectome is the UI for operating RRFlow estates through the public RRD
-contract. Its independent repository is pinned here as the optional
-`connectome/` Git submodule from the owner's `agent/layman-lenses-wip` branch.
-The parent pins an exact reviewed commit, preserving that authored UI and its
-independent history. Engine builds and operation work without initializing it.
+RRFlow is the reasoning engine. **Connectome** is its operator and developer
+UI, maintained in its own repository and pinned here as the optional
+`connectome/` Git submodule. The [Connectome client contract](docs/reference/client/connectome.md#repository-checkout)
+owns checkout instructions and the UI's public-engine boundary.
 
-```bash
-git submodule update --init connectome
-cargo build --locked -p rrflow-cli --bin rrflow
-cd connectome
-pnpm install --frozen-lockfile
-pnpm tauri:dev
-```
+Planned **rrflow.ai** and **rroflow.ai** services offer optional remote engine
+access/synchronization and governed learning respectively; their
+[service roles and opt-in boundaries](docs/reference/client/devpulse-cloud.md#optional-managed-service-roles)
+are targets, not deployed-service claims. **shippin.cloud** extends this
+experience with a private devspace. The initial friends-and-family experience will
+demonstrate current AI-assisted development: create projects, run Rust,
+Python, and Go code, load the running project's UI inside the private cloud
+devspace, and launch projects on the web.
 
-Until the desktop bundle includes the engine, add the built `rrflow` executable
-to PATH or select its absolute path in **Settings → Serving**. On Windows the
-debug build is `target/debug/rrflow.exe` under the engine checkout; on macOS
-and Linux it is `target/debug/rrflow`. Use the engine revision pinned by
-Connectome's native contract dependencies, currently `e5672ec1`; the product
-version alone does not establish protocol compatibility.
+**DevPulse** is the project development application, shipping first on Windows.
+Standalone RRFlow with Connectome targets guided installation in a few steps
+on Windows, macOS and Linux. DevPulse bundles RRFlow and guides optional
+Docker setup when a project needs containers. Its RRFlow integration
+must provision local project VMs/containers, run their toolchains and UIs, and
+support explicitly selected **bidirectional synchronization** with either
+**shippin.cloud or an operator-controlled homelab**. Local and homelab operation
+must remain available without a hosted account. Database synchronization,
+project-file transfer and environment provisioning have distinct receipts and
+failure states; the [integration contract](docs/reference/client/devpulse-cloud.md)
+owns those requirements.
 
-Click **Start serving**. The serving console should show `[install] …`,
-`[serve] Listening at http://127.0.0.1:<port> as instance-…`, then
-`[ready] The estate answered an authenticated readiness check`. Acceptance is
-the Records lens with all three checks verified in **Engine details**. Report the actual
-error text if the sequence fails; an open port or compiled UI is insufficient.
-
-The cloud version is a planned browser delivery of the same Connectome UI
-over the public RRD contract. It needs a supported browser authentication and
-remote transport profile; a desktop build does not establish cloud readiness.
-The [Connectome client contract](docs/reference/client/connectome.md) owns
-that boundary and the current conformance limits. Updating the submodule pin
-is an explicit parent-repository change; normal submodule initialization uses
-the reviewed commit rather than following `main` automatically.
+These are delivery targets, not claims of available hosted execution,
+deployment, or synchronization. The [delivery boundaries](docs/architecture/system-overview.md#delivery-experiences)
+define how these experiences share one engine; the existing roadmap and
+pre-alpha status remain authoritative.
 
 ## Enter RRFlow
+
+For a local desktop workflow, use the [native Connectome workbench](docs/reference/client/connectome.md#native-local-workbench):
+start the bundled RRFlow engine after an explicit installation preview, explore
+the authenticated schema and data models, query records, and navigate their
+relationships. This is a development build with real-engine evidence; full
+client qualification remains open.
+
+Start with the [runnable local rrflowDB integration](docs/reference/sdk/rrflowdb-local.md):
+build the native engine, create related records, query them with rrflowQL and
+reopen persistent rrflowKV state. [DevPulse and optional shippin.cloud sync](docs/reference/client/devpulse-cloud.md)
+defines local operation without an account and the explicit cloud opt-in boundary.
+Cloud account synchronization and PostgreSQL compatibility remain unimplemented.
+
+The installed engine also exposes an authenticated, bounded
+[Parquet query-result export](docs/reference/data/knowledge-connectors.md#bundled-query-export).
+Apache's Rust writer is linked into the binary. This capability is available
+through the public operation catalogue and clients; a Connectome export control,
+bulk import and streaming exchange remain unqualified.
 
 | Need | Single owning record |
 |---|---|
 | Understand the product, components, and boundaries | [RRFlow system overview](docs/architecture/system-overview.md) |
-| Configure knowledge trees, native/external paths and inspect provider readiness | [Knowledge trees and provider paths](docs/reference/knowledge-trees.md) |
-| Understand LFG, the SWAG System One controller and recursive-learning boundaries | [Inference extensions](docs/reference/inference-extensions.md) |
+| Follow researched scale, bounded execution, input/schema and signal decisions into their owning implementation packages | [RRFlow scale and contract rationale](docs/architecture/engine-scale-and-contracts.md) |
+| Configure CPU analysis, System One model selection and scoped inference caches | [LFG and SWAG target contract](docs/reference/inference/lfg-swag.md) |
+| Prepare Spark experiments, qualify SWAG candidates and govern RROFLOW improvement | [Learning reference](docs/reference/inference/learning/README.md) |
+| Discover connector requirements and build source-grounded knowledge trees | [Knowledge connectors and Parquet target contract](docs/reference/data/knowledge-connectors.md) |
+| Follow planned DuckDB analytical exchange and optional execution | [DuckDB interoperability contract](docs/reference/data/duckdb.md) — unimplemented; native rrflowDB remains authoritative |
 | Understand project, estate, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
 | Select and prove deployment form, storage profile, and endpoint presentation independently | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
 | Install, serve, verify, repair, restore, and remove one project estate through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |
@@ -180,9 +209,12 @@ receipt closes a lost acknowledgement without guest re-execution. C-04 is
 reopened: current and temporal state is selected through authenticated,
 budgeted semantic-version point/range reads at one `ReadStamp`, and normal
 query, retrieval, context, memory, inference, and vector-candidate paths no
-longer reconstruct state from the runtime change log, but every vector search
-still rebuilds the vector artifact and quantization catalogues from cursor 0
-([POAM-028](docs/poam/rrflow-1.0-alpha/poam-028.md)). Exact
+longer reconstruct state from the runtime change log. Vector search now reads
+artifact and quantization catalogues with its candidates at one authenticated
+stamp and within one request key budget. A retained-stamp regression and a
+1,024-unrelated-record growth corpus pass through rrflowKV reopen; this is
+bounded evidence, not massive-codebase qualification. C-04 remains open for
+the remaining [POAM-028](docs/poam/rrflow-1.0-alpha/poam-028.md) closure work. Exact
 rrflowMX/rrflowKV, rrflowKV reopen, and physical-counter evidence passes for
 the direct reads. C-05 is complete
 for the single-node alpha composition: retired physical readers are absent;
@@ -232,8 +264,12 @@ zero under scan-resistant LRU, while recording 18,200 same-scope suppressions,
 semantic, and projected-row digests, and exact 1 MiB capacity compliance.
 Measured evidence rejects value separation, semantic-family cache partitions,
 Moka, TinyLFU, and caller-controlled cache bypass for this accepted format.
-D-01 remains open and is the active executable item. Its first bounded
-prerequisite now exists: a source-built primary `rrflow` 1.0.0 executable can
+D-01 is complete for the bounded installed-engine foundation. Its
+[acceptance matrix and native receipts](docs/roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+bind one candidate to successful Linux, macOS and Windows isolation, native
+filesystem/ownership denial, recovery and actual primary-binary lifecycle
+checks. C-07 is the active executable item. The original walking prerequisite
+remains: a source-built primary `rrflow` 1.0.0 executable can
 deterministically preview and apply a fresh or existing local-project
 installation, serve the generated public contract, complete an authenticated
 readiness challenge, and perform mutation-free quick verification. The linked
@@ -250,7 +286,8 @@ it. The linked
 [canonical-estate journal](docs/evidence/change-journals/gate-d/d-01-canonical-estate-layout-and-configuration.md)
 records the exact implementation and tests. A third bounded prerequisite now
 makes that sealed installation the only product startup authority. The same
-plan resumes after deterministic interruptions at each of eight durable stages
+plan resumes after deterministic interruptions at each of ten durable-effect
+stages, plus the pre-intent lease boundary,
 without changing its first-apply time or duplicating its token, credential,
 installed record, audit, checkpoint, or locator. The primary CLI, internal
 server process, embedded MCP mode, six-language SDK conformance daemon,
@@ -259,7 +296,19 @@ state; the pre-canonical manifest, private project binding, raw product CLI,
 standalone security initializer, development supervisor, and server initializer
 were removed directly. The linked
 [authority-convergence journal](docs/evidence/change-journals/gate-d/d-01-precanonical-authority-convergence-and-install-recovery.md)
-records the exact replacement and limits. The reasoning runner remains
+records the exact replacement and limits. A fourth bounded prerequisite now
+removes caller-selected installation time. `RrdEngine` makes one fallible host
+clock observation, labels it `host_system_time` / `unverified`, seals the first
+observation into recovery and installed records, and applies the strict
+format-2 `clock.maximum_rollback_ms = 0` default during recovery, replay, and
+open. Read-only verification reports current, explicitly tolerated rollback,
+exceeded rollback, or unavailable time without mutating the estate; unsafe
+open fails closed. The same bounded abrupt-kill/reopen primary-binary test is
+now scheduled on Linux, macOS, and Windows. The linked
+[clock-substrate journal](docs/evidence/change-journals/gate-d/d-01-engine-owned-installation-clock.md)
+records the exact boundary and proof. This does not authenticate or correct
+UTC, establish runtime-wide temporal high-water marks, or qualify a native
+platform distribution. The reasoning runner remains
 truthfully unavailable. This is still not a streamed DataFusion `RecordBatch`
 provider, native graph/BM25/vector access, complete attunement, turnkey release
 distribution, or persistent reasoning/recall proof.
@@ -273,10 +322,14 @@ root quarantined; its help and parser reject the removed raw-database and
 development commands. Repair, uninstall, durable attunement execution, and
 release service management remain absent. The retained internal server and
 adapter binaries open only an already-installed estate, but they are not a
-second supported operator command tree. No signed/offline-complete platform
-bundle or native Windows
-`rrflow.exe` has been built and run. D-01 owns the remaining single-executable
-walking lifecycle, D-11 owns complete repair/restore/uninstall, and Gate J owns
+second supported operator command tree. Native primary-executable lifecycle
+tests now pass on Windows, Linux and macOS; the
+[native lifecycle journal](docs/evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
+records their bounded scope. No signed/offline-complete platform bundle has
+been qualified. D-01 supplies the accepted single-executable installation
+foundation;
+C-07 owns wider installed storage recovery/lifetime, D-11 owns complete
+repair/restore/uninstall, and Gate J owns
 native signed platform distributions. See the
 [installed lifecycle](docs/reference/deployment/installed-lifecycle.md) and
 [POA&M](docs/poam/rrflow-1.0-alpha.md).

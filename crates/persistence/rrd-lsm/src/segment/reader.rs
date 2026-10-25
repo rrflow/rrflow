@@ -2,12 +2,16 @@ use super::format::PageKind;
 use super::{
     key_at, offset_at, sequence_at, valid_at, KeySpine, PageCacheAccess, PageLoadEvidence, Segment,
 };
-use crate::{Error, Manifest, Memtable, Result, Snapshot};
+use crate::{Error, Manifest, ProjectedOutputMemory, Result, Snapshot};
 use arrow_buffer::{Buffer, MutableBuffer};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::{Arc, Mutex};
+
+#[cfg(test)]
+#[path = "reader_lifetime_tests.rs"]
+mod lifetime_tests;
 
 pub const PROJECTED_READ_CONTRACT_VERSION: u16 = 1;
 
@@ -206,6 +210,7 @@ pub enum ProjectedReadResource {
     OutputBufferBytes,
     BatchRows,
     BatchAllocatedBytes,
+    RetainedOutputBytes,
 }
 
 impl ProjectedReadResource {
@@ -222,6 +227,7 @@ impl ProjectedReadResource {
             Self::OutputBufferBytes => "output_buffer_bytes",
             Self::BatchRows => "batch_rows",
             Self::BatchAllocatedBytes => "batch_allocated_bytes",
+            Self::RetainedOutputBytes => "retained_output_bytes",
         }
     }
 }
@@ -278,6 +284,10 @@ pub struct ProjectedReadEvidence {
     pub outcome: ProjectedReadOutcome,
 }
 
+/// Immutable copied output. Clones and slices of its Arrow buffers keep the
+/// originating database-open instance's output reservation until the last
+/// allocation owner drops. These custom-owned buffers cannot be converted
+/// in place to mutable buffers; caller-created copies are outside that pool.
 #[derive(Debug, Clone)]
 pub struct ProjectedReadBatch {
     projection: ProjectedReadProjection,
@@ -354,6 +364,13 @@ struct ActiveManifest {
 }
 
 impl ActiveReadViews {
+    pub(crate) fn ownership(registry: &Arc<Mutex<Self>>) -> Result<(u64, u64)> {
+        let views = registry
+            .lock()
+            .map_err(|_| Error::PoisonedReadViewRegistry)?;
+        Ok((views.active as u64, views.pinned_bytes))
+    }
+
     pub(crate) fn acquire(
         registry: &Arc<Mutex<Self>>,
         manifest: Manifest,
@@ -426,15 +443,17 @@ impl ActiveReadViews {
         })
     }
 
-    pub(crate) fn manifests(registry: &Arc<Mutex<Self>>) -> Result<Vec<Manifest>> {
+    pub(crate) fn visit_manifests(
+        registry: &Arc<Mutex<Self>>,
+        mut visit: impl FnMut(&Manifest) -> Result<()>,
+    ) -> Result<()> {
         let views = registry
             .lock()
             .map_err(|_| Error::PoisonedReadViewRegistry)?;
-        Ok(views
-            .manifests
-            .values()
-            .map(|entry| entry.manifest.clone())
-            .collect())
+        for entry in views.manifests.values() {
+            visit(&entry.manifest)?;
+        }
+        Ok(())
     }
 }
 
@@ -476,7 +495,9 @@ impl ReadViewLease {
             .checked_sub(self.pinned_bytes)
             .ok_or(Error::PoisonedReadViewRegistry)?;
         let remove = next_references == 0;
-        if remove != (next_manifest_pinned == 0) {
+        // Empty views legitimately hold a reference with zero pinned bytes.
+        // Only the last reference requires all of this manifest's charge gone.
+        if remove && next_manifest_pinned != 0 {
             return Err(Error::PoisonedReadViewRegistry);
         }
         if remove {
@@ -506,7 +527,7 @@ impl Drop for ReadViewLease {
 pub(crate) struct ReadView {
     pub sequence: u64,
     pub manifest: String,
-    pub memtable: Arc<Memtable>,
+    pub memtable: Arc<crate::mutable_memory::MutableGeneration>,
     pub segments: Vec<Arc<Segment>>,
     pub pinned_bytes: u64,
 }
@@ -519,10 +540,12 @@ pub struct ProjectedReadStream {
     cursors: Vec<RunCursor>,
     heads: Vec<Option<ProjectedEntry>>,
     heap: BinaryHeap<HeapItem>,
+    unopened: BinaryHeap<HeapItem>,
     pending: Option<PreparedRow>,
     initialized: bool,
     terminal: bool,
     lease: Option<ReadViewLease>,
+    output_memory: ProjectedOutputMemory,
 }
 
 impl ProjectedReadStream {
@@ -533,6 +556,7 @@ impl ProjectedReadStream {
         budget: ProjectedReadBudget,
         cache_access: PageCacheAccess,
         lease: ReadViewLease,
+        output_memory: ProjectedOutputMemory,
     ) -> Self {
         let ranges: Arc<[ProjectedReadRange]> = ranges.into();
         let mut cursors = Vec::with_capacity(
@@ -575,10 +599,12 @@ impl ProjectedReadStream {
             cursors,
             heads,
             heap: BinaryHeap::new(),
+            unopened: BinaryHeap::new(),
             pending: None,
             initialized: false,
             terminal: false,
             lease: Some(lease),
+            output_memory,
         }
     }
 
@@ -712,7 +738,30 @@ impl ProjectedReadStream {
         }
         self.initialized = true;
         for run in 0..self.cursors.len() {
-            self.advance(run)?;
+            match &self.cursors[run] {
+                RunCursor::Memtable(_) => self.advance(run)?,
+                RunCursor::Segment(cursor) => self.unopened.push(HeapItem {
+                    // Descriptor bounds already govern read-view selection.
+                    // This lower bound cannot exceed any visible selected key.
+                    key: cursor.segment.descriptor.first_key.clone(),
+                    run,
+                }),
+            }
+        }
+        Ok(())
+    }
+
+    fn open_competing_runs(&mut self) -> Result<()> {
+        // Open every run that could precede or tie the smallest loaded key.
+        // Opening may move that key; compare again before selecting a winner.
+        // Disjoint future runs remain pinned/admitted but need no page I/O yet.
+        while self.unopened.peek().is_some_and(|candidate| {
+            self.heap
+                .peek()
+                .is_none_or(|head| candidate.key <= head.key)
+        }) {
+            let candidate = self.unopened.pop().expect("unopened run was checked");
+            self.advance(candidate.run)?;
         }
         Ok(())
     }
@@ -731,6 +780,7 @@ impl ProjectedReadStream {
 
     fn next_row(&mut self) -> Result<Option<PreparedRow>> {
         loop {
+            self.open_competing_runs()?;
             let Some(first) = self.heap.pop() else {
                 return Ok(None);
             };
@@ -787,6 +837,7 @@ impl ProjectedReadStream {
     ) -> Result<ProjectedReadBatch> {
         let allocation =
             batch_allocation_bytes(rows.len(), key_bytes, value_bytes, self.projection)?;
+        let mut reservation = self.output_memory.reserve(allocation)?;
         self.meter.record_batch_allocation(allocation)?;
         let mut key_offsets = MutableBuffer::from_len_zeroed((rows.len() + 1) * 8);
         let mut key_data = MutableBuffer::from_len_zeroed(key_bytes);
@@ -834,10 +885,14 @@ impl ProjectedReadStream {
         let batch = ProjectedReadBatch {
             projection: self.projection,
             rows: rows.len(),
-            key_offsets: Buffer::from(key_offsets),
-            key_data: Buffer::from(key_data),
-            value_offsets: value_offsets.map(Buffer::from),
-            value_data: value_data.map(Buffer::from),
+            key_offsets: reservation.wrap(key_offsets)?,
+            key_data: reservation.wrap(key_data)?,
+            value_offsets: value_offsets
+                .map(|buffer| reservation.wrap(buffer))
+                .transpose()?,
+            value_data: value_data
+                .map(|buffer| reservation.wrap(buffer))
+                .transpose()?,
         };
         self.meter.record_emitted_batch(
             rows.len() as u64,
@@ -854,6 +909,13 @@ impl ProjectedReadStream {
         }
         self.terminal = true;
         self.meter.evidence.outcome = outcome;
+        // Release captured generations and temporary buffers before the pin.
+        // Returned batches own copied buffers independently of these sources.
+        self.pending = None;
+        self.heads = Vec::new();
+        self.heap = BinaryHeap::new();
+        self.unopened = BinaryHeap::new();
+        self.cursors = Vec::new();
         let release = self
             .lease
             .take()
@@ -927,7 +989,7 @@ impl RunCursor {
 
 #[derive(Debug)]
 struct MemtableProjectedCursor {
-    table: Arc<Memtable>,
+    table: Arc<crate::mutable_memory::MutableGeneration>,
     ranges: Arc<[ProjectedReadRange]>,
     read_sequence: u64,
     after: Option<Vec<u8>>,

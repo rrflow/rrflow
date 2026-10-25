@@ -71,10 +71,37 @@ pub enum Command {
         #[arg(long = "test-distribution-executable", hide = true)]
         test_distribution_executable: Option<std::path::PathBuf>,
     },
+    /// Explicitly repair only a validated incomplete final WAL frame while stopped.
+    Repair {
+        #[command(subcommand)]
+        action: RepairAction,
+    },
     /// Preview or apply the publication of a verified restore while the estate is stopped.
     Restore {
         #[command(subcommand)]
         action: RestoreAction,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum RepairAction {
+    /// Inspect the installed estate and emit an exact plan without changing bytes.
+    Plan {
+        #[arg(long, default_value = ".")]
+        project: std::path::PathBuf,
+        #[arg(long = "test-distribution-executable", hide = true)]
+        test_distribution_executable: Option<std::path::PathBuf>,
+    },
+    /// Truncate only the incomplete tail approved by this exact plan digest.
+    Apply {
+        #[arg(long, default_value = ".")]
+        project: std::path::PathBuf,
+        #[arg(long)]
+        plan: std::path::PathBuf,
+        #[arg(long)]
+        expect: String,
+        #[arg(long = "test-distribution-executable", hide = true)]
+        test_distribution_executable: Option<std::path::PathBuf>,
     },
 }
 
@@ -110,12 +137,17 @@ pub enum RestoreAction {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum InstallAction {
+    /// Generate a new identity input without writing project or engine state.
+    Identity,
     /// Emit an exact, deterministic preview and perform no project writes.
     Plan {
         #[arg(long, default_value = ".")]
         project: std::path::PathBuf,
         #[arg(long, value_enum, default_value_t = InstallMode::Existing)]
         mode: InstallMode,
+        /// Identity from `install identity`; retain it across previews for this installation.
+        #[arg(long)]
+        identity: String,
         #[arg(long, default_value = "default")]
         profile: String,
         /// Operator-authored estate ceilings sealed into the installation plan.

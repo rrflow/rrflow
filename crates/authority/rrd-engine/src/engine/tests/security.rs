@@ -1,4 +1,5 @@
 use super::*;
+use crate::ServiceErrorKind;
 use rrd_contract::{
     AssembleContext, DataLogicalModel, DataPropertySchema, DataRecordSchema, DataReference,
     DataSchemaMode, DataSchemaRegistry, DataTableSchema, DataValueType, ExecuteQuery, QueryBudget,
@@ -9,6 +10,127 @@ use rrd_security::{
     DataPolicy, IdentityBinding, JwtIssueRequest, JwtIssuer, PolicyPredicate, Role,
 };
 use std::collections::{BTreeMap, BTreeSet};
+
+fn overlapping_backup_invocation(now: u64, attempt: u64) -> Invocation {
+    Invocation {
+        context: mutation_context(
+            &id("overlap-backup-key"),
+            "overlap-backup-request",
+            "overlap-backup-operation",
+        ),
+        resource: ResourcePath {
+            segments: vec![ResourceId::new(ResourceKind::Instance, instance().as_str()).unwrap()],
+        },
+        observed_at_unix_ms: now,
+        attempt,
+        request_sha256: digest::sha256_hex(b"same-backup-request"),
+    }
+}
+
+fn successful_invocation_completion() -> InvocationCompletion {
+    InvocationCompletion {
+        decision: AuditDecision::Allowed,
+        status_code: 200,
+        response_sha256: digest::sha256_hex(b"same-backup-result"),
+    }
+}
+
+#[test]
+fn overlapping_invocation_rejection_preserves_original_owner() {
+    let (_root, persistent) = isolated_engine();
+    for engine in [persistent, RrdEngine::rrflow_mx(instance(), TOKEN_KEY)] {
+        let first = engine
+            .begin_invocation(
+                overlapping_backup_invocation(1_000, 1),
+                RrdOperation::BackupCreate,
+                InvocationCredential::Anonymous,
+            )
+            .unwrap();
+        let (error, owns_unrelated_call) = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let error = engine
+                        .begin_invocation(
+                            overlapping_backup_invocation(1_100, 2),
+                            RrdOperation::BackupCreate,
+                            InvocationCredential::Anonymous,
+                        )
+                        .unwrap_err();
+                    (
+                        error,
+                        engine.has_active_invocation("unrelated-request", "unrelated-operation"),
+                    )
+                })
+                .join()
+                .unwrap()
+        });
+        assert!(
+            !owns_unrelated_call,
+            "rejected caller stole the active thread reservation"
+        );
+        assert!(engine.has_active_invocation("unrelated-request", "unrelated-operation"));
+        assert_eq!(error.kind(), ServiceErrorKind::Conflict);
+        assert!(
+            error.retryable(),
+            "in-flight work is not a permanent payload conflict"
+        );
+        let audit = SecurityRepository::new(&engine.storage, instance())
+            .audit_since(0, 16)
+            .unwrap();
+        assert_eq!(
+            audit
+                .records
+                .iter()
+                .filter(|(_, record)| {
+                    record.action == SecurityAction::BackupCreate
+                        && record.phase == AuditPhase::Completed
+                        && record.decision == AuditDecision::Failed
+                        && record.status_code == 409
+                })
+                .count(),
+            1,
+            "the overlapping request must have its own completed denial"
+        );
+        engine
+            .complete_invocation(&first, successful_invocation_completion())
+            .unwrap();
+        assert!(!engine.has_active_invocation("overlap-backup-request", "overlap-backup-operation"));
+    }
+}
+
+#[test]
+fn overlapping_invocation_stale_completion_cannot_remove_a_later_attempt() {
+    let (_root, persistent) = isolated_engine();
+    for engine in [persistent, RrdEngine::rrflow_mx(instance(), TOKEN_KEY)] {
+        let first = engine
+            .begin_invocation(
+                overlapping_backup_invocation(1_000, 1),
+                RrdOperation::BackupCreate,
+                InvocationCredential::Anonymous,
+            )
+            .unwrap();
+        engine
+            .complete_invocation(&first, successful_invocation_completion())
+            .unwrap();
+        let second = engine
+            .begin_invocation(
+                // Even identical caller metadata must receive a new reservation.
+                overlapping_backup_invocation(1_000, 1),
+                RrdOperation::BackupCreate,
+                InvocationCredential::Anonymous,
+            )
+            .unwrap();
+        assert!(matches!(
+            engine.complete_invocation(&first, successful_invocation_completion()),
+            Err(ServiceError::IdempotencyConflict)
+        ));
+        assert!(engine.has_active_invocation("overlap-backup-request", "overlap-backup-operation"));
+        engine
+            .complete_invocation(&second, successful_invocation_completion())
+            .unwrap();
+        assert!(!engine.has_active_invocation("overlap-backup-request", "overlap-backup-operation"));
+    }
+}
 
 #[test]
 fn embedded_engine_cannot_bypass_policy_grants() {
@@ -172,6 +294,17 @@ fn diagnostic_snapshot_requires_its_exact_grant() {
     );
 
     assert!(matches!(result, Err(ServiceError::PermissionDenied)));
+    let storage = engine.read_storage_diagnostics(
+        &lease.session_id,
+        &lease.token,
+        &rrd_contract::ReadStorageDiagnostics {
+            scope: "instance:test-instance".into(),
+        },
+        1_100,
+        "storage-denied",
+        "storage-denied",
+    );
+    assert!(matches!(storage, Err(ServiceError::PermissionDenied)));
 }
 
 /// Characterizes POAM-029. The diagnostic read compares a before/after stamp
@@ -266,6 +399,33 @@ fn an_audited_read_inside_every_assembly_window_exhausts_the_diagnostic_read() {
         )
         .unwrap();
     assert_eq!(quiet.read.assembly_attempts, 1);
+    let storage = engine
+        .read_storage_diagnostics(
+            &lease.session_id,
+            &lease.token,
+            &rrd_contract::ReadStorageDiagnostics {
+                scope: scope.clone(),
+            },
+            1_100,
+            "storage-observation",
+            "storage-observation",
+        )
+        .unwrap();
+    storage.validate().unwrap();
+    assert_eq!(storage.profile, quiet.storage.profile);
+    assert!(matches!(
+        engine.read_storage_diagnostics(
+            &lease.session_id,
+            &lease.token,
+            &rrd_contract::ReadStorageDiagnostics {
+                scope: "instance:another-estate".into()
+            },
+            1_100,
+            "storage-wrong-scope",
+            "storage-wrong-scope"
+        ),
+        Err(ServiceError::WrongScope)
+    ));
 
     let runtime_cursor = engine.storage.runtime().cursor().unwrap();
     let control_sequence = engine.storage.control().sequence().unwrap();
@@ -279,6 +439,20 @@ fn an_audited_read_inside_every_assembly_window_exhausts_the_diagnostic_read() {
         "operation-diagnostic-busy",
         &mut |attempt| {
             attempts.push(attempt);
+            engine
+                .read_storage_diagnostics(
+                    &lease.session_id,
+                    &lease.token,
+                    &rrd_contract::ReadStorageDiagnostics {
+                        scope: scope.clone(),
+                    },
+                    1_200,
+                    &format!("storage-during-{attempt}"),
+                    &format!("storage-during-{attempt}"),
+                )?
+                .validate()
+                .unwrap();
+
             engine
                 .read_changefeed(
                     &lease.session_id,
@@ -945,6 +1119,62 @@ fn compiled_role_policy_injects_tenant_rows_and_fields_before_query_planning() {
     assert!(result
         .canonical_query
         .contains("classification = \"public\""));
+    let export_request = rrd_contract::ExportQuery {
+        query: query.clone(),
+        max_output_bytes: 524288,
+    };
+    let export = engine
+        .export_query_scoped(
+            &lease.session_id,
+            &lease.token,
+            &export_request,
+            &resource,
+            30,
+            "request-tenant-export",
+            "operation-tenant-export",
+        )
+        .unwrap();
+    assert_eq!(export.source.execution.returned_rows, 1);
+    assert_eq!(export.columns, 3); // identity plus the two authorized fields
+    assert_eq!(export.source.plan, result.plan);
+    let bytes = export.decode_artifact().unwrap();
+    for forbidden in [
+        "alpha-secret",
+        "private-secret",
+        "beta-secret",
+        "beta-public",
+        "alpha-private",
+    ] {
+        assert!(!bytes
+            .windows(forbidden.len())
+            .any(|window| window == forbidden.as_bytes()));
+    }
+    assert!(matches!(
+        engine.export_query_scoped(
+            &lease.session_id,
+            &id("incorrect-token"),
+            &export_request,
+            &resource,
+            30,
+            "request-denied-export",
+            "operation-denied-export",
+        ),
+        Err(ServiceError::Unauthenticated)
+    ));
+    let mut secret_export = export_request.clone();
+    secret_export.query.query = "FROM record:document AT VALID 20 KNOWN HEAD PROJECT secret".into();
+    assert!(matches!(
+        engine.export_query_scoped(
+            &lease.session_id,
+            &lease.token,
+            &secret_export,
+            &resource,
+            30,
+            "request-secret-export",
+            "operation-secret-export",
+        ),
+        Err(ServiceError::PermissionDenied)
+    ));
     let denied = engine.execute_query(
         &lease.session_id,
         &lease.token,

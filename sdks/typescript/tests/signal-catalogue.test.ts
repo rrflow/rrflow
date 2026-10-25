@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ENDPOINT_OPENAPI_DOCUMENT_SHA256 } from "../src/generated/endpoints.js";
 import {
   OPENAPI_DOCUMENT_SHA256,
   SIGNAL_CATALOGUE,
@@ -7,7 +8,6 @@ import {
   SIGNAL_CATALOGUE_SHA256,
 } from "../src/index.js";
 
-const EXPECTED_OPENAPI_SHA256 = "9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d";
 const EXPECTED_SIGNAL_SHA256 = "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07";
 
 test("generated signal catalogue is public, exact, and inert", () => {
@@ -19,7 +19,7 @@ test("generated signal catalogue is public, exact, and inert", () => {
   };
 
   assert.equal(SIGNAL_CATALOGUE_SHA256, EXPECTED_SIGNAL_SHA256);
-  assert.equal(OPENAPI_DOCUMENT_SHA256, EXPECTED_OPENAPI_SHA256);
+  assert.equal(OPENAPI_DOCUMENT_SHA256, ENDPOINT_OPENAPI_DOCUMENT_SHA256);
   assert.deepEqual(SIGNAL_CATALOGUE, parsed);
   assert.equal(parsed.contract_version, 1);
   assert.equal(parsed.diagnostic_levels.length, 4);

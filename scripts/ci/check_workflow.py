@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import sys
@@ -14,6 +15,40 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIRECTORY = ROOT / ".github/workflows"
 CALLER = ROOT / ".github/workflows/ci.yml"
 REUSABLE = ROOT / ".github/workflows/ci-reusable.yml"
+DEVELOPMENT_CONTAINER = ROOT / ".devcontainer"
+DIGEST_PINNED_IMAGE = re.compile(r"[^@\s]+@sha256:[0-9a-f]{64}")
+
+# Containerfile ARG -> the one candidate-CI value it must equal.
+CI_TOOLCHAIN_PINS = {
+    "NODE_VERSION": r"node-version: (\S+)",
+    "PNPM_VERSION": r"pnpm/action-setup@[^\n]*\n\s+with:\n\s+version: (\S+)",
+    "PYTHON_VERSION": r"python-version: (\S+)",
+    "UV_VERSION": r"astral-sh/setup-uv@[^\n]*\n\s+with:\n\s+version: (\S+)",
+    "GO_VERSION": r"go-version: (\S+)",
+    "JAVA_VERSION": r"java-version: (\S+)",
+    "DOTNET_VERSION": r"dotnet-version: (\S+)",
+    "MAVEN_VERSION": r"MAVEN_VERSION: (\S+)",
+    "MAVEN_SHA512": r"MAVEN_SHA512: (\S+)",
+}
+CONTAINER_CHECKSUMS = {
+    "RUSTUP_SHA256": r"[0-9a-f]{64}",
+    "UV_SHA256": r"[0-9a-f]{64}",
+    "PYTHON_SHA256": r"[0-9a-f]{64}",
+    "NODE_SHA256": r"[0-9a-f]{64}",
+    "PNPM_INTEGRITY": r"sha512-[A-Za-z0-9+/]{86}==",
+    "GO_SHA256": r"[0-9a-f]{64}",
+    "JAVA_SHA256": r"[0-9a-f]{64}",
+    "MAVEN_SHA512": r"[0-9a-f]{128}",
+    "DOTNET_SHA512": r"[0-9a-f]{128}",
+}
+DEVCONTAINER_LIFECYCLE_COMMANDS = {
+    "initializeCommand",
+    "onCreateCommand",
+    "updateContentCommand",
+    "postCreateCommand",
+    "postStartCommand",
+    "postAttachCommand",
+}
 
 
 class PolicyError(RuntimeError):
@@ -23,6 +58,42 @@ class PolicyError(RuntimeError):
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise PolicyError(message)
+
+
+def verify_candidate_admission(caller: str) -> None:
+    """Keep the thin caller's admission envelope explicit and fail closed on drift.
+
+    This intentionally accepts the small checked-in YAML shape, not arbitrary
+    workflow syntax. GitHub evaluates the condition; this policy prevents lost
+    transitions, path filters, or an alternate caller from bypassing that shape.
+    """
+    trigger = re.search(r"(?ms)^on:\n(.*?)(?=^\S)", caller)
+    require(trigger is not None, "candidate CI must declare its event envelope")
+    events = re.fullmatch(
+        r"  pull_request:\n    types: \[([a-z_, ]+)\]\n"
+        r"  merge_group:\n  workflow_dispatch:\n\n",
+        trigger.group(1),
+    )
+    require(events is not None, "candidate events must not add filters or omit merge/manual dispatch")
+    activities = [item.strip() for item in events.group(1).split(",")]
+    required = {"opened", "synchronize", "reopened", "ready_for_review", "converted_to_draft"}
+    require(
+        len(activities) == len(required) and set(activities) == required,
+        "candidate PR events must include ready and draft transitions exactly once",
+    )
+    jobs = job_blocks(caller)
+    require(set(jobs) == {"pipeline"}, "candidate admission must have one pipeline caller")
+    conditions = re.findall(r"(?m)^    if: (.+)$", jobs["pipeline"])
+    require(
+        conditions == ["${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}"],
+        "draft PRs must defer full CI; ready, merge-group and manual candidates must run it",
+    )
+    require(
+        "concurrency:\n"
+        "  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}\n"
+        "  cancel-in-progress: true\n" in caller,
+        "draft transitions must cancel only stale runs for the same PR or ref",
+    )
 
 
 def job_blocks(workflow: str) -> dict[str, str]:
@@ -47,12 +118,21 @@ def workspace_packages() -> set[str]:
 
 def optional_feature_packages() -> set[str]:
     packages = set()
+    diagnostic_packages = set()
     for manifest in (ROOT / "crates").rglob("Cargo.toml"):
         with manifest.open("rb") as source:
             document = tomllib.load(source)
         features = set(document.get("features", {})) - {"default"}
+        # This explicit diagnostic feature changes the primary's private stdin
+        # contract. Its separate native job owns the diagnostic corpus; ordinary
+        # installed suites continue to qualify the default artifact.
+        if "crash-test" in features:
+            diagnostic_packages.add(document["package"]["name"])
+            features.remove("crash-test")
         if features:
             packages.add(document["package"]["name"])
+    require(diagnostic_packages == {"rrd-lsm", "rrd-store", "rrd-engine", "rrflow-cli"},
+            "diagnostic feature must remain within its four-crate composition")
     return packages
 
 
@@ -100,9 +180,21 @@ def verify_workflow_security(workflows: dict[Path, str]) -> None:
         )
 
         for line_number, body in checkout_steps(workflow):
+            if path == REUSABLE:
+                require(
+                    not any(re.match(r"(?:ref|repository|path)\s*:", entry) for entry in body),
+                    f"candidate checkout must use its triggering source revision: {relative}:{line_number}",
+                )
             require(
                 "persist-credentials: false" in body,
                 f"checkout credentials must not persist: {relative}:{line_number}",
+            )
+            # A declared submodule is a pinned source input, so every checkout
+            # must materialize it rather than build an incomplete tree.
+            require(
+                not (ROOT / ".gitmodules").is_file()
+                or "submodules: recursive" in body,
+                f"checkout must fetch declared submodules recursively: {relative}:{line_number}",
             )
 
 
@@ -294,11 +386,150 @@ def verify_sdk_conformance(block: str) -> None:
     )
 
 
+def single_ci_value(reusable: str, pattern: str, label: str) -> str:
+    values = set(re.findall(pattern, reusable))
+    require(
+        len(values) == 1,
+        f"candidate CI must declare exactly one {label} value: {sorted(values)}",
+    )
+    return values.pop()
+
+
+def compose_services(compose: str) -> dict[str, str]:
+    marker = "\nservices:\n"
+    require(marker in compose, "development compose file must define services")
+    services = compose.split(marker, 1)[1]
+    services = re.split(r"(?m)^\S", services, maxsplit=1)[0]
+    matches = list(re.finditer(r"(?m)^  ([a-z][a-z0-9-]*):\s*$", services))
+    return {
+        match.group(1): services[match.end() : matches[index + 1].start()]
+        if index + 1 < len(matches)
+        else services[match.end() :]
+        for index, match in enumerate(matches)
+    }
+
+
+def verify_development_container(reusable: str, pgvector_job: str) -> int:
+    """Keep the local workspace a faithful reproduction of candidate CI pins."""
+    containerfile = (DEVELOPMENT_CONTAINER / "Containerfile").read_text(
+        encoding="utf-8"
+    )
+    compose = (DEVELOPMENT_CONTAINER / "compose.yaml").read_text(encoding="utf-8")
+    devcontainer = json.loads(
+        (DEVELOPMENT_CONTAINER / "devcontainer.json").read_text(encoding="utf-8")
+    )
+
+    stages: set[str] = set()
+    for image, stage in re.findall(
+        r"(?m)^FROM\s+(\S+)\s+AS\s+([a-z][a-z0-9-]*)\s*$", containerfile
+    ):
+        require(
+            image in stages or DIGEST_PINNED_IMAGE.fullmatch(image) is not None,
+            f"development container base image must be digest pinned: {image}",
+        )
+        stages.add(stage)
+    require(
+        {"rust", "full"} <= stages,
+        f"development container must provide rust and full targets: {sorted(stages)}",
+    )
+    require(
+        len(re.findall(r"(?m)^FROM\s", containerfile)) == len(stages),
+        "every development container stage must be named",
+    )
+
+    arguments = dict(re.findall(r"(?m)^ARG\s+([A-Z0-9_]+)=(\S+)\s*$", containerfile))
+    with (ROOT / "rust-toolchain.toml").open("rb") as source:
+        channel = tomllib.load(source)["toolchain"]["channel"]
+    expected = {"RUST_VERSION": channel}
+    for name, pattern in CI_TOOLCHAIN_PINS.items():
+        expected[name] = single_ci_value(reusable, pattern, name)
+    for name, value in expected.items():
+        require(
+            arguments.get(name) == value,
+            f"development container {name} must equal candidate CI {value!r}: "
+            f"{arguments.get(name)!r}",
+        )
+    for name, pattern in CONTAINER_CHECKSUMS.items():
+        require(
+            re.fullmatch(pattern, arguments.get(name, "")) is not None,
+            f"development container checksum {name} is absent or malformed",
+        )
+        require(
+            containerfile.count(f"${{{name}") >= 1,
+            f"development container checksum {name} is declared but never verified",
+        )
+    downloads = len(re.findall(r"\bcurl\s+-fsSLo\b", containerfile))
+    verifications = len(
+        re.findall(r"\bsha(?:256|512)sum --check --strict\b", containerfile)
+    )
+    require(
+        downloads == len(CONTAINER_CHECKSUMS) and verifications == downloads,
+        "every development container download must be strictly checksum verified: "
+        f"{downloads} downloads, {verifications} verifications",
+    )
+    require(
+        re.fullmatch(r"\d{8}T\d{6}Z", arguments.get("UBUNTU_SNAPSHOT", "")) is not None
+        and containerfile.count('--snapshot "${UBUNTU_SNAPSHOT}"') == 4,
+        "development container packages must resolve from one fixed Ubuntu snapshot",
+    )
+
+    services = compose_services(compose)
+    require(
+        set(services) == {"workspace", "pgvector"},
+        f"development compose services must be workspace and pgvector: {sorted(services)}",
+    )
+    for name, block in services.items():
+        for image in re.findall(r"(?m)^\s+image:\s+(\S+)", block):
+            local = image.startswith("localhost/") and "\n    build:\n" in block
+            require(
+                local or DIGEST_PINNED_IMAGE.fullmatch(image) is not None,
+                f"development compose image must be locally built or digest pinned: {image}",
+            )
+    pgvector = services["pgvector"]
+    ci_image = single_ci_value(pgvector_job, r"(?m)^\s+image:\s+(\S+)", "pgvector image")
+    local_images = re.findall(r"(?m)^\s+image:\s+(\S+)", pgvector)
+    require(
+        len(local_images) == 1
+        and local_images[0].removeprefix("docker.io/") == ci_image.removeprefix("docker.io/"),
+        f"development pgvector image must equal candidate CI {ci_image}: {local_images}",
+    )
+    for variable in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"):
+        value = single_ci_value(pgvector_job, rf"{variable}: (\S+)", variable)
+        require(
+            f"{variable}: {value}" in pgvector,
+            f"development pgvector {variable} must equal candidate CI {value!r}",
+        )
+    require(
+        "@127.0.0.1:5432/" in pgvector_job
+        and "profiles: [\"pgvector\"]" in pgvector
+        and "network_mode: host" in pgvector
+        and "network_mode: host" in services["workspace"],
+        "development pgvector must be opt-in and reachable at the candidate-CI loopback URL",
+    )
+
+    lifecycle = sorted(DEVCONTAINER_LIFECYCLE_COMMANDS & set(devcontainer))
+    require(
+        not lifecycle,
+        f"devcontainer.json must not declare editor lifecycle commands: {lifecycle}",
+    )
+    build = devcontainer.get("build", {})
+    require(
+        build.get("dockerfile") == "Containerfile" and build.get("target") in stages,
+        "devcontainer.json must build a named target of the one Containerfile",
+    )
+    return len(expected) + len(CONTAINER_CHECKSUMS)
+
+
 def main() -> None:
     workflows = workflow_sources()
     caller = workflows[CALLER]
     reusable = workflows[REUSABLE]
     jobs = job_blocks(reusable)
+    verify_candidate_admission(caller)
+    require(
+        reusable.count("python3 scripts/ci/test_candidate_admission.py") == 1,
+        "candidate admission regressions must run exactly once",
+    )
 
     for trigger in ["pull_request:", "merge_group:", "workflow_dispatch:"]:
         require(
@@ -338,8 +569,17 @@ def main() -> None:
         reusable.count("python3 scripts/ci/build_execution_inventory.py --check") == 1,
         "the exhaustive execution inventory must be checked exactly once",
     )
+    require(
+        reusable.count("python3 scripts/knowledge/render_capacity_profiles.py --check") == 1
+        and reusable.count("python3 scripts/knowledge/test_capacity_profiles.py") == 1
+        and reusable.count("python3 scripts/ci/test_collect_storage_acceptance.py") == 1
+        and reusable.count("python3 scripts/ci/test_sustained_launch.py") == 1,
+        "the owning J-04 capacity projection must be checked exactly once",
+    )
 
     expected_jobs = {
+        "installed-reopen",
+        "installed-crash",
         "topology-smoke",
         "estate-portability",
         "verify",
@@ -357,6 +597,88 @@ def main() -> None:
         require(
             "timeout-minutes:" in block, f"CI job {job} must have an explicit timeout"
         )
+
+    for job in ["topology-smoke", "estate-portability"]:
+        for command in [
+            "cargo test -p rrd-lsm --lib admission_tests --locked",
+            "cargo test -p rrd-lsm --test write_admission --locked",
+            "cargo test -p rrd-store --test write_admission --test semantic_commit_atomicity --locked",
+            "cargo test -p rrd-engine --lib engine::tests::write_admission --locked",
+        ]:
+            require(jobs[job].count(command) == 1,
+                    f"{job} must require encoded staging and rejection recovery: {command}")
+        require(
+            "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
+            in jobs[job],
+            f"{job} must exercise the installed primary executable lifecycle",
+        )
+        for command in [
+            "cargo test -p rrd-lsm --test mutable_limits --locked",
+            "cargo test -p rrd-store --test mutable_admission --locked",
+            "cargo test -p rrd-store --test logical_archive_resilience --test backup_catalogue configured_ --locked",
+            "cargo test -p rrd-lsm --test write_diagnostics --locked",
+            "cargo test -p rrd-store --test rrflow_kv_operator --locked",
+            "cargo test -p rrd-lsm --test projected_lifetime --locked",
+            "cargo test -p rrd-lsm --lib reader::lifetime_tests --locked",
+            "cargo test -p rrd-lsm --test projected_output_limits --locked",
+            "cargo test -p rrd-lsm --lib segment::output::tests --locked",
+            "cargo test -p rrd-lsm --test projected_read_adversarial interleaved --locked -- --nocapture",
+        ]:
+            require(jobs[job].count(command) == 1, f"{job} must qualify native storage ownership and admission once: {command}")
+    reopen = jobs["installed-reopen"]
+    for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
+        require(f"- {platform}" in reopen, f"ordinary reopen corpus must qualify {platform}")
+    for command in [
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
+        "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
+        "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
+        "RRFLOW_REOPEN_RECEIPT_DIR:",
+        "'attempts': 5150",
+        "actions/upload-artifact@",
+    ]:
+        require(command in reopen, f"ordinary reopen qualification missing: {command}")
+    require("--features" not in reopen and "--all-features" not in reopen,
+            "ordinary reopen corpus must not activate diagnostic features")
+    diagnostic = jobs["installed-crash"]
+    for platform in ["ubuntu-latest", "macos-latest", "windows-latest"]:
+        require(f"- {platform}" in diagnostic, f"diagnostic primary must qualify {platform}")
+    for command in [
+        "cargo build -p rrflow-cli --bin rrflow --locked",
+        "cargo test -p rrflow-cli --test installed_crash --features crash-test --locked --no-run",
+        "cargo test -p rrflow-cli --test installed_crash --features crash-test --locked -- --nocapture --test-threads=2",
+        "cargo test -p rrflow-cli --test lifecycle_process --features crash-test --locked",
+        "cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings",
+        "C07C_NATIVE_PAUSE_V1=",
+        "--skip publication_and_reclamation",
+        "publication_and_reclamation --nocapture --test-threads=2",
+        "Require both complete installed publication receipts",
+        "RRFLOW_PUBLICATION_RECEIPT_DIR:",
+    ]:
+        require(command in diagnostic, f"installed diagnostic qualification missing: {command}")
+    require(diagnostic.index("Verify diagnostic protocol") < diagnostic.index("Build explicit diagnostic"),
+            "ordinary artifact exclusion must precede diagnostic compilation")
+    require(
+        "cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings"
+        in jobs["estate-portability"],
+        "native installed lifecycle tests must not hide platform warnings",
+    )
+    require(
+        jobs["topology-smoke"].count("python3 scripts/ci/run_offline_lifecycle.py") == 1
+        and "python3 scripts/ci/test_offline_lifecycle.py" in jobs["verify"],
+        "installed lifecycle must enforce offline isolation and test its artifact/mount policy",
+    )
+
+    for native in ["topology-smoke", "estate-portability"]:
+        require("scripts/ci/run_filesystem_containment.py" in jobs[native],
+                f"{native} must execute native mount containment qualification")
+        require("scripts/ci/run_private_owner.py" in jobs[native]
+                and "scripts/ci/run_offline_lifecycle.py --receipt" in jobs[native]
+                and "cargo test -p rrflow-cli --test lifecycle_process --locked" in jobs[native]
+                and "actions/upload-artifact@" in jobs[native],
+                f"{native} must execute required native denials and bounded capture and retain sanitized receipts")
 
     gate = jobs["ci-gate"]
     needs_match = re.search(
@@ -420,6 +742,22 @@ def main() -> None:
         "python3 scripts/ci/check_generated_surfaces.py" in jobs["verify"],
         "repository policy must reject generated product-surface drift",
     )
+    installed_lifecycle = (
+        "cargo test -p rrflow-cli --test installed_lifecycle --locked -- --nocapture"
+    )
+    require(
+        jobs["topology-smoke"].count(installed_lifecycle) == 1,
+        "Linux topology smoke must run the primary installed lifecycle exactly once",
+    )
+    require(
+        jobs["estate-portability"].count(installed_lifecycle) == 1,
+        "macOS/Windows portability must run the same primary installed lifecycle exactly once",
+    )
+    require(
+        "- windows-latest" in jobs["estate-portability"]
+        and "- macos-latest" in jobs["estate-portability"],
+        "estate portability must retain Windows and macOS development runners",
+    )
 
     suite_count, package_count = verify_engine_suites(jobs["engine-suites"])
     verify_sdk_conformance(jobs["sdk-conformance"])
@@ -435,10 +773,12 @@ def main() -> None:
     verify_workflow_security(workflows)
     verify_action_pins(workflows)
     verify_arc_policy()
+    container_pins = verify_development_container(reusable, jobs["pgvector-feature"])
     print(
         f"CI policy OK: {len(workflows)} workflows, {len(jobs) - 1} substantive jobs, "
         f"{suite_count} cohesive engine suites, "
-        f"{package_count} default-feature packages, {feature_count} optional-feature packages"
+        f"{package_count} default-feature packages, {feature_count} optional-feature packages, "
+        f"{container_pins} development-container pins"
     )
 
 

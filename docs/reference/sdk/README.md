@@ -25,6 +25,7 @@ a supported SDK until its installed real-process conformance passes. See the
 - [RRFlow Go SDK](go.md) — [`rrflow://rrflow-instance/data/reference/sdk/go`](rrflow://rrflow-instance/data/reference/sdk/go) — active implementation reference; alpha SDK and module qualification are incomplete
 - [RRFlow Java SDK](java.md) — [`rrflow://rrflow-instance/data/reference/sdk/java`](rrflow://rrflow-instance/data/reference/sdk/java) — active implementation reference; alpha SDK and artifact qualification are incomplete
 - [RRFlow Python SDK](python.md) — [`rrflow://rrflow-instance/data/reference/sdk/python`](rrflow://rrflow-instance/data/reference/sdk/python) — active implementation reference; alpha SDK and package qualification are incomplete
+- [Build against local rrflowDB](rrflowdb-local.md) — [`rrflow://rrflow-instance/data/reference/sdk/rrflowdb-local`](rrflow://rrflow-instance/data/reference/sdk/rrflowdb-local) — active native database integration guide; pre-alpha, not PostgreSQL qualification
 - [RRFlow Rust SDK](rust.md) — [`rrflow://rrflow-instance/data/reference/sdk/rust`](rrflow://rrflow-instance/data/reference/sdk/rust) — active implementation reference; alpha SDK qualification is incomplete
 - [RRFlow TypeScript SDK](typescript.md) — [`rrflow://rrflow-instance/data/reference/sdk/typescript`](rrflow://rrflow-instance/data/reference/sdk/typescript) — active implementation reference; alpha SDK and package qualification are incomplete
 <!-- rrflow:generated-index:end -->

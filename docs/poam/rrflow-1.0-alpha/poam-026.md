@@ -10,12 +10,40 @@ independently.
 
 ## Observed deficiency
 
-RRFlow has a closed durable trace vocabulary, typed causal links, selected Rust `tracing`
-subscribers, rrflowKV physical counters, and DataFusion operator metrics, but no qualified
-release-semantic diagnostic build, machine-readable build identity, OpenTelemetry bridge,
-closed metric-instrument catalogue, latency boundary/protocol, exporter/cardinality/overhead
+RRFlow has a closed durable trace vocabulary and metric-instrument catalogue,
+typed causal links, selected Rust `tracing` subscribers, rrflowKV physical
+counters, DataFusion operator metrics, and the bounded primary build-provenance
+implementation below, but no qualified release/diagnostic parity, OpenTelemetry
+bridge, implemented latency boundary/protocol, exporter/cardinality/overhead
 policy, self-telemetry, sanitized diagnostic capture, or complete causal coverage across
 storage, graph, lexical, vector, DataFusion, context, reasoning, commit, and delivery.
+
+At `554ce4ccf1cb25aceba036dafaf4c8df79c42701`, the primary CLI's
+`installed.rs::VersionReport` exposes product/protocol versions and release
+stage only. It lacks the source/tree/feature/format/configuration identity
+required by H-05a. The [next executable cut](../../architecture/engine-scale-and-contracts.md#next-executable-cut)
+uses the existing early H-05a prerequisite to D-01 qualification. The new
+[signal-to-action acceptance](../../architecture/engine-data-flow.md#signal-to-action-acceptance)
+defines testable operational behavior; it is a plan, not new instrumentation.
+
+The [primary build-provenance implementation](../../reference/release/build-identity.md)
+now adds compiler and declared source/actual-feature identity to local version
+and startup reports, explicit unavailable provenance for ordinary Cargo builds,
+and a release-derived diagnostic profile. The linked
+[journal](../../evidence/change-journals/gate-h/h-05a-primary-build-provenance.md)
+records the bounded evidence. Full H-05a and this deficiency remain open:
+storage/distribution identity, remote discovery, runtime levels and executed
+release/diagnostic parity are not established by the build helper.
+
+The requested [local-evidence/model-usage demonstration](../../architecture/engine-data-flow.md#project-evidence-model-usage-and-reasoning-efficiency)
+also lacks complete accounting. Code inspection at `0273f11b` found the legacy
+`crates/evaluation/rrflow-eval/src/main.rs::metrics` parser returns an input sum
+of zero when a Claude/Gemini `usage` object exists but contains no recognized
+counts; it also chooses only the first Gemini model statistics entry. This is
+not proof of zero usage or complete multi-model totals. H-05/G-06 must normalize
+provider semantics with missing/partial/multiple-model fixtures before those
+values support savings claims. Local/remote, cached and reported reasoning
+breakdowns and source-quality joins remain unqualified; no status is closed.
 
 ## Impact
 

@@ -96,6 +96,7 @@ async fn public_knowledge_trees_authenticate_compare_replay_and_survive_restart(
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &digest::sha256_hex(b"knowledge-tree-installed-test"),
         "default",
         None,
         &executable,
@@ -106,7 +107,6 @@ async fn public_knowledge_trees_authenticate_compare_replay_and_survive_restart(
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1,
         &executable,
     )
     .unwrap();

@@ -1,0 +1,2866 @@
+{
+  "$defs": {
+    "AcknowledgementLedger": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/Attempt"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        },
+        "expected": {
+          "items": {
+            "$ref": "#/$defs/ExpectedOperation"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        },
+        "readback": {
+          "items": {
+            "$ref": "#/$defs/Readback"
+          },
+          "maxItems": 10000,
+          "type": "array"
+        }
+      },
+      "required": [
+        "expected",
+        "attempts",
+        "readback"
+      ],
+      "type": "object"
+    },
+    "AllocationEnforcement": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "observed_only",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "cgroup_v2",
+              "type": "string"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "receipt_sha256"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "windows_job",
+              "type": "string"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "receipt_sha256"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "external_vm",
+              "type": "string"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "receipt_sha256"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Attempt": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "logical_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "outcome": {
+          "$ref": "#/$defs/AttemptOutcome"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "started_ns": {
+          "description": "Client monotonic offsets, including failed attempts, never host UTC.",
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "logical_id",
+        "request_sha256",
+        "started_ns",
+        "finished_ns",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "AttemptOutcome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "acknowledged",
+              "type": "string"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "receipt_sha256"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "rejected",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "uncertain",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BackupCoverageSnapshot": {
+      "enum": [
+        "included",
+        "referenced_only",
+        "rebuild_required",
+        "excluded"
+      ],
+      "type": "string"
+    },
+    "BackupEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt": {
+          "$ref": "#/$defs/CreateInstanceBackupResult"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verification_catalogue_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "verified_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_ns",
+        "finished_ns",
+        "verified_ns",
+        "receipt",
+        "verification_catalogue_sha256"
+      ],
+      "type": "object"
+    },
+    "Budgets": {
+      "additionalProperties": false,
+      "description": "Proposed, frozen laboratory ceilings. They are NOT installed configuration.\nByte reservations are disjoint; recovery replay bytes differ from memory.",
+      "properties": {
+        "aggregate_process_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Limit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-estate disjoint reservations must fit this aggregate."
+        },
+        "atomic_batch_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "atomic_mutations": {
+          "$ref": "#/$defs/Limit"
+        },
+        "attempts": {
+          "$ref": "#/$defs/Limit"
+        },
+        "cache_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "decoded_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "disk_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "estates": {
+          "$ref": "#/$defs/Limit"
+        },
+        "host_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "maintenance_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "maintenance_workers": {
+          "$ref": "#/$defs/Limit"
+        },
+        "mutable_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "mutable_versions": {
+          "$ref": "#/$defs/Limit"
+        },
+        "process_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "queue_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "queue_requests": {
+          "$ref": "#/$defs/Limit"
+        },
+        "queue_wait_ms": {
+          "$ref": "#/$defs/Limit"
+        },
+        "recovery_frames": {
+          "$ref": "#/$defs/Limit"
+        },
+        "recovery_memory_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "recovery_ms": {
+          "$ref": "#/$defs/Limit"
+        },
+        "recovery_replay_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "recovery_reserve_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "retained_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "run_ms": {
+          "$ref": "#/$defs/Limit"
+        },
+        "temporary_disk_bytes": {
+          "$ref": "#/$defs/Limit"
+        }
+      },
+      "required": [
+        "atomic_batch_bytes",
+        "atomic_mutations",
+        "mutable_bytes",
+        "mutable_versions",
+        "queue_bytes",
+        "queue_requests",
+        "queue_wait_ms",
+        "maintenance_bytes",
+        "maintenance_workers",
+        "cache_bytes",
+        "decoded_bytes",
+        "retained_bytes",
+        "recovery_memory_bytes",
+        "recovery_replay_bytes",
+        "recovery_frames",
+        "recovery_ms",
+        "process_bytes",
+        "host_bytes",
+        "estates",
+        "disk_bytes",
+        "temporary_disk_bytes",
+        "recovery_reserve_bytes",
+        "run_ms",
+        "attempts"
+      ],
+      "type": "object"
+    },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "executable_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "public_catalogue_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "tree": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "commit",
+        "tree",
+        "clean",
+        "executable_sha256",
+        "public_catalogue_sha256",
+        "configuration_sha256"
+      ],
+      "type": "object"
+    },
+    "CapabilityStatus": {
+      "enum": [
+        "unavailable",
+        "experimental",
+        "available"
+      ],
+      "type": "string"
+    },
+    "CapacityLane": {
+      "enum": [
+        "cold",
+        "warm",
+        "backup_under_write",
+        "reader_pin_interference",
+        "forced_reopens"
+      ],
+      "type": "string"
+    },
+    "CaseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "faults": {
+          "description": "Faults are retained even if recovery and the independent oracle pass.",
+          "items": {
+            "$ref": "#/$defs/Failure"
+          },
+          "maxItems": 256,
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "ledger": {
+          "$ref": "#/$defs/AcknowledgementLedger"
+        },
+        "limitation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seed": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/CaseStatus"
+        }
+      },
+      "required": [
+        "id",
+        "seed",
+        "status",
+        "faults",
+        "ledger"
+      ],
+      "type": "object"
+    },
+    "CaseStatus": {
+      "enum": [
+        "executed",
+        "failed",
+        "skipped",
+        "unimplemented"
+      ],
+      "type": "string"
+    },
+    "ClockPolicy": {
+      "additionalProperties": false,
+      "description": "Policy for wall-clock observations at governed durable-effect boundaries.\n\nA value of zero is strict: any observed rollback from a persisted anchor is\nrejected. A nonzero value is an explicit operator-selected allowance, not\nevidence that the host clock is synchronized or trustworthy.",
+      "properties": {
+        "maximum_rollback_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maximum_rollback_ms"
+      ],
+      "type": "object"
+    },
+    "ColdStartEvidence": {
+      "additionalProperties": false,
+      "description": "Owned-file cache eviction verified before process restart. The measured\ninterval includes startup and first read; subsequent reads may be warm.",
+      "properties": {
+        "evicted_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "file_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inventory_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "page_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pages": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "ready_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resident_pages": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_ns",
+        "evicted_ns",
+        "ready_ns",
+        "finished_ns",
+        "files",
+        "file_bytes",
+        "pages",
+        "resident_pages",
+        "page_bytes",
+        "inventory_sha256",
+        "readback_sha256"
+      ],
+      "type": "object"
+    },
+    "CorpusEvidence": {
+      "additionalProperties": false,
+      "description": "Streaming corpus receipts bind generated input, acknowledged writes and a\nsecond complete readback pass without retaining the corpus in driver memory.",
+      "properties": {
+        "acknowledgement_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "anchor_records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "edges": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "encoded_mutation_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "logical_source_bytes": {
+          "description": "UTF-8 source payload only; vectors and protocol encoding are additional.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "records": {
+          "description": "Project documents; the separately counted graph anchor is not workload data.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vector_dimensions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vectors": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verified_records": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "records",
+        "anchor_records",
+        "edges",
+        "vectors",
+        "vector_dimensions",
+        "logical_source_bytes",
+        "encoded_mutation_bytes",
+        "verified_records",
+        "started_ns",
+        "finished_ns",
+        "input_sha256",
+        "acknowledgement_sha256",
+        "readback_sha256"
+      ],
+      "type": "object"
+    },
+    "CreateInstanceBackupResult": {
+      "additionalProperties": false,
+      "properties": {
+        "backup": {
+          "$ref": "#/$defs/InstanceBackupSnapshot"
+        },
+        "catalogue_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "catalogue_sha256": {
+          "type": "string"
+        },
+        "idempotent_replay": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "backup",
+        "catalogue_revision",
+        "catalogue_sha256",
+        "idempotent_replay"
+      ],
+      "type": "object"
+    },
+    "DiagnosticMaintenanceSnapshot": {
+      "additionalProperties": false,
+      "description": "Cumulative flush and compaction work since the process opened the store.",
+      "properties": {
+        "automatic_compactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "automatic_flushes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_output_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed_compactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed_flushes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "oversized_batches": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "peak_compaction_buffer_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "write_stalls": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "automatic_flushes",
+        "failed_flushes",
+        "write_stalls",
+        "oversized_batches",
+        "automatic_compactions",
+        "failed_compactions",
+        "compaction_input_bytes",
+        "compaction_output_bytes",
+        "peak_compaction_buffer_bytes"
+      ],
+      "type": "object"
+    },
+    "DiagnosticMemtableSnapshot": {
+      "additionalProperties": false,
+      "description": "The rrflowKV mutable write buffer.",
+      "properties": {
+        "approximate_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "key_payload_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "keys": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_versions": {
+          "description": "Version count that triggers an automatic flush.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "owned_bytes_lower_bound": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spilled_chains": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spilled_version_capacity": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tombstones": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value_payload_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version_record_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "versions",
+        "max_versions",
+        "approximate_bytes",
+        "keys",
+        "key_payload_bytes",
+        "value_payload_bytes",
+        "tombstones",
+        "spilled_chains",
+        "spilled_version_capacity",
+        "version_record_bytes",
+        "owned_bytes_lower_bound"
+      ],
+      "type": "object"
+    },
+    "DiagnosticPageCacheSnapshot": {
+      "additionalProperties": false,
+      "description": "The bounded decoded-page cache and the page reads it served or missed.\nHit, miss, eviction, load, byte, and filter counters are cumulative since\nthe process opened the store.",
+      "properties": {
+        "bytes_allocated": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_borrowed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_copied": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_decoded": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_decompressed": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_read": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "capacity_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "evictions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "filter_checks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "filter_negatives": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hits": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "misses": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_loads": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resident_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "capacity_bytes",
+        "resident_bytes",
+        "entries",
+        "hits",
+        "misses",
+        "evictions",
+        "page_loads",
+        "bytes_read",
+        "bytes_decoded",
+        "bytes_borrowed",
+        "bytes_allocated",
+        "bytes_copied",
+        "bytes_decompressed",
+        "filter_checks",
+        "filter_negatives"
+      ],
+      "type": "object"
+    },
+    "DiagnosticRrflowKvSnapshot": {
+      "additionalProperties": false,
+      "description": "rrflowKV physical state and counters.",
+      "properties": {
+        "durable_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maintenance": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "manifest_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memtable": {
+          "$ref": "#/$defs/DiagnosticMemtableSnapshot"
+        },
+        "page_cache": {
+          "$ref": "#/$defs/DiagnosticPageCacheSnapshot"
+        },
+        "physical_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "segment_io": {
+          "$ref": "#/$defs/DiagnosticSegmentIoSnapshot"
+        },
+        "segment_set": {
+          "$ref": "#/$defs/DiagnosticSegmentSetSnapshot"
+        },
+        "write_ahead_log": {
+          "$ref": "#/$defs/DiagnosticWriteAheadLogSnapshot"
+        }
+      },
+      "required": [
+        "physical_sequence",
+        "manifest_generation",
+        "durable_sequence",
+        "memtable",
+        "write_ahead_log",
+        "maintenance",
+        "segment_set",
+        "page_cache",
+        "segment_io"
+      ],
+      "type": "object"
+    },
+    "DiagnosticSegmentIoMode": {
+      "description": "The segment read path rrflowKV requested.",
+      "enum": [
+        "auto",
+        "mmap",
+        "io_uring",
+        "bounded"
+      ],
+      "type": "string"
+    },
+    "DiagnosticSegmentIoSnapshot": {
+      "additionalProperties": false,
+      "description": "Segment file I/O by access path, cumulative since the store opened.",
+      "properties": {
+        "bounded_reads": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bounded_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_read": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fallbacks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "io_uring_reads": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "io_uring_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "last_fallback_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_request_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mmap_reads": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mmap_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "peak_request_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "read_operations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "requested_mode": {
+          "$ref": "#/$defs/DiagnosticSegmentIoMode"
+        }
+      },
+      "required": [
+        "requested_mode",
+        "mmap_segments",
+        "io_uring_segments",
+        "bounded_segments",
+        "fallbacks",
+        "read_operations",
+        "mmap_reads",
+        "io_uring_reads",
+        "bounded_reads",
+        "bytes_read",
+        "max_request_bytes",
+        "peak_request_bytes"
+      ],
+      "type": "object"
+    },
+    "DiagnosticSegmentSetSnapshot": {
+      "additionalProperties": false,
+      "description": "The persisted segment set named by the current manifest.",
+      "properties": {
+        "compaction_debt_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_target_segment_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "l0_compaction_trigger": {
+          "description": "L0 segment count that triggers compaction.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "l0_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "segment_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "segments",
+        "segment_bytes",
+        "l0_segments",
+        "l0_compaction_trigger",
+        "compaction_debt_segments",
+        "compaction_target_segment_bytes"
+      ],
+      "type": "object"
+    },
+    "DiagnosticStorageAdmission": {
+      "additionalProperties": false,
+      "description": "Process-local physical storage observation for the instance's storage\nprofile. It carries `observation` authority: counters are measured at\n`observed_at_unix_ms`, are not bound to the read stamp, and reset when the\nprocess reopens its store.",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "active_read_views": {
+          "description": "Actual live physical read views and conservative aggregate pin charge.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_limit": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "denied_source_allocations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fenced": {
+          "type": "boolean"
+        },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_logical_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outstanding_requests": {
+          "description": "Includes the active request plus admitted waiters, matching admission.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "peak_source_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "queued_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_bytes": {
+          "description": "Logical owner charges; these are not allocator or process RSS bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_projected_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_source_bytes": {
+          "description": "Owned source-page allocation charges; excludes borrowed mmap residency.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checkpoint_entries",
+        "checkpoint_limit",
+        "native_transactions",
+        "native_transaction_bytes",
+        "active_read_views",
+        "pinned_read_bytes",
+        "retained_mutable_bytes",
+        "retained_projected_bytes",
+        "retained_source_bytes",
+        "peak_source_bytes",
+        "denied_source_allocations",
+        "outstanding_requests",
+        "outstanding_logical_bytes",
+        "queued_requests",
+        "active",
+        "fenced"
+      ],
+      "type": "object"
+    },
+    "DiagnosticStorageEvidenceLevel": {
+      "description": "How much physical evidence the instance's storage profile reports.",
+      "oneOf": [
+        {
+          "const": "logical_only",
+          "description": "The profile has no stable physical counters (volatile rrflowMX).",
+          "type": "string"
+        },
+        {
+          "const": "rrflow_kv_counters",
+          "description": "rrflowKV memtable, WAL, maintenance, segment, page-cache, and segment\nI/O counters.",
+          "type": "string"
+        }
+      ]
+    },
+    "DiagnosticStorageSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "admission": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiagnosticStorageAdmission"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_level": {
+          "$ref": "#/$defs/DiagnosticStorageEvidenceLevel"
+        },
+        "observed_at_unix_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "profile": {
+          "$ref": "#/$defs/StorageProfileKind"
+        },
+        "rrflow_kv": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiagnosticRrflowKvSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "observed_at_unix_ms",
+        "profile",
+        "evidence_level"
+      ],
+      "type": "object"
+    },
+    "DiagnosticWriteAheadLogSnapshot": {
+      "additionalProperties": false,
+      "description": "The rrflowKV write-ahead log tail not yet flushed into segments.",
+      "properties": {
+        "payload_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload_max_bytes": {
+          "description": "Payload size that triggers an automatic flush.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "payload_bytes",
+        "payload_max_bytes"
+      ],
+      "type": "object"
+    },
+    "Digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "DurabilityClass": {
+      "enum": [
+        "authoritative",
+        "buffered"
+      ],
+      "type": "string"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "filesystem_device": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "flush_primitive": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "measurement_tool": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "mount_options": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "os_version": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "platform": {
+          "$ref": "#/$defs/NativePlatform"
+        },
+        "target": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "toolchain": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "platform",
+        "target",
+        "toolchain",
+        "cpu",
+        "os_version",
+        "filesystem_device",
+        "mount_options",
+        "flush_primitive",
+        "measurement_tool"
+      ],
+      "type": "object"
+    },
+    "EstateConfiguration": {
+      "additionalProperties": false,
+      "description": "Effective, immutable configuration bound to an installation plan and\nsurfaced to every client. Mutating it requires a future governed\nconfigure-plan/configure-apply operation.",
+      "properties": {
+        "clock": {
+          "$ref": "#/$defs/ClockPolicy"
+        },
+        "configuration_sha256": {
+          "type": "string"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "query": {
+          "$ref": "#/$defs/QueryBudget"
+        },
+        "reasoning": {
+          "$ref": "#/$defs/ReasoningLimits"
+        },
+        "recall": {
+          "$ref": "#/$defs/RecallLimits"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageLimits"
+        }
+      },
+      "required": [
+        "format_version",
+        "revision",
+        "clock",
+        "storage",
+        "reasoning",
+        "recall",
+        "query",
+        "configuration_sha256"
+      ],
+      "type": "object"
+    },
+    "EvidenceClass": {
+      "enum": [
+        "synthetic",
+        "io_model",
+        "native_process",
+        "native_capacity"
+      ],
+      "type": "string"
+    },
+    "ExpectedOperation": {
+      "additionalProperties": false,
+      "description": "Written by the workload oracle BEFORE execution, not reconstructed from\nthe engine's response. Digested into the required case in the manifest.",
+      "properties": {
+        "effect_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "logical_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "resolution": {
+          "$ref": "#/$defs/ExpectedResolution"
+        }
+      },
+      "required": [
+        "logical_id",
+        "request_sha256",
+        "effect_sha256",
+        "resolution"
+      ],
+      "type": "object"
+    },
+    "ExpectedResolution": {
+      "enum": [
+        "present",
+        "absent",
+        "either"
+      ],
+      "type": "string"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "code": {
+          "$ref": "#/$defs/Id"
+        },
+        "occurrence": {
+          "$ref": "#/$defs/Limit"
+        },
+        "phase": {
+          "$ref": "#/$defs/FailurePhase"
+        }
+      },
+      "required": [
+        "phase",
+        "code",
+        "occurrence",
+        "artifact_sha256"
+      ],
+      "type": "object"
+    },
+    "FailurePhase": {
+      "enum": [
+        "admission",
+        "append",
+        "sync",
+        "publication",
+        "recovery",
+        "readback",
+        "measurement",
+        "cleanup"
+      ],
+      "type": "string"
+    },
+    "Id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+      "type": "string"
+    },
+    "InstanceBackupSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "application_complete": {
+          "type": "boolean"
+        },
+        "archive": {
+          "$ref": "#/$defs/LogicalArchiveSnapshot"
+        },
+        "backup_sha256": {
+          "type": "string"
+        },
+        "catalogues": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "claims": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "created_at_unix_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "installed_control": {
+          "$ref": "#/$defs/BackupCoverageSnapshot",
+          "description": "The estate's control state outside the catalogues: installed record\nand checkpoint, active configuration, security policy and audit chain,\nattunement plan and job state, and estate documents. `included` means\nthe backup carries them as a replayable control-journal archive; the\ntoken key and operator credential are never carried."
+        },
+        "invocation_telemetry": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "label": {
+          "type": "string"
+        },
+        "object_payloads": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "projections": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "snapshot_leases": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        },
+        "typed_runtime": {
+          "$ref": "#/$defs/BackupCoverageSnapshot"
+        }
+      },
+      "required": [
+        "backup_sha256",
+        "label",
+        "created_at_unix_ms",
+        "archive",
+        "claims",
+        "typed_runtime",
+        "catalogues",
+        "installed_control",
+        "object_payloads",
+        "projections",
+        "invocation_telemetry",
+        "snapshot_leases",
+        "application_complete"
+      ],
+      "type": "object"
+    },
+    "LaneEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged_readback_verified": {
+          "type": "boolean"
+        },
+        "lane": {
+          "$ref": "#/$defs/CapacityLane"
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "repetitions": {
+          "$ref": "#/$defs/Limit"
+        }
+      },
+      "required": [
+        "lane",
+        "repetitions",
+        "receipt_sha256",
+        "acknowledged_readback_verified"
+      ],
+      "type": "object"
+    },
+    "Limit": {
+      "format": "uint64",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "LoadAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/StorageLoadKind"
+        },
+        "logical_id": {
+          "$ref": "#/$defs/Id"
+        },
+        "outcome": {
+          "$ref": "#/$defs/LoadOutcome"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "result_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "scheduled_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verification_finished_ns": {
+          "description": "End of independent readback while the admitted client slot is still held.\nAbsent in historical evidence; never infer zero verification cost.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "write": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WriteTransition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sequence",
+        "kind",
+        "scheduled_ns",
+        "started_ns",
+        "finished_ns",
+        "outcome",
+        "logical_id",
+        "request_sha256",
+        "result_sha256"
+      ],
+      "type": "object"
+    },
+    "LoadOutcome": {
+      "enum": [
+        "acknowledged",
+        "rejected",
+        "cancelled",
+        "failed",
+        "uncertain"
+      ],
+      "type": "string"
+    },
+    "LoadPhase": {
+      "enum": [
+        "warmup",
+        "measured",
+        "burst",
+        "drain",
+        "soak"
+      ],
+      "type": "string"
+    },
+    "LogicalArchiveSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "action_count": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "archive_sha256": {
+          "type": "string"
+        },
+        "claim_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "contract_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime_audit_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runtime_commits": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime_cursor": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime_mutations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "standalone_claims": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "format_version",
+        "contract_version",
+        "archive_sha256",
+        "action_count",
+        "standalone_claims",
+        "runtime_commits",
+        "runtime_mutations",
+        "payload_bytes",
+        "claim_sequence",
+        "runtime_cursor"
+      ],
+      "type": "object"
+    },
+    "NativeAllocationKind": {
+      "enum": [
+        "cgroup_v2",
+        "windows_job"
+      ],
+      "type": "string"
+    },
+    "NativeAllocationReceipt": {
+      "additionalProperties": false,
+      "description": "Launcher receipt, retained with samples. Its digest binds declared native\ncontrols; the installed driver separately checks live kernel membership.",
+      "properties": {
+        "engine_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "harness_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "host_bytes": {
+          "$ref": "#/$defs/Limit"
+        },
+        "host_logical_cpus": {
+          "$ref": "#/$defs/Limit"
+        },
+        "kind": {
+          "$ref": "#/$defs/NativeAllocationKind"
+        },
+        "nonce": {
+          "$ref": "#/$defs/Digest"
+        },
+        "vcpus": {
+          "$ref": "#/$defs/Limit"
+        }
+      },
+      "required": [
+        "format_version",
+        "kind",
+        "nonce",
+        "engine_bytes",
+        "host_bytes",
+        "harness_sha256",
+        "vcpus",
+        "host_logical_cpus"
+      ],
+      "type": "object"
+    },
+    "NativeMetric": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "observed",
+              "type": "string"
+            },
+            "value": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "status",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/Id"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NativePlatform": {
+      "enum": [
+        "linux_ext4",
+        "macos_apfs",
+        "windows_ntfs"
+      ],
+      "type": "string"
+    },
+    "OperationBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/CapabilityStatus",
+          "description": "Reported driver support, not activation or an inferred catalogue promise."
+        },
+        "driver_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "operation": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "operation",
+        "availability",
+        "driver_sha256"
+      ],
+      "type": "object"
+    },
+    "QueryBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_batch_rows": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_elapsed_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_memory_bytes": {
+          "default": 67108864,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_rows": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_spill_bytes": {
+          "default": 268435456,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_storage_keys": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_storage_keys",
+        "max_rows",
+        "max_output_bytes",
+        "max_batch_rows"
+      ],
+      "type": "object"
+    },
+    "Readback": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "applications": {
+              "$ref": "#/$defs/Limit"
+            },
+            "effect_sha256": {
+              "$ref": "#/$defs/Digest"
+            },
+            "kind": {
+              "const": "present",
+              "type": "string"
+            },
+            "logical_id": {
+              "$ref": "#/$defs/Id"
+            },
+            "receipt_sha256": {
+              "$ref": "#/$defs/Digest"
+            },
+            "request_sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "logical_id",
+            "request_sha256",
+            "effect_sha256",
+            "receipt_sha256",
+            "applications"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A positive absence observation after authoritative recovery. Omission\nof a readback entry is unresolved, NOT proof of absence.",
+          "properties": {
+            "kind": {
+              "const": "absent",
+              "type": "string"
+            },
+            "logical_id": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "logical_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ReaderInterferenceEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "cancelled": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "drained": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "maintenance_after": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "maintenance_before": {
+          "$ref": "#/$defs/DiagnosticMaintenanceSnapshot"
+        },
+        "observed": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "observed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "opened": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "opened_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "released": {
+          "$ref": "#/$defs/StorageCursorSnapshot"
+        },
+        "released_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        },
+        "source_released": {
+          "$ref": "#/$defs/DiagnosticStorageAdmission"
+        }
+      },
+      "required": [
+        "opened_ns",
+        "observed_ns",
+        "released_ns",
+        "opened",
+        "observed",
+        "cancelled",
+        "released",
+        "baseline",
+        "retained",
+        "source_released",
+        "drained",
+        "maintenance_before",
+        "maintenance_after"
+      ],
+      "type": "object"
+    },
+    "ReasoningLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_run_elapsed_ms": {
+          "description": "Wall-clock ceiling for a future governed reasoning run. This is not a\nlimit on private analysis performed before a durable/effect boundary.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_step_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_steps": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_run_elapsed_ms",
+        "max_steps",
+        "max_step_elapsed_ms"
+      ],
+      "type": "object"
+    },
+    "RecallLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_graph_depth": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_items": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_storage_keys": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_graph_depth",
+        "max_items",
+        "max_output_bytes",
+        "max_storage_keys"
+      ],
+      "type": "object"
+    },
+    "ReopenEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "corpus_readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "corpus_records_verified": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cycles": {
+          "items": {
+            "$ref": "#/$defs/ReopenObservation"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "type": "array"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "started_ns",
+        "finished_ns",
+        "corpus_records_verified",
+        "corpus_readback_sha256",
+        "cycles"
+      ],
+      "type": "object"
+    },
+    "ReopenObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_operations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cycle": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "finished_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "killed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "killed_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "original_receipts_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "readback_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "ready_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reopened_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "replay_receipts_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "cycle",
+        "killed_pid",
+        "reopened_pid",
+        "killed_ns",
+        "ready_ns",
+        "finished_ns",
+        "checked_operations",
+        "expected_sha256",
+        "original_receipts_sha256",
+        "replay_receipts_sha256",
+        "readback_sha256"
+      ],
+      "type": "object"
+    },
+    "RequiredCase": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ledger_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "operation": {
+          "$ref": "#/$defs/Id"
+        },
+        "seed": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "operation",
+        "seed",
+        "expected_ledger_sha256"
+      ],
+      "type": "object"
+    },
+    "ResourceSample": {
+      "additionalProperties": false,
+      "properties": {
+        "allocation_enforcement": {
+          "$ref": "#/$defs/AllocationEnforcement"
+        },
+        "allocation_receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NativeAllocationReceipt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cpu_time_ns": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "elapsed_ns": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "host_resident_bytes": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "maintenance_debt_segments": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "mapped_bytes": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "private_bytes": {
+          "$ref": "#/$defs/NativeMetric",
+          "description": "Linux private resident pages; Windows private committed memory. Native\nplatforms must be compared separately; neither is process RSS."
+        },
+        "queue_requests": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "read_bytes": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "resident_bytes": {
+          "$ref": "#/$defs/NativeMetric"
+        },
+        "retained_bytes": {
+          "$ref": "#/$defs/NativeMetric",
+          "description": "Missing logical ownership metrics remain explicit, never zero-filled."
+        },
+        "storage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiagnosticStorageSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "written_bytes": {
+          "$ref": "#/$defs/NativeMetric"
+        }
+      },
+      "required": [
+        "elapsed_ns",
+        "pid",
+        "resident_bytes",
+        "private_bytes",
+        "mapped_bytes",
+        "host_resident_bytes",
+        "read_bytes",
+        "written_bytes",
+        "cpu_time_ns",
+        "retained_bytes",
+        "queue_requests",
+        "maintenance_debt_segments",
+        "allocation_enforcement"
+      ],
+      "type": "object"
+    },
+    "StorageCursorSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "allocated_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cursor_id": {
+          "type": "string"
+        },
+        "page_ordinal": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_sha256": {
+          "type": "string"
+        },
+        "released": {
+          "type": "boolean"
+        },
+        "rows": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot_sequence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_open": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cursor_id",
+        "released",
+        "source_open",
+        "snapshot_sequence",
+        "page_ordinal",
+        "rows",
+        "allocated_bytes",
+        "page_sha256"
+      ],
+      "type": "object"
+    },
+    "StorageLimits": {
+      "additionalProperties": false,
+      "description": "Installed native storage limits. These bound separately accounted owners,\nnot total process RSS. Changing them requires a new governed configuration\nand reopening storage; they are never hot-applied by a client.",
+      "properties": {
+        "active_read_views": {
+          "description": "Aggregate live physical read owners and charged pinned bytes; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "checkpoint_entries": {
+          "description": "Named checkpoint-directory entry ceiling; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_logical_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_input_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_l0_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "compaction_output_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memtable_flush_target_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mutable_accounted_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mutable_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transaction_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "native_transactions": {
+          "description": "Native transaction owner count and logical buffer capacity; restart required.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_cache_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projected_output_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_delete_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_delete_files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_inventory_entries": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reclamation_metadata_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_elapsed_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_metadata_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_read_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_reserve_bytes": {
+          "description": "Bytes to keep available beyond each native WAL/immutable allocation.\nRequires restart; racy admission cannot replace actual I/O error handling.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_wal_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_wal_frames": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_generations": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_mutable_versions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_page_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transaction_admission_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transaction_admission_requests": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transaction_admission_wait_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wal_flush_target_bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checkpoint_entries",
+        "native_transactions",
+        "native_transaction_bytes",
+        "active_read_views",
+        "pinned_read_bytes",
+        "recovery_reserve_bytes",
+        "mutable_accounted_bytes",
+        "mutable_versions",
+        "projected_output_bytes",
+        "source_page_bytes",
+        "page_cache_bytes",
+        "wal_flush_target_bytes",
+        "memtable_flush_target_versions",
+        "compaction_input_bytes",
+        "compaction_input_logical_bytes",
+        "compaction_input_versions",
+        "compaction_output_segments",
+        "compaction_elapsed_ms",
+        "compaction_l0_segments",
+        "retained_mutable_bytes",
+        "retained_mutable_versions",
+        "retained_mutable_generations",
+        "reclamation_inventory_entries",
+        "reclamation_metadata_bytes",
+        "reclamation_delete_files",
+        "reclamation_delete_bytes",
+        "reclamation_elapsed_ms",
+        "transaction_admission_requests",
+        "transaction_admission_bytes",
+        "transaction_admission_wait_ms",
+        "recovery_metadata_bytes",
+        "recovery_files",
+        "recovery_read_bytes",
+        "recovery_wal_bytes",
+        "recovery_wal_frames",
+        "recovery_elapsed_ms"
+      ],
+      "type": "object"
+    },
+    "StorageLoadKind": {
+      "enum": [
+        "point_read",
+        "range_read",
+        "mixed_write",
+        "maintenance"
+      ],
+      "type": "string"
+    },
+    "StorageManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/OperationBinding"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "budgets": {
+          "$ref": "#/$defs/Budgets"
+        },
+        "candidate": {
+          "$ref": "#/$defs/Candidate"
+        },
+        "corpus_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "durability": {
+          "$ref": "#/$defs/DurabilityClass"
+        },
+        "environment": {
+          "$ref": "#/$defs/Environment"
+        },
+        "evidence_class": {
+          "$ref": "#/$defs/EvidenceClass"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 1,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "installed_configuration": {
+          "$ref": "#/$defs/EstateConfiguration"
+        },
+        "profile": {
+          "$ref": "#/$defs/Id"
+        },
+        "required_cases": {
+          "items": {
+            "$ref": "#/$defs/RequiredCase"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "storage_observation": {
+          "$ref": "#/$defs/DiagnosticStorageSnapshot"
+        }
+      },
+      "required": [
+        "format_version",
+        "profile",
+        "evidence_class",
+        "durability",
+        "candidate",
+        "environment",
+        "corpus_sha256",
+        "installed_configuration",
+        "storage_observation",
+        "budgets",
+        "bindings",
+        "required_cases"
+      ],
+      "type": "object"
+    },
+    "StorageProfileKind": {
+      "enum": [
+        "rrflow_mx",
+        "rrflow_kv"
+      ],
+      "type": "string"
+    },
+    "StorageResult": {
+      "additionalProperties": false,
+      "properties": {
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/CaseResult"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "type": "array"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 1,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "format_version",
+        "manifest_sha256",
+        "cases"
+      ],
+      "type": "object"
+    },
+    "WriteTransition": {
+      "additionalProperties": false,
+      "description": "Bounded load-slot identity, separate from immutable seeded read coordinates.\nGeneration advances only after acknowledged independent readback.",
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "slot": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "slot",
+        "generation"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "items": {
+        "$ref": "#/$defs/LoadAttempt"
+      },
+      "maxItems": 10000,
+      "type": "array"
+    },
+    "backup": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BackupEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "backup_started_ns": {
+      "description": "Launch time for the one bounded backup, possibly completed in a later segment.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "campaign_sha256": {
+      "$ref": "#/$defs/Digest"
+    },
+    "cold_start": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ColdStartEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "corpus": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CorpusEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "finished_ns": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "format_version": {
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "index": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "lanes": {
+      "items": {
+        "$ref": "#/$defs/LaneEvidence"
+      },
+      "maxItems": 5,
+      "type": "array"
+    },
+    "manifest": {
+      "$ref": "#/$defs/StorageManifest",
+      "description": "Frozen before this segment's operations; full candidate/environment and\ninstalled configuration must equal the campaign's template identities."
+    },
+    "phase": {
+      "$ref": "#/$defs/LoadPhase"
+    },
+    "point": {
+      "$ref": "#/$defs/Id"
+    },
+    "previous_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reader": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReaderInterferenceEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reopens": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReopenEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/ResourceSample"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "result": {
+      "$ref": "#/$defs/StorageResult"
+    },
+    "seed": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "started_ns": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "format_version",
+    "campaign_sha256",
+    "index",
+    "point",
+    "seed",
+    "phase",
+    "started_ns",
+    "finished_ns",
+    "manifest",
+    "result",
+    "attempts",
+    "resources",
+    "lanes"
+  ],
+  "title": "SustainedSegment",
+  "type": "object"
+}

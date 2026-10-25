@@ -46,6 +46,7 @@ mod auth;
 mod capabilities;
 mod envelope;
 mod handlers;
+mod maintenance;
 mod response;
 mod router;
 mod server;

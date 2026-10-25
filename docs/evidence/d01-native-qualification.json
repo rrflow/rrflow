@@ -1,0 +1,337 @@
+{
+  "candidate": "9b6c357186c495acd807b7efced61234fcdb324a",
+  "candidate_tree": "e1a600d45b65da3c1e83e986963ef30f8f18ca39",
+  "ci_run": 39674145683,
+  "final_attempt": 2,
+  "retry": "Attempt 1 macOS never acquired a hosted runner; capacity cancellation made the aggregate gate fail. Attempt 2 reran macOS and the dependent gate at the same source revision, retaining fifteen successful jobs.",
+  "jobs": [
+    {
+      "name": "pipeline / estate process (macos-latest)",
+      "databaseId": 119487607619,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487607619"
+    },
+    {
+      "name": "pipeline / verify",
+      "databaseId": 119487608623,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487608623"
+    },
+    {
+      "name": "pipeline / optional feature (rrd-operator-knowledge)",
+      "databaseId": 119487609427,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487609427"
+    },
+    {
+      "name": "pipeline / optional feature (rrd-cluster)",
+      "databaseId": 119487609806,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487609806"
+    },
+    {
+      "name": "pipeline / optional feature (rrd-lsm)",
+      "databaseId": 119487610185,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487610185"
+    },
+    {
+      "name": "pipeline / engine suite (product-operations)",
+      "databaseId": 119487610259,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487610259"
+    },
+    {
+      "name": "pipeline / engine suite (service-protocol)",
+      "databaseId": 119487610312,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487610312"
+    },
+    {
+      "name": "pipeline / optional feature (rrd-vector)",
+      "databaseId": 119487610545,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487610545"
+    },
+    {
+      "name": "pipeline / engine suite (engine-authority)",
+      "databaseId": 119487610993,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487610993"
+    },
+    {
+      "name": "pipeline / optional feature (rrd-engine)",
+      "databaseId": 119487657895,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487657895"
+    },
+    {
+      "name": "pipeline / estate process (windows-latest)",
+      "databaseId": 119487658682,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487658682"
+    },
+    {
+      "name": "pipeline / engine suite (kernel-storage)",
+      "databaseId": 119487660833,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487660833"
+    },
+    {
+      "name": "pipeline / optional feature (rrd-inference)",
+      "databaseId": 119487665102,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487665102"
+    },
+    {
+      "name": "pipeline / engine suite (query-retrieval)",
+      "databaseId": 119487674313,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487674313"
+    },
+    {
+      "name": "pipeline / installed RRFlow lifecycle",
+      "databaseId": 119487677690,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487677690"
+    },
+    {
+      "name": "pipeline / supported SDK conformance",
+      "databaseId": 119487690179,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119487690179"
+    },
+    {
+      "name": "pipeline / ci-gate",
+      "databaseId": 119500160002,
+      "conclusion": "success",
+      "url": "https://github.com/rrflow/rrflow-development/actions/runs/39674145683/job/119500160002"
+    }
+  ],
+  "native_observations": [
+    {
+      "platform": "linux",
+      "receipt_sha256": "4af83819d8ed3d749009dbb7e32e7422334ed69e5f0b192d7b38abfc280644f9",
+      "source_log_job_id": 119479802257,
+      "linux_engine_log_job_id": 119487610993,
+      "artifact": {
+        "id": 12381411919,
+        "name": "offline-linux",
+        "digest": "sha256:4fa5bdb8240292154914a0c52da97f3355431cd24f409a1b2f1bfa8d19b26936",
+        "created_at": "2026-10-21T21:08:52Z"
+      },
+      "foreign_owner": {
+        "platform": "linux",
+        "case": "engine::token_key::private_file::platform::tests::foreign_owner_is_denied_without_repair",
+        "passed": 1,
+        "ignored": 0,
+        "harness_sha256": "73f44bd841ae40bbd8ba474c11534c5161f4dfe3a5ea93dcf01232d8660aa5e7"
+      },
+      "mount_case": "bind_mount_crossing_is_denied_before_any_effect",
+      "process_death_stages_in_native_log": [],
+      "installation_cases": [
+        "engine::tests::installation::a_restore_into_an_existing_verified_target_is_recovered_without_a_second_writer",
+        "engine::tests::installation::a_restored_root_carries_the_installed_control_state",
+        "engine::tests::installation::a_staged_restore_is_published_in_place_and_the_estate_opens_from_the_backup",
+        "engine::tests::installation::an_interrupted_publication_resumes_from_its_recorded_stage",
+        "engine::tests::installation::changed_project_or_credential_permissions_fail_closed",
+        "engine::tests::installation::configuration_input_rejects_unknown_oversized_and_symbolic_sources",
+        "engine::tests::installation::exact_apply_reopens_and_quick_verification_changes_no_bytes",
+        "engine::tests::installation::explicit_configuration_is_sealed_and_apply_does_not_reread_it",
+        "engine::tests::installation::fresh_project_apply_and_exact_replay_are_supported",
+        "engine::tests::installation::independent_installations_do_not_reuse_content_identity",
+        "engine::tests::installation::installation_identity_and_root_are_bound_before_effects",
+        "engine::tests::installation::installed_backups_and_restore_staging_live_beside_the_storage_roots",
+        "engine::tests::installation::installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state",
+        "engine::tests::installation::installed_open_and_inspection_reject_symbolic_object_paths",
+        "engine::tests::installation::installed_open_and_verify_never_repair_a_torn_or_missing_active_wal",
+        "engine::tests::installation::installed_secret_aliases_deny_open_verify_and_replay_without_effects",
+        "engine::tests::installation::planning_is_byte_identical_and_has_no_project_effect",
+        "engine::tests::installation::pre_canonical_rrflow_state_blocks_a_parallel_installation_authority",
+        "engine::tests::installation::rehashed_profile_field_forgery_fails_before_any_project_effect",
+        "engine::tests::installation::unavailable_or_rolled_back_clock_blocks_effects_but_not_read_only_diagnosis",
+        "engine::tests::installation_bootstrap::altered_installed_instructions_deny_inspection_open_and_replay_without_repair",
+        "engine::tests::installation_bootstrap::bundled_bootstrap_closes_observed_files_records_and_inactive_specializations",
+        "engine::tests::installation_bootstrap::installation_preview_covers_transient_intent_before_storage_creation",
+        "engine::tests::installation_bootstrap::linked_bootstrap_bytes_are_platform_stable_and_unknown_profiles_have_no_effects",
+        "engine::tests::installation_bootstrap::rehashed_bootstrap_drift_is_denied_before_any_project_effect",
+        "engine::tests::installation_bootstrap::shared_sdk_corpus_identity_matches_bundled_installation",
+        "engine::tests::installation_concurrency::competing_plans_and_recovery_are_excluded_at_every_installation_boundary",
+        "engine::tests::installation_concurrency::interrupted_admission_retains_an_empty_lease_and_deterministic_preview",
+        "engine::tests::installation_concurrency::lease_admission_rejects_nonempty_directory_and_hardlink_without_repair",
+        "engine::tests::installation_concurrency::live_recovery_owns_the_same_project_lease_as_initial_apply",
+        "engine::tests::installation_concurrency::process_death_releases_admission_without_regenerating_prepared_secrets",
+        "engine::tests::installation_concurrency::same_plan_contender_cannot_advance_an_active_installation_intent",
+        "engine::tests::installation_concurrency::unrelated_projects_can_install_while_another_project_is_paused",
+        "engine::tests::installation_recovery::aliased_secret_intent_cannot_advance_interrupted_installation",
+        "engine::tests::installation_recovery::anchored_installation_preserves_outside_state_at_durable_boundaries",
+        "engine::tests::installation_recovery::interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority",
+        "engine::tests::installation_recovery::interrupted_installation_cannot_resume_at_a_different_root",
+        "engine::tests::installation_recovery::interrupted_recovery_rejects_clock_rollback_without_changing_owned_state",
+        "engine::tests::installation_recovery::malformed_or_foreign_recovery_state_is_preserved_and_rejected",
+        "engine::tests::installation_recovery::owned_intent_rejects_project_and_executable_drift_without_writes",
+        "engine::tests::installation_recovery::partial_control_state_and_missing_committed_secret_fail_closed",
+        "engine::tests::installation_recovery::published_locator_recovers_only_its_exact_pending_link",
+        "engine::tests::installation_recovery::symbolic_intent_collision_is_preserved_and_rejected"
+      ],
+      "installed_wal_damage_preservation": "passed"
+    },
+    {
+      "platform": "darwin",
+      "receipt_sha256": "b4cfb4de0b5d93639f4fe4dcdd7b2f137fb8e5b292534455077db8c12f1986c2",
+      "source_log_job_id": 119487607619,
+      "linux_engine_log_job_id": null,
+      "artifact": {
+        "id": 12382438883,
+        "name": "offline-macos-latest",
+        "digest": "sha256:ef807f96c318b8b436b10d271a75d7c940d94207748bfac9aeff4a53b7700489",
+        "created_at": "2026-10-21T21:24:26Z"
+      },
+      "foreign_owner": {
+        "platform": "darwin",
+        "case": "engine::token_key::private_file::platform::tests::foreign_owner_is_denied_without_repair",
+        "passed": 1,
+        "ignored": 0,
+        "harness_sha256": "a01cd776c3ef131b7d9feb014dc4b5862334dba1bbcdec0860389e0e40dd7760"
+      },
+      "mount_case": "mounted_volume_crossing_is_denied_before_any_effect",
+      "process_death_stages_in_native_log": [
+        "LeaseAcquired",
+        "IntentPublished",
+        "EstateDirectoriesReady",
+        "BootstrapStaged",
+        "BootstrapReady",
+        "StorageReady",
+        "TokenReady",
+        "CredentialReady",
+        "EngineCommitted",
+        "LocatorPublished",
+        "IntentAcknowledged"
+      ],
+      "installation_cases": [
+        "engine::tests::installation::a_restore_into_an_existing_verified_target_is_recovered_without_a_second_writer",
+        "engine::tests::installation::a_restored_root_carries_the_installed_control_state",
+        "engine::tests::installation::a_staged_restore_is_published_in_place_and_the_estate_opens_from_the_backup",
+        "engine::tests::installation::an_interrupted_publication_resumes_from_its_recorded_stage",
+        "engine::tests::installation::changed_project_or_credential_permissions_fail_closed",
+        "engine::tests::installation::configuration_input_rejects_unknown_oversized_and_symbolic_sources",
+        "engine::tests::installation::exact_apply_reopens_and_quick_verification_changes_no_bytes",
+        "engine::tests::installation::explicit_configuration_is_sealed_and_apply_does_not_reread_it",
+        "engine::tests::installation::fresh_project_apply_and_exact_replay_are_supported",
+        "engine::tests::installation::independent_installations_do_not_reuse_content_identity",
+        "engine::tests::installation::installation_identity_and_root_are_bound_before_effects",
+        "engine::tests::installation::installed_backups_and_restore_staging_live_beside_the_storage_roots",
+        "engine::tests::installation::installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state",
+        "engine::tests::installation::installed_open_and_inspection_reject_symbolic_object_paths",
+        "engine::tests::installation::installed_open_and_verify_never_repair_a_torn_or_missing_active_wal",
+        "engine::tests::installation::installed_secret_aliases_deny_open_verify_and_replay_without_effects",
+        "engine::tests::installation::planning_is_byte_identical_and_has_no_project_effect",
+        "engine::tests::installation::pre_canonical_rrflow_state_blocks_a_parallel_installation_authority",
+        "engine::tests::installation::rehashed_profile_field_forgery_fails_before_any_project_effect",
+        "engine::tests::installation::unavailable_or_rolled_back_clock_blocks_effects_but_not_read_only_diagnosis",
+        "engine::tests::installation_bootstrap::altered_installed_instructions_deny_inspection_open_and_replay_without_repair",
+        "engine::tests::installation_bootstrap::bundled_bootstrap_closes_observed_files_records_and_inactive_specializations",
+        "engine::tests::installation_bootstrap::installation_preview_covers_transient_intent_before_storage_creation",
+        "engine::tests::installation_bootstrap::linked_bootstrap_bytes_are_platform_stable_and_unknown_profiles_have_no_effects",
+        "engine::tests::installation_bootstrap::rehashed_bootstrap_drift_is_denied_before_any_project_effect",
+        "engine::tests::installation_bootstrap::shared_sdk_corpus_identity_matches_bundled_installation",
+        "engine::tests::installation_concurrency::competing_plans_and_recovery_are_excluded_at_every_installation_boundary",
+        "engine::tests::installation_concurrency::interrupted_admission_retains_an_empty_lease_and_deterministic_preview",
+        "engine::tests::installation_concurrency::lease_admission_rejects_nonempty_directory_and_hardlink_without_repair",
+        "engine::tests::installation_concurrency::live_recovery_owns_the_same_project_lease_as_initial_apply",
+        "engine::tests::installation_concurrency::process_death_releases_admission_without_regenerating_prepared_secrets",
+        "engine::tests::installation_concurrency::same_plan_contender_cannot_advance_an_active_installation_intent",
+        "engine::tests::installation_concurrency::unrelated_projects_can_install_while_another_project_is_paused",
+        "engine::tests::installation_recovery::aliased_secret_intent_cannot_advance_interrupted_installation",
+        "engine::tests::installation_recovery::anchored_installation_preserves_outside_state_at_durable_boundaries",
+        "engine::tests::installation_recovery::interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority",
+        "engine::tests::installation_recovery::interrupted_installation_cannot_resume_at_a_different_root",
+        "engine::tests::installation_recovery::interrupted_recovery_rejects_clock_rollback_without_changing_owned_state",
+        "engine::tests::installation_recovery::malformed_or_foreign_recovery_state_is_preserved_and_rejected",
+        "engine::tests::installation_recovery::owned_intent_rejects_project_and_executable_drift_without_writes",
+        "engine::tests::installation_recovery::partial_control_state_and_missing_committed_secret_fail_closed",
+        "engine::tests::installation_recovery::published_locator_recovers_only_its_exact_pending_link",
+        "engine::tests::installation_recovery::symbolic_intent_collision_is_preserved_and_rejected"
+      ],
+      "installed_wal_damage_preservation": "passed"
+    },
+    {
+      "platform": "win32",
+      "receipt_sha256": "6909f1d3b012d63b56b9a1de72023ece4dccf21c35d78005d1a48f49354a0c90",
+      "source_log_job_id": 119479802872,
+      "linux_engine_log_job_id": null,
+      "artifact": {
+        "id": 12382530654,
+        "name": "offline-windows-latest",
+        "digest": "sha256:a1fa862be0b063be07579e96fce6f6f9d769dd6dc6449e35054e9d1c918e3260",
+        "created_at": "2026-10-21T21:03:20Z"
+      },
+      "foreign_owner": {
+        "platform": "win32",
+        "case": "engine::token_key::private_file::platform::tests::foreign_owner_is_denied_without_repair",
+        "passed": 1,
+        "ignored": 0,
+        "harness_sha256": "09525d1cc243c347fc7510a1c1b32d63e1e56d9e35d3307c0d0f2a7c1d63f8c0"
+      },
+      "mount_case": null,
+      "process_death_stages_in_native_log": [
+        "LeaseAcquired",
+        "IntentPublished",
+        "EstateDirectoriesReady",
+        "BootstrapStaged",
+        "BootstrapReady",
+        "StorageReady",
+        "TokenReady",
+        "CredentialReady",
+        "EngineCommitted",
+        "LocatorPublished",
+        "IntentAcknowledged"
+      ],
+      "installation_cases": [
+        "engine::tests::installation::a_restore_into_an_existing_verified_target_is_recovered_without_a_second_writer",
+        "engine::tests::installation::a_restored_root_carries_the_installed_control_state",
+        "engine::tests::installation::a_staged_restore_is_published_in_place_and_the_estate_opens_from_the_backup",
+        "engine::tests::installation::an_interrupted_publication_resumes_from_its_recorded_stage",
+        "engine::tests::installation::changed_project_or_credential_permissions_fail_closed",
+        "engine::tests::installation::configuration_input_rejects_unknown_oversized_and_symbolic_sources",
+        "engine::tests::installation::exact_apply_reopens_and_quick_verification_changes_no_bytes",
+        "engine::tests::installation::explicit_configuration_is_sealed_and_apply_does_not_reread_it",
+        "engine::tests::installation::fresh_project_apply_and_exact_replay_are_supported",
+        "engine::tests::installation::independent_installations_do_not_reuse_content_identity",
+        "engine::tests::installation::installation_identity_and_root_are_bound_before_effects",
+        "engine::tests::installation::installed_backups_and_restore_staging_live_beside_the_storage_roots",
+        "engine::tests::installation::installed_locator_relocates_but_never_walks_ancestors_or_pairs_foreign_state",
+        "engine::tests::installation::installed_open_and_verify_never_repair_a_torn_or_missing_active_wal",
+        "engine::tests::installation::installed_secret_aliases_deny_open_verify_and_replay_without_effects",
+        "engine::tests::installation::planning_is_byte_identical_and_has_no_project_effect",
+        "engine::tests::installation::pre_canonical_rrflow_state_blocks_a_parallel_installation_authority",
+        "engine::tests::installation::rehashed_profile_field_forgery_fails_before_any_project_effect",
+        "engine::tests::installation::unavailable_or_rolled_back_clock_blocks_effects_but_not_read_only_diagnosis",
+        "engine::tests::installation_bootstrap::altered_installed_instructions_deny_inspection_open_and_replay_without_repair",
+        "engine::tests::installation_bootstrap::bundled_bootstrap_closes_observed_files_records_and_inactive_specializations",
+        "engine::tests::installation_bootstrap::installation_preview_covers_transient_intent_before_storage_creation",
+        "engine::tests::installation_bootstrap::linked_bootstrap_bytes_are_platform_stable_and_unknown_profiles_have_no_effects",
+        "engine::tests::installation_bootstrap::rehashed_bootstrap_drift_is_denied_before_any_project_effect",
+        "engine::tests::installation_bootstrap::shared_sdk_corpus_identity_matches_bundled_installation",
+        "engine::tests::installation_concurrency::competing_plans_and_recovery_are_excluded_at_every_installation_boundary",
+        "engine::tests::installation_concurrency::interrupted_admission_retains_an_empty_lease_and_deterministic_preview",
+        "engine::tests::installation_concurrency::lease_admission_rejects_nonempty_directory_and_hardlink_without_repair",
+        "engine::tests::installation_concurrency::live_recovery_owns_the_same_project_lease_as_initial_apply",
+        "engine::tests::installation_concurrency::process_death_releases_admission_without_regenerating_prepared_secrets",
+        "engine::tests::installation_concurrency::same_plan_contender_cannot_advance_an_active_installation_intent",
+        "engine::tests::installation_concurrency::unrelated_projects_can_install_while_another_project_is_paused",
+        "engine::tests::installation_recovery::aliased_secret_intent_cannot_advance_interrupted_installation",
+        "engine::tests::installation_recovery::anchored_installation_preserves_outside_state_at_durable_boundaries",
+        "engine::tests::installation_recovery::interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority",
+        "engine::tests::installation_recovery::interrupted_installation_cannot_resume_at_a_different_root",
+        "engine::tests::installation_recovery::interrupted_recovery_rejects_clock_rollback_without_changing_owned_state",
+        "engine::tests::installation_recovery::malformed_or_foreign_recovery_state_is_preserved_and_rejected",
+        "engine::tests::installation_recovery::owned_intent_rejects_project_and_executable_drift_without_writes",
+        "engine::tests::installation_recovery::partial_control_state_and_missing_committed_secret_fail_closed",
+        "engine::tests::installation_recovery::published_locator_recovers_only_its_exact_pending_link"
+      ],
+      "installed_wal_damage_preservation": "passed"
+    }
+  ],
+  "limit": "D-01 bounded installed-engine qualification only; OS libraries and test infrastructure remain available. No signed distribution, complete alpha, hostile-code sandbox, scale, PostgreSQL or model-execution claim."
+}

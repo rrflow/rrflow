@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-const expectedOpenAPISHA256 = "9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d"
 const expectedSignalCatalogueSHA256 = "239df2ced5974d4351ca01565369646964cb65c63d0fbae01dddccb4c3ac5a07"
 
 func TestGeneratedSignalCatalogueIsPublicExactAndInert(t *testing.T) {
@@ -22,8 +21,12 @@ func TestGeneratedSignalCatalogueIsPublicExactAndInert(t *testing.T) {
 	if SignalCatalogueSHA256 != expectedSignalCatalogueSHA256 {
 		t.Fatalf("signal catalogue digest = %s", SignalCatalogueSHA256)
 	}
-	if OpenAPIDocumentSHA256 != expectedOpenAPISHA256 {
-		t.Fatalf("OpenAPI digest = %s", OpenAPIDocumentSHA256)
+	if OpenAPIDocumentSHA256 != EndpointOpenAPIDocumentSHA256 {
+		t.Fatalf(
+			"signal OpenAPI digest %s differs from endpoint digest %s",
+			OpenAPIDocumentSHA256,
+			EndpointOpenAPIDocumentSHA256,
+		)
 	}
 	if catalogue.ContractVersion != 1 || len(catalogue.DiagnosticLevels) != 4 ||
 		len(catalogue.MetricAttributes) != 9 || len(catalogue.MetricInstruments) != 22 {

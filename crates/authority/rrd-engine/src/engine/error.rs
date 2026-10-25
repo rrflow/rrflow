@@ -8,6 +8,8 @@ pub enum ServiceError {
     Estate(String),
     Storage(String),
     StorageConflict(String),
+    StorageAdmission(String),
+    AdmissionCancelled,
     SessionNotFound,
     Unauthenticated,
     SessionExpired,
@@ -17,11 +19,13 @@ pub enum ServiceError {
     TransactionQuota,
     RenewalQuota,
     IdempotencyConflict,
+    InvocationInProgress,
     CommitInProgress,
     WrongScope,
     OperationDigestMismatch,
     Query(String),
     Inference(String),
+    InferenceBusy,
     Vector(String),
     VectorPressure(String),
     Changefeed(String),
@@ -43,11 +47,20 @@ pub enum ServiceError {
     FunctionNotFound,
     FunctionCatalogueRevisionNotFound,
     MemoryTargetNotFound,
+    FlightNotFound,
+    TaskNotFound,
+    TaskClosed,
     SeatNotRepresented,
     Runtime(String),
     PermissionDenied,
     DeadlineExceeded,
     ProjectBindingMismatch,
+    ClockUnavailable(ClockObservationFailure),
+    ClockRollback {
+        observed_at_unix_ms: u64,
+        anchor_unix_ms: u64,
+        maximum_rollback_ms: u64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,10 +93,12 @@ impl ServiceError {
             | Self::TransactionNotFound
             | Self::SubscriptionNotFound
             | Self::FunctionNotFound
-            | Self::MemoryTargetNotFound => ServiceErrorKind::NotFound,
+            | Self::MemoryTargetNotFound
+            | Self::FlightNotFound
+            | Self::TaskNotFound => ServiceErrorKind::NotFound,
             Self::Unauthenticated => ServiceErrorKind::Unauthenticated,
             Self::PermissionDenied => ServiceErrorKind::PermissionDenied,
-            Self::IdempotencyConflict => ServiceErrorKind::Conflict,
+            Self::IdempotencyConflict | Self::InvocationInProgress => ServiceErrorKind::Conflict,
             Self::SessionExpired
             | Self::TransactionExpired
             | Self::TransactionClosed
@@ -91,11 +106,17 @@ impl ServiceError {
             | Self::SubscriptionExpired { .. }
             | Self::SubscriptionLeaseExpired
             | Self::SubscriptionClosed
+            | Self::TaskClosed
             | Self::SubscriptionConnectionReplaced
             | Self::FunctionCatalogueRevisionNotFound
             | Self::SeatNotRepresented
+            | Self::ClockUnavailable(_)
+            | Self::ClockRollback { .. }
+            | Self::AdmissionCancelled
             | Self::ProjectBindingMismatch => ServiceErrorKind::FailedPrecondition,
             Self::TransactionQuota
+            | Self::StorageAdmission(_)
+            | Self::InferenceBusy
             | Self::RenewalQuota
             | Self::SubscriptionBackpressure
             | Self::FunctionLimit(_)
@@ -108,13 +129,29 @@ impl ServiceError {
     }
 
     pub fn retryable(&self) -> bool {
-        matches!(self, Self::StorageConflict(_))
+        matches!(
+            self,
+            Self::StorageConflict(_) | Self::InvocationInProgress | Self::InferenceBusy
+        )
     }
 }
 
 impl fmt::Display for ServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+        match self {
+            Self::ClockUnavailable(failure) => {
+                write!(f, "host clock is unavailable: {failure:?}")
+            }
+            Self::ClockRollback {
+                observed_at_unix_ms,
+                anchor_unix_ms,
+                maximum_rollback_ms,
+            } => write!(
+                f,
+                "host clock rollback exceeds policy: observed {observed_at_unix_ms}, installation anchor {anchor_unix_ms}, maximum rollback {maximum_rollback_ms} ms"
+            ),
+            _ => write!(f, "{self:?}"),
+        }
     }
 }
 
@@ -124,6 +161,20 @@ impl From<rrd_store::Error> for ServiceError {
     fn from(value: rrd_store::Error) -> Self {
         let message = value.to_string();
         match value {
+            // Owner exhaustion or source-page pressure can obstruct an already
+            // published commit. Only a proven-absent outcome permits rejection.
+            rrd_store::Error::TransactionLimit { .. }
+            | rrd_store::Error::SourcePageLimit { .. }
+            | rrd_store::Error::ProjectedReadLimit { .. } => Self::Storage(message),
+            rrd_store::Error::WriteBatchLimit { .. }
+            | rrd_store::Error::MutableLimit { .. }
+            | rrd_store::Error::MaintenanceLimit { .. }
+            | rrd_store::Error::DiskAdmission { .. }
+            | rrd_store::Error::CheckpointLimit { .. }
+            | rrd_store::Error::RecoveryLimit { .. }
+            | rrd_store::Error::ReclamationPending
+            | rrd_store::Error::ReclamationLimit { .. } => Self::StorageAdmission(message),
+            rrd_store::Error::RuntimeReadBudgetExceeded { .. } => Self::ConfigurationLimit(message),
             rrd_store::Error::IndexConstraint(_) => Self::Query(message),
             rrd_store::Error::RuntimeConflict { .. }
             | rrd_store::Error::RuntimeSchemaConflict { .. }
@@ -156,5 +207,37 @@ impl From<rrd_security::Error> for ServiceError {
             }
             rrd_security::Error::Store(error) => Self::from(error),
         }
+    }
+}
+
+impl From<rrd_query::Error> for ServiceError {
+    fn from(error: rrd_query::Error) -> Self {
+        match error {
+            rrd_query::Error::StorageAdmission(message) => Self::StorageAdmission(message),
+            rrd_query::Error::Budget(message) => Self::ConfigurationLimit(message),
+            other => Self::Query(other.to_string()),
+        }
+    }
+}
+
+/// Preserve the existing query error surface while carrying native admission
+/// through storage reads that precede the query pipeline.
+pub(super) fn query_storage_error(error: rrd_store::Error) -> ServiceError {
+    match error {
+        rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. } => {
+            ServiceError::StorageAdmission(error.to_string())
+        }
+        other => ServiceError::Query(other.to_string()),
+    }
+}
+
+/// Known read-only acquisition can report pressure without asserting a durable
+/// effect was rejected. Durable callers must use the ordinary conversion.
+pub(super) fn storage_read_error(error: rrd_store::Error) -> ServiceError {
+    match error {
+        rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. } => {
+            ServiceError::StorageAdmission(error.to_string())
+        }
+        other => ServiceError::from(other),
     }
 }

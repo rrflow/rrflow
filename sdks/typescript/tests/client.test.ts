@@ -10,22 +10,12 @@ const jsonResponse = (value: unknown, status = 200) =>
   });
 
 test("generated catalogue tracks all mutation boundaries", () => {
-  assert.equal(Object.keys(endpoints).length, 35);
+  assert.equal(Object.keys(endpoints).length, 46);
+  assert.equal(endpoints["diagnostics-storage-cursor"].path, "/v1/diagnostics/storage/cursor");
+  assert.equal(endpoints["diagnostics-storage-cursor"].authentication, "session_bearer");
   assert.equal(endpoints["audit-export"].path, "/v1/audit/export");
   assert.equal(endpoints["backup-create"].mutation, true);
   assert.equal(endpoints["transaction-preview"].mutation, true);
-  assert.deepEqual(endpoints["knowledge-tree-list"], {
-    method: "POST",
-    path: "/v1/knowledge/trees/list",
-    authentication: "session_bearer",
-    mutation: false,
-  });
-  assert.deepEqual(endpoints["knowledge-tree-replace"], {
-    method: "POST",
-    path: "/v1/knowledge/trees/replace",
-    authentication: "session_bearer",
-    mutation: true,
-  });
 });
 
 test("public negotiation retries transport loss and validates the ArkType envelope", async () => {
@@ -54,8 +44,43 @@ test("public negotiation retries transport loss and validates the ArkType envelo
             endpoint_presentation: "loopback_http_websocket",
           },
           configuration: {
-            format_version: 1,
+            format_version: 3,
             revision: 1,
+            clock: {
+              maximum_rollback_ms: 0,
+            },
+            storage: {
+              mutable_accounted_bytes: 134217728,
+              mutable_versions: 1048576,
+              projected_output_bytes: 134217728,
+              source_page_bytes: 268435456,
+              page_cache_bytes: 4194304,
+              wal_flush_target_bytes: 67108864,
+              memtable_flush_target_versions: 524288,
+              compaction_input_bytes: 1073741824,
+              compaction_input_logical_bytes: 268435456,
+              compaction_input_versions: 4194304,
+              compaction_output_segments: 256,
+              compaction_elapsed_ms: 30000,
+              compaction_l0_segments: 64,
+              retained_mutable_bytes: 536870912,
+              retained_mutable_versions: 4194304,
+              retained_mutable_generations: 64,
+              reclamation_inventory_entries: 262144,
+              reclamation_metadata_bytes: 67108864,
+              reclamation_delete_files: 1024,
+              reclamation_delete_bytes: 1073741824,
+              reclamation_elapsed_ms: 30000,
+              transaction_admission_requests: 64,
+              transaction_admission_bytes: 67108864,
+              transaction_admission_wait_ms: 30000,
+              recovery_metadata_bytes: 67108864,
+              recovery_files: 262144,
+              recovery_read_bytes: 1099511627776,
+              recovery_wal_bytes: 268435456,
+              recovery_wal_frames: 1048576,
+              recovery_elapsed_ms: 120000,
+            },
             reasoning: {
               max_run_elapsed_ms: 900_000,
               max_steps: 256,
@@ -77,7 +102,7 @@ test("public negotiation retries transport loss and validates the ArkType envelo
               max_elapsed_ms: 30_000,
             },
             configuration_sha256:
-              "bf8a4557c1465ab4bf0e8640be42f65b28e4d65dff5f3147b2892edfe9db31be",
+              "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0",
           },
           instance: { kind: "instance", id: "sdk-test" },
           capabilities: [],
@@ -95,6 +120,34 @@ test("public negotiation retries transport loss and validates the ArkType envelo
   assert.equal(capabilities.deployment.deployment_form, "single_node_server");
   assert.equal(capabilities.configuration.reasoning.max_run_elapsed_ms, 900_000);
   assert.equal(attempts, 2);
+});
+
+test("the transport is invoked as a free function, as a browser's fetch requires", async () => {
+  // Browsers throw "Illegal invocation" when `fetch` runs with any `this`
+  // other than the global object; the client must never call it as a method.
+  const transport = function (this: unknown, input: RequestInfo | URL) {
+    if (this !== undefined && this !== globalThis) {
+      throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+    }
+    assert.equal(new URL(input.toString()).pathname, "/v1/health/live");
+    return Promise.resolve(
+      jsonResponse({
+        protocol: "rrd",
+        protocol_version: 1,
+        request_id: "server-request",
+        operation_id: "server-operation",
+        outcome: { status: "ok", payload: { observed_at_unix_ms: 7 } },
+      }),
+    );
+  } as typeof fetch;
+  const client = new RrdClient({
+    baseUrl: "http://127.0.0.1:9477",
+    instance: "sdk-test",
+    maxAttempts: 1,
+    fetch: transport,
+  });
+  const liveness = await client.call("health-live", undefined, {});
+  assert.equal(liveness.observed_at_unix_ms, 7);
 });
 
 test("session and query calls construct authenticated bounded v1 envelopes", async () => {

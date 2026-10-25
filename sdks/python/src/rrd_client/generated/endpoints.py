@@ -1,6 +1,10 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d
+# OpenAPI SHA-256: ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65
 from typing import Final, Literal, TypedDict
+
+ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = (
+    "ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65"
+)
 
 OperationId = Literal[
     "audit-export",
@@ -11,15 +15,22 @@ OperationId = Literal[
     "changefeed-follow",
     "changefeed-read",
     "context-assemble",
+    "data-schema-read",
     "diagnostics-read",
+    "diagnostics-storage-cursor",
+    "diagnostics-storage-read",
     "endpoint-catalogue",
     "estate-read",
+    "flight-launch",
+    "flight-list",
+    "flight-read",
     "health-live",
     "health-ready",
     "knowledge-tree-list",
     "knowledge-tree-replace",
     "openapi-read",
     "query-execute",
+    "query-export",
     "query-index-ensure",
     "query-index-list",
     "query-live-poll",
@@ -29,6 +40,10 @@ OperationId = Literal[
     "session-renew",
     "subscription-close",
     "subscription-open",
+    "task-close",
+    "task-list",
+    "task-open",
+    "task-read",
     "transaction-abort",
     "transaction-begin",
     "transaction-commit",
@@ -97,11 +112,29 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": False,
         "path": "/v1/context/assemble",
     },
+    "data-schema-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/data/schema",
+    },
     "diagnostics-read": {
         "authentication": "session_bearer",
         "method": "POST",
         "mutation": False,
         "path": "/v1/diagnostics/read",
+    },
+    "diagnostics-storage-cursor": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/diagnostics/storage/cursor",
+    },
+    "diagnostics-storage-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/diagnostics/storage/read",
     },
     "endpoint-catalogue": {
         "authentication": "public",
@@ -114,6 +147,24 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/estates/{estate}/read",
+    },
+    "flight-launch": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/flights",
+    },
+    "flight-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/flights/list",
+    },
+    "flight-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/flights/read",
     },
     "health-live": {
         "authentication": "public",
@@ -150,6 +201,12 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/query",
+    },
+    "query-export": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/query/export",
     },
     "query-index-ensure": {
         "authentication": "session_bearer",
@@ -204,6 +261,30 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": True,
         "path": "/v1/subscriptions/open",
+    },
+    "task-close": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/close",
+    },
+    "task-list": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/list",
+    },
+    "task-open": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks",
+    },
+    "task-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/read",
     },
     "transaction-abort": {
         "authentication": "session_bearer",

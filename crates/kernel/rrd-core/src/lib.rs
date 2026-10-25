@@ -4,9 +4,9 @@
 //!
 //! ## Boundary
 //!
-//! This crate depends on `serde` alone. It must not depend on the substrate, a
-//! transport, or tier policy, and must not expose substrate types in its public
-//! API. Adapters implement [`temporal::ClaimSource`].
+//! This crate depends only on `serde` and a pure cryptographic primitive. It must
+//! not depend on the substrate, transport or tier policy, or expose their types
+//! in its public API. Adapters implement [`temporal::ClaimSource`].
 //!
 //! `SPEC.md` §5 states the modularity criterion: a module satisfies the
 //! specification if and only if it compiles and passes its tests with every

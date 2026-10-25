@@ -7,13 +7,15 @@ use rrd_client::{
 };
 use rrd_contract::{
     transaction_operation_sha256, AbortTransaction, AssembleContext, BeginTransaction, CanonicalId,
-    CloseSubscription, CommitTransaction, ContextEvidenceKind, CreateSession,
+    CloseSubscription, CloseTask, CommitTransaction, ContextEvidenceKind, CreateSession,
     DeploymentConformanceCorpus, DeploymentForm, EndpointPresentation, ErrorCode, ExecuteQuery,
-    ExportAudit, InstallationManagedPathKind, InstallationTargetKind, OpenSubscription,
-    PreviewTransaction, QueryBudget, ReadAccessPath, ReadAudit, ReadChangefeed,
-    ReadDiagnosticSnapshot, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
+    ExportAudit, InstallationManagedPathKind, InstallationTargetKind, LaunchPromptFlight,
+    ListPromptFlights, ListTasks, OpenSubscription, OpenTask, PreviewTransaction,
+    PromptFlightContextMode, PromptFlightContextRequest, PromptFlightProvider, PromptFlightStage,
+    QueryBudget, ReadAccessPath, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot,
+    ReadPromptFlight, ReadTask, RequestContext, RequestEnvelope, ResourceId, ResourceKind,
     ResourcePath, SessionLimits, StorageProfileKind, SubscriptionAcknowledgement,
-    SubscriptionDelivery, SubscriptionResume, SubscriptionStream, TransactionMutation,
+    SubscriptionDelivery, SubscriptionResume, SubscriptionStream, TaskStatus, TransactionMutation,
     WebSocketCancel, WebSocketCancellationDisposition, WebSocketErrorTarget, WebSocketFrame,
     WebSocketPayload, WebSocketRequest, PROTOCOL, PROTOCOL_VERSION,
 };
@@ -294,6 +296,7 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
     let installation = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -304,7 +307,6 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         InstallationTargetKind::ExistingProject,
         &installation,
         &installation.installation.plan_sha256,
-        1,
         &executable,
     )
     .unwrap();
@@ -362,6 +364,10 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
             Action::MemoryContextRead,
             Action::ServiceInspect,
             Action::DiagnosticsRead,
+            Action::FlightLaunch,
+            Action::FlightRead,
+            Action::TaskWrite,
+            Action::TaskRead,
         ]
         .into_iter()
         .map(|action| ResourceGrant {
@@ -839,11 +845,33 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         }
     }
     socket.unsubscribe(&subscription_id).await.unwrap();
-    match receive_application_frame(&mut socket).await.payload {
-        WebSocketPayload::Unsubscribed(result) => {
-            assert_eq!(result.subscription.subscription_id, subscription_id);
+    // Delivery runs on its own polling cadence, so the next page after the
+    // acknowledged cursor may already be on the wire when the server handles
+    // the unsubscribe. Such an in-flight page continues the acknowledged
+    // stream and is bounded by the subscription's max_in_flight (1 here); the
+    // server removes the subscription before it answers, so the `unsubscribed`
+    // frame ends the stream.
+    let mut in_flight = 0;
+    loop {
+        match receive_application_frame(&mut socket).await.payload {
+            WebSocketPayload::Unsubscribed(result) => {
+                assert_eq!(result.subscription.subscription_id, subscription_id);
+                assert_eq!(result.subscription.acknowledged_cursor, 2);
+                break;
+            }
+            WebSocketPayload::Delivery(delivery) if delivery.subscription_id == subscription_id => {
+                in_flight += 1;
+                assert_eq!(
+                    in_flight, 1,
+                    "max_in_flight 1 admits one unacknowledged delivery"
+                );
+                assert_eq!(delivery.connection_generation, replay.connection_generation);
+                assert!(delivery.delivery_sequence > replay.delivery_sequence);
+                assert_eq!(delivery.from_cursor, 2);
+            }
+            WebSocketPayload::Backpressure(_) => {}
+            payload => panic!("unexpected unsubscribe payload: {payload:?}"),
         }
-        payload => panic!("unexpected unsubscribe payload: {payload:?}"),
     }
     socket.close().await.unwrap();
 
@@ -1047,6 +1075,81 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
     assert_eq!(diagnostics.read.runtime_manifest_sha256.len(), 64);
     assert_eq!(diagnostics.changes.head_cursor, runtime_head);
     assert_eq!(diagnostics.schema.as_ref().unwrap().revision, 2);
+    let physical = client
+        .read_storage_diagnostics(
+            &session,
+            rrd_contract::ReadStorageDiagnostics {
+                scope: format!("instance:{}", client.instance_id()),
+            },
+            RequestOptions::read("storage-only", "storage-only").unwrap(),
+        )
+        .await
+        .unwrap();
+    physical.validate().unwrap();
+    assert_eq!(physical.profile, StorageProfileKind::RrflowKv);
+    assert!(physical.rrflow_kv.is_some());
+    assert!(physical.admission.is_some());
+    let cursor_request = |action| rrd_contract::InspectStorageCursor {
+        scope: format!("instance:{}", client.instance_id()),
+        cursor_id: rrd_contract::CorrelationId::new("native-inspection").unwrap(),
+        action,
+    };
+    assert!(client
+        .inspect_storage_cursor(
+            &websocket_limited_session,
+            cursor_request(rrd_contract::StorageCursorAction::Open {
+                batch_rows: 1,
+                batch_bytes: 4096,
+                lifetime_ms: 30_000
+            }),
+            RequestOptions::read("cursor-denied", "cursor-denied").unwrap()
+        )
+        .await
+        .is_err());
+    let held = client
+        .inspect_storage_cursor(
+            &session,
+            cursor_request(rrd_contract::StorageCursorAction::Open {
+                batch_rows: 1,
+                batch_bytes: 4096,
+                lifetime_ms: 30_000,
+            }),
+            RequestOptions::read("cursor-open", "cursor-open").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(held.rows > 0 && held.allocated_bytes > 0);
+    let cancelled = client
+        .inspect_storage_cursor(
+            &session,
+            cursor_request(rrd_contract::StorageCursorAction::CancelSource {}),
+            RequestOptions::read("cursor-cancel", "cursor-cancel").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!cancelled.source_open);
+    assert_eq!(cancelled.page_sha256, held.page_sha256);
+    assert!(
+        client
+            .inspect_storage_cursor(
+                &session,
+                cursor_request(rrd_contract::StorageCursorAction::Release {}),
+                RequestOptions::read("cursor-release", "cursor-release").unwrap()
+            )
+            .await
+            .unwrap()
+            .released
+    );
+    assert!(client
+        .read_storage_diagnostics(
+            &websocket_limited_session,
+            rrd_contract::ReadStorageDiagnostics {
+                scope: format!("instance:{}", client.instance_id())
+            },
+            RequestOptions::read("storage-forbidden", "storage-forbidden").unwrap()
+        )
+        .await
+        .is_err());
     assert!(diagnostics.models.models.iter().any(|model| {
         model.id.as_str() == "document"
             && model.kind == rrd_contract::DiagnosticModelKind::Record
@@ -1079,7 +1182,7 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
         .read_diagnostic_snapshot(
             &session,
             ReadDiagnosticSnapshot {
-                scope,
+                scope: scope.clone(),
                 graph_valid_at_unix_ms: 1_100,
                 graph_known_at_cursor: Some(runtime_head.saturating_add(1)),
                 graph_compare_cursor: 0,
@@ -1150,6 +1253,240 @@ async fn rust_client_negotiates_authenticates_queries_and_reads_audit() {
             && record.phase == rrd_contract::AuditPhase::Completed
             && record.decision == rrd_contract::AuditDecision::Allowed
     }));
+
+    let launch = LaunchPromptFlight {
+        scope: scope.clone(),
+        prompt: "Alpha".into(),
+        provider: PromptFlightProvider::Observe,
+        context_mode: PromptFlightContextMode::Pruned,
+        context: PromptFlightContextRequest {
+            valid_at: 100,
+            seeds: Vec::new(),
+            max_graph_depth: 2,
+            max_items: 16,
+            max_output_bytes: 16_384,
+            max_storage_keys: 1_024,
+        },
+        acceptance_marker: None,
+        task_id: None,
+    };
+    let flight = client
+        .launch_prompt_flight(
+            &session,
+            launch.clone(),
+            RequestOptions::mutation("request-flight", "operation-flight", "flight-key").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!flight.idempotent_replay);
+    let record = &flight.flight.record;
+    assert_eq!(record.metrics.context_items, context.items.len() as u64);
+    assert_eq!(record.metrics.context_output_bytes, context.output_bytes);
+    // The flight is the first runtime write of this session: one schema
+    // mutation installing both flight tables precedes the row.
+    assert_eq!(record.read.runtime_cursor, runtime_head);
+    assert_eq!(record.flight_cursor, runtime_head + 2);
+    assert_eq!(
+        flight
+            .flight
+            .events
+            .iter()
+            .map(|event| event.stage)
+            .collect::<Vec<_>>(),
+        vec![
+            PromptFlightStage::Prompt,
+            PromptFlightStage::Context,
+            PromptFlightStage::Outcome
+        ]
+    );
+    let replay = client
+        .launch_prompt_flight(
+            &session,
+            launch.clone(),
+            RequestOptions::mutation(
+                "request-flight-again",
+                "operation-flight-again",
+                "flight-key",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(replay.idempotent_replay);
+    assert_eq!(replay.flight, flight.flight);
+    let flights = client
+        .list_prompt_flights(
+            &session,
+            ListPromptFlights {
+                scope: scope.clone(),
+                after_cursor: 0,
+                limit: 8,
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-flight-list", "operation-flight-list").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(flights.flights, vec![record.clone()]);
+    assert!(!flights.truncated);
+    let read = client
+        .read_prompt_flight(
+            &session,
+            ReadPromptFlight {
+                scope: scope.clone(),
+                flight_id: record.flight_id.clone(),
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-flight-read", "operation-flight-read").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(read.flight, flight.flight);
+    assert!(read
+        .read_evidence
+        .paths
+        .iter()
+        .any(|path| path.path == ReadAccessPath::EventVersions));
+    let after_flight = client
+        .read_changefeed(
+            &session,
+            ReadChangefeed {
+                scope: scope.clone(),
+                after_cursor: runtime_head,
+                limit: 64,
+            },
+            RequestOptions::read("request-changes-flight", "operation-changes-flight").unwrap(),
+        )
+        .await
+        .unwrap();
+    // Schema, row, one edge per record the context used, and three events.
+    assert_eq!(record.use_count, 1, "the flight used document:alpha");
+    assert_eq!(flight.flight.uses[0].reference.id.as_str(), "alpha");
+    let flight_changes = 5 + record.use_count;
+    assert_eq!(after_flight.through_cursor, runtime_head + flight_changes);
+    assert_eq!(after_flight.changes.len() as u64, flight_changes);
+    let flight_audit = client
+        .read_audit(
+            &session,
+            ReadAudit {
+                after_sequence: 0,
+                limit: 256,
+            },
+            RequestOptions::read("request-audit-flight", "operation-audit-flight").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(flight_audit.records.iter().any(|record| {
+        record.action == rrd_contract::SecurityAction::FlightLaunch
+            && record.phase == rrd_contract::AuditPhase::Completed
+            && record.decision == rrd_contract::AuditDecision::Allowed
+    }));
+    assert!(flight_audit.records.iter().any(|record| {
+        record.action == rrd_contract::SecurityAction::FlightRead
+            && record.phase == rrd_contract::AuditPhase::Completed
+            && record.decision == rrd_contract::AuditDecision::Allowed
+    }));
+
+    // A named task over the real socket: open, join one flight, read, list,
+    // close, and refuse a flight once closed.
+    let opened = client
+        .open_task(
+            &session,
+            OpenTask {
+                scope: scope.clone(),
+                title: "Alpha recall".into(),
+                goal: "Answer Alpha from the estate.".into(),
+            },
+            RequestOptions::mutation("request-task-open", "operation-task-open", "task-key")
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(!opened.idempotent_replay);
+    assert_eq!(opened.task.status, TaskStatus::Open);
+    let joined = client
+        .launch_prompt_flight(
+            &session,
+            LaunchPromptFlight {
+                task_id: Some(opened.task.task_id.clone()),
+                ..launch.clone()
+            },
+            RequestOptions::mutation(
+                "request-task-flight",
+                "operation-task-flight",
+                "task-flight-key",
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        joined.flight.record.task_id.as_ref(),
+        Some(&opened.task.task_id)
+    );
+    let read_task = client
+        .read_task(
+            &session,
+            ReadTask {
+                scope: scope.clone(),
+                task_id: opened.task.task_id.clone(),
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-task-read", "operation-task-read").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(read_task.task, opened.task);
+    let closed = client
+        .close_task(
+            &session,
+            CloseTask {
+                scope: scope.clone(),
+                task_id: opened.task.task_id.clone(),
+                status: TaskStatus::Completed,
+                outcome: Some("Alpha answered.".into()),
+            },
+            RequestOptions::mutation("request-task-close", "operation-task-close", "task-close")
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(closed.task.status, TaskStatus::Completed);
+    let tasks = client
+        .list_tasks(
+            &session,
+            ListTasks {
+                scope: scope.clone(),
+                after_cursor: 0,
+                limit: 8,
+                max_storage_keys: 1_024,
+            },
+            RequestOptions::read("request-task-list", "operation-task-list").unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(tasks.tasks, vec![closed.task.clone()]);
+    match client
+        .launch_prompt_flight(
+            &session,
+            LaunchPromptFlight {
+                task_id: Some(opened.task.task_id.clone()),
+                ..launch.clone()
+            },
+            RequestOptions::mutation(
+                "request-task-flight-late",
+                "operation-task-flight-late",
+                "task-flight-late-key",
+            )
+            .unwrap(),
+        )
+        .await
+    {
+        Err(Error::Api { error, .. }) => {
+            assert_eq!(error.code, ErrorCode::FailedPrecondition)
+        }
+        other => panic!("a closed task admits no flight: {other:?}"),
+    }
 
     assert!(matches!(
         RrdClient::connect_local(

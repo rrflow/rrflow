@@ -50,6 +50,12 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "bounded cluster artifact-transfer replay",
     },
     AllowedUse {
+        path: "crates/compute/rrd-query/tests/graph_traversal.rs",
+        kind: SensitiveReadUse::CausalLogPage,
+        count: 3,
+        operation: "exact breadth-first graph traversal and durable-reopen oracles",
+    },
+    AllowedUse {
         path: "crates/compute/rrd-query/tests/query.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 1,
@@ -138,6 +144,12 @@ const ALLOWED_USES: &[AllowedUse] = &[
         kind: SensitiveReadUse::DataSnapshotReducer,
         count: 1,
         operation: "exact all-model data reducer oracle",
+    },
+    AllowedUse {
+        path: "crates/persistence/rrd-store/tests/adjacency_reads.rs",
+        kind: SensitiveReadUse::CausalLogPage,
+        count: 2,
+        operation: "exact commit-path adjacency index oracle",
     },
     AllowedUse {
         path: "crates/persistence/rrd-store/tests/catalog_revision.rs",
@@ -268,7 +280,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
     AllowedUse {
         path: "crates/persistence/rrd-store/tests/snapshot.rs",
         kind: SensitiveReadUse::SnapshotCausalLogPage,
-        count: 12,
+        count: 13,
         operation: "snapshot-lease change-page characterization",
     },
     AllowedUse {
@@ -300,29 +312,13 @@ struct KnownDeficientUse {
 /// The POA&M ledger statuses of a deficiency that is still present.
 const PRESENT_DEFICIENCY_STATUSES: [&str; 3] = ["Open", "Sequenced", "Verifying"];
 
-const KNOWN_DEFICIENT_USES: &[KnownDeficientUse] = &[
-    KnownDeficientUse {
-        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
-        kind: SensitiveReadUse::UnstampedCausalLogPage,
-        count: 1,
-        operation: "vector artifact catalogue rebuilt from cursor 0 on every vector search",
-        poam: "POAM-028",
-    },
-    KnownDeficientUse {
-        path: "crates/authority/rrd-engine/src/runtime/vector_catalog.rs",
-        kind: SensitiveReadUse::CausalLogPage,
-        count: 1,
-        operation: "quantization catalogue rebuilt from cursor 0 on every vector search",
-        poam: "POAM-028",
-    },
-    KnownDeficientUse {
-        path: "crates/operations/rrd-maintenance/src/lib.rs",
-        kind: SensitiveReadUse::UnstampedCausalLogPage,
-        count: 1,
-        operation: "maintenance-run state rebuilt from cursor 0; the crate has no in-tree caller",
-        poam: "POAM-028",
-    },
-];
+const KNOWN_DEFICIENT_USES: &[KnownDeficientUse] = &[KnownDeficientUse {
+    path: "crates/operations/rrd-maintenance/src/lib.rs",
+    kind: SensitiveReadUse::UnstampedCausalLogPage,
+    count: 1,
+    operation: "maintenance-run state rebuilt from cursor 0; the crate has no in-tree caller",
+    poam: "POAM-028",
+}];
 
 #[test]
 fn causal_log_and_snapshot_reducer_uses_match_the_explicit_allowlist() {

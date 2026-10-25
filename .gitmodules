@@ -1,4 +1,3 @@
 [submodule "connectome"]
 	path = connectome
 	url = https://github.com/rrflow/connectome-development.git
-	branch = agent/layman-lenses-wip

@@ -41,6 +41,7 @@ fn install_instance(state_root: &Path) -> PathBuf {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -51,7 +52,6 @@ fn install_instance(state_root: &Path) -> PathBuf {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        1,
         &executable,
     )
     .unwrap();

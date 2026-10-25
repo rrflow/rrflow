@@ -5,82 +5,52 @@
 //! incomplete tail bytes are reported for explicit repair, while corruption in
 //! a complete frame fails closed.
 
+#[cfg(test)]
+mod fault_io;
+
+// The same owned rendezvous used by unit tests, explicitly compiled into a
+// diagnostic primary artifact only. Never enabled by a default dependency.
+#[cfg(all(feature = "crash-test", not(test)))]
+#[doc(hidden)]
+#[path = "fault_io/crash.rs"]
+pub mod crash_test;
+
 mod batch;
 mod database;
 mod error;
+pub mod filesystem;
 mod inspection;
 mod io;
+mod maintenance_limits;
 mod manifest;
 mod memtable;
+mod mutable;
+mod mutable_memory;
+mod reclamation;
+mod recovery_budget;
 mod segment;
 mod snapshot_bundle;
+mod tail_repair;
 mod transaction;
 mod wal;
 mod write_diagnostics;
 
 use std::path::Path;
 
-#[cfg(unix)]
-/// Requests durable directory-entry metadata on platforms that expose a
-/// directory `fsync` operation.
+/// Requests directory durability using an admitted native directory handle.
+/// Windows publication itself uses write-through rename semantics.
 pub fn sync_directory(path: &Path) -> std::io::Result<()> {
-    std::fs::File::open(path)?.sync_all()
+    filesystem::AnchoredPath::open_root(path)?.sync_directory()
 }
 
-#[cfg(not(unix))]
-/// Completes the portable directory-publication boundary on platforms without
-/// a directory `fsync` operation. Windows publication durability is supplied
-/// by [`publish_rename`]'s write-through rename instead.
-pub fn sync_directory(_path: &Path) -> std::io::Result<()> {
-    Ok(())
-}
-
-#[cfg(unix)]
-/// Atomically publishes a completed temporary file or directory and requests
-/// durable parent-directory metadata where the platform supports it.
-pub fn publish_rename(directory: &Path, temporary: &Path, target: &Path) -> std::io::Result<()> {
-    std::fs::rename(temporary, target)?;
-    sync_directory(directory)
-}
-
-#[cfg(windows)]
-/// Atomically replaces a target using write-through Windows rename semantics.
+/// Standalone path entry point. Installed owners pass retained capabilities
+/// directly; this function establishes authority for explicit utility inputs.
 pub fn publish_rename(_directory: &Path, temporary: &Path, target: &Path) -> std::io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
-    };
-
-    let temporary = temporary
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<_>>();
-    let target = target
-        .as_os_str()
-        .encode_wide()
-        .chain(Some(0))
-        .collect::<Vec<_>>();
-    let moved = unsafe {
-        MoveFileExW(
-            temporary.as_ptr(),
-            target.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if moved == 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    Ok(())
+    filesystem::AnchoredPath::from_path(temporary)?
+        .rename_to(&filesystem::AnchoredPath::from_path(target)?)
 }
 
-#[cfg(not(any(unix, windows)))]
-/// Publishes a completed temporary path on other supported platforms.
-pub fn publish_rename(_directory: &Path, temporary: &Path, target: &Path) -> std::io::Result<()> {
-    std::fs::rename(temporary, target)
-}
-
-pub use batch::{Mutation, WriteBatch, BATCH_FORMAT_VERSION};
+pub use batch::{Mutation, WriteBatch, WriteBatchResource, WriteBatchSize, BATCH_FORMAT_VERSION};
 pub use database::{
     CompactionBoundary, CompactionOutcome, CompactionPolicy, Database, DatabaseOptions,
     FailureMode, FlushBoundary, GarbageCollectionReport, MaintenancePolicy, MaintenanceStats,
@@ -91,10 +61,15 @@ pub use database::{
 pub use error::{Error, Result};
 pub use inspection::{DatabaseInspection, InspectionFile, ReadOnlyDatabase};
 pub use io::{SegmentIoMode, SegmentIoPolicy, SegmentIoStats, DEFAULT_SEGMENT_IO_REQUEST_BYTES};
+pub use maintenance_limits::{CompactionLimits, MaintenanceResource};
 pub use manifest::{
     Checkpoint, CurrentPointer, Manifest, ManifestStore, SegmentDescriptor, MANIFEST_FORMAT_VERSION,
 };
 pub use memtable::{Memtable, MemtableProfile, VersionedValue};
+pub use mutable::{MutableLimits, MutableResource};
+pub use mutable_memory::{MutableMemory, MutableMemoryStats, MutableRetentionLimits};
+pub use reclamation::{ReclamationLimits, ReclamationResource};
+pub use recovery_budget::{RecoveryLimits, RecoveryResource};
 #[cfg(feature = "physical-policy-lab")]
 pub use segment::{
     run_physical_policy_trial, CachePolicyObservation, CandidateDecision, CodecObservation,
@@ -103,26 +78,31 @@ pub use segment::{
     PHYSICAL_POLICY_EVIDENCE_VERSION,
 };
 pub use segment::{
-    PageCachePolicy, PageCacheStats, ProjectedReadBatch, ProjectedReadBudget,
-    ProjectedReadEvidence, ProjectedReadOutcome, ProjectedReadProjection, ProjectedReadRange,
-    ProjectedReadRequest, ProjectedReadResource, ProjectedReadStream, Segment,
-    SegmentCompressionPolicy, SegmentOpenEvidence, SegmentRowGroupBudget, COMPRESSION_BASIS_POINTS,
+    PageCachePolicy, PageCacheStats, ProjectedOutputMemory, ProjectedOutputStats,
+    ProjectedReadBatch, ProjectedReadBudget, ProjectedReadEvidence, ProjectedReadOutcome,
+    ProjectedReadProjection, ProjectedReadRange, ProjectedReadRequest, ProjectedReadResource,
+    ProjectedReadStream, Segment, SegmentCompressionPolicy, SegmentOpenEvidence,
+    SegmentRowGroupBudget, SourcePageMemory, SourcePageStats, COMPRESSION_BASIS_POINTS,
     DEFAULT_COMPRESSION_MAXIMUM_PAGE_LOGICAL_BYTES,
     DEFAULT_COMPRESSION_MINIMUM_SAVINGS_BASIS_POINTS, DEFAULT_MAX_ACTIVE_READ_VIEWS,
     DEFAULT_MAX_BATCH_ALLOCATED_BYTES, DEFAULT_MAX_BATCH_ROWS, DEFAULT_MAX_OUTPUT_BUFFER_BYTES,
     DEFAULT_MAX_OUTPUT_ROWS, DEFAULT_MAX_PAGE_LOGICAL_BYTES, DEFAULT_MAX_PAGE_REQUESTS,
     DEFAULT_MAX_PINNED_READ_BYTES, DEFAULT_MAX_PROJECTED_READ_RANGES,
     DEFAULT_MAX_PROJECTED_READ_RUNS, DEFAULT_MAX_VERSIONS_EXAMINED, DEFAULT_PAGE_CACHE_BYTES,
-    DEFAULT_PAGE_CACHE_PROTECTED_CAPACITY_BASIS_POINTS, DEFAULT_ROW_GROUP_MAX_ROWS,
-    DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY,
-    PROJECTED_READ_CONTRACT_VERSION, SEGMENT_FORMAT_VERSION, SEGMENT_KEY_CODEC_DIGEST,
-    SEGMENT_OPEN_EVIDENCE_VERSION, SEGMENT_PAGE_FORMAT_DIGEST, SEGMENT_SCHEMA_DIGEST,
+    DEFAULT_PAGE_CACHE_PROTECTED_CAPACITY_BASIS_POINTS, DEFAULT_PROJECTED_OUTPUT_BYTES,
+    DEFAULT_ROW_GROUP_MAX_ROWS, DEFAULT_ROW_GROUP_TARGET_BYTES, DEFAULT_SEGMENT_COMPRESSION_POLICY,
+    DEFAULT_SOURCE_PAGE_BYTES, PROJECTED_READ_CONTRACT_VERSION, SEGMENT_FORMAT_VERSION,
+    SEGMENT_KEY_CODEC_DIGEST, SEGMENT_OPEN_EVIDENCE_VERSION, SEGMENT_PAGE_FORMAT_DIGEST,
+    SEGMENT_SCHEMA_DIGEST,
 };
 pub use snapshot_bundle::{
     SnapshotBundle, SnapshotBundleFile, SnapshotExportBoundary, SnapshotSegment,
     SNAPSHOT_BUNDLE_FORMAT_VERSION, SNAPSHOT_BUNDLE_MAX_BYTES,
 };
-pub use transaction::{Transaction, TransactionCommit, TransactionRollback};
+pub use tail_repair::{TailRepair, TailRepairPlan, TailRepairReceipt};
+pub use transaction::{
+    Transaction, TransactionCommit, TransactionLimits, TransactionResource, TransactionRollback,
+};
 pub use wal::{
     recover, recover_from, repair_torn_tail, AppendReceipt, Durability, RecoveredBatch, Recovery,
     WalBatch, WalWriter, WAL_FORMAT_VERSION, WAL_MAX_PAYLOAD_BYTES,
@@ -150,7 +130,10 @@ mod durable_fs_tests {
         let temporary_file = root.path().join("file.pending");
         let target_file = root.path().join("file.ready");
         std::fs::write(&temporary_file, b"ready").unwrap();
-        std::fs::File::open(&temporary_file)
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&temporary_file)
             .unwrap()
             .sync_all()
             .unwrap();

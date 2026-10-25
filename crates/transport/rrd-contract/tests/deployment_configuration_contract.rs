@@ -1,8 +1,8 @@
 use rrd_contract::{
-    estate_configuration_sha256, CanonicalId, DeploymentForm, DeploymentProfile,
+    estate_configuration_sha256, CanonicalId, ClockPolicy, DeploymentForm, DeploymentProfile,
     EndpointPresentation, EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity,
     QueryBudget, ReasoningLimits, RecallLimits, StorageProfileKind,
-    ESTATE_CONFIGURATION_FORMAT_VERSION,
+    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS,
 };
 
 fn identity() -> InstalledEstateIdentity {
@@ -16,6 +16,10 @@ fn identity() -> InstalledEstateIdentity {
 fn input() -> EstateConfigurationInput {
     EstateConfigurationInput {
         format_version: ESTATE_CONFIGURATION_FORMAT_VERSION,
+        storage: rrd_contract::StorageLimits::default(),
+        clock: ClockPolicy {
+            maximum_rollback_ms: 0,
+        },
         reasoning: ReasoningLimits {
             max_run_elapsed_ms: 900_000,
             max_steps: 256,
@@ -68,6 +72,70 @@ fn configuration_rejects_invalid_limits_and_digest_drift() {
 }
 
 #[test]
+fn read_retention_ceiling_is_positive_bounded_and_sealed() {
+    let baseline = EstateConfiguration::from_input(1, input()).unwrap();
+    for (views, bytes) in [(0, 1), (65_537, 1), (1, 0), (1, (1 << 40) + 1)] {
+        let mut invalid = input();
+        invalid.storage.native_transactions = views;
+        invalid.storage.native_transaction_bytes = bytes;
+        assert!(EstateConfiguration::from_input(1, invalid).is_err());
+        let mut invalid = input();
+        invalid.storage.active_read_views = views;
+        invalid.storage.pinned_read_bytes = bytes;
+        assert!(EstateConfiguration::from_input(1, invalid).is_err());
+    }
+    for field in 0..4 {
+        let mut changed = input();
+        if field == 0 {
+            changed.storage.active_read_views += 1;
+        } else if field == 1 {
+            changed.storage.native_transactions += 1;
+        } else if field == 2 {
+            changed.storage.native_transaction_bytes += 1;
+        } else {
+            changed.storage.pinned_read_bytes += 1;
+        }
+        let changed = EstateConfiguration::from_input(1, changed).unwrap();
+        assert_ne!(baseline.configuration_sha256, changed.configuration_sha256);
+        let mut tampered = baseline.clone();
+        tampered.storage = changed.storage;
+        assert!(tampered.validate().is_err());
+    }
+}
+
+#[test]
+fn recovery_reserve_is_positive_bounded_and_sealed() {
+    let baseline = EstateConfiguration::from_input(1, input()).unwrap();
+    for reserve in [0, (1 << 40) + 1] {
+        let mut invalid = input();
+        invalid.storage.recovery_reserve_bytes = reserve;
+        assert!(EstateConfiguration::from_input(1, invalid).is_err());
+    }
+    let mut changed = input();
+    changed.storage.recovery_reserve_bytes += 1;
+    let changed = EstateConfiguration::from_input(1, changed).unwrap();
+    assert_ne!(baseline.configuration_sha256, changed.configuration_sha256);
+    let mut tampered = baseline;
+    tampered.storage.recovery_reserve_bytes += 1;
+    assert!(tampered.validate().is_err());
+}
+
+#[test]
+fn clock_rollback_policy_is_strict_bounded_and_digest_bound() {
+    let strict = EstateConfiguration::from_input(1, input()).unwrap();
+    assert_eq!(strict.clock.maximum_rollback_ms, 0);
+
+    let mut maximum = input();
+    maximum.clock.maximum_rollback_ms = MAX_CLOCK_ROLLBACK_MS;
+    let maximum = EstateConfiguration::from_input(1, maximum).unwrap();
+    assert_ne!(maximum.configuration_sha256, strict.configuration_sha256);
+
+    let mut unbounded = input();
+    unbounded.clock.maximum_rollback_ms = MAX_CLOCK_ROLLBACK_MS + 1;
+    assert!(EstateConfiguration::from_input(1, unbounded).is_err());
+}
+
+#[test]
 fn deployment_axes_reject_inconsistent_combinations() {
     let embedded_network = DeploymentProfile {
         contract_version: 1,
@@ -108,4 +176,21 @@ fn strict_contract_rejects_unknown_and_legacy_scalar_fields() {
         "instance_id": "rrflow-local"
     });
     assert!(serde_json::from_value::<InstalledEstateIdentity>(identity).is_err());
+}
+
+#[test]
+fn checkpoint_quota_is_finite_restart_configuration_and_digest_bound() {
+    for entries in [0, 65_537, u64::MAX] {
+        let mut config = input();
+        config.storage.checkpoint_entries = entries;
+        assert!(EstateConfiguration::from_input(1, config).is_err());
+    }
+    let baseline = EstateConfiguration::from_input(1, input()).unwrap();
+    let mut changed = input();
+    changed.storage.checkpoint_entries = 7;
+    let changed = EstateConfiguration::from_input(1, changed).unwrap();
+    assert_ne!(baseline.configuration_sha256, changed.configuration_sha256);
+    let mut tampered = baseline;
+    tampered.storage.checkpoint_entries = 7;
+    assert!(tampered.validate().is_err());
 }

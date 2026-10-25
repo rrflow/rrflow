@@ -1,5 +1,7 @@
 use super::security::AuditEvent;
+use super::transaction_admission::InvocationAdmission;
 use super::*;
+use std::sync::Arc;
 
 /// Canonical operation identity presented by every embedded or transported
 /// RRD call. Adapters select an operation; only the engine maps it to policy.
@@ -45,6 +47,10 @@ pub enum RrdOperation {
     FunctionCatalogueWrite,
     FunctionExecute,
     DiagnosticsRead,
+    FlightLaunch,
+    FlightRead,
+    TaskWrite,
+    TaskRead,
     MemoryContextRead,
     ReasoningRead,
     ReasoningWrite,
@@ -76,6 +82,8 @@ impl RrdOperation {
                 | Self::VectorCollectionDelete
                 | Self::VectorPayloadIndexEnsure
                 | Self::VectorPayloadIndexDelete
+                | Self::FlightLaunch
+                | Self::TaskWrite
                 | Self::ReasoningWrite
                 | Self::KnowledgeTreeWrite
         )
@@ -123,6 +131,10 @@ impl RrdOperation {
             Self::FunctionCatalogueWrite => SecurityAction::FunctionCatalogueWrite,
             Self::FunctionExecute => SecurityAction::FunctionExecute,
             Self::DiagnosticsRead => SecurityAction::DiagnosticsRead,
+            Self::FlightLaunch => SecurityAction::FlightLaunch,
+            Self::FlightRead => SecurityAction::FlightRead,
+            Self::TaskWrite => SecurityAction::TaskWrite,
+            Self::TaskRead => SecurityAction::TaskRead,
             Self::MemoryContextRead => SecurityAction::MemoryContextRead,
             Self::ReasoningRead => SecurityAction::ReasoningRead,
             Self::ReasoningWrite => SecurityAction::ReasoningWrite,
@@ -163,6 +175,14 @@ pub struct AuthorizedInvocation {
     invocation: Invocation,
     operation: RrdOperation,
     principal_id: Option<CanonicalId>,
+    // Pointer identity distinguishes admissions even when callers reuse every
+    // public coordinate. Cloning the handle preserves its completion authority.
+    reservation: Arc<InvocationAdmission>,
+}
+
+pub(in crate::engine) struct ActiveInvocation {
+    owner: std::thread::ThreadId,
+    reservation: Arc<InvocationAdmission>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,6 +192,14 @@ pub struct InvocationCompletion {
     pub response_sha256: String,
 }
 
+impl AuthorizedInvocation {
+    /// Deny this invocation while waiting to acquire the transaction gate.
+    /// Already admitted effects must still be reconciled; this is not rollback.
+    pub fn cancel_pending(&self) {
+        self.reservation.cancel();
+    }
+}
+
 impl RrdEngine {
     pub fn begin_invocation(
         &self,
@@ -179,6 +207,7 @@ impl RrdEngine {
         operation: RrdOperation,
         credential: InvocationCredential<'_>,
     ) -> Result<AuthorizedInvocation> {
+        let admission_started = std::time::Instant::now();
         self.validate_invocation(&invocation, operation)?;
         let repository =
             rrd_security::SecurityRepository::new(&self.storage, self.instance.clone());
@@ -273,19 +302,40 @@ impl RrdEngine {
             digest::sha256_hex(b"rrd-audit-completion-pending"),
         )?;
         let coordinates = invocation_coordinates(&invocation);
-        if self
+        let mut active = self
             .active_invocations
             .lock()
-            .expect("active invocation mutex")
-            .insert(coordinates, std::thread::current().id())
-            .is_some()
-        {
-            return Err(ServiceError::IdempotencyConflict);
-        }
+            .expect("active invocation mutex");
+        let std::collections::btree_map::Entry::Vacant(entry) = active.entry(coordinates) else {
+            drop(active);
+            let error = ServiceError::InvocationInProgress;
+            self.append_invocation_audit(
+                &invocation,
+                operation,
+                principal_id,
+                AuditPhase::Completed,
+                AuditDecision::Failed,
+                409,
+                digest::sha256_hex(error.to_string().as_bytes()),
+            )?;
+            return Err(error);
+        };
+        let reservation = Arc::new(InvocationAdmission::new(
+            admission_started,
+            invocation
+                .context
+                .deadline_unix_ms
+                .map(|deadline| deadline.saturating_sub(invocation.observed_at_unix_ms)),
+        ));
+        entry.insert(ActiveInvocation {
+            owner: std::thread::current().id(),
+            reservation: Arc::clone(&reservation),
+        });
         Ok(AuthorizedInvocation {
             invocation,
             operation,
             principal_id,
+            reservation,
         })
     }
 
@@ -296,11 +346,13 @@ impl RrdEngine {
     ) -> Result<()> {
         validate_sha256(&completion.response_sha256)?;
         let coordinates = invocation_coordinates(&authorized.invocation);
-        if !self
+        let mut active = self
             .active_invocations
             .lock()
-            .expect("active invocation mutex")
-            .contains_key(&coordinates)
+            .expect("active invocation mutex");
+        if !active
+            .get(&coordinates)
+            .is_some_and(|entry| Arc::ptr_eq(&entry.reservation, &authorized.reservation))
         {
             return Err(ServiceError::IdempotencyConflict);
         }
@@ -313,10 +365,7 @@ impl RrdEngine {
             completion.status_code,
             completion.response_sha256,
         )?;
-        self.active_invocations
-            .lock()
-            .expect("active invocation mutex")
-            .remove(&coordinates);
+        active.remove(&coordinates);
         Ok(())
     }
 
@@ -438,6 +487,20 @@ impl RrdEngine {
         })
     }
 
+    pub(super) fn invocation_admission(
+        &self,
+        request_id: &str,
+        operation_id: &str,
+    ) -> Result<Option<Arc<InvocationAdmission>>> {
+        let active = self
+            .active_invocations
+            .lock()
+            .map_err(|_| ServiceError::Storage("active invocation mutex poisoned".into()))?;
+        Ok(active
+            .get(&(request_id.into(), operation_id.into()))
+            .map(|entry| Arc::clone(&entry.reservation)))
+    }
+
     pub(in crate::engine) fn has_active_invocation(
         &self,
         request_id: &str,
@@ -447,9 +510,9 @@ impl RrdEngine {
             .lock()
             .expect("active invocation mutex")
             .iter()
-            .any(|(coordinates, owner)| {
+            .any(|(coordinates, active)| {
                 coordinates == &(request_id.into(), operation_id.into())
-                    || owner == &std::thread::current().id()
+                    || active.owner == std::thread::current().id()
             })
     }
 

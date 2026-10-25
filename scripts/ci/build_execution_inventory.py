@@ -15,9 +15,6 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "docs" / "roadmap" / "rrflow-1.0-file-plan.jsonl"
 ROADMAP = ROOT / "docs" / "roadmap" / "rrflow-1.0.md"
 ACTIVE_CHANGE_PLAN = "docs/roadmap/rrflow-1.0-active-change.json"
-CONNECTOME_PATH = "connectome"
-CONNECTOME_REPOSITORY = "https://github.com/rrflow/connectome-development.git"
-CONNECTOME_BRANCH = "agent/layman-lenses-wip"
 
 PACKAGE_GATES: dict[str, tuple[str, ...]] = {
     "rrd-core": ("A-07", "C-01", "C-02", "C-03", "H-05", "I-01"),
@@ -735,6 +732,10 @@ GENERATED_PROJECTIONS = {
 }
 
 PLANNED_PATHS: dict[str, tuple[str, ...]] = {
+    "crates/transport/rrd-contract/src/graph_family.rs": ("H-09",),
+    "crates/authority/rrd-engine/src/engine/graph_family.rs": ("H-09",),
+    "crates/transport/rrd-contract/src/project_link.rs": ("H-10",),
+    "crates/authority/rrd-engine/src/engine/project_link.rs": ("H-10",),
     "scripts/ci/check_change_plan.py": ("J-01", "J-02"),
     "scripts/ci/test_change_plan.py": ("J-01", "J-02"),
     "crates/persistence/rrd-lsm/src/lib.rs": ("C-02", "C-07", "D-01"),
@@ -760,7 +761,7 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
         "D-01",
         "J-02",
     ),
-    "crates/authority/rrd-engine/assets/install/default-profile-v1.json": (
+    "crates/authority/rrd-engine/assets/install/default-profile-v2.json": (
         "D-01",
         "J-03",
         "J-05",
@@ -1552,11 +1553,9 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
     ),
     "crates/adapters/rrflow-cli/tests/repair_conformance.rs": ("D-11", "J-02"),
     "crates/adapters/rrflow-cli/tests/automation_install_conformance.rs": ("I-06",),
-    "crates/adapters/rrflow-cli/templates/project-v1/manifest.toml": ("D-01",),
-    "crates/adapters/rrflow-cli/templates/project-v1/AGENTS.md": ("D-01",),
-    "crates/adapters/rrflow-cli/templates/project-v1/CLAUDE.md": ("D-01",),
-    "crates/adapters/rrflow-cli/templates/project-v1/GEMINI.md": ("D-01",),
-    "crates/adapters/rrflow-cli/templates/project-v1/.rrflow/config.toml": ("D-01",),
+    "crates/authority/rrd-engine/assets/install/clyffy-profile-v2.json": ("D-01",),
+    "crates/authority/rrd-engine/assets/install/templates/generic-project-v1.md": ("D-01",),
+    "crates/authority/rrd-engine/assets/install/.gitattributes": ("D-01", "J-05"),
     "crates/adapters/rrflow-cli/tests/fixtures/install-empty/.keep": ("D-01",),
     "crates/adapters/rrflow-cli/tests/fixtures/install-existing/README.md": ("D-01",),
     "crates/adapters/rrflow-cli/tests/fixtures/install-existing/AGENTS.md": ("D-01",),
@@ -1618,6 +1617,13 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
         "J-03",
         "J-05",
     ),
+    "docs/reference/client/connectome-implementation-guide.md": (
+        "D-01",
+        "H-04",
+        "H-06",
+        "J-03",
+        "J-05",
+    ),
     "docs/reference/context/README.md": ("KB-05", "KB-08"),
     "docs/reference/context/context-maintenance.md": ("KB-05",),
     "docs/reference/context/retrieval.md": ("KB-05",),
@@ -1637,6 +1643,7 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
     "docs/reference/operations/README.md": ("KB-05", "KB-08"),
     "docs/reference/operations/estate-control.md": ("KB-05",),
     "docs/reference/protocol/README.md": ("KB-05", "KB-08"),
+    "docs/reference/protocol/postgresql.md": ("H-08", "J-02", "J-03", "J-05"),
     "docs/reference/protocol/public-contract.md": ("KB-05",),
     "docs/reference/protocol/server.md": ("KB-05",),
     "docs/reference/protocol/subscriptions.md": ("KB-05",),
@@ -1671,59 +1678,6 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 
-def gitlinks() -> dict[str, str]:
-    """Read pins from the parent index; optional client contents are never inputs."""
-    result = subprocess.run(
-        ["git", "ls-files", "--stage", "-z"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-    )
-    links = {}
-    for encoded in result.stdout.split(b"\0"):
-        if not encoded:
-            continue
-        metadata, path = encoded.decode("utf-8").split("\t", 1)
-        mode, revision, stage = metadata.split()
-        if mode != "160000":
-            continue
-        if path != CONNECTOME_PATH or stage != "0":
-            raise ValueError(f"only the optional connectome gitlink is allowed: {path}")
-        if not re.fullmatch(r"[0-9a-f]{40}", revision) or revision == "0" * 40:
-            raise ValueError(f"connectome gitlink has no exact commit: {revision}")
-        links[path] = revision
-
-    modules = ROOT / ".gitmodules"
-    if not modules.exists():
-        if links:
-            raise ValueError("connectome gitlink requires canonical .gitmodules")
-        return links
-    result = subprocess.run(
-        ["git", "config", "--file", str(modules), "--null", "--list"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-    )
-    entries = [
-        entry.decode("utf-8").split("\n", 1)
-        for entry in result.stdout.split(b"\0")
-        if entry
-    ]
-    declaration = {
-        "submodule.connectome.path": CONNECTOME_PATH,
-        "submodule.connectome.url": CONNECTOME_REPOSITORY,
-        "submodule.connectome.branch": CONNECTOME_BRANCH,
-    }
-    if (
-        len(entries) != len(declaration)
-        or any(len(entry) != 2 for entry in entries)
-        or dict(entries) != declaration
-        or set(links) != {CONNECTOME_PATH}
-    ):
-        raise ValueError(".gitmodules must declare only the canonical connectome repository")
-    return links
-
-
 def git_files() -> list[str]:
     result = subprocess.run(
         [
@@ -1743,6 +1697,27 @@ def git_files() -> list[str]:
     if output_relative not in paths:
         paths.append(output_relative)
     return sorted(paths)
+
+
+def gitlinks() -> dict[str, str]:
+    """Read parent-pinned object IDs, independent of child checkout state."""
+    result = subprocess.run(
+        ["git", "ls-files", "--stage", "-z"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    links = {}
+    for entry in result.stdout.split(b"\0"):
+        if not entry:
+            continue
+        header, path = entry.decode("utf-8").split("\t", 1)
+        mode, revision, stage = header.split()
+        if stage != "0":
+            raise ValueError(f"unmerged index entry: {path}")
+        if mode == "160000":
+            links[path] = revision
+    return links
 
 
 def file_kind(path: str) -> str:
@@ -1776,7 +1751,9 @@ def package_name(path: str) -> str | None:
 
 
 def planned_gates(path: str) -> tuple[str, ...]:
-    if path == ACTIVE_CHANGE_PLAN:
+    if path in {".gitmodules", "connectome"}:
+        gates = ("H-06", "H-07", "J-03")
+    elif path == ACTIVE_CHANGE_PLAN:
         gates = ("J-01", "J-02")
     elif path in FILE_OVERRIDES:
         gates = ("A-07", *FILE_OVERRIDES[path])
@@ -1868,7 +1845,7 @@ def line_count(data: bytes) -> int | None:
     return data.count(b"\n") + (0 if data.endswith(b"\n") else 1)
 
 
-def current_record(path: str) -> dict[str, object]:
+def current_record(path: str, links: dict[str, str]) -> dict[str, object]:
     relative_output = OUTPUT.relative_to(ROOT).as_posix()
     if path == relative_output:
         return {
@@ -1878,6 +1855,21 @@ def current_record(path: str) -> dict[str, object]:
             "coverage": "self-record; content digest and line count intentionally omitted",
             "planned_gates": ["A-06"],
             "action": "regenerate deterministically after repository path or content changes",
+        }
+    if path in links:
+        # Hash the parent Git object identity, never files in the optional child.
+        identity = f"160000 {links[path]}\n".encode("ascii")
+        return {
+            "path": path,
+            "state": "current",
+            "kind": "git-submodule",
+            "git_revision": links[path],
+            "bytes": len(identity),
+            "lines": None,
+            "sha256": hashlib.sha256(identity).hexdigest(),
+            "coverage": "parent gitlink identity only; child source belongs to its separate repository",
+            "planned_gates": list(planned_gates(path)),
+            "action": "pin optional UI source after review; never consume it as engine build or runtime input",
         }
     data = (ROOT / path).read_bytes()
     lines = line_count(data)
@@ -1894,26 +1886,10 @@ def current_record(path: str) -> dict[str, object]:
     }
 
 
-def gitlink_record(path: str, revision: str) -> dict[str, object]:
-    return {
-        "path": path,
-        "state": "current",
-        "kind": "optional-client-gitlink",
-        "repository": CONNECTOME_REPOSITORY,
-        "git_revision": revision,
-        "coverage": "parent gitlink only; client checkout is optional and independently owned",
-        "planned_gates": ["D-01", "H-06"],
-        "action": "pin the separately released public-contract client; never require its source for the engine build, installation, or readiness",
-    }
-
-
 def records() -> list[dict[str, object]]:
-    links = gitlinks()
     current_paths = git_files()
-    result = [
-        gitlink_record(path, links[path]) if path in links else current_record(path)
-        for path in current_paths
-    ]
+    links = gitlinks()
+    result = [current_record(path, links) for path in current_paths]
     current_set = set(current_paths)
     for path, gates in PLANNED_PATHS.items():
         if path in current_set:
@@ -1934,7 +1910,6 @@ def records() -> list[dict[str, object]]:
 
 
 def validate(records_to_check: list[dict[str, object]]) -> None:
-    links = gitlinks()
     roadmap = ROADMAP.read_text(encoding="utf-8")
     roadmap_ids = set(
         re.findall(r"(?m)^\| \[[ x]\] \| ((?:[A-J]-\d{2})|(?:KB-\d{2})) \|", roadmap)
@@ -1989,10 +1964,7 @@ def validate(records_to_check: list[dict[str, object]]) -> None:
             raise ValueError(f"execution-plan path {path} has unknown gates: {unknown}")
         state = record["state"]
         if state == "current":
-            if path in links:
-                if record != gitlink_record(path, links[path]):
-                    raise ValueError(f"optional client record does not match the gitlink: {path}")
-            elif not {"bytes", "sha256", "coverage"}.issubset(record):
+            if not {"bytes", "sha256", "coverage"}.issubset(record):
                 raise ValueError(
                     f"current path lacks complete baseline evidence: {path}"
                 )

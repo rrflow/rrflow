@@ -10,8 +10,11 @@ independently.
 
 ## Observed deficiency
 
+The following observation describes the 2026-10-17 reopening; repair evidence
+appears below.
+
 C-04's accepted evidence records that vector-search admission has no
-causal-log source. Two vector catalogues are still rebuilt by replaying the
+causal-log source. Two vector catalogues were rebuilt by replaying the
 scope's whole runtime change log from cursor 0, in
 `crates/authority/rrd-engine/src/runtime/vector_catalog.rs`:
 
@@ -20,7 +23,7 @@ scope's whole runtime change log from cursor 0, in
 - `quantization_artifact_catalogue_at_read` pages `read_changes` from cursor 0
   at a freshly captured stamp, not the request's.
 
-`reopen_vector_runtime_metadata` runs both inside every vector search
+`reopen_vector_runtime_metadata` ran both inside every vector search
 (`crates/authority/rrd-engine/src/engine/vector/search.rs`). HNSW build,
 artifact publication preflight, collection deletion, and payload-index
 deletion rebuild both catalogues; quantization build, list, activate, and
@@ -33,11 +36,13 @@ C-04's source-closure test
 (`crates/authority/rrd-engine/tests/direct_read_source_closure.rs`) did not
 search for `changes_since(` or `snapshot_changes(`, and it allowlisted the
 per-search `read_changes(` call as an explicit quantization
-projection-catalogue rebuild. It now enumerates every public runtime change-page reader
-and lists these three replays as known deficiencies of this record; each is
-tolerated only while this record is not closed.
+projection-catalogue rebuild. The correction enumerated every public runtime
+change-page reader and listed these three replays as known deficiencies; each
+was tolerated only while this record was not closed.
 
 ## Impact
+
+At reopening:
 
 Vector search cost grows with the scope's whole history, not with the request.
 On the Connectome demonstration estate (270 records, 986 relations, 270
@@ -46,6 +51,43 @@ candidates come from the request's `ReadStamp` while both catalogues come from
 the current head, so the two can differ when a publication commits in
 between; no test covers that interleaving. The accepted C-04 claim overstated
 closure, so C-04 is reopened.
+
+## Repair evidence (2026-10-20)
+
+[PR 39](https://github.com/rrflow/rrflow-development/pull/39) replaces both
+vector catalogue log scans with authenticated typed version reads. Search
+reads candidates, the three catalogue record types, and exact referenced
+object identities in one storage transaction at the request's `ReadStamp`
+and under its `max_storage_keys`. Existing atomic publication, canonical JSON,
+revision-gap and quantization lifecycle checks still validate the result.
+Other catalogue inspection/publication helpers use direct reads with an
+explicit 100,000-key ceiling; they do not obtain an unbounded history allowance.
+
+The retained-stamp test first failed by selecting generation 2 for a request
+bound to generation 1. The repair preserves the expected generation through
+publication and close/reopen, and similarly preserves ready/active/retired
+quantization state. A 1,024-unrelated-record fixture keeps semantic reads at
+four keys and 5,467 decoded bytes. Total reads increase from 28 to 65 keys
+because accumulator authentication grows; a retained read examines 37 keys.
+These numbers are fixture evidence, not a general constant-time claim.
+The [repair journal](../../evidence/change-journals/gate-c/c-04e-stamped-vector-catalogues.md)
+records exact commands and limitations.
+
+Review also verified that `RuntimeReadBudgetExceeded` was converted to an
+internal service error. A request-level regression failed with `Internal`
+instead of `ResourceExhausted`. The existing configuration-limit category now
+carries that typed storage denial without an automatic retry, while ordinary
+storage faults remain internal. The
+[budget-signal correction receipt](../../evidence/change-journals/gate-c/c-04e-vector-budget-signal-correction.md)
+records the additional proof and final candidate requirement.
+
+The two repaired source-closure exceptions are removed. The independent
+`rrd-maintenance` log replay remains the one known exception, so POAM-028
+and C-04 remain open. Catalogue generation/lifecycle history is still read
+within its typed ranges; persistent incremental vector serving, large-estate
+resource qualification and current-head generation lookup remain E-04 work.
+This package does not implement codebase inventory or establish that a
+stored source digest still matches an externally modified working tree.
 
 ## Owning gates
 

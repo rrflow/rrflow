@@ -1,0 +1,238 @@
+# C-07g: bounded logical backup checkpoints
+
+**Status:** active implementation evidence; installed sustained acceptance pending
+**Coordinate:** `rrflow://rrflow-instance/data/evidence/c-07g-backup-checkpoint-cost`
+**Owner:** OBJ-02 / C-07g / J-04 / POAM-035 / PR117
+
+## Brief and measured trigger
+
+[PR117](https://github.com/rrflow/rrflow-development/pull/117) was extended before
+editing this measured backup cost. Starting revision:
+`7f331491dfa35d8e6bbae9aa7b80b790c5b6726b`. This continues the same storage-cost
+repair; it does not add a planning authority or alter version 1.0.0.
+
+The preceding digest candidate `d512b932aabe50c71e7efcba270212e7f16fe1fe`
+built optimized Linux in 247.5 seconds. Ordinary executable SHA-256:
+`2e209292deb157d88b72993d0fae8019c5b59276af4fde161e40909f8eb81867`;
+harness SHA-256:
+`6092ffa26d513bca5dfb196b3fc255451a133b603a895f9bf44bdb2b61f66547`.
+Its 1,000-record / 5,000-edge / 1,000-vector (384-dimensional) characterization
+used four clients, 5 RPS, seed 7, four CPUs and a 2-GiB aggregate cgroup on a
+32-GiB WSL host. It is not the isolated 8-GiB Desktop qualification profile.
+
+The run completed, including final readback/restart and confirmed cleanup, but
+failed its operating point: 577 acknowledged, 23 rejected (22 driver-slot,
+one storage conflict), 24 latency overruns, zero unresolved effects and zero
+missing metrics. Launcher elapsed 276.52 seconds includes a validator rebuild;
+do not compare it as engine runtime. Backup creation took 11.892 seconds for
+1,014 actions, plus 0.167 seconds verification; the segment barrier delayed
+next dispatch up to 4.935 seconds. Default export synchronizes the archive and
+publishes a durable receipt for every action. This observation motivates the
+repair without asserting it explains every failure or all growth costs.
+
+Native evidence remains at
+`/home/devcontainers/rrflow-c07-native-79663cdd/digest-5rps-growth-1000-d512b932`;
+small copies and derived timing analysis are retained operator-locally under
+`target/c07-pr117-native-evidence`. Exit zero meant valid collected evidence,
+not passing capacity. A subsequent 10,000-record characterization acknowledged
+all 10,000 writes and independently verified 4,352 records before an explicit
+operator interruption at 279.15 seconds to avoid spending another long cycle
+on the older candidate. It is incomplete, not a timeout failure or passing
+result. Its `operator-interruption.json` records exact launcher identity and
+verified removal of the owned cgroup; raw launch/progress receipts remain
+unchanged. No 24-hour soak started.
+
+## Canonical boundary and replacement map
+
+`crates/persistence/rrd-store/src/archive/export.rs` owns this repair. The
+public default export and explicit with-progress entry point call the same
+private implementation with an explicit internal checkpoint policy. The default
+used by application backup checkpoints at 64 actions or 1 MiB accumulated
+payload, whichever is reached first. One admitted action may cross the byte
+threshold; its existing MAX_ACTION_BYTES limit still applies. Pending counters
+retain no extra action payloads. The final partial batch is checkpointed before
+the existing footer sync and atomic publication.
+
+The explicit with-progress API retains every per-action durable callback and
+its interruption semantics. No archive format, digest, receipt schema, source
+cut, restore policy, callback name, application-backup coverage, normal
+transaction acknowledgement, or transaction coordinator changes. Only private
+export checkpoint frequency changes; an unacknowledged incomplete archive is
+never treated as a published backup. Complete prefixes still reconcile with
+older receipts; invalid/torn bytes remain fail-closed rather than acquiring a
+new repair lane.
+
+Traceability: the previous per-action writer sync/receipt sequence becomes one
+local checkpoint closure, called by the same export implementation. Existing
+source scans, receipt validation, prefix comparison, source-advancement denial,
+footer sync and rename remain in place. Existing resilience tests are retained;
+new boundary tests exercise multiple batches and byte-triggered checkpoints.
+Stop on identity/callback drift, lost source validation, publication before
+sync, or extra unbounded retained state.
+
+Files read: README/AGENTS and C-07/POAM035/authoring routine from the
+parent package; export implementation, format writer/replay state and prefix
+reader, receipt validation and publication, logical_archive_resilience tests,
+rrd-store manifest; application-backup snapshot/export path and engine backup
+entry points; installed workload, backup lane and segment scheduling. Research
+decision: this is a code-grounded correction of per-action persistence cost,
+not an upstream algorithm adaptation or a claim of novel reasoning. Existing
+progress receipts and native timings provide attribution; no runtime telemetry
+side channel is added.
+
+## Verification
+
+- Existing first oracle: `cargo test --locked -p rrd-store --test logical_archive_resilience --jobs 6`
+  passed all 15 cases in 3.45 seconds, including all canonical runtime families,
+  audit round-trip, interrupted export/restore and source-advancement denial.
+- `cargo test --locked -p rrd-store --lib archive::export::checkpoint_tests --jobs 6`
+  passed three cases; the manual measurement is ignored. A stale unused test
+  import produced one warning, was removed, and subsequent strict lint passed.
+  Mixed 130-action history checkpoints at 64/128/130, preserves per-action API
+  callbacks, restores claims/runtime history and matches archive bytes. Six
+  injected interruptions cover archive-sync and receipt-publication boundaries,
+  including the tail. Five 400,000-byte payloads prove byte-trigger/tail behavior.
+- `cargo test --locked -p rrd-store --jobs 6`: 235 passed, zero failed, one
+  deliberately ignored manual measurement.
+- `cargo clippy --locked -p rrd-store --all-targets --jobs 6 -- -D warnings`: passed.
+- `cargo test --locked -p rrflow-cli --test installed_reopen --jobs 6 -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture`:
+  passed in 8.52 seconds. Actual records/relations/vectors, backup under writes,
+  retained-reader drain, termination/reopen and replay remain verified.
+  Log: operator-local `target/c07-backup-validation.log`.
+- `cargo test --locked -p rrd-store --lib archive::export::checkpoint_tests::bounded_checkpoint_measurement --jobs 6 -- --exact --ignored --nocapture`:
+  passed, identical inventory/digest. Windows native debug build, 512 actions:
+  per-action 512 checkpoints / 1,004,512,000 ns; bounded eight checkpoints /
+  142,243,500 ns. Source creation is outside the timer. This single development
+  measurement is not a release SLA or full capacity qualification.
+  Log: `target/c07-backup-measurement.log`.
+
+## Change-authoring checklist and limits
+
+- [x] Bind outcome, exact source boundary, first oracle, risk and stops in PR before edits.
+- [x] Retain failed operating points and incomplete growth characterization under original identities.
+- [x] Preserve one implementation, transaction authority and public archive/callback contracts.
+- [x] Validate independent round-trip bytes and both durable interruption boundaries.
+- [x] Run owning suite, strict lint and installed flow without changing acceptance limits.
+- [ ] Complete new candidate CI and native sustained comparison before acceptance claims.
+
+Changed paths: export implementation/tests, this journal, existing C-07 and
+POAM035 links, generated navigation and inventory. C-07/POAM035 stay open.
+Full profile matrix, 24-hour soak, query-growth optimization, comparative
+reasoning quality/token savings and accounting UI are not proved by this repair.
+
+Final authored diff review, formatting, documentation policy, generated navigation, 1,594-record execution inventory and staged whitespace checks passed. Native sustained comparison and candidate CI remain pending at commit.
+
+
+### Candidate CI boundary finding and correction
+
+Candidate 5481dc3b failed engine-authority and optional-engine CI in
+`direct_read_source_closure`: two direct `changes_since` calls in the new
+round-trip unit test increased the protected source allowlist count. Production
+export reads were unchanged. Preserve the allowlist and replace those test
+reads with a full restored-archive re-export/inventory/byte comparison, retaining
+independent claim comparison and existing canonical-family integration tests.
+No production read path or allowlist was widened to pass CI.
+
+`cargo test --locked -p rrd-engine --test direct_read_source_closure --jobs 6`
+passed. The three checkpoint tests passed again (one manual measurement ignored),
+and strict rrd-store all-target lint passed. Log:
+`target/c07-backup-source-closure.log`. This test-only correction does not alter
+the running 5481dc3b native binary; that run retains its original source identity.
+
+
+### Optimized installed comparison, including retained failure
+
+Exact source 5481dc3b built optimized Linux in 299.3 seconds. Ordinary binary
+SHA-256 `5fd92ca949d17bfb71e94134e723f3d89b55fffe0ed2ab2aa485bda14fb29b44`,
+harness `8a0674e085db96f732f7d26ae0014d065d99387e37f30cf3f038af006a465131`.
+The same frozen 1k/4-client/5-RPS characterization completed with final readback,
+restart and owned cleanup. Launcher elapsed was 447.55 seconds, including
+preparation; it is not evidence of whole-engine speedup.
+
+Backup creation was 1,939.776 ms, verification 195.285 ms and its offered
+segment finished in 10,030.450 ms. The earlier 11,891.742-ms creation and
+4,934.522-ms following dispatch delay were removed from that measured window.
+All 300 warmup/measured/burst requests acknowledged, with zero latency overruns,
+unresolved effects or missing metrics in those phases. This is an observed
+installed backup improvement, not overall acceptance.
+
+The later short endurance phase still failed: 241 acknowledged and 59 rejected
+(55 driver-slot, four storage-conflict), with 40 latency overruns. Across the
+run: 541 acknowledged, 59 rejected, zero unresolved and no missing metrics.
+Late segment maxima reached 2,240.462-ms response and 3,020.225-ms independent
+verification, producing late dispatch and exhausted client slots. Native
+counters recorded one automatic flush and compaction, no failed maintenance,
+and zero final maintenance debt. These are attribution leads; no cause is
+claimed solely from correlation. Full qualification and actual 24-hour soak
+remain blocked. Do not run a higher-rate qualification or alter thresholds to
+hide this failure.
+
+Raw receipts remain at
+`/home/devcontainers/rrflow-c07-native-79663cdd/backup-5rps-growth-1000-5481dc3b`.
+Small copies and derived timing analysis: `target/c07-pr117-backup-evidence`.
+The frozen candidate is clean; the subsequent source-closure test correction
+is separate and changes no runtime behavior. Its CI must still pass before
+landing. Next attribution belongs to existing native read/maintenance and
+scheduler paths; the query planner already has identity/adjacency access, so
+this evidence does not justify creating a parallel index or read authority.
+
+
+### Configured cache characterization
+
+A separate clean-source 5481dc3b characterization changes only the installed
+page-cache configuration from 4 MiB to 64 MiB, plus the required distinct
+profile/path/digest identity. It retains the same binary, 1,000-record corpus,
+5-RPS/four-client/seed-7 schedule, four CPUs, 2-GiB aggregate cgroup and
+500-ms scheduled-response limit. The shipped default remains unchanged.
+
+`wsl -d Ubuntu -- python3 /mnt/d/localdev/devlabs/rrflow/target/run_c07_cache64_5rps.py 1000`
+completed in 184.89 seconds including preparation. All 600 requests were
+acknowledged; every phase had zero failures, unresolved effects, latency
+exceedances and missing metrics. Independent corpus/readback, two forced
+reopens, backup under writes and owned cleanup completed. Maximum scheduled
+response was 468.630 ms and maximum sampled engine RSS was 380,260,352 bytes.
+This is a short characterization, not the Desktop profile or a 24-hour soak;
+`qualification_passed` correctly remains false.
+
+Final native counters show one successful automatic flush and compaction,
+zero failed maintenance and zero final compaction debt. Cache misses were
+13,257, evictions 7,269 and segment I/O 75,374,246 bytes. The failed 4-MiB run
+recorded 34,265 misses, 33,854 evictions and 154,823,641 segment-read bytes.
+The outcomes differ, so these totals are diagnostic comparisons rather than
+normalized per-request benchmark claims. Native cache residence remained
+67,060,163 bytes under its 67,108,864-byte cap. Configuration sensitivity is
+observed; causal attribution and growth qualification remain open. Do not
+increase acceptance limits or change the shipped default from this one point.
+
+Campaign digest:
+`649e492b66dcf38d7fc5f3ae756d1c7663ed0ef2c53e22859980bc4579dd0dce`.
+Raw receipts remain under
+`/home/devcontainers/rrflow-c07-native-79663cdd/cache64-5rps-growth-1000-5481dc3b`;
+small copies, frozen configuration and derived resource/timing summaries are
+retained at operator-local `target/c07-pr117-cache-evidence/1000`.
+A separately frozen 10,000-record characterization completed with the failure
+recorded below. No actual 24-hour soak is running.
+
+
+The 10k run acknowledged all corpus writes, then exposed slow independent
+readback. A bounded 10-second, 49-Hz userspace CPU profile attached only to the
+engine whose executable hash and project path matched this owned campaign.
+It collected 86 samples with zero lost samples and a 0.045-MB artifact;
+`Segment::load_page_with_access` accounted for 4.65%, with allocation/copy and
+version-selection samples also present. This sample is too small to attribute
+a complete root cause; it does not justify a default-cache change. The sampled
+interval can affect timing and remains diagnostic only. Raw profile/report and
+ownership receipt remain in this campaign's directory; no host policy changed.
+
+
+The 10k diagnostic finished in 517.08 seconds with all 10,000 writes acknowledged
+and all 10,000 independent corpus verifications recorded, then failed the first
+forced restart at `installed_reopen.rs::Estate::start_for`: readiness channel
+`Disconnected`. Zero measured segments were produced; the failed campaign is
+`b924beb05732bcda541228c24de6d0bc09d8aaa53792a1458cd389849b0a8d7f`.
+Launcher exit 101 and confirmed owned cleanup are retained. Test-owned temporary
+estate files were removed by the existing guard; this does not prove the cause
+of startup exit. Capture discarded stderr before the panic, so the actual engine
+error remains unknown. Preserve this failed result; neither cache sizing nor
+the backup repair is full growth acceptance. The
+[startup capture repair](c-07g-startup-failure-capture.md) owns that diagnostic gap.

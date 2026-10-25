@@ -71,7 +71,7 @@ This is source topology, not qualification of the incomplete behaviors below.
 
 `Client` is a synchronous API whose methods accept `context.Context`. It has
 helpers for capabilities, endpoint catalogue, OpenAPI, and session creation,
-plus one generic `Call`. That generic call can address all 33 current HTTP
+plus one generic `Call`. That generic call can address all 40 current HTTP
 operation identifiers. This is route coverage, not operation-semantic
 coverage. The module has no WebSocket implementation; subscription
 administration and changefeed follow are ordinary HTTP calls.
@@ -106,11 +106,11 @@ source with `go/format`, and supports an exact byte-for-byte drift check.
 
 The current `endpoints_gen.go` contains:
 
-- 33 `OperationID` constants;
+- 40 `OperationID` constants;
 - method, route template, first authentication scheme, and mutation flag for
   each operation; and
 - OpenAPI SHA-256
-  `9ff05ee56d8b17408eea2a5491aeb63140bc7852e37473b556d4be0df3c53c6d`.
+  `ddbcfd660f2c5d708396229a1ebe176ca7dc8343bbe47f4ad3d3a734194b4c65`.
 
 It does not generate request/result/error types, path-parameter sets, security
 actions, exact success statuses, media types, causal identity rules,
@@ -361,7 +361,7 @@ Current evidence is deliberately bounded:
 | generator, `gofmt`, `go vet`, `go mod tidy -diff` | all passed | Source/generation/module hygiene only; descriptors still omit operation semantics. |
 | conformance command without `RRD_SDK_CONFORMANCE_MANIFEST` | exited nonzero with the required-manifest panic | Fail-closed configuration only; no scenario executed. |
 | conformance command against the live example harness | passes with corpus SHA-256 `b3977c57c8d268f861e9d5158e5609bf3e7d2e1db01f914a12911b95c3404cb2` | Real HTTP against a direct-seeded rrflowKV fixture; not installation, rrflowMX parity, or full labelled behavior. |
-| generated-surface parity | 33 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
+| generated-surface parity | 40 descriptors match the OpenAPI digest | Method/path/auth/mutation projection only; not runtime binding or semantic execution. |
 | injected transport probe | replayed an unpinned query, accepted `201 text/plain` and invalid payload, and exposed the bearer through JSON and formatting | Reproducible open H-04 correctness/security defects. |
 | network-disabled local-toolchain test | passed with no module dependencies | Existing-checkout/current-toolchain evidence only; not a clean external consumer or signed artifact. |
 

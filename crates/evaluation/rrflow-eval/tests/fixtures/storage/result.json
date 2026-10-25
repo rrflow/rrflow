@@ -1,0 +1,103 @@
+{
+  "cases": [
+    {
+      "faults": [],
+      "id": "ack-history",
+      "ledger": {
+        "attempts": [
+          {
+            "attempt_id": "a1",
+            "finished_ns": 10,
+            "logical_id": "write-a",
+            "outcome": {
+              "kind": "acknowledged",
+              "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "started_ns": 0
+          },
+          {
+            "attempt_id": "a2",
+            "finished_ns": 20,
+            "logical_id": "write-a",
+            "outcome": {
+              "kind": "acknowledged",
+              "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "started_ns": 11
+          },
+          {
+            "attempt_id": "b1",
+            "finished_ns": 30,
+            "logical_id": "write-b",
+            "outcome": {
+              "kind": "rejected",
+              "reason": "before-effect-admission"
+            },
+            "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "started_ns": 21
+          },
+          {
+            "attempt_id": "c1",
+            "finished_ns": 40,
+            "logical_id": "write-c",
+            "outcome": {
+              "kind": "uncertain",
+              "reason": "response-lost"
+            },
+            "request_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "started_ns": 31
+          }
+        ],
+        "expected": [
+          {
+            "effect_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "logical_id": "write-a",
+            "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "resolution": "present"
+          },
+          {
+            "effect_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "logical_id": "write-b",
+            "request_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "resolution": "absent"
+          },
+          {
+            "effect_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "logical_id": "write-c",
+            "request_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "resolution": "either"
+          }
+        ],
+        "readback": [
+          {
+            "applications": 1,
+            "effect_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "kind": "present",
+            "logical_id": "write-a",
+            "receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "request_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "kind": "absent",
+            "logical_id": "write-b"
+          },
+          {
+            "applications": 1,
+            "effect_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "kind": "present",
+            "logical_id": "write-c",
+            "receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "request_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ]
+      },
+      "limitation": null,
+      "seed": 7,
+      "status": "executed"
+    }
+  ],
+  "format_version": 1,
+  "manifest_sha256": "97947ddb5d469037548b8853880f38252224e9335164924a39ee09bf3c2fe9cd"
+}

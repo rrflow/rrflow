@@ -24,12 +24,35 @@ pub(in crate::engine) fn read_vector_versions(
     read: &ReadStamp,
     max_storage_keys: u64,
 ) -> Result<DirectVectorRead> {
-    let direct = engine.storage.runtime().read_versioned(
+    let direct = engine
+        .storage
+        .runtime()
+        .read_versioned(
+            read,
+            &[rrd_store::RuntimeVersionedSource::Vectors { kind: None }],
+            rrd_store::RuntimeReadBudget::new(max_storage_keys)
+                .map_err(|error| ServiceError::Vector(error.to_string()))?,
+        )
+        .map_err(super::error::storage_read_error)?;
+    public_vector_read(direct)
+}
+
+pub(in crate::engine) fn read_vector_search_versions(
+    engine: &RrdEngine,
+    read: &ReadStamp,
+    max_storage_keys: u64,
+) -> Result<DirectVectorRead> {
+    let direct = crate::runtime::vector_catalog::read_vector_catalogue_versions(
+        &engine.storage,
         read,
         &[rrd_store::RuntimeVersionedSource::Vectors { kind: None }],
-        rrd_store::RuntimeReadBudget::new(max_storage_keys)
-            .map_err(|error| ServiceError::Vector(error.to_string()))?,
-    )?;
+        rrd_store::RuntimeReadBudget::new(max_storage_keys)?,
+    )
+    .map_err(super::error::storage_read_error)?;
+    public_vector_read(direct)
+}
+
+fn public_vector_read(direct: rrd_store::RuntimeVersionedRead) -> Result<DirectVectorRead> {
     let selected_versions = u64::try_from(direct.changes.len())
         .map_err(|_| ServiceError::Vector("selected vector versions exceed u64".into()))?;
     Ok(DirectVectorRead {

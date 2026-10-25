@@ -38,7 +38,7 @@ fn context(request: &str, operation: &str, idempotency: &str) -> RequestContext 
         request_id: correlation(request),
         operation_id: correlation(operation),
         idempotency_key: Some(correlation(idempotency)),
-        deadline_unix_ms: Some(10_000),
+        deadline_unix_ms: Some(u64::MAX),
     }
 }
 
@@ -78,6 +78,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -88,11 +89,11 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        100,
         &executable,
     )
     .unwrap();
     assert!(!installation.idempotent_replay);
+    let at = |offset: u64| installation.applied_at_unix_ms + offset;
     let database = project.join(
         &preview
             .installation
@@ -170,7 +171,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 },
             },
             &correlation("authority-session"),
-            1_000,
+            at(1_000),
             "request-session",
             "operation-session",
         )
@@ -198,7 +199,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 "operation-vector-catalogue",
                 "vector-catalogue-key",
             ),
-            1_100,
+            at(1_100),
         )
         .unwrap();
     assert_eq!(vectors.catalogue_revision, 1);
@@ -216,7 +217,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 "operation-transaction-begin",
                 "transaction-begin-key",
             ),
-            1_200,
+            at(1_200),
         )
         .unwrap();
     let document = reference("document", "document-a");
@@ -308,7 +309,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
             &transaction.transaction_id,
             &correlation("transaction-commit-key"),
             &commit_request,
-            1_300,
+            at(1_300),
             "request-transaction-commit",
             "operation-transaction-commit",
         )
@@ -316,7 +317,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
     assert_eq!(commit.mutation_count, 4);
     assert_eq!(commit.claim_mutation_count, Some(1));
 
-    let runtime_before_denial = engine.readiness(1_450).unwrap().runtime_cursor;
+    let runtime_before_denial = engine.readiness(at(1_450)).unwrap().runtime_cursor;
     let invalid_session_token = correlation("invalid-session-token");
     let denied = engine.begin_invocation(
         Invocation {
@@ -326,7 +327,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 "denied-backup-key",
             ),
             resource: resource(&instance),
-            observed_at_unix_ms: 1_450,
+            observed_at_unix_ms: at(1_450),
             attempt: 1,
             request_sha256: digest::sha256_hex(b"denied-backup"),
         },
@@ -341,7 +342,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
         "invalid session credential should be denied, got {denied:?}"
     );
     assert_eq!(
-        engine.readiness(1_451).unwrap().runtime_cursor,
+        engine.readiness(at(1_451)).unwrap().runtime_cursor,
         runtime_before_denial,
         "authentication denial must not mutate the runtime log"
     );
@@ -368,7 +369,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 "operation-coordinated-vector-catalogue",
                 "coordinated-vector-catalogue-key",
             ),
-            1_480,
+            at(1_480),
         )
         .unwrap();
     let vector_read = engine
@@ -376,7 +377,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
             &lease.session_id,
             &lease.token,
             &diagnostic_request(&scope),
-            1_490,
+            at(1_490),
             "request-vector-read-stamp",
             "operation-vector-read-stamp",
         )
@@ -396,7 +397,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 full_text: None,
                 budget: QueryBudget::default(),
             },
-            1_500,
+            at(1_500),
             "request-query-index",
             "operation-query-index",
         )
@@ -416,7 +417,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 after_cursor: 0,
                 limit: 64,
             },
-            1_600,
+            at(1_600),
             "request-changefeed",
             "operation-changefeed",
         )
@@ -429,7 +430,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
             &lease.session_id,
             &lease.token,
             &diagnostic_request(&scope),
-            1_700,
+            at(1_700),
             "request-diagnostic",
             "operation-diagnostic",
         )
@@ -483,7 +484,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
                 after_sequence: 0,
                 limit: 64,
             },
-            1_800,
+            at(1_800),
             "request-audit",
             "operation-audit",
         )
@@ -519,7 +520,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
             &lease.token,
             &CloseSession {},
             &correlation("session-close-key"),
-            1_900,
+            at(1_900),
             "request-session-close",
             "operation-session-close",
         )
@@ -529,7 +530,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
 
     let reopened = RrdEngine::open_installed(&project, &executable).unwrap();
     assert_eq!(reopened.instance_id(), &instance);
-    let readiness = reopened.readiness(2_000).unwrap();
+    let readiness = reopened.readiness(at(2_000)).unwrap();
     assert_eq!(readiness.runtime_cursor, diagnostic.read.runtime_cursor);
     assert_eq!(readiness.claim_sequence, diagnostic.read.claim_sequence);
     let close_replay = reopened
@@ -538,7 +539,7 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
             &lease.token,
             &CloseSession {},
             &correlation("session-close-key"),
-            2_000,
+            at(2_000),
             "request-session-close-replay",
             "operation-session-close-replay",
         )
@@ -552,7 +553,6 @@ fn one_authority_coordinates_security_data_catalogues_audit_and_reopen() {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        2_100,
         &executable,
     )
     .unwrap();
@@ -605,6 +605,7 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &executable,
@@ -615,7 +616,6 @@ fn estate_recovery_prune_and_restore_are_one_fenced_engine_workflow() {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        5,
         &executable,
     )
     .unwrap();

@@ -1,6 +1,6 @@
 # RRFlow Connectome client contract
 
-**Status:** active target client contract; optional authored client source is pinned, H-06 conformance remains unqualified
+**Status:** active target client contract; canonical RRFlow discovery handoff exists, separate checkout remains non-conforming
 **Coordinate:** `rrflow://rrflow-instance/data/reference/client/connectome`
 **Owner:** Connectome connection, projection, interaction, local-state, and conformance requirements
 
@@ -17,6 +17,11 @@ language clients. Roadmap [H-06](../../roadmap/rrflow-1.0.md#gate-h--prove-conte
 owns implementation and acceptance. This record cannot add an engine operation
 or declare Connectome qualified.
 
+The [real-engine implementation guide](connectome-implementation-guide.md)
+maps the audited separate checkout to concrete replacement packages and a
+write/kill/restart/readback acceptance journey. It is supporting guidance, not
+another contract or H-06 qualification record.
+
 ## Product and authority boundary
 
 Connectome is RRFlow's optional operator and developer workbench. It is built,
@@ -25,37 +30,87 @@ remote, or explicitly mesh-resolved instances without Connectome, and the
 default RRFlow distribution does not require the Connectome checkout or
 artifact.
 
-## Joint development and delivery
+### Repository checkout
 
-The engine repository pins Connectome's independent development history at
-root `connectome/` through a Git submodule whose source is
-`https://github.com/rrflow/connectome-development.git` and the owner's
-`agent/layman-lenses-wip` branch. This selects the authored Connectome UI;
-updating from another branch is not an implicit integration step. Initialize it with
-`git submodule update --init connectome`. The gitlink selects an exact reviewed
-client revision; advancing that pin is an explicit engine-repository change.
-Connectome is excluded from the engine Cargo workspace, default build,
-distribution, and readiness prerequisites. A checkout with the client
-uninitialized must still build and operate RRFlow.
+The RRFlow repository registers Connectome at `connectome/` as an optional Git
+submodule of `https://github.com/rrflow/connectome-development.git`. The parent
+Git tree pins the exact UI revision; `.gitmodules` owns the source URL. UI
+changes are developed and reviewed in that separate repository, then a bounded
+RRFlow change advances the pin with its integration evidence. A submodule pin
+does not qualify the UI or create engine authority.
 
-Connectome is the management UI for available estate operations. The desktop
-Tauri shell can drive the primary `rrflow` executable's install/serve/ready
-sequence and then render authenticated engine state. Until binary bundling
-lands, the executable must be on PATH or selected in Settings → Serving and
-must match the client's pinned native contract. The root README supplies the
-development commands and serving-handshake oracle. Exposing a control does
-not make an unavailable engine operation implemented.
+For UI development, explicitly acquire the pinned checkout:
 
-The cloud version is a planned browser delivery of the same client and public
-operation contract. Hosting and physical placement do not add an engine
-deployment form. Browser transport and short-lived, origin-constrained
-authentication must be implemented and qualified before this delivery can
-claim authenticated estate management; the desktop secret boundary cannot be
-copied into browser storage. Local process launch remains a desktop
-capability. Any cloud provisioning or fleet control service requires its own
-accepted public contract and cannot be inferred from client navigation.
+```bash
+git submodule update --init -- connectome
+git submodule status -- connectome
+```
 
-## Projection authority
+The Connectome development repository is public and supports anonymous
+acquisition. Engine-only local clones can omit initialization. Candidate CI
+recursively checks out the pinned UI source under the repository source policy.
+The [publication receipt](../../evidence/change-journals/gate-h/h-06-connectome-public-association.md)
+records the authorized visibility change and anonymous-access verification. The
+default engine build and installed distribution cannot read source or assets
+from the UI checkout. A UI distribution must package its required assets;
+installed startup cannot fetch this repository.
+
+The parent inventory records the gitlink revision without traversing child
+files. Local UI edits remain owned by the child repository. Never replace its
+pin with an escaping sibling path or treat a dirty checkout as reproducible
+integration evidence. Use `git submodule update --init -- connectome` to restore
+the recorded revision, rather than updating to an unreviewed branch tip.
+
+The [delivery architecture](../../architecture/system-overview.md#delivery-experiences)
+relates this UI to shippin.cloud private devspaces and the DevPulse local
+offering. Hosted project execution, previews, web launch, account creation,
+and synchronization are product targets requiring their own public-contract
+integration and proof; this source registration supplies none of those effects.
+
+### Native local workbench
+
+[Connectome PR12](https://github.com/rrflow/connectome-development/pull/12)
+implements visible local startup, a DB/QL/KV guide, and a native model browser
+on the existing authenticated Rust SDK session. The packaged engine/SDK input
+is RRFlow `4860a253663c9c757800aafeb40890b76114c4f0`; the parent gitlink records
+the reviewed UI revision independently. The
+[workbench guide](https://github.com/rrflow/connectome-development/blob/main/docs/native-workbench.md)
+owns build and desktop-use instructions.
+
+Newer RRFlow installation-plan contract v2 requires an explicit identity from
+`rrflow install identity`, retained across preview regeneration and supplied
+with `install plan --identity`. The pinned workbench above uses its named older
+engine/SDK pair; it is not qualification of that new installation contract.
+Updating its engine bundle requires updating and testing this adapter input as
+described in the [implementation guide](connectome-implementation-guide.md#run-the-current-installed-engine).
+
+The desktop shows the native installation preview, requires its exact accepted
+digest, and regenerates the plan before apply. Existing estates reopen through
+the same installed lifecycle. Data models display the authenticated catalogue,
+bounded native query results and read cursors; graph, vector and storage lenses
+remain public-operation projections. The local workflow requires no account.
+The renderer holds a credential path, never the long-lived credential itself.
+
+Real-process tests cover installation rejection/acceptance/reopen, independent
+sessions, the digest-verified bundled engine, catalogue reads, key/value,
+event, time-series and geo queries, and graph/vector/storage views. The Windows
+development desktop was also driven through actual install, query, close and
+reopen; native quick verification passed. The
+[package receipt](../../evidence/change-journals/gate-h/h-06-native-turnkey-workbench.md)
+links candidate, build and bounded acceptance evidence. Browser rendering
+tests remain distinct from this actual native evidence.
+
+Current limits: row queries for records, relations and events require a
+registered typed schema; schemaless table metadata alone does not register a
+query source. The UI explains unavailable browsing. Time-series queries select
+the series record kind, not the sample table kind. Object metadata without a
+public row source remains schema-only. Media understanding/generation requires
+separately configured models and authorization. PostgreSQL compatibility,
+DevPulse packaging, cloud accounts/synchronization and hosted devspaces are
+still open. The unsigned Windows development bundle does not satisfy signed
+release, complete H-06, or clean-machine installer acceptance.
+
+### Projection authority
 
 Connectome is a projection client. It may:
 
@@ -174,6 +229,15 @@ support future plan/apply and UI preparation, not a success badge. Context and
 query controls must default at or below the advertised estate ceilings rather
 than blindly sending the protocol hard maximum.
 
+The [user-selected effort contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+owns reasoning controls. H-06 must show the selected preset or custom limits,
+effective estate caps, remaining time/steps/attempts and known cost, plus Stop
+and an explicitly previewed extension. A stopped run shows partial results and
+unresolved work with the engine's reason. Resume cannot reset consumption.
+Until the runner and configuration-apply capabilities are advertised, these
+controls must be unavailable with an explanation; changing a local UI setting
+cannot claim an enforced timeout. All clients share the engine's authority.
+
 ## One object, many bounded lenses
 
 Connectome presents several lenses over the same engine result. Changing a
@@ -209,6 +273,65 @@ not tables or databases that Connectome maintains. Saved client-only layout,
 filters, focus, column widths, and panel state are preferences. A shareable
 durable lens, if later accepted, is a versioned typed rrflowDB record created
 through an authorized `RrdEngine` operation; local storage cannot promote one.
+
+## Guided project, knowledge and session journey
+
+These are H-06 target requirements, not additional capabilities of the pinned
+workbench. Keep them within the existing project, knowledge, runs and evidence
+workspaces; a new adapter or view mode does not warrant another top-level
+feature area. Nested routes and breadcrumbs retain exact instance, resource
+and permitted read coordinates. A deep link never implies authorization.
+
+Choosing a new or existing project previews the engine's exact installation
+plan. Once authorized, the installed lifecycle provisions one estate/rrflowDB
+and its rrflowKV storage automatically; users do not install three databases
+for DB, KV and QL. Reopening that project resolves and validates the existing
+identity. A missing, foreign or damaged binding requires an explicit recovery
+or installation decision, never silent creation of a replacement estate.
+Switching projects detaches the previous view's subscriptions/session handles
+and isolates cached results; it does not stop independently running projects.
+Running projects concurrently does not grant context sharing.
+
+Within the project, show knowledge paths with their supported effects,
+requirements, active binding, source revision, freshness and unavailable
+reasons. Guide a user from a source to its chunks, relationships and cited
+result through the same engine-provided evidence. Profile enrichment remains
+a proposal with provenance and an accepted configuration revision. The
+[knowledge baseline contract](../data/knowledge-connectors.md#graph-and-retrieval-baselines)
+owns capture, candidate comparison, promotion and retention semantics; its
+baseline/candidate/current views belong under knowledge and evidence.
+
+Within runs, **session replay means inspection of retained execution evidence**.
+Group the user's project conversation and linked tasks/runs without making an
+authentication session their durable identity. A fresh authenticated connection
+reads authorized prompt/output records, context/citations, observable model/tool
+attempts, transitions, receipts, timings, budgets and failures. Scrubbing and
+opening a recorded hop must not invoke a model, execute a tool or mutate the
+project. Missing/redacted content, retention gaps and unavailable historical
+artifacts are visible; the UI cannot reconstruct them as if recorded.
+Never record/replay bearer tokens or expose private model chain-of-thought.
+
+**Run again** or **compare a variant** starts new governed work, linked to the
+original run. Show changed source/configuration/model identities, current
+permissions, model/tool effects and cost/effort limits. Require the engine's
+current admission and applicable authorization; an old receipt grants no new
+effects. Distinguish deterministic retained-result inspection from a new model
+response that may differ. An uncertain prior mutation is reconciled through
+its original operation coordinates before proposing dependent new effects.
+
+Teach the workflow through plain-language explanations of source evidence,
+proposals, change previews, tests and review. Offer progressive detail for plans,
+schemas and traces. Do not force exploratory reading into a closed workflow;
+show why the durable-effect boundary needs verification. A green control must
+name what was verified and expose partial, denied or unimplemented stages.
+
+H-06 acceptance must exercise two project estates in one actual desktop build:
+install/reopen each, switch during in-flight requests, follow knowledge
+breadcrumbs, compare a baseline, inspect a retained run after engine restart,
+and explicitly fork a new authorized run. Assert no cross-project cache/session
+leakage, no external invocation during inspection, no duplicate effect after
+lost ACK and correct deep links under restricted permissions. Mocks and the
+older native workbench's installation tests do not prove this journey.
 
 ## Graph, timeline, and context interaction
 
@@ -310,22 +433,21 @@ connect to them as hidden RRFlow persistence or infer that discovery activated
 them. A future enterprise fleet control plane requires its own accepted public
 contract; a client-local `rrflow-control` protocol cannot create one.
 
-## Current separate-checkout audit
+## Historical separate-checkout audit
 
-The historical reviewed implementation baseline was the clean separate repository at
+The historical reviewed implementation baseline is the clean separate repository at
 `../connectome`, commit
 `38f68ce7adda9d03501f3591165f0e14996899ec` (`feat: add authenticated native
 RRD client`). Its successful checks characterize useful code; they do not prove
-H-06. That path and revision identify the audit below, not the current
-submodule checkout or a current conformance result.
+H-06.
 
 | Current implementation | Useful behavior retained as a requirement | Direct-convergence gap |
 |---|---|---|
 | Separate React/Tauri repository and production build | Connectome remains independently built and released. | The production bundle still carries SurrealDB client/UI/CBOR/Wasm aliases, QL Wasm packages, inherited surfaces, and multi-megabyte chunks. They are removed when the corresponding RRFlow surface exists; no compatibility or migration mode survives. |
 | `src-tauri/src/rrd/client.rs` and `transport.rs` | Native loopback validation, redirect denial, response limits, one authenticated session, and explicit close have four passing focused tests. | The client handwrites a partial RRD contract, exposes generic JSON, supports only capabilities/session/diagnostics/context, has no network TLS or WebSocket path, and is not generated from or conformed against the shared public contract/SDK corpus. |
-| `src/rrflow/runtime.ts` | Bounded URL construction and response-shape checks are useful client defenses. | It duplicates protocol truth and consumes the now-rejected scalar deployment list (`memory`, `embedded`, `local_daemon`, `edge`, `remote`, `distributed`). Replace it from generated RRFlow OpenAPI digest `0ef644d8b65019d3fdbb3cf6bf5dd0961473d41d66b0080529801d0008cd9040`; retain no fallback decoder. |
+| `src/rrflow/runtime.ts` | Bounded URL construction and response-shape checks are useful client defenses. | It duplicates protocol truth and consumes the now-rejected scalar deployment list (`memory`, `embedded`, `local_daemon`, `edge`, `remote`, `distributed`). Replace it with generated types bound to the packaged and advertised RRFlow OpenAPI identity; retain no fallback decoder. |
 | `src/rrflow/attunement.ts` and runtime-connection UI | The eleven phase names and honest progress presentation can be projected from RRD. | The client duplicates attunement phases, estimates, trigger/routine/hook/skill definitions, status, and static automation rows. All lifecycle state must come from public engine job records and capabilities. |
-| `src/rrflow/diagnostics.ts` | A detailed trace/run inspector remains a required view. | It defines a retired diagnostics protocol, provider-flight state and runners, and private `/api/*` routes. This is a parallel diagnostics/reasoning lifecycle and is removed directly. |
+| `src/rrflow/diagnostics.ts` | A detailed trace/run inspector and the prompt-flight lens remain required views. | It defines a retired diagnostics protocol, provider-flight state and runners, and private `/api/*` routes that no engine serves. The flight lens is rebuilt on `flight-launch`, `flight-list`, and `flight-read` plus `diagnostics-read`; the retired protocol and routes are replaced by those public operations, not kept as a parallel lifecycle ([POAM-032](../../poam/rrflow-1.0-alpha/poam-032.md)). |
 | `src/rrflow/control-plane.ts` | Multi-instance navigation remains a valid client use case. | It invents a client-owned `rrflow-control` protocol and managed-instance state without an accepted engine/fleet contract. It cannot be treated as current RRFlow capability. |
 | `src/providers/Context/index.tsx` | Connection state belongs in one narrow client service. | It hardcodes an RRFlow cloud hostname, namespace/database, old vendor client, and fixed reconnect loop. Configuration, topology, credentials, and reconnection must come from the accepted endpoint/session contracts. |
 | `tests/smoke/connectome.spec.ts` | The production overview and bootstrap screen render in Chromium. | The two tests mock liveness/readiness/capabilities, use stale `backend`, `deployment_mode`, and `0.1.0` values, and exercise no installed RRD process, authentication, WebSocket, graph/index/DataFusion/context flow, restart, denial, or resource bound. |
@@ -335,13 +457,20 @@ tests pass. The build reports unresolved/browser-externalized SurrealDB QL/Wasm
 paths and oversized chunks. Four focused native `rrd` tests pass. These results
 prove a compilable, renderable, partially connected rough draft only.
 
+RRFlow's own installed-lifecycle oracle now commits and queries a claim, kills
+the serving process abruptly, starts the same installed project again, performs
+fresh readiness and session handshakes, and returns the same claim through the
+public Rust client before final offline verification. That proves a concrete
+persistence target on the engine side; it does not prove the separate
+Connectome artifact consumes it.
+
 ## Direct-convergence sequence
 
 Implementation remains one reviewed package at a time in the separate
 Connectome repository:
 
-1. Generate or consume one qualified public RRD client surface at the exact
-   OpenAPI digest above; implement the structured identity/deployment/
+1. Generate or consume one qualified public RRD client surface bound to one
+   exact packaged OpenAPI digest; implement the structured identity/deployment/
    configuration bootstrap and delete handwritten/old-vocabulary branches in
    the same package.
 2. Implement the native credential, endpoint, HTTP/WebSocket, session,
@@ -418,3 +547,14 @@ No Anytype identity, space/channel hierarchy, middleware, command, schema,
 storage, source layout, or renderer becomes an RRFlow contract. The accepted
 ideas above are independently specified and must pass RRFlow's own security,
 semantic, resource, and conformance evidence.
+
+## Knowledge-tree configuration
+
+The optional UI must negotiate `knowledge-tree-catalogue` before using the
+[project-bound configuration operations](../knowledge-trees.md). Display saved
+external paths as configuration, not proof of connector availability or import.
+Native collection and named-vector references are validated by the engine.
+Replacement uses the observed catalogue revision and preserves the editor draft
+on conflict. Engine grants, admission and durable receipts remain authoritative.
+The current parent pin and PR114's workspace pin are separate from this engine
+API integration; neither is advanced implicitly here.

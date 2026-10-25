@@ -5,17 +5,20 @@ use crate::{Error, Result, RrdClient, Session};
 use hyper::{Method, StatusCode};
 use rrd_contract::{
     AbortTransaction, AssembleContext, AuditExport, AuditPage, BeginTransaction, CanonicalId,
-    ChangefeedFollowResult, ChangefeedPage, CommitReceipt, CommitTransaction, ContextPacket,
-    CorrelationId, CreateInstanceBackup, CreateInstanceBackupResult, DiagnosticSnapshot,
-    EnsureVectorCollection, EnsureVectorCollectionResult, EstateSnapshot, ExecuteQuery,
-    ExportAudit, FollowChangefeed, InstanceBackupCatalogueSnapshot, KnowledgeTreeCatalogue,
-    ListInstanceBackups, ListKnowledgeTrees, ListVectorCollections, PreviewTransaction,
-    QueryResult, ReadAudit, ReadChangefeed, ReadDiagnosticSnapshot, ReadEstate,
+    ChangefeedFollowResult, ChangefeedPage, CloseTask, CommitReceipt, CommitTransaction,
+    ContextPacket, CorrelationId, CreateInstanceBackup, CreateInstanceBackupResult,
+    DiagnosticSnapshot, EnsureVectorCollection, EnsureVectorCollectionResult, EstateSnapshot,
+    ExecuteQuery, ExportAudit, FollowChangefeed, InstanceBackupCatalogueSnapshot,
+    KnowledgeTreeCatalogue, LaunchPromptFlight, LaunchPromptFlightResult, ListInstanceBackups,
+    ListKnowledgeTrees, ListPromptFlights, ListTasks, ListVectorCollections, OpenTask,
+    PreviewTransaction, PromptFlightPage, PromptFlightReadResult, QueryResult, ReadAudit,
+    ReadChangefeed, ReadDiagnosticSnapshot, ReadEstate, ReadPromptFlight, ReadTask,
     ReplaceKnowledgeTrees, ReplaceKnowledgeTreesResult, RequestContext, RequestEnvelope,
     ResourceId, ResourceKind, ResourcePath, ResponseEnvelope, ResponseOutcome,
     RestoreInstanceBackup, RestoreInstanceBackupResult, RetrieveVectorPoints, ScrollVectorPoints,
-    SearchVectors, TransactionLease, TransactionPreview, VectorCollectionCatalogueSnapshot,
-    VectorPointBatch, VectorPointPage, VectorSearchResult, PROTOCOL, PROTOCOL_VERSION,
+    SearchVectors, TaskPage, TaskReadResult, TaskResult, TransactionLease, TransactionPreview,
+    VectorCollectionCatalogueSnapshot, VectorPointBatch, VectorPointPage, VectorSearchResult,
+    PROTOCOL, PROTOCOL_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -67,6 +70,44 @@ impl RequestOptions {
 }
 
 impl RrdClient {
+    /// Discover the native catalogue through the authenticated operation
+    /// descriptor. Requires the instance-wide diagnostics-read grant.
+    pub async fn read_data_schema(
+        &self,
+        session: &Session,
+        request: rrd_contract::ReadDataSchema,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::DataSchemaSnapshot> {
+        request.validate().map_err(contract)?;
+        let expected_scope = request.scope.clone();
+        let catalogue = rrd_contract::endpoint_catalogue();
+        let endpoint = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == "data-schema-read")
+            .ok_or_else(|| Error::Contract("data schema operation is unavailable".into()))?;
+        let method = match endpoint.method {
+            rrd_contract::HttpMethod::Get => Method::GET,
+            rrd_contract::HttpMethod::Post => Method::POST,
+            rrd_contract::HttpMethod::Delete => Method::DELETE,
+        };
+        let result: rrd_contract::DataSchemaSnapshot = self
+            .session_call(
+                method,
+                &endpoint.path,
+                session,
+                request,
+                options,
+                endpoint.mutation,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        if result.scope != expected_scope {
+            return Err(Error::ResponseIdentityMismatch);
+        }
+        Ok(result)
+    }
+
     pub async fn execute_query(
         &self,
         session: &Session,
@@ -75,6 +116,43 @@ impl RrdClient {
     ) -> Result<QueryResult> {
         self.session_call(Method::POST, "/v1/query", session, request, options, false)
             .await
+    }
+
+    pub async fn export_query(
+        &self,
+        session: &Session,
+        request: rrd_contract::ExportQuery,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::QueryExport> {
+        request.validate().map_err(contract)?;
+        let scope = request.query.scope.clone();
+        let limit = request.max_output_bytes;
+        let catalogue = rrd_contract::endpoint_catalogue();
+        let endpoint = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == "query-export")
+            .ok_or_else(|| Error::Contract("query export operation is unavailable".into()))?;
+        let method = match endpoint.method {
+            rrd_contract::HttpMethod::Get => Method::GET,
+            rrd_contract::HttpMethod::Post => Method::POST,
+            rrd_contract::HttpMethod::Delete => Method::DELETE,
+        };
+        let result: rrd_contract::QueryExport = self
+            .session_call(
+                method,
+                &endpoint.path,
+                session,
+                request,
+                options,
+                endpoint.mutation,
+            )
+            .await?;
+        result.decode_artifact().map_err(contract)?;
+        if result.source.scope != scope || result.artifact_bytes > limit {
+            return Err(Error::ResponseIdentityMismatch);
+        }
+        Ok(result)
     }
 
     pub async fn begin_transaction(
@@ -439,6 +517,47 @@ impl RrdClient {
         Ok(snapshot)
     }
 
+    pub async fn inspect_storage_cursor(
+        &self,
+        session: &Session,
+        request: rrd_contract::InspectStorageCursor,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::StorageCursorSnapshot> {
+        let result: rrd_contract::StorageCursorSnapshot = self
+            .session_call(
+                Method::POST,
+                "/v1/diagnostics/storage/cursor",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
+    /// Bounded physical observations without materializing graph history.
+    pub async fn read_storage_diagnostics(
+        &self,
+        session: &Session,
+        request: rrd_contract::ReadStorageDiagnostics,
+        options: RequestOptions,
+    ) -> Result<rrd_contract::DiagnosticStorageSnapshot> {
+        let snapshot: rrd_contract::DiagnosticStorageSnapshot = self
+            .session_call(
+                Method::POST,
+                "/v1/diagnostics/storage/read",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        snapshot.validate().map_err(contract)?;
+        Ok(snapshot)
+    }
+
     pub async fn assemble_context(
         &self,
         session: &Session,
@@ -457,6 +576,132 @@ impl RrdClient {
             .await?;
         packet.validate().map_err(contract)?;
         Ok(packet)
+    }
+
+    pub async fn launch_prompt_flight(
+        &self,
+        session: &Session,
+        request: LaunchPromptFlight,
+        options: RequestOptions,
+    ) -> Result<LaunchPromptFlightResult> {
+        let result: LaunchPromptFlightResult = self
+            .session_call(Method::POST, "/v1/flights", session, request, options, true)
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
+    pub async fn list_prompt_flights(
+        &self,
+        session: &Session,
+        request: ListPromptFlights,
+        options: RequestOptions,
+    ) -> Result<PromptFlightPage> {
+        let page: PromptFlightPage = self
+            .session_call(
+                Method::POST,
+                "/v1/flights/list",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        page.validate().map_err(contract)?;
+        Ok(page)
+    }
+
+    pub async fn read_prompt_flight(
+        &self,
+        session: &Session,
+        request: ReadPromptFlight,
+        options: RequestOptions,
+    ) -> Result<PromptFlightReadResult> {
+        let result: PromptFlightReadResult = self
+            .session_call(
+                Method::POST,
+                "/v1/flights/read",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
+    pub async fn open_task(
+        &self,
+        session: &Session,
+        request: OpenTask,
+        options: RequestOptions,
+    ) -> Result<TaskResult> {
+        let result: TaskResult = self
+            .session_call(Method::POST, "/v1/tasks", session, request, options, true)
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
+    pub async fn close_task(
+        &self,
+        session: &Session,
+        request: CloseTask,
+        options: RequestOptions,
+    ) -> Result<TaskResult> {
+        let result: TaskResult = self
+            .session_call(
+                Method::POST,
+                "/v1/tasks/close",
+                session,
+                request,
+                options,
+                true,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
+    }
+
+    pub async fn list_tasks(
+        &self,
+        session: &Session,
+        request: ListTasks,
+        options: RequestOptions,
+    ) -> Result<TaskPage> {
+        let page: TaskPage = self
+            .session_call(
+                Method::POST,
+                "/v1/tasks/list",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        page.validate().map_err(contract)?;
+        Ok(page)
+    }
+
+    pub async fn read_task(
+        &self,
+        session: &Session,
+        request: ReadTask,
+        options: RequestOptions,
+    ) -> Result<TaskReadResult> {
+        let result: TaskReadResult = self
+            .session_call(
+                Method::POST,
+                "/v1/tasks/read",
+                session,
+                request,
+                options,
+                false,
+            )
+            .await?;
+        result.validate().map_err(contract)?;
+        Ok(result)
     }
 
     pub(crate) async fn session_call<T, O>(

@@ -1,11 +1,14 @@
+use crate::filesystem::{AnchoredPath, OpenOptions};
 use crate::{Error, Result};
 use rrd_core::digest;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::fs::File;
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
+
+pub const DEFAULT_CHECKPOINT_ENTRIES: usize = 1024;
 
 pub const MANIFEST_FORMAT_VERSION: u16 = 3;
 const MANIFEST_CONTROL_FORMAT_VERSION: u16 = 1;
@@ -409,8 +412,13 @@ impl CurrentPointer {
 /// Holds the process lock for the full publication session. Manifest bytes are
 /// synced before `CURRENT`, then the parent directory is synced after rename.
 pub struct ManifestStore {
-    root: PathBuf,
+    root: AnchoredPath,
     _lock: File,
+    temporary_nonce: String,
+    publication_uncertain: AtomicBool,
+    checkpoint_entries: usize,
+    checkpoint_budget: crate::ReclamationLimits,
+    checkpoint_gate: Mutex<()>,
 }
 
 impl Drop for ManifestStore {
@@ -426,15 +434,23 @@ impl ManifestStore {
     /// Creates the manifest namespace and its exclusive writer lease. The
     /// caller must have already established an empty database root.
     pub fn create(root: &Path) -> Result<Self> {
+        Self::create_anchored(&AnchoredPath::open_root(root)?)
+    }
+
+    pub fn create_anchored(root: &AnchoredPath) -> Result<Self> {
         let manifest_directory = root.join(MANIFEST_DIRECTORY);
         let checkpoint_directory = root.join(CHECKPOINT_DIRECTORY);
-        std::fs::create_dir(&manifest_directory).map_err(|error| {
-            Error::io("creating manifest directory", &manifest_directory, error)
+        manifest_directory.create_dir().map_err(|error| {
+            Error::io(
+                "creating manifest directory",
+                manifest_directory.diagnostic_path(),
+                error,
+            )
         })?;
-        std::fs::create_dir(&checkpoint_directory).map_err(|error| {
+        checkpoint_directory.create_dir().map_err(|error| {
             Error::io(
                 "creating checkpoint directory",
-                &checkpoint_directory,
+                checkpoint_directory.diagnostic_path(),
                 error,
             )
         })?;
@@ -443,6 +459,10 @@ impl ManifestStore {
 
     /// Opens a complete manifest namespace without creating any path.
     pub fn open_existing(root: &Path) -> Result<Self> {
+        Self::open_existing_anchored(&AnchoredPath::open_root(root)?)
+    }
+
+    pub fn open_existing_anchored(root: &AnchoredPath) -> Result<Self> {
         for (operation, path) in [
             ("opening manifest directory", root.join(MANIFEST_DIRECTORY)),
             (
@@ -450,8 +470,9 @@ impl ManifestStore {
                 root.join(CHECKPOINT_DIRECTORY),
             ),
         ] {
-            let metadata = std::fs::symlink_metadata(&path)
-                .map_err(|error| Error::io(operation, &path, error))?;
+            let metadata = path
+                .metadata()
+                .map_err(|error| Error::io(operation, path.diagnostic_path(), error))?;
             if metadata.file_type().is_symlink() || !metadata.is_dir() {
                 return Err(Error::InvalidManifest(format!(
                     "{} is not a non-symlink directory",
@@ -465,26 +486,42 @@ impl ManifestStore {
     /// Legacy manifest utility entry point retained for direct manifest tests.
     /// Database lifecycle code uses `create` or `open_existing` explicitly.
     pub fn open(root: &Path) -> Result<Self> {
+        Self::open_anchored(&AnchoredPath::open_root(root)?)
+    }
+
+    pub fn open_anchored(root: &AnchoredPath) -> Result<Self> {
         let manifest_directory = root.join(MANIFEST_DIRECTORY);
         let checkpoint_directory = root.join(CHECKPOINT_DIRECTORY);
-        std::fs::create_dir_all(&manifest_directory).map_err(|error| {
-            Error::io("creating manifest directory", &manifest_directory, error)
+        manifest_directory.create_dir_all().map_err(|error| {
+            Error::io(
+                "creating manifest directory",
+                manifest_directory.diagnostic_path(),
+                error,
+            )
         })?;
-        std::fs::create_dir_all(&checkpoint_directory).map_err(|error| {
+        checkpoint_directory.create_dir_all().map_err(|error| {
             Error::io(
                 "creating checkpoint directory",
-                &checkpoint_directory,
+                checkpoint_directory.diagnostic_path(),
                 error,
             )
         })?;
         Self::acquire_writer(root, false, true)
     }
 
-    fn acquire_writer(root: &Path, create_new: bool, create_if_missing: bool) -> Result<Self> {
+    fn acquire_writer(
+        root: &AnchoredPath,
+        create_new: bool,
+        create_if_missing: bool,
+    ) -> Result<Self> {
         let lock_path = root.join(MANIFEST_LOCK_FILE);
         if !create_new && !create_if_missing {
-            let metadata = std::fs::symlink_metadata(&lock_path).map_err(|error| {
-                Error::io("validating existing manifest lock", &lock_path, error)
+            let metadata = lock_path.metadata().map_err(|error| {
+                Error::io(
+                    "validating existing manifest lock",
+                    lock_path.diagnostic_path(),
+                    error,
+                )
             })?;
             if metadata.file_type().is_symlink() || !metadata.is_file() {
                 return Err(Error::InvalidManifest(
@@ -492,6 +529,14 @@ impl ManifestStore {
                 ));
             }
         }
+        // A process-local counter restarts at one and can collide with bytes
+        // left by a killed publisher. A new writer namespace preserves those
+        // bytes while allowing subsequent create-new publications to proceed.
+        use ring::rand::SecureRandom;
+        let mut nonce = [0u8; 16];
+        ring::rand::SystemRandom::new()
+            .fill(&mut nonce)
+            .map_err(|_| Error::Io(std::io::Error::other("manifest writer entropy unavailable")))?;
         let mut options = OpenOptions::new();
         options.read(true).write(true).truncate(false);
         if create_new {
@@ -499,27 +544,78 @@ impl ManifestStore {
         } else {
             options.create(create_if_missing);
         }
-        let lock = options
-            .open(&lock_path)
-            .map_err(|error| Error::io("opening manifest lock", &lock_path, error))?;
+        let lock = options.open(&lock_path).map_err(|error| {
+            Error::io("opening manifest lock", lock_path.diagnostic_path(), error)
+        })?;
         match lock.try_lock() {
             Ok(()) => {}
             Err(std::fs::TryLockError::WouldBlock) => {
-                return Err(Error::DatabaseWriterLock { path: lock_path });
+                return Err(Error::DatabaseWriterLock {
+                    path: lock_path.diagnostic_path().to_owned(),
+                });
             }
             Err(std::fs::TryLockError::Error(error)) => {
-                return Err(Error::io("acquiring manifest lock", &lock_path, error));
+                return Err(Error::io(
+                    "acquiring manifest lock",
+                    lock_path.diagnostic_path(),
+                    error,
+                ));
             }
         }
-        Ok(Self {
+        let store = Self {
             root: root.to_owned(),
             _lock: lock,
-        })
+            temporary_nonce: nonce.iter().map(|byte| format!("{byte:02x}")).collect(),
+            publication_uncertain: AtomicBool::new(false),
+            checkpoint_entries: DEFAULT_CHECKPOINT_ENTRIES,
+            checkpoint_budget: crate::ReclamationLimits::default(),
+            checkpoint_gate: Mutex::new(()),
+        };
+        if !create_new {
+            // Reopen may observe an earlier rename/unlink whose barrier failed.
+            // Stabilize the selected root and checkpoint names before allowing
+            // effects (especially GC) based on that observed reachability.
+            root.sync_directory()?;
+            root.join(CHECKPOINT_DIRECTORY).sync_directory()?;
+        }
+        Ok(store)
+    }
+
+    pub(crate) fn ensure_publication_ready(&self) -> Result<()> {
+        if self.publication_uncertain.load(Ordering::Acquire) {
+            return Err(Error::RecoveryRequired {
+                boundary: "uncertain manifest publication",
+            });
+        }
+        Ok(())
+    }
+
+    fn publication_result<T>(&self, result: Result<T>) -> Result<T> {
+        if result.is_err() && !matches!(&result, Err(Error::DiskAdmission { .. })) {
+            // A failed rename or directory barrier may already have selected a
+            // different root. No dependent effect may use the old in-memory root.
+            self.publication_uncertain.store(true, Ordering::Release);
+        }
+        result
     }
 
     pub fn current(&self) -> Result<Option<(CurrentPointer, Manifest)>> {
+        self.current_using(|path| Ok(path.read()?))
+    }
+
+    pub(crate) fn current_bounded(
+        &self,
+        budget: &mut crate::recovery_budget::RecoveryBudget,
+    ) -> Result<Option<(CurrentPointer, Manifest)>> {
+        self.current_using(|path| budget.metadata(path))
+    }
+
+    fn current_using(
+        &self,
+        mut read: impl FnMut(&AnchoredPath) -> Result<Vec<u8>>,
+    ) -> Result<Option<(CurrentPointer, Manifest)>> {
         let path = self.root.join(CURRENT_FILE);
-        match std::fs::symlink_metadata(&path) {
+        match path.metadata() {
             Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
                 return Err(Error::InvalidManifest(
                     "CURRENT is not a regular non-symlink file".into(),
@@ -527,12 +623,18 @@ impl ManifestStore {
             }
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(Error::io("validating CURRENT", &path, error)),
+            Err(error) => {
+                return Err(Error::io(
+                    "validating CURRENT",
+                    path.diagnostic_path(),
+                    error,
+                ))
+            }
         }
-        let bytes = std::fs::read(path)?;
+        let bytes = read(&path)?;
         let pointer: CurrentPointer = serde_json::from_slice(&bytes)?;
         pointer.validate()?;
-        let manifest = self.load(&pointer.manifest)?;
+        let manifest = self.load_using(&pointer.manifest, read)?;
         if manifest.generation != pointer.generation {
             return Err(Error::InvalidManifest(
                 "CURRENT generation differs from its manifest".into(),
@@ -542,6 +644,22 @@ impl ManifestStore {
     }
 
     pub fn load(&self, digest: &str) -> Result<Manifest> {
+        self.load_using(digest, |path| Ok(path.read()?))
+    }
+
+    pub(crate) fn load_bounded(
+        &self,
+        digest: &str,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<Manifest> {
+        self.load_using(digest, |path| budget.read_metadata(path))
+    }
+
+    fn load_using(
+        &self,
+        digest: &str,
+        mut read: impl FnMut(&AnchoredPath) -> Result<Vec<u8>>,
+    ) -> Result<Manifest> {
         if !is_sha256(digest) {
             return Err(Error::InvalidManifest(
                 "manifest lookup requires a SHA-256 identity".into(),
@@ -551,14 +669,15 @@ impl ManifestStore {
             .root
             .join(MANIFEST_DIRECTORY)
             .join(format!("{digest}.json"));
-        let metadata = std::fs::symlink_metadata(&path)
-            .map_err(|error| Error::io("validating manifest file", &path, error))?;
+        let metadata = path.metadata().map_err(|error| {
+            Error::io("validating manifest file", path.diagnostic_path(), error)
+        })?;
         if metadata.file_type().is_symlink() || !metadata.is_file() {
             return Err(Error::InvalidManifest(
                 "manifest is not a regular non-symlink file".into(),
             ));
         }
-        let bytes = std::fs::read(&path)?;
+        let bytes = read(&path)?;
         let manifest: Manifest = serde_json::from_slice(&bytes)?;
         manifest.validate()?;
         if manifest.digest != digest {
@@ -570,6 +689,7 @@ impl ManifestStore {
     }
 
     pub fn publish(&self, manifest: &Manifest, expected: Option<&str>) -> Result<CurrentPointer> {
+        self.ensure_publication_ready()?;
         manifest.validate()?;
         let current = self.current()?;
         let actual = current
@@ -592,10 +712,59 @@ impl ManifestStore {
                 ))
             }
         }
-        self.persist_manifest(manifest)?;
+        self.publication_result(self.persist_manifest(manifest))?;
         let pointer = CurrentPointer::new(manifest);
-        self.publish_pointer(&pointer)?;
+        self.publication_result(self.publish_pointer(&pointer))?;
         Ok(pointer)
+    }
+
+    /// Restart-only ceiling shared by checkpoint creation, listing and release.
+    /// Count every directory entry, including interrupted temporary publications.
+    pub fn with_checkpoint_limits(
+        mut self,
+        entries: usize,
+        metadata: crate::ReclamationLimits,
+    ) -> Result<Self> {
+        if entries == 0 || entries > 65_536 {
+            return Err(Error::InvalidConfiguration(
+                "checkpoint entries must be in 1..=65536".into(),
+            ));
+        }
+        metadata.validate()?;
+        self.checkpoint_entries = entries;
+        self.checkpoint_budget = metadata;
+        Ok(self)
+    }
+
+    fn checkpoint_entry_count(
+        &self,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<usize> {
+        let mut count = 0usize;
+        for entry in self.root.join(CHECKPOINT_DIRECTORY).entries()? {
+            budget.entry()?;
+            entry?;
+            count += 1;
+            if count > self.checkpoint_entries {
+                return Err(Error::CheckpointLimit {
+                    limit: self.checkpoint_entries,
+                    observed: count,
+                });
+            }
+        }
+        Ok(count)
+    }
+
+    pub fn checkpoint_ownership(&self) -> Result<(u64, u64)> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.checkpoint_budget);
+        Ok((
+            self.checkpoint_entry_count(&mut budget)? as u64,
+            self.checkpoint_entries as u64,
+        ))
     }
 
     pub fn checkpoint(
@@ -604,40 +773,91 @@ impl ManifestStore {
         manifest_digest: &str,
         created_at: u64,
     ) -> Result<Checkpoint> {
-        let manifest = self.load(manifest_digest)?;
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
+        self.ensure_publication_ready()?;
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.checkpoint_budget);
+        let manifest = self.load_bounded(manifest_digest, &mut budget)?;
         let checkpoint = Checkpoint::new(name, &manifest, created_at)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let path = directory.join(format!("{name}.json"));
         let bytes = serde_json::to_vec(&checkpoint)?;
-        if path.exists() {
-            let existing: Checkpoint = serde_json::from_slice(&std::fs::read(&path)?)?;
+        if path.try_exists()? {
+            let existing: Checkpoint = serde_json::from_slice(&budget.read_metadata(&path)?)?;
             existing.validate()?;
             if existing == checkpoint {
+                self.publication_result(directory.sync_directory().map_err(Error::Io))?;
                 return Ok(existing);
             }
             return Err(Error::InvalidManifest(format!(
                 "checkpoint {name:?} already pins another manifest or instant"
             )));
         }
+        let count = self.checkpoint_entry_count(&mut budget)?;
+        if count >= self.checkpoint_entries {
+            return Err(Error::CheckpointLimit {
+                limit: self.checkpoint_entries,
+                observed: count + 1,
+            });
+        }
         let temporary = directory.join(format!(
-            ".{name}.{}.tmp",
+            ".{name}.{}.{}.tmp",
+            self.temporary_nonce,
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
-        persist_rename(&directory, &temporary, &path, &bytes)?;
+        self.publication_result(persist_rename(&directory, &temporary, &path, &bytes))?;
         Ok(checkpoint)
     }
 
     pub fn checkpoints(&self) -> Result<Vec<Checkpoint>> {
+        let mut budget = crate::reclamation::ReclamationBudget::new(self.checkpoint_budget);
+        self.checkpoints_inner(&mut budget)
+    }
+
+    pub(crate) fn checkpoints_bounded(
+        &self,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<Vec<Checkpoint>> {
+        self.checkpoints_inner(budget)
+    }
+
+    fn checkpoints_inner(
+        &self,
+        budget: &mut crate::reclamation::ReclamationBudget,
+    ) -> Result<Vec<Checkpoint>> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let mut checkpoints = Vec::new();
-        for entry in std::fs::read_dir(directory)? {
-            let entry = entry?;
-            if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
+        let mut entries = Vec::new();
+        for entry in directory.entries()? {
+            budget.entry()?;
+            if entries.len() >= self.checkpoint_entries {
+                return Err(Error::CheckpointLimit {
+                    limit: self.checkpoint_entries,
+                    observed: entries.len() + 1,
+                });
+            }
+            entries.push(entry?);
+        }
+        entries.sort_by(|left, right| left.relative_path().cmp(right.relative_path()));
+        for entry in entries {
+            if entry
+                .relative_path()
+                .extension()
+                .and_then(|value| value.to_str())
+                != Some("json")
+            {
                 continue;
             }
-            let checkpoint: Checkpoint = serde_json::from_slice(&std::fs::read(entry.path())?)?;
+            let bytes = budget.read_metadata(&entry)?;
+            let checkpoint: Checkpoint = serde_json::from_slice(&bytes)?;
             checkpoint.validate()?;
-            let manifest = self.load(&checkpoint.manifest)?;
+            let manifest = self.load_bounded(&checkpoint.manifest, budget)?;
             if manifest.generation != checkpoint.generation {
                 return Err(Error::InvalidManifest(format!(
                     "checkpoint {:?} generation differs from its manifest",
@@ -651,16 +871,21 @@ impl ManifestStore {
     }
 
     pub fn release_checkpoint(&self, name: &str) -> Result<bool> {
+        let _gate = self
+            .checkpoint_gate
+            .lock()
+            .map_err(|_| Error::PoisonedWriter)?;
+        self.ensure_publication_ready()?;
         validate_checkpoint_name(name)?;
         let directory = self.root.join(CHECKPOINT_DIRECTORY);
         let path = directory.join(format!("{name}.json"));
-        match std::fs::remove_file(path) {
+        match path.remove_file() {
             Ok(()) => {
-                crate::sync_directory(&directory)?;
+                self.publication_result(directory.sync_directory().map_err(Error::Io))?;
                 Ok(true)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-            Err(error) => Err(error.into()),
+            Err(error) => self.publication_result(Err(error.into())),
         }
     }
 
@@ -668,26 +893,34 @@ impl ManifestStore {
         let directory = self.root.join(MANIFEST_DIRECTORY);
         let path = directory.join(format!("{}.json", manifest.digest));
         let bytes = serde_json::to_vec(manifest)?;
-        match std::fs::symlink_metadata(&path) {
+        match path.metadata() {
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() || !metadata.is_file() {
                     return Err(Error::InvalidManifest(
                         "existing manifest is not a regular non-symlink file".into(),
                     ));
                 }
-                if std::fs::read(&path)? != bytes {
+                if path.read()? != bytes {
                     return Err(Error::InvalidManifest(
                         "existing manifest identity has different bytes".into(),
                     ));
                 }
+                directory.sync_directory()?;
                 return Ok(());
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(Error::io("validating manifest destination", &path, error)),
+            Err(error) => {
+                return Err(Error::io(
+                    "validating manifest destination",
+                    path.diagnostic_path(),
+                    error,
+                ))
+            }
         }
         let temporary = directory.join(format!(
-            ".{}.{}.tmp",
+            ".{}.{}.{}.tmp",
             manifest.digest,
+            self.temporary_nonce,
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
         persist_rename(&directory, &temporary, &path, &bytes)
@@ -696,7 +929,8 @@ impl ManifestStore {
     fn publish_pointer(&self, pointer: &CurrentPointer) -> Result<()> {
         let path = self.root.join(CURRENT_FILE);
         let temporary = self.root.join(format!(
-            ".CURRENT.{}.tmp",
+            ".CURRENT.{}.{}.tmp",
+            self.temporary_nonce,
             POINTER_TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
         persist_rename(&self.root, &temporary, &path, &serde_json::to_vec(pointer)?)
@@ -717,18 +951,12 @@ fn validate_checkpoint_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-fn persist_rename(directory: &Path, temporary: &Path, target: &Path, bytes: &[u8]) -> Result<()> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(temporary)?;
-    if let Err(error) = (|| -> std::io::Result<()> {
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        crate::publish_rename(directory, temporary, target)
-    })() {
-        let _ = std::fs::remove_file(temporary);
-        return Err(Error::Io(error));
-    }
-    Ok(())
+fn persist_rename(
+    _directory: &AnchoredPath,
+    temporary: &AnchoredPath,
+    target: &AnchoredPath,
+    bytes: &[u8],
+) -> Result<()> {
+    temporary.admit_disk(bytes.len() as u64, true)?;
+    crate::filesystem::persist_rename(temporary, target, bytes).map_err(Error::Io)
 }

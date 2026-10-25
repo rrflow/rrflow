@@ -44,6 +44,7 @@ fn install(state_root: &Path, instance: &str) -> CanonicalId {
     let preview = RrdEngine::plan_installation(
         &project,
         InstallationTargetKind::ExistingProject,
+        &RrdEngine::generate_installation_identity().unwrap(),
         "default",
         None,
         &test_executable(),
@@ -54,7 +55,6 @@ fn install(state_root: &Path, instance: &str) -> CanonicalId {
         InstallationTargetKind::ExistingProject,
         &preview,
         &preview.installation.plan_sha256,
-        100,
         &test_executable(),
     )
     .unwrap();
