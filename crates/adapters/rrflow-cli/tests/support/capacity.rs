@@ -203,21 +203,28 @@ fn fill_data<W: Write>(
     let mut bytes_at_barrier = 0;
     let mut barrier_since_write = false;
     let mut write_size = buffer.len();
+    let mut writes = 0u64;
     loop {
         assert!(
             started.elapsed() < Duration::from_secs(25),
-            "bounded owned-volume fill"
+            "bounded owned-volume fill: bytes={bytes} writes={writes} request_bytes={write_size} elapsed_ms={}",
+            started.elapsed().as_millis()
         );
         assert!(
             bytes < max_bytes,
             "owned filesystem did not enforce its capacity"
         );
         let attempt = write_size.min((max_bytes - bytes) as usize);
+        writes += 1;
         match file.write(&buffer[..attempt]) {
             Ok(0) => panic!("zero-length filler write"),
             Ok(n) => {
                 bytes += n as u64;
                 barrier_since_write = false;
+                // A reduced probe can succeed as allocation becomes available.
+                // Resume bulk writes instead of draining that space bytewise.
+                // Subsequent capacity errors still reduce to the one-byte oracle.
+                write_size = buffer.len();
             }
             Err(error) => {
                 let Some(code) = error.raw_os_error().filter(|code| capacity_code(*code)) else {
@@ -565,6 +572,50 @@ fn filler_host_sync_preserves_native_noncapacity_errors() {
 mod filler_tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn successful_small_write_recovers_bulk_allocation_without_bytewise_drain() {
+        struct ReopenedAllocation {
+            written: usize,
+            calls: usize,
+        }
+        const AVAILABLE: usize = 1024 * 1024 + 1;
+        impl Write for ReopenedAllocation {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.calls += 1;
+                assert!(
+                    self.calls < 128,
+                    "available allocation drained byte by byte"
+                );
+                if self.written == AVAILABLE || (self.written == 0 && bytes.len() > 1) {
+                    return Err(std::io::Error::from_raw_os_error(if cfg!(windows) {
+                        112
+                    } else {
+                        28
+                    }));
+                }
+                let count = bytes.len().min(AVAILABLE - self.written);
+                self.written += count;
+                Ok(count)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut file = ReopenedAllocation {
+            written: 0,
+            calls: 0,
+        };
+        let mut syncs = 0;
+        let (bytes, code) = fill_data(&mut file, 2 * 1024 * 1024, Instant::now(), |_| {
+            syncs += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(bytes, AVAILABLE as u64);
+        assert_eq!(syncs, 1);
+        assert!(capacity_code(code));
+    }
 
     #[test]
     fn settle_pressure_repeats_after_either_category_allocates() {

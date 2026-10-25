@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [fill-write recovery correction](../../evidence/change-journals/gate-c/c-07f-fill-write-recovery.md)
+retains PR114 run 40167630906: after 24 successful native macOS cases, disposable
+filling exceeded its original 25-second deadline. A deterministic regression
+exposes the helper retaining one-byte requests after allocation becomes
+available. Bulk requests now resume after progress; bounds and the synchronized
+native-error oracle remain unchanged. Exact integrated qualification is pending.
+
 The [joint APFS pressure correction](../../evidence/change-journals/gate-c/c-07f-apfs-joint-pressure.md)
 retains run 40162479866: 29 native cases passed before an existing segment
 case failed to produce the selected native error. One metadata pass and final
