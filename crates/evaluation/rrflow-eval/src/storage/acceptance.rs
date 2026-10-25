@@ -145,7 +145,10 @@ impl CandidateCiReceipt {
                 "Qualify installed native capacity failure and recovery",
             )?;
             if os == "macos-latest" {
-                Self::step(crash, "Require repeated APFS WAL exhaustion and recovery")?;
+                Self::step(
+                    crash,
+                    "Require repeated APFS WAL and segment exhaustion and recovery",
+                )?;
             }
             Self::step(
                 crash,
