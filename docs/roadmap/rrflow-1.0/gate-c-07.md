@@ -13,6 +13,14 @@ records code inspection and executed component tests at `b6052fee`.
 
 ## Result required
 
+The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
+preserves PR127/128 and records a further macOS failure: the selected WAL
+pause was reached, filler returned ENOSPC, but the required native error did
+not arrive and the API reported resource exhaustion. Bounded physical-file
+and synthetic-request diagnostics plus repeated fresh/existing APFS cases
+address missing attribution. This is not yet a causal repair or acceptance;
+original deadlines, caps, native-error and recovery oracles remain required.
+
 The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-encoder-working-set.md)
 records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
 CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
