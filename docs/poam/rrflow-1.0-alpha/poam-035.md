@@ -16,6 +16,14 @@ buffer reuse in PR128. Exact-byte and component checks do not establish repair
 of that installed timeout. Full growth/profile and actual 24-hour acceptance
 remain open; no deadline or resource cap is relaxed.
 
+The [integrated public-client readback package](../../evidence/change-journals/gate-c/c-07-integrated-readback.md)
+addresses a separate demonstration gap: the existing local database example
+combined two independent HEAD queries, so a concurrent commit could yield a
+mixed-cursor view. Its fixed-cursor read and independently expected sample
+verification retain the real transaction/reopen checks. This improves the
+usable DB/graph/QL flow; it does not close native capacity, lifetime, full
+profile or 24-hour-soak acceptance. The C-07 qualification gap remains open.
+
 PR125 Ubuntu job `121000145879` also exposed a diagnostic subprocess fixture
 race: the child could exit before required stdin delivery, producing
 `BrokenPipe`. The [integrated repair journal](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md#observed-process-fixture-input-race)
