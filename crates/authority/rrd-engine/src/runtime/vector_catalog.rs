@@ -154,10 +154,10 @@ impl VectorArtifactBinding {
         &self,
         objects: &impl ImmutableObjectStore,
     ) -> Result<Option<Arc<VectorArtifact>>, Box<dyn std::error::Error>> {
-        let Some(path) = objects.verified_path(&self.object)? else {
+        let Some(file) = objects.verified_file(&self.object)? else {
             return Ok(None);
         };
-        let Some(artifact) = VectorArtifact::open_mmap(self.kind, path)? else {
+        let Some(artifact) = VectorArtifact::open_mmap_file(self.kind, file)? else {
             return Ok(None);
         };
         self.validate_artifact(&artifact)?;

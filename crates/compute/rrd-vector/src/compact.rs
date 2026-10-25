@@ -15,7 +15,7 @@ use rrd_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -224,6 +224,11 @@ impl CompactDenseSegment {
                 path.display()
             ))
         })?;
+        Self::open_mmap_file(file)
+    }
+
+    /// Maps the already admitted immutable file without reopening a pathname.
+    pub fn open_mmap_file(file: File) -> Result<Self> {
         let length = file
             .metadata()
             .map_err(|error| runtime_error(format!("cannot stat compact dense artifact: {error}")))?
@@ -243,22 +248,30 @@ impl CompactDenseSegment {
     /// Durably stages and atomically publishes this immutable artifact. An
     /// existing path is accepted only when it contains the same verified bytes.
     pub fn write_atomic(&self, path: impl AsRef<Path>) -> Result<()> {
-        let path = path.as_ref();
+        use rrd_store::filesystem::{AnchoredPath, OpenOptions};
+        let path = AnchoredPath::from_path(path.as_ref())
+            .map_err(|error| runtime_error(error.to_string()))?;
         let parent = path
             .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or_else(|| Path::new("."));
-        std::fs::create_dir_all(parent).map_err(|error| {
-            runtime_error(format!("cannot create compact artifact directory: {error}"))
-        })?;
-        if path.exists() {
-            let existing = Self::open_mmap(path)?;
+            .ok_or_else(|| runtime_error("artifact has no parent"))?;
+        parent
+            .create_dir_all()
+            .map_err(|error| runtime_error(error.to_string()))?;
+        if path
+            .try_exists()
+            .map_err(|error| runtime_error(error.to_string()))?
+        {
+            let existing = Self::open_mmap_file(
+                path.open_read()
+                    .map_err(|error| runtime_error(error.to_string()))?,
+            )?;
             if existing.as_bytes() == self.as_bytes() {
                 return Ok(());
             }
             return invalid("compact dense publication path contains different bytes");
         }
         let name = path
+            .relative_path()
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| runtime_error("compact dense publication path has no UTF-8 filename"))?;
@@ -267,24 +280,26 @@ impl CompactDenseSegment {
             std::process::id(),
             TEMPORARY_ID.fetch_add(1, Ordering::Relaxed)
         ));
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)
+            .map_err(|error| {
+                runtime_error(format!("cannot stage compact dense artifact: {error}"))
+            })?;
         let publish = (|| -> std::io::Result<()> {
-            let mut file = OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(&temporary)?;
             file.write_all(self.as_bytes())?;
             file.sync_all()?;
-            drop(file);
-            // A hard-link publication is atomic and fail-if-present. Unlike
-            // rename on Unix, it cannot overwrite a generation that won a race.
-            std::fs::hard_link(&temporary, path)?;
-            std::fs::remove_file(&temporary)?;
-            File::open(parent)?.sync_all()
+            temporary.rename_new_to(&path)
         })();
+        drop(file);
         if let Err(error) = publish {
-            let _ = std::fs::remove_file(&temporary);
+            let _ = temporary.remove_file();
             if error.kind() == std::io::ErrorKind::AlreadyExists {
-                let existing = Self::open_mmap(path)?;
+                let existing = Self::open_mmap_file(
+                    path.open_read()
+                        .map_err(|error| runtime_error(error.to_string()))?,
+                )?;
                 if existing.as_bytes() == self.as_bytes() {
                     return Ok(());
                 }
@@ -294,7 +309,10 @@ impl CompactDenseSegment {
                 "cannot publish compact dense artifact: {error}"
             )));
         }
-        let published = Self::open_mmap(path)?;
+        let published = Self::open_mmap_file(
+            path.open_read()
+                .map_err(|error| runtime_error(error.to_string()))?,
+        )?;
         if published.descriptor != self.descriptor {
             return invalid("published compact dense descriptor failed verification");
         }

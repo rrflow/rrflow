@@ -856,19 +856,15 @@ fn transaction_binding_effects_commit_atomically_and_failures_leave_data_unchang
             && record.phase == rrd_contract::AuditPhase::Completed
             && record.decision == AuditDecision::Allowed
     }), "successful transaction functions are evidenced by atomic receipts, not a pre-commit allowed audit");
-    let session_key = format!(
-        "server/state/test-instance/session/{}",
-        lease.session_id.as_str()
-    );
-    let state: Value =
-        serde_json::from_slice(&engine.storage.control().get(&session_key).unwrap().unwrap())
-            .unwrap();
-    let function_receipt: FunctionInvocationReceipt = serde_json::from_value(
-        state["transactions"][transaction.transaction_id.as_str()]["commit_intent"]
-            ["function_receipts"][0]
-            .clone(),
-    )
-    .unwrap();
+    let (_, state) = engine
+        .load_authenticated(&lease.session_id, &lease.token)
+        .unwrap();
+    let record = engine
+        .transaction_record(&state, &transaction.transaction_id)
+        .unwrap()
+        .unwrap();
+    let function_receipt: FunctionInvocationReceipt =
+        record.commit_intent.unwrap().function_receipts[0].clone();
     let stored_receipt = engine
         .storage
         .function_catalogue()

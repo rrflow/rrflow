@@ -187,12 +187,12 @@ adapter. The plan is canonical serialized data whose SHA-256 covers:
 Repeated planning over unchanged inputs is byte-identical. A stale plan fails
 before mutation.
 
-Installation-plan contract version 2 seals the explicit identity input and
+Installation-plan contract version 4 seals the explicit identity input and
 `project_root_sha256`, a digest of the initial canonical root. Identical project
 content does not allocate an estate identity. New apply and interrupted recovery
 must match that root before effects. Once the installed locator and record are
 published, relocation, reopen and exact completed replay retain the persisted
-identity; the live path is not its permanent identity. Unbound version-1 plans
+identity; the live path is not its permanent identity. Prior version-1/2/3 plans
 are rejected. Attunement and result envelopes retain their independent version
 1; product version remains `1.0.0`. This is not a binary-upgrade or estate-
 migration facility: retain the executable that created an existing pre-alpha
@@ -201,22 +201,65 @@ estate until its qualified upgrade path exists.
 clients can check the installation boundary without treating the frozen
 product version as a capability signal.
 
+The plan also previews `acquire_installation_lease` and the ninth
+managed path, `.rrflow-install.lock`. Its precondition means absent or a
+validated private, empty, single-link regular file; its removal rule is
+`retain_for_exclusion`. File presence does not mean an installation is active
+or complete. The native handle lock is the only admission owner. Apply and
+recovery retain it through locator publication and intent acknowledgement;
+contenders fail immediately with a storage conflict. Closing the handle or
+process termination releases ownership without unlinking the file. Lease
+contents are never repaired, PID/age never permits takeover, and unrelated
+projects have independent admission. Read-only preview creates nothing and
+excludes this path from project inventory only after validating it. Invalid
+new-install preconditions are checked before creation, then checked again
+under the lock. This local native-file contract establishes no network-share
+locking qualification.
+
+Version 4 seals the linked generic template bytes and selected specialization
+in `InstallationBootstrap`, persisted within the installed binding. `--profile
+default` selects a provider-neutral seat; `--profile clyffy` explicitly selects
+the bundled Clyffy seat. Both keep endpoint candidates absent and external
+process, network invocation and activated-provider lists empty. Installation
+never activates a provider or rewrites project-owned instructions.
+
+The thirteen managed paths include the lease, intent, locator staging file,
+`.rrflow/bootstrap.md` and its staging file. Ten ordered actions distinguish
+credential generation in the intent from later credential delivery. The plan
+binds the ten initial logical records (seat schema/record, security policy/audit/
+head, configuration, installed binding, checkpoint and pending attunement
+plan/job), owner-only directories and secret files, entropy sizes, and the
+rrflowKV owner's format coordinates. Initial semantic payloads are bounded to
+one MiB each and four MiB together; these are semantic admission limits, not a
+claim that physical storage uses exactly that number of bytes. Template and
+rendered instruction text are each limited to 64 KiB.
+
+Owned assets pin LF checkout bytes. Preview seals their exact digests; apply
+rejects altered or rehashed bundle input before effects. Instructions publish
+through an exact-content staging file. Recovery checks its bytes, and installed
+inspection/open/replay reject instruction drift without silently repairing it.
+Dynamic time and secret inputs are obtained only during authorized apply through
+the existing engine clock and OS entropy authority. Actual installed/transaction,
+credential and manifest digests remain in existing receipts. The attunement job
+remains pending; this bootstrap is not verified source indexing or provider
+configuration. The [D-01 accepted matrix](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+binds native qualification and foundation acceptance to exact candidate evidence.
+
 ## Install apply
 
 `rrflow install apply` accepts only the named plan and expected digest. It:
 
 1. resolves and revalidates the exact bundle and project preconditions;
-2. acquires an exclusive create-new lease without following an unreviewed link
-   or mount change;
-3. creates a plan-addressed staging root and uses a create-new rrflowKV API;
-4. commits the installed binding, initial seat, security authority, install
-   checkpoint, audit, outbox, and commit evidence through `RrdEngine`;
-5. performs credential delivery through a capability-scoped, create-new,
-   idempotency-aware sink and records prepared/effect/observation/receipt state;
-6. fsyncs the staged root and atomically publishes the minimal locator only
-   after the committed instance is self-verifying;
-7. acknowledges the exact receipt; and
-8. creates the durable attunement job without treating an event as completion.
+2. acquires a nonblocking native lock on the previewed private empty
+   `.rrflow-install.lock` file without following an unreviewed link or mount
+   change; retains that handle through final acknowledgement;
+3. prepares the accepted clock anchor and secrets once in the private intent;
+4. creates the private estate directories and publishes exact bundled instructions;
+5. creates the plan-addressed rrflowKV root and delivers the prepared credentials;
+6. commits the installed binding, initial seat, security authority, checkpoint,
+   audit, configuration and pending attunement plan/job through `RrdEngine`;
+7. verifies the committed instance and atomically publishes its minimal locator; and
+8. acknowledges the exact intent without treating file presence as job completion.
 
 Every crash boundary resumes the same plan or fails closed. It cannot create a
 second credential, policy, estate, instance, audit outcome, or project edit.
@@ -231,19 +274,21 @@ Packages `D01-02-canonical-estate-layout-and-configuration-v1`,
 startup slice without claiming the complete target above:
 
 - `rrd-contract` owns `InstalledEstateIdentity`, three independent deployment
-  coordinates, and a strict self-digesting format-2 `EstateConfiguration`,
-  including `clock.maximum_rollback_ms` with a zero default;
+  coordinates, and a strict self-digesting format-3 `EstateConfiguration`,
+  including `clock.maximum_rollback_ms` with a zero default and required native
+  storage limits;
 - the bundled default configuration or one explicit regular, non-symlinked
   TOML file up to 64 KiB is read during planning, validated below hard compiled
   maxima, assigned revision 1, and sealed into the plan;
 - apply never rereads that mutable input. It consumes the sealed value and
   creates, in declared order, `.rrflow/`, `.rrflow/rrd/`,
-  `.rrflow/rrd/roots/`, `.rrflow/credentials/`, one create-new storage root,
-  token key, credential document, and `.rrflow/config.toml`;
+  `.rrflow/rrd/roots/`, `.rrflow/credentials/`, bundled bootstrap instructions,
+  one create-new storage root, token key, credential document and `.rrflow/config.toml`;
 - the active configuration is committed inside rrflowDB at
   `server/state/<instance>/configuration/active` before locator publication;
-- installed open validates locator, installed record, configuration revision
-  and digest, then binds the same identity/configuration into `RrdEngine`;
+- locator format 2 projects the sealed storage policy for admission before
+  WAL replay. Installed open and read-only inspection validate that projection
+  against the installed record and effective configuration before readiness;
 - query, live-query, query-index, and context requests above the installed
   ceiling fail before their data operation; and
 - server capabilities and generated OpenAPI/SDK types expose the effective
@@ -260,9 +305,9 @@ startup slice without claiming the complete target above:
   credential, one semantic installation commit, pending locator, and active
   locator. It classifies empty, committed, published, and complete states and
   removes only the exact pending locator and acknowledged intent it owns;
-- deterministic test-only observation stops before or after each of the eight
-  durable stages: intent, directories, store, token, credential, engine commit,
-  locator publication, and intent acknowledgement. Retrying the same plan
+- deterministic test-only observation covers lease acquisition and ten
+  durable stages: intent, directories, bootstrap staging/publication, store,
+  token, credential, engine commit, locator publication and intent acknowledgement. Retrying the same plan
   preserves the first clock anchor and leaves one token, credential, installed
   record, policy, audit/checkpoint result, attunement plan/job, and locator;
 - recovery, exact replay, and installed open compare a fresh observation with
@@ -280,6 +325,185 @@ startup slice without claiming the complete target above:
   raw product CLI, development supervisor, standalone security initializer,
   and server initializer are removed with no successful compatibility reader.
 
+### Reasoning-limit configuration
+
+Installation can seal reasoning ceilings from `install plan --configuration
+<toml>`. Copy the complete bundled
+[`default-estate-configuration-v3.toml`](../../../crates/authority/rrd-engine/assets/install/default-estate-configuration-v3.toml)
+as the input and edit its existing `[reasoning]` table, for example:
+
+```toml
+[reasoning]
+max_run_elapsed_ms = 120000
+max_steps = 16
+max_step_elapsed_ms = 15000
+```
+
+This is a two-minute, sixteen-step, fifteen-second-per-step configuration
+example, not a complete configuration file or a running timeout feature.
+The full input must retain its required storage/clock/recall/query sections.
+Preview and apply the sealed installation plan through the existing commands;
+do not edit an installed `.rrflow/config.toml` to bypass the active revision.
+Post-install governed configuration changes remain D-06 work.
+
+The existing parser requires positive limits, per-step time no greater than
+total time, and compiled maxima of one hour per run, 10,000 steps and five
+minutes per step. The default is fifteen minutes, 256 steps and one minute
+per step. `governed-reasoning-runner` is unavailable: these values are currently
+validated configuration and advertised ceilings, not evidence of end-to-end
+loop prevention. The [LFG/SWAG budget contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+owns aggregate accounting, retries, effort presets, stop/resume and required
+runtime proof. Existing query/context limits remain separately enforced.
+
+### Native storage limits
+
+The required `[storage]` configuration separates active-state, output, cache,
+and maintenance controls:
+`mutable_accounted_bytes` (128 MiB default), `mutable_versions` (1,048,576),
+`projected_output_bytes` (128 MiB), `source_page_bytes` (256 MiB),
+`page_cache_bytes` (4 MiB, zero disables
+caching), `wal_flush_target_bytes` (64 MiB) and
+`memtable_flush_target_versions` (524,288). The first two are native active-state
+hard caps; the next three bound retained projected allocations, live owned
+source-page allocations and cache residency;
+the last two are soft synchronous maintenance targets. A single atomic batch
+may exceed a soft target only within hard admission. These are not aggregate
+RSS bounds. Protocol ceilings and checked native conversion
+reject invalid configuration. Current limits require reopening; no live
+configure operation or qualified capacity profile is implied.
+
+Source-page admission precedes file-page allocation and decompression. It
+counts the compressed input and decoded output while both exist, and retains
+the charge through cache eviction, Arrow clones/slices and reader/database
+close. Raw mapped pages remain borrowed and use the separate file-pin policy.
+Cache pressure evicts cache owners before returning typed resource exhaustion;
+held reader buffers cannot lose their charge. Storage admission diagnostics
+expose `retained_source_bytes`, `peak_source_bytes` and
+`denied_source_allocations`. These count owned page payload allocations, not
+allocator overhead, borrowed mappings, snapshot-input backing bytes or RSS.
+
+Immutable maintenance adds `compaction_input_bytes` (1 GiB),
+`compaction_input_logical_bytes` (256 MiB), `compaction_input_versions`
+(4,194,304), `compaction_output_segments` (256), `compaction_elapsed_ms`
+(30,000) and `compaction_l0_segments` (64). Verified segment metadata admits
+compressed and decoded input, including complete hot-key histories, before
+cursor decoding. Logical bytes count page payloads, not heap overhead or RSS.
+The deadline is cooperative between records/partitions and before publication;
+it cannot interrupt a filesystem operation. Output partitions are bounded
+before creation. L0 saturation denies further write admission if synchronous
+maintenance cannot make room, including repeated attempts after a prior flush.
+Explicit flushes also cannot exceed the L0 cap. Pressure never authorizes
+pruning protected history. Unpublished partition files from interrupted work
+remain subject to the existing validated garbage collector. Total on-disk
+history, higher-level debt, retained snapshots and process memory are separate
+qualification obligations; these controls do not claim those are bounded.
+
+Flushes partition the mutable table at key boundaries using the native
+`CompactionPolicy::target_segment_bytes` output target (8 MiB default), also
+used for compaction. This is a logical payload target, not a physical-file or
+RSS cap; one complete version chain stays together even when larger. The plan
+borrows boundary keys and checks the complete output count against both L0
+and output-segment limits before syncing or creating output. Each partition
+uses the existing v6 writer; one manifest publishes every partition and the
+successor WAL together. Failed partial output remains unreachable and is
+reclaimed by the existing collector. The cooperative maintenance deadline
+applies before publication. The [partitioned-flush evidence](../../evidence/change-journals/gate-c/c-07d-partitioned-flush.md)
+does not establish installed capacity or a completed soak.
+
+A compaction-budget denial at a soft write-triggered flush defers that optional
+merge and retains its debt/failure counters. The incoming write still must pass
+hard L0, reclamation and mutable admission before WAL append; a failed optional
+merge cannot by itself consume otherwise available write capacity. Native I/O,
+corruption and publication uncertainty are not ignored. Cleanup ownership begins
+before partition creation, including when idle work fails before publication.
+
+Writers also offer one immutable compaction quantum when L0 debt between
+flushes reaches a full configured input-segment quantum, or the hard L0 cap
+if smaller. Smaller debt remains eligible for idle upkeep. The offer runs
+before a flush needs additional slots; if no earlier quantum
+was offered, a newly flushed table can trigger one afterward. A write never
+loops to drain debt or offers a second compaction at saturation. This path does
+not flush the mutable tail as a side effect of housekeeping. The same hard
+admission and protected-snapshot rules apply; failed admission is backpressure,
+not permission to exceed the cap. The [foreground debt record](../../evidence/change-journals/gate-c/c-07d-foreground-debt-progress.md)
+separates this component behavior from installed capacity evidence.
+
+While serving, the existing one-second host sweep offers one engine-owned
+physical maintenance quantum to a single joined worker. Busy ticks are skipped.
+Each admitted quantum either reclaims a bounded pending inventory or performs
+one bounded compaction to reduce L0 debt. It uses the same writer lock and
+configured limits and does not flush the active mutable tail or advance logical
+cursors. For both foreground commit maintenance and idle upkeep, the store
+explicitly permits pruning superseded physical versions:
+registered transactions remain protected, read views and named checkpoints
+retain their generations, and logical versioned keys remain data. Standalone
+automatic maintenance retains all versions for untracked copyable snapshots;
+an owner may select the explicit protected-snapshot entry point. Shutdown and
+cancellation stop new offers and join any admitted quantum; the cooperative deadline still cannot
+interrupt a blocked filesystem call. Embedded hosts can offer the same work
+through `RrdEngine::maintain_storage`. The
+[idle-maintenance evidence](../../evidence/change-journals/gate-c/c-07d-idle-maintenance.md)
+and [owned-history evidence](../../evidence/change-journals/gate-c/c-07d-tracked-history-maintenance.md)
+do not replace installed latency, drain or soak qualification.
+The [foreground retention evidence](../../evidence/change-journals/gate-c/c-07d-write-history-retention.md)
+also checks that enabling diagnostics does not change retained state.
+
+Retained mutable generations share an ownership-based pool per opened database:
+`retained_mutable_bytes` (512 MiB), `retained_mutable_versions` (4,194,304) and
+`retained_mutable_generations` (64). A writer reserves a complete copy before
+copy-on-write and before WAL append; cancellation releases only the owners it
+actually drops. Readers can retain their charge after the database closes.
+The byte charge covers keys, values and version records, excluding allocator
+and tree overhead. Independently reopened pools do not establish a host quota.
+
+The normal write path now invokes bounded reachability reclamation after
+publication and on reopen, before appending the incoming batch. Controls are
+`reclamation_inventory_entries` (262,144), `reclamation_metadata_bytes` (64 MiB),
+`reclamation_delete_files` (1,024), `reclamation_delete_bytes` (1 GiB), and
+`reclamation_elapsed_ms` (30,000). Current, captured-reader and checkpoint
+manifests protect their files. Complete admitted inventories and protected
+references are checked before deletion; damaged references fail closed.
+Partial deletion cycles synchronize completed removals and retain pending work.
+A partial cycle returns reclamation pressure before the incoming WAL append;
+retries drain that finite work before admitting additional growth.
+A single file larger than the deletion budget reports explicit pressure.
+Elapsed limits are cooperative and cannot interrupt native filesystem calls.
+These controls do not qualify actual disk exhaustion or sustained capacity.
+
+Engine transaction serialization uses a FIFO admission gate with
+`transaction_admission_requests` (64 active plus queued requests),
+`transaction_admission_bytes` (64 MiB aggregate serialized logical request
+charge), and `transaction_admission_wait_ms` (30,000). A bounded counting sink
+measures each request without allocating a second serialized buffer. The
+active owner remains charged until its actual guard drops. Timeout and pending
+cancellation release queued reservations; a panic in effect code fences future
+admission. These controls cover the existing transaction/unique-index/function/
+flight/task/operator gate, not transport parsing or total process allocation.
+`AuthorizedInvocation::cancel_pending` controls an authenticated embedded
+invocation waiting for that gate; it is not an HTTP disconnect hook or rollback
+of effects already admitted. Request-context deadlines are checked before
+admission. Native `transaction_admission_snapshot` exposes content-free current
+and peak charge; no new wire operation or independent lifecycle is introduced.
+
+Recovery and mutation-free inspection use `recovery_metadata_bytes` (64 MiB),
+`recovery_files` (262,144 admitted file reads), `recovery_read_bytes` (1 TiB
+conservative whole-file charge), `recovery_wal_bytes` (256 MiB),
+`recovery_wal_frames` (1,048,576), and `recovery_elapsed_ms` (120,000). Metadata
+is admitted before allocation, immutable files before segment opening, and WAL
+size/frames before payload materialization. Inspection charges repeated reads
+again, including its full-file digest pass. Its hashing loop checks elapsed
+work and rejects changed file lengths. Budget exhaustion preserves bytes and
+returns explicit non-readiness; it does not repair tails or relax the installed
+policy. Elapsed checks are cooperative, not interruption of an OS call. These
+work bounds do not establish recovery disk reserve or total process RSS.
+
+Apply, interrupted installation, reopen, inspection, backup restore and restore
+publication lower the same sealed policy into native storage options. A low
+replay limit denies access without modifying authoritative bytes; inspection
+does not silently retry with larger defaults. Configuration format 2 and locator
+format 1 are replaced pre-release shapes and are rejected, not migrated or
+silently defaulted. Product version remains 1.0.0.
+
 The implementation rejects any pre-existing `.rrflow` tree for a new install.
 It does not migrate, merge, or delete a user's pre-canonical
 `.rrflow/instance.toml` state; that collision remains a fail-closed diagnostic.
@@ -288,8 +512,8 @@ it. The clock substrate proves only relative rollback against a sealed anchor:
 it does not authenticate or correct UTC, detect every forward error or drift,
 or establish runtime-wide timestamp high-water rules. Platform synchronization
 diagnosis, explicitly authorized correction, and native clock qualification
-remain open. Handle-relative race hardening, complete native ACL
-qualification, configuration plan/apply, attunement phase execution, full
+remain open. D-01's bounded native filesystem and ACL qualification is accepted
+in the linked matrix. Configuration plan/apply, attunement phase execution, full
 verify/repair/restore/uninstall, service integration, release assembly, and
 clean-machine qualification remain separate packages. The staged rationale and
 exit proofs are in the
@@ -313,15 +537,73 @@ for those principals, regular/non-reparse attributes and single link. The
 read handle excludes concurrent write/delete sharing. Unsupported native
 security enforcement fails closed; no runtime ACL utility is required.
 
-These are leaf-file guarantees, not ancestor-directory or mount containment,
-an atomic project snapshot, resistance to every same-owner race, a credential
-migration facility, or complete native ACL qualification. Privileged foreign-
-owner and Windows reparse adversarial fixtures remain unqualified. The
+These private-object checks compose with retained filesystem authority below.
+They do not establish an atomic project snapshot, resistance to every
+same-owner race, a credential migration facility, or qualification for arbitrary
+filesystems. Privileged foreign-owner cases now pass explicitly on Linux,
+macOS and Windows in the
+[D-01 accepted matrix](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21).
+The
 [native secret boundary journal](../../evidence/change-journals/gate-d/d-01-native-secret-boundary.md)
 records real filesystem denial and retained installation/recovery evidence.
-D-01 remains open.
+D-01's installed foundation is accepted; wider operational and release gates remain open.
 
 ## Open, serve, and readiness
+
+### Private estate-directory admission
+
+The four engine-owned boundaries `.rrflow`, `.rrflow/rrd`,
+`.rrflow/rrd/roots` and `.rrflow/credentials` are created with private native
+security. Unix creation requests mode `0700`; admission requires that mode
+and effective-user ownership on the opened directory. Windows creation
+supplies a protected owner/LocalSystem DACL with object/container inheritance;
+admission inspects the directory handle's owner, DACL and non-reparse disk
+attributes. The default project-parent ACL is not used as the security policy.
+
+Apply and recovery validate every present boundary before reading recovery
+secrets or advancing store work. Installed locator, credential, open and
+inspection operations require all four boundaries. Missing paths are allowed
+only during new or interrupted apply. A changed mode, unsupported ACL or
+non-directory object is refused without permission repair; project-owned
+parents are never tightened. Creation does not replace an existing object.
+
+These checks extend the private-object boundary. Existing pre-alpha estates
+with incompatible directory permissions
+are refused rather than silently upgraded.
+
+### Retained filesystem authority
+
+Installation retains the admitted project directory and each private estate
+boundary. Store, manifest, WAL, segment, object, backup, archive and restore
+operations carry directory capabilities through their existing owners.
+Diagnostic path strings cannot be used as capability inputs. Each relative
+component is opened without following links and checked against the admitted
+native mount identity. Payload admission rejects nonregular files and multiple
+hard links before reads or truncation; this also applies to installation's
+project-input inventory. Public standalone path APIs establish authority once
+at entry. Host parent aliases may be resolved before initial admission; the
+selected root leaf itself cannot be a link.
+
+WAL replay and writable recovery retain the same file. Object digest
+verification hands its opened file to vector mapping and snapshot transport;
+consumers do not reopen a previously verified pathname. Publication and cleanup
+operate relative to retained parents. Locator and vector publication use atomic
+no-replace operations, preserving a concurrent winner. Windows publication holds
+all ancestors without delete sharing and uses write-through rename. Unix uses
+directory-relative rename and directory synchronization. Linux requires native
+mount IDs; macOS uses the filesystem identity and mounted-on name; Windows
+rejects reparses and volumes without persistent ACL support. Unsupported native
+enforcement is an error, with no pathname fallback.
+
+The [containment journal](../../evidence/change-journals/gate-d/d-01-anchored-filesystem.md)
+records platform-specific tests and qualification limits. These operations do
+not make mutable project content an atomic snapshot or protect against every
+same-owner modification. Whole-install exclusivity, bounded installed bootstrap
+and the native offline matrix are accepted in D-01.3 through D-01.6. Network
+filesystems and arbitrary filesystem implementations are not qualified by the
+local native runner results.
+
+### Installed engine admission
 
 Normal open is `open_existing`, never create-or-open. A read-only inspector
 first resolves the project locator, validates the installed closure, and
@@ -410,6 +692,28 @@ retained or quarantined under the exact plan; it is never overwritten.
 Acknowledged complete-frame corruption, an unauthenticated manifest choice,
 irreconcilable semantic divergence, or unknown authorization truth can never
 be "fixed" by guessed values.
+
+### Implemented incomplete-tail candidate repair
+
+The current `repair plan --project <root>` command emits JSON to stdout;
+`repair apply --project <root> --plan <file> --expect <sha256>` accepts that
+exact artifact. Only an incomplete final WAL frame qualifies. Planning and
+ordinary verification preserve bytes; complete checksum corruption, missing
+authoritative files, a stale physical inventory or an insufficient recovery
+budget deny repair.
+
+The bounded copy includes every regular file in the active root, including
+object payloads and the private token. Its plan declares source inventory,
+copy bytes, no fallback, same-filesystem publication and quarantine. Only the
+candidate WAL is truncated. The original root is retained under a
+content-addressed quarantine; a private intent resumes interrupted copy and
+publication, and the existing control journal records completion. The candidate
+carries before/after inventory identities. This implementation retains the
+existing installed root name and locator binding, matching the current restore
+publication profile. General locator replacement, other repair classes and
+full semantic/index verification remain D-11 work. The
+[C-07f journal](../../evidence/change-journals/gate-c/c-07f-native-capacity.md)
+separates implementation and compilation from native qualification results.
 
 ## Backup and restore
 

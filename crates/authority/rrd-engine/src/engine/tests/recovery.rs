@@ -86,6 +86,7 @@ fn commit_reopens_replays_and_does_not_duplicate_claims() {
             "session.created",
             "transaction.began",
             "transaction.commit_prepared",
+            "transaction.retained",
             "transaction.committed",
         ]
     );

@@ -3,34 +3,38 @@ use super::clock::FixedClock;
 use super::clock::{assess, observe_required, require_accepted, ClockSource, HostSystemClock};
 use super::*;
 use crate::engine::estate_layout::{
-    create_estate_directories, reject_existing_estate, reject_existing_symlink_path, safe_join,
-    validate_managed_relative, validate_recovery_estate, EstateLayout, LOCATOR_RELATIVE_PATH,
-    STORAGE_DIRECTORY,
+    create_estate_directories, reject_existing_estate, safe_join, validate_estate_directories,
+    validate_managed_relative, validate_recovery_estate, EstateFilesystem, EstateLayout,
+    LOCATOR_RELATIVE_PATH, STORAGE_DIRECTORY,
 };
 use crate::engine::memory_estate::build_memory_estate_plan;
-use crate::engine::token_key::{read_api_key_document, read_token_key, ApiKeyDocument};
+use crate::engine::token_key::{
+    read_api_key_document_anchored as read_api_key_document,
+    read_token_key_anchored as read_token_key, ApiKeyDocument,
+};
 use rrd_contract::{
     attunement_plan_sha256, installation_plan_sha256, installation_result_sha256, AttunementJob,
     AttunementJobState, AttunementPhase, AttunementPhasePlan, AttunementPlan, DeploymentProfile,
     EstateConfiguration, EstateConfigurationInput, InstallationActionDisposition,
     InstallationActionKind, InstallationActionResult, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationResult, InstallationTargetKind,
-    InstalledEstateIdentity, MemorySeatDefinition, PersistMemoryEstate, StorageProfileKind,
-    ATTUNEMENT_PHASES, INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+    InstalledEstateIdentity, PersistMemoryEstate, StorageProfileKind, ATTUNEMENT_PHASES,
+    INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
 };
 use rrd_core::digest::Sha256 as IncrementalSha256;
 use rrd_security::{Principal, PrincipalKind, ResourceGrant, SecurityState, SECURITY_FORMAT};
+use rrd_store::filesystem::{AnchoredPath, OpenOptions};
 use rrd_store::{ControlTransition, RrflowKvInspector};
 use serde::de::DeserializeOwned;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
-const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v1.json");
+const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v2.json");
 const DEFAULT_CONFIGURATION_BYTES: &[u8] =
-    include_bytes!("../../assets/install/default-estate-configuration-v2.toml");
-const INSTALL_PROFILE_FORMAT: u16 = 1;
-const LOCATOR_FORMAT: u16 = 1;
+    include_bytes!("../../assets/install/default-estate-configuration-v3.toml");
+const CLYFFY_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/clyffy-profile-v2.json");
+const INSTALL_PROFILE_FORMAT: u16 = 2;
+const LOCATOR_FORMAT: u16 = 2;
 const INSTALLED_RECORD_FORMAT: u16 = 2;
 const INSTALL_CHECKPOINT_FORMAT: u16 = 2;
 pub(super) const INSTALLED_RECORD_KEY: &str = "server/state/install/record";
@@ -38,7 +42,10 @@ const INSTALL_CHECKPOINT_KEY: &str = "server/state/install/checkpoint";
 pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
 const MAX_CONFIGURATION_BYTES: u64 = 64 * 1024;
 
+mod admission;
+mod bootstrap;
 mod inventory;
+mod lease;
 pub(super) mod recovery;
 
 use inventory::{project_inventory_sha256, project_inventory_sha256_excluding};
@@ -55,7 +62,8 @@ pub struct DefaultInstallProfile {
     pub id: CanonicalId,
     pub configuration_asset: String,
     pub deployment: DeploymentProfile,
-    pub initial_seat: MemorySeatDefinition,
+    pub template_asset: String,
+    pub specialization: rrd_contract::InstallationSpecialization,
     pub initial_principal_id: CanonicalId,
     pub credential_bytes: u16,
     pub initial_grant_policy: CanonicalId,
@@ -78,20 +86,28 @@ pub struct DefaultAttunementPhase {
 
 impl DefaultInstallProfile {
     pub(super) fn load(requested: &str) -> Result<(Self, String)> {
-        if requested != "default" {
-            return Err(ServiceError::Contract(format!(
-                "unsupported installation profile {requested:?}"
-            )));
-        }
-        let profile: Self = serde_json::from_slice(INSTALL_PROFILE_BYTES).map_err(contract_json)?;
+        let bytes = match requested {
+            "default" => INSTALL_PROFILE_BYTES,
+            "clyffy" => CLYFFY_PROFILE_BYTES,
+            _ => {
+                return Err(ServiceError::Contract(format!(
+                    "unsupported installation profile {requested:?}"
+                )))
+            }
+        };
+        let profile: Self = serde_json::from_slice(bytes).map_err(contract_json)?;
         profile.validate()?;
-        Ok((profile, digest::sha256_hex(INSTALL_PROFILE_BYTES)))
+        if profile.id.as_str() != requested {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        Ok((profile, digest::sha256_hex(bytes)))
     }
 
     fn validate(&self) -> Result<()> {
         if self.format_version != INSTALL_PROFILE_FORMAT
-            || self.id.as_str() != "default"
-            || self.configuration_asset != "default-estate-configuration-v2.toml"
+            || !matches!(self.id.as_str(), "default" | "clyffy")
+            || self.template_asset != "templates/generic-project-v1.md"
+            || self.configuration_asset != "default-estate-configuration-v3.toml"
             || self.initial_grant_policy.as_str() != "local-owner-all-actions"
             || !(32..=4_096).contains(&self.credential_bytes)
             || self.inventory_max_files == 0
@@ -102,7 +118,7 @@ impl DefaultInstallProfile {
                 "default installation profile has invalid bounds or identity".into(),
             ));
         }
-        self.initial_seat
+        self.specialization
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
         self.deployment
@@ -143,33 +159,19 @@ impl DefaultInstallProfile {
 pub fn load_estate_configuration(path: Option<&Path>) -> Result<EstateConfiguration> {
     let bytes = match path {
         None => DEFAULT_CONFIGURATION_BYTES.to_vec(),
-        Some(path) => {
-            let metadata = std::fs::symlink_metadata(path)
-                .map_err(|error| ServiceError::Storage(error.to_string()))?;
-            if metadata.file_type().is_symlink()
-                || !metadata.is_file()
-                || metadata.len() > MAX_CONFIGURATION_BYTES
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            let mut bytes = Vec::with_capacity(metadata.len() as usize);
-            File::open(path)
-                .map_err(|error| ServiceError::Storage(error.to_string()))?
-                .take(MAX_CONFIGURATION_BYTES + 1)
-                .read_to_end(&mut bytes)
-                .map_err(|error| ServiceError::Storage(error.to_string()))?;
-            if bytes.len() as u64 > MAX_CONFIGURATION_BYTES {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            bytes
-        }
+        Some(path) => read_regular_bounded(
+            &AnchoredPath::from_path(path).map_err(storage_error)?,
+            MAX_CONFIGURATION_BYTES,
+        )?,
     };
     let input: EstateConfigurationInput = toml::from_str(
         std::str::from_utf8(&bytes).map_err(|error| ServiceError::Contract(error.to_string()))?,
     )
     .map_err(|error| ServiceError::Contract(error.to_string()))?;
-    EstateConfiguration::from_input(1, input)
-        .map_err(|error| ServiceError::Contract(error.to_string()))
+    let configuration = EstateConfiguration::from_input(1, input)
+        .map_err(|error| ServiceError::Contract(error.to_string()))?;
+    super::core::installed_storage_options(&configuration.storage)?;
+    Ok(configuration)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,10 +205,13 @@ pub struct ProjectLocator {
     pub installed_record_sha256: String,
     pub configuration_revision: u64,
     pub configuration_sha256: String,
+    /// Pre-open projection, verified against the sealed installed record.
+    pub storage: rrd_contract::StorageLimits,
 }
 
 impl ProjectLocator {
     fn validate(&self) -> Result<()> {
+        super::core::installed_storage_options(&self.storage)?;
         if self.format_version != LOCATOR_FORMAT
             || self.product_version != env!("CARGO_PKG_VERSION")
             || !is_sha256(&self.plan_sha256)
@@ -363,7 +368,7 @@ impl RrdEngine {
         let (profile, profile_sha256) = DefaultInstallProfile::load(profile_id)?;
         let configuration = load_estate_configuration(configuration_path)?;
         let executable_sha256 = sha256_file(executable)?;
-        let project_precondition_sha256 = project_inventory_sha256(&project, &profile)?;
+        let project_precondition_sha256 = project_inventory_sha256(project.project(), &profile)?;
         let identity_seed = installation_identity_seed(
             installation_identity,
             target_kind,
@@ -411,6 +416,7 @@ impl RrdEngine {
         let layout = EstateLayout::new(&install_id, &profile.initial_principal_id)?;
         let absent = digest::sha256_hex(b"rrflow-install-managed-path-absent-v1");
         let managed_paths = layout.managed_paths(&absent);
+        let bootstrap = bootstrap::build(&profile, &layout)?;
         let actions = installation_actions(
             &configuration.configuration_sha256,
             &attunement.plan_sha256,
@@ -431,7 +437,8 @@ impl RrdEngine {
             project_precondition_sha256,
             storage_root_id: install_id,
             configuration,
-            initial_seat: profile.initial_seat,
+            initial_seat: profile.specialization.seat.clone(),
+            bootstrap,
             initial_principal_id: profile.initial_principal_id,
             initial_grants: SecurityAction::ALL.to_vec(),
             credential_bytes: profile.credential_bytes,
@@ -545,6 +552,25 @@ impl RrdEngine {
         )
     }
 
+    #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn apply_installation_with_test_observer(
+        project: &Path,
+        preview: &InstallationPreview,
+        executable: &Path,
+        observer: &mut dyn FnMut(InstallApplyStage, InstallRecoveryState) -> Result<()>,
+    ) -> Result<InstallationResult> {
+        Self::apply_installation_with_observer(
+            project,
+            preview.installation.target_kind,
+            preview,
+            &preview.installation.plan_sha256,
+            executable,
+            &FixedClock::at(1_800_000_000_000),
+            observer,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn apply_installation_with_observer(
         project: &Path,
@@ -563,7 +589,8 @@ impl RrdEngine {
                 "installation apply mode or expected digest does not match the preview".into(),
             ));
         }
-        let project = canonical_project_root(project)?;
+        let mut project = canonical_project_root(project)?;
+        validate_estate_directories(&project, true)?;
         let executable_sha256 = sha256_file(executable)?;
         if executable_sha256 != preview.installation.executable_sha256 {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -579,15 +606,35 @@ impl RrdEngine {
             &preview.installation.storage_root_id,
             &preview.installation.initial_principal_id,
         )?;
-        let locator_path = project.join(LOCATOR_RELATIVE_PATH);
         validate_sealed_preview(preview, &profile, &profile_sha256, &executable_sha256)?;
 
-        match std::fs::symlink_metadata(&locator_path) {
-            Ok(_) => {
-                let intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
-                let result = replay_installation_result(&project, preview, executable, clock)?;
+        // Refused preconditions must not create even an empty admission file.
+        // Existing leases are locked before reading mutable recovery state.
+        let _lease = match lease::InstallationLease::existing(project.project())? {
+            Some(lease) => lease,
+            None => {
+                admission::inspect(&project, &layout, preview, &profile, executable, clock)?;
+                lease::InstallationLease::create_or_acquire(project.project())?
+            }
+        };
+        // Recheck every mutable precondition under the retained native owner.
+        // Re-admit private descendants in case another owner completed between
+        // the initial read-only preflight and this successful acquisition.
+        project.admit_missing_private_directories(true)?;
+        let admitted = admission::inspect(&project, &layout, preview, &profile, executable, clock)?;
+        observe_install_stage(
+            preview,
+            started,
+            InstallApplyStage::LeaseAcquired,
+            InstallRecoveryState::Admitted,
+            None,
+            observer,
+        )?;
+
+        let intent = match admitted {
+            admission::Admission::Published { intent, result } => {
                 if let Some(intent) = intent {
-                    let (_, _, locator_bytes) = read_locator(&project)?;
+                    let (_, _, locator_bytes) = read_locator_anchored(&project)?;
                     validate_recovery_estate(&project, &layout)?;
                     observe_install_stage(
                         preview,
@@ -608,84 +655,46 @@ impl RrdEngine {
                         observer,
                     )?;
                 }
-                return Ok(result);
+                return Ok(*result);
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(ServiceError::Storage(error.to_string())),
-        }
-
-        // A completed estate is portable and was handled above from its
-        // persisted authority. A new or interrupted installation is still bound
-        // to the root explicitly previewed before any filesystem effect.
-        if initial_project_root_sha256(&project)? != preview.installation.project_root_sha256 {
-            return Err(ServiceError::ProjectBindingMismatch);
-        }
-        let existing_intent = read_existing_intent(&project, &layout, preview, &executable_sha256)?;
-        let intent = if let Some(intent) = existing_intent {
-            let clock_assessment = assess(
-                clock.observe(),
-                intent.clock_anchor(),
-                &preview.installation.configuration.clock,
-                "install.apply.recover",
-            )?;
-            require_accepted(&clock_assessment)?;
-            validate_recovery_estate(&project, &layout)?;
-            if project_inventory_sha256_excluding(
-                &project,
-                &profile,
-                Some(Path::new(&layout.install_intent)),
-            )? != preview.installation.project_precondition_sha256
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
+            admission::Admission::Recover(intent) => {
+                observe_install_stage(
+                    preview,
+                    started,
+                    InstallApplyStage::IntentPublished,
+                    InstallRecoveryState::OwnedIntent,
+                    None,
+                    observer,
+                )?;
+                *intent
             }
-            observe_install_stage(
-                preview,
-                started,
-                InstallApplyStage::IntentPublished,
-                InstallRecoveryState::OwnedIntent,
-                None,
-                observer,
-            )?;
-            intent
-        } else {
-            reject_existing_estate(&project)?;
-            validate_installation_target(&project, target_kind)?;
-            if project_inventory_sha256(&project, &profile)?
-                != preview.installation.project_precondition_sha256
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            for managed in &preview.installation.managed_paths {
-                if std::fs::symlink_metadata(project.join(&managed.relative_path)).is_ok() {
+            admission::Admission::New(clock_anchor) => {
+                let (intent, recovery_state) = load_or_create_intent(
+                    &project,
+                    &layout,
+                    preview,
+                    &clock_anchor,
+                    &executable_sha256,
+                )?;
+                if project_inventory_sha256_excluding(
+                    project.project(),
+                    &profile,
+                    Some(Path::new(&layout.install_intent)),
+                )? != preview.installation.project_precondition_sha256
+                {
                     return Err(ServiceError::ProjectBindingMismatch);
                 }
+                validate_recovery_estate(&project, &layout)?;
+                observe_install_stage(
+                    preview,
+                    started,
+                    InstallApplyStage::IntentPublished,
+                    recovery_state,
+                    None,
+                    observer,
+                )?;
+                intent
             }
-            let clock_anchor = observe_required(clock, "install.apply.new")?;
-            let (intent, recovery_state) = load_or_create_intent(
-                &project,
-                &layout,
-                preview,
-                &clock_anchor,
-                &executable_sha256,
-            )?;
-            if project_inventory_sha256_excluding(
-                &project,
-                &profile,
-                Some(Path::new(&layout.install_intent)),
-            )? != preview.installation.project_precondition_sha256
-            {
-                return Err(ServiceError::ProjectBindingMismatch);
-            }
-            validate_recovery_estate(&project, &layout)?;
-            observe_install_stage(
-                preview,
-                started,
-                InstallApplyStage::IntentPublished,
-                recovery_state,
-                None,
-                observer,
-            )?;
-            intent
         };
 
         let storage_relative = preview
@@ -703,12 +712,31 @@ impl RrdEngine {
             .managed_path(InstallationManagedPathKind::OperatorCredential)
             .relative_path
             .clone();
-        create_estate_directories(&project)?;
+        create_estate_directories(&mut project)?;
         validate_recovery_estate(&project, &layout)?;
+        let locator_path = safe_join(&project, LOCATOR_RELATIVE_PATH)?;
         observe_install_stage(
             preview,
             started,
             InstallApplyStage::EstateDirectoriesReady,
+            InstallRecoveryState::OwnedIntent,
+            None,
+            observer,
+        )?;
+        bootstrap::materialize(&project, &layout, preview, &mut || {
+            observe_install_stage(
+                preview,
+                started,
+                InstallApplyStage::BootstrapStaged,
+                InstallRecoveryState::OwnedIntent,
+                None,
+                observer,
+            )
+        })?;
+        observe_install_stage(
+            preview,
+            started,
+            InstallApplyStage::BootstrapReady,
             InstallRecoveryState::OwnedIntent,
             None,
             observer,
@@ -718,13 +746,27 @@ impl RrdEngine {
         let credential_path = safe_join(&project, &credential_relative)?;
         let instance_id = preview.installation.target.instance_id.clone();
         let token_key = intent.token_key()?;
-        let engine = match std::fs::symlink_metadata(&storage_root) {
+        let engine = match storage_root.metadata() {
             Ok(metadata) if !metadata.file_type().is_symlink() && metadata.is_dir() => {
-                RrdEngine::open_existing(&storage_root, instance_id.clone(), token_key)?
+                RrdEngine::open_existing_anchored_with_options(
+                    &storage_root,
+                    instance_id.clone(),
+                    token_key,
+                    super::core::installed_storage_options(
+                        &preview.installation.configuration.storage,
+                    )?,
+                )?
             }
             Ok(_) => return Err(ServiceError::ProjectBindingMismatch),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                RrdEngine::create_new(&storage_root, instance_id.clone(), token_key)?
+                RrdEngine::create_new_anchored_with_options(
+                    &storage_root,
+                    instance_id.clone(),
+                    token_key,
+                    super::core::installed_storage_options(
+                        &preview.installation.configuration.storage,
+                    )?,
+                )?
             }
             Err(error) => return Err(ServiceError::Storage(error.to_string())),
         };
@@ -931,6 +973,7 @@ impl RrdEngine {
                 "attunement.job.created",
             )?,
         ]);
+        bootstrap::validate_transaction(preview, &runtime_commit, &transitions)?;
         let committed_before = store_state == InstallRecoveryState::Committed;
         if !committed_before {
             require_empty_installation(&engine, &transitions)?;
@@ -954,6 +997,7 @@ impl RrdEngine {
             &transitions,
             expected_runtime_cursor,
             bootstrap_control_sequence,
+            super::core::installed_storage_options(&preview.installation.configuration.storage)?,
         )?;
         observe_install_stage(
             preview,
@@ -976,6 +1020,7 @@ impl RrdEngine {
             executable_sha256: preview.installation.executable_sha256.clone(),
             installed_record_sha256: installed.record_sha256.clone(),
             configuration_revision: preview.installation.configuration.revision,
+            storage: preview.installation.configuration.storage.clone(),
             configuration_sha256: preview
                 .installation
                 .configuration
@@ -1033,14 +1078,19 @@ impl RrdEngine {
         executable: &Path,
         clock: &dyn ClockSource,
     ) -> Result<Self> {
-        let preflight = Self::inspect_installed_with_clock_at_boundary(
-            project,
-            executable,
-            clock,
-            "install.open.preflight",
-        )?;
+        let project = canonical_project_root(project)?;
+        Self::open_installed_anchored(&project, executable, clock)
+    }
+
+    pub(super) fn open_installed_anchored(
+        project: &EstateFilesystem,
+        executable: &Path,
+        clock: &dyn ClockSource,
+    ) -> Result<Self> {
+        let preflight =
+            Self::inspect_installed_anchored(project, executable, clock, "install.open.preflight")?;
         require_accepted(&preflight.clock)?;
-        let (project, locator, _) = read_locator(project)?;
+        let (project, locator, _) = read_locator_anchored(project)?;
         let (_, profile_sha256) = DefaultInstallProfile::load(locator.profile_id.as_str())?;
         if sha256_file(executable)? != locator.executable_sha256
             || profile_sha256 != locator.profile_sha256
@@ -1051,10 +1101,13 @@ impl RrdEngine {
         let storage_root = safe_join(&project, &locator.storage_root)?;
         let token_key = read_token_key(&token_path)
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
-        let mut engine = RrdEngine::open_existing(
+        #[cfg(feature = "crash-test")]
+        let _recovery_crash = rrd_store::crash_test::enter_recovery(storage_root.diagnostic_path());
+        let mut engine = RrdEngine::open_existing_anchored_with_options(
             &storage_root,
             locator.identity.instance_id.clone(),
             token_key,
+            super::core::installed_storage_options(&locator.storage)?,
         )?;
         let bytes = engine
             .storage
@@ -1064,6 +1117,7 @@ impl RrdEngine {
         let installed: InstalledEstateRecord = decode_json(&bytes, "installed estate record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        bootstrap::verify(&project, &installed.installation)?;
         if locator.identity.instance_id != preflight.instance_id
             || locator.plan_sha256 != preflight.plan_sha256
             || installed.clock_anchor != preflight.clock.anchor
@@ -1080,7 +1134,8 @@ impl RrdEngine {
         configuration
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
-        if configuration.revision != locator.configuration_revision
+        if configuration.storage != locator.storage
+            || configuration.revision != locator.configuration_revision
             || configuration.configuration_sha256 != locator.configuration_sha256
         {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -1142,7 +1197,18 @@ impl RrdEngine {
         clock: &dyn ClockSource,
         boundary: &'static str,
     ) -> Result<InstallationVerificationReport> {
-        let (project, locator, locator_bytes) = read_locator(project)?;
+        let project = canonical_project(project, InstallationTargetKind::ExistingProject)?;
+        Self::inspect_installed_anchored(&project, executable, clock, boundary)
+    }
+
+    pub(super) fn inspect_installed_anchored(
+        project: &EstateFilesystem,
+        executable: &Path,
+        clock: &dyn ClockSource,
+        boundary: &'static str,
+    ) -> Result<InstallationVerificationReport> {
+        let (project, locator, locator_bytes) = read_locator_anchored(project)?;
+
         let executable_sha256 = sha256_file(executable)?;
         if executable_sha256 != locator.executable_sha256 {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -1157,11 +1223,22 @@ impl RrdEngine {
             .map_err(|error| ServiceError::Storage(error.to_string()))?;
         let storage_root = safe_join(&project, &locator.storage_root)?;
         super::core::validate_existing_object_layout(&storage_root)?;
-        let inspector = RrflowKvInspector::open(&storage_root)?;
+        let inspector = RrflowKvInspector::open_anchored_with_options(
+            &storage_root,
+            super::core::installed_storage_options(&locator.storage)?,
+        )?;
         let installed: InstalledEstateRecord =
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        bootstrap::verify(&project, &installed.installation)?;
+        let layout = EstateLayout::new(
+            &installed.installation.storage_root_id,
+            &installed.installation.initial_principal_id,
+        )?;
+        if installed.installation.bootstrap != bootstrap::build(&profile, &layout)? {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
         let configuration: EstateConfiguration = decode_control(
             &inspector,
             &estate_configuration_key(&locator.identity.instance_id),
@@ -1170,7 +1247,8 @@ impl RrdEngine {
         configuration
             .validate()
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
-        if configuration.revision != locator.configuration_revision
+        if configuration.storage != locator.storage
+            || configuration.revision != locator.configuration_revision
             || configuration.configuration_sha256 != locator.configuration_sha256
         {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -1181,7 +1259,7 @@ impl RrdEngine {
             &configuration.clock,
             boundary,
         )?;
-        let project_inventory_sha256 = project_inventory_sha256(&project, &profile)?;
+        let project_inventory_sha256 = project_inventory_sha256(project.project(), &profile)?;
         let attunement_source_current =
             project_inventory_sha256 == installed.installation.project_precondition_sha256;
         if credential.plan_sha256 != installed.installation.plan_sha256
@@ -1320,8 +1398,10 @@ fn installation_identity_seed(
     ))
 }
 
-fn initial_project_root_sha256(project: &Path) -> Result<String> {
+fn initial_project_root_sha256(project: &EstateFilesystem) -> Result<String> {
     let canonical = project
+        .project()
+        .diagnostic_path()
         .to_str()
         .ok_or(ServiceError::ProjectBindingMismatch)?;
     json_sha256(&("rrflow-initial-project-root-v1", canonical))
@@ -1334,9 +1414,12 @@ fn installation_actions(
 ) -> Result<Vec<InstallationPlanAction>> {
     let action_kinds = [
         InstallationActionKind::ValidateProject,
-        InstallationActionKind::CreateEstateDirectories,
-        InstallationActionKind::CreateStorageRoot,
+        InstallationActionKind::AcquireInstallationLease,
         InstallationActionKind::PrepareCredentials,
+        InstallationActionKind::CreateEstateDirectories,
+        InstallationActionKind::MaterializeBootstrap,
+        InstallationActionKind::CreateStorageRoot,
+        InstallationActionKind::DeliverCredentials,
         InstallationActionKind::InitializeInstance,
         InstallationActionKind::CreateAttunementJob,
         InstallationActionKind::PublishProjectLocator,
@@ -1344,6 +1427,9 @@ fn installation_actions(
     let estimates = [
         0,
         0,
+        u64::from(credential_bytes) * 2 + 4_096,
+        0,
+        64 * 1024,
         4_096,
         u64::from(credential_bytes) * 2 + 512,
         16_384,
@@ -1420,7 +1506,12 @@ fn validate_sealed_preview(
         || installation.profile_sha256 != profile_sha256
         || installation.storage_root_id != installation.id
         || installation.configuration.revision != 1
-        || installation.initial_seat != profile.initial_seat
+        || installation.initial_seat != profile.specialization.seat
+        || installation.bootstrap
+            != bootstrap::build(
+                profile,
+                &EstateLayout::new(&install_id, &profile.initial_principal_id)?,
+            )?
         || installation.initial_principal_id != profile.initial_principal_id
         || installation.initial_grants != SecurityAction::ALL
         || installation.credential_bytes != profile.credential_bytes
@@ -1440,31 +1531,34 @@ fn validate_sealed_preview(
     Ok(())
 }
 
-fn canonical_project(project: &Path, target_kind: InstallationTargetKind) -> Result<PathBuf> {
+fn canonical_project(
+    project: &Path,
+    target_kind: InstallationTargetKind,
+) -> Result<EstateFilesystem> {
     let project = canonical_project_root(project)?;
     validate_installation_target(&project, target_kind)?;
     Ok(project)
 }
 
-fn canonical_project_root(project: &Path) -> Result<PathBuf> {
-    let link = std::fs::symlink_metadata(project)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?;
-    if link.file_type().is_symlink() || !link.is_dir() {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    let project =
-        std::fs::canonicalize(project).map_err(|error| ServiceError::Storage(error.to_string()))?;
-    Ok(project)
+fn canonical_project_root(project: &Path) -> Result<EstateFilesystem> {
+    let project = AnchoredPath::open_root(project).map_err(storage_error)?;
+    EstateFilesystem::admit(project, true)
 }
 
-fn validate_installation_target(project: &Path, target_kind: InstallationTargetKind) -> Result<()> {
-    if target_kind == InstallationTargetKind::FreshProject
-        && std::fs::read_dir(project)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?
-            .next()
-            .is_some()
-    {
-        return Err(ServiceError::ProjectBindingMismatch);
+fn validate_installation_target(
+    project: &EstateFilesystem,
+    target_kind: InstallationTargetKind,
+) -> Result<()> {
+    if target_kind == InstallationTargetKind::FreshProject {
+        let admitted_lease = lease::admit_existing(project.project())?;
+        for entry in project.project().entries().map_err(storage_error)? {
+            let entry = entry.map_err(storage_error)?;
+            if admitted_lease.is_some() && entry.relative_path() == Path::new(lease::RELATIVE_PATH)
+            {
+                continue;
+            }
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
     }
     Ok(())
 }
@@ -1538,13 +1632,14 @@ fn require_empty_installation(engine: &RrdEngine, transitions: &[ControlTransiti
 }
 
 fn require_committed_installation(
-    storage_root: &Path,
+    storage_root: &AnchoredPath,
     runtime_commit: &RuntimeCommit,
     transitions: &[ControlTransition],
     expected_runtime_cursor: u64,
     expected_control_sequence: u64,
+    options: rrd_store::DatabaseOptions,
 ) -> Result<ReadStamp> {
-    let inspector = RrflowKvInspector::open(storage_root)?;
+    let inspector = RrflowKvInspector::open_anchored_with_options(storage_root, options)?;
     let inspection = inspector.inspection();
     if inspection.claim_sequence != 0
         || inspection.runtime_cursor != expected_runtime_cursor
@@ -1577,12 +1672,8 @@ fn require_committed_installation(
 }
 
 pub(super) fn sha256_file(path: &Path) -> Result<String> {
-    let metadata = std::fs::symlink_metadata(path)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    let mut file = File::open(path).map_err(|error| ServiceError::Storage(error.to_string()))?;
+    let path = AnchoredPath::from_path(path).map_err(storage_error)?;
+    let mut file = path.open_read().map_err(storage_error)?;
     let mut hasher = IncrementalSha256::new();
     let mut buffer = [0u8; 64 * 1024];
     loop {
@@ -1597,39 +1688,41 @@ pub(super) fn sha256_file(path: &Path) -> Result<String> {
     Ok(hasher.finalize_hex())
 }
 
-pub(super) fn read_locator(project: &Path) -> Result<(PathBuf, ProjectLocator, Vec<u8>)> {
+pub(super) fn read_locator(project: &Path) -> Result<(EstateFilesystem, ProjectLocator, Vec<u8>)> {
     let project = canonical_project(project, InstallationTargetKind::ExistingProject)?;
-    let path = project.join(LOCATOR_RELATIVE_PATH);
-    reject_existing_symlink_path(&project, &path)?;
-    let metadata = std::fs::symlink_metadata(&path)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?;
-    if !metadata.is_file() || metadata.len() > MAX_LOCATOR_BYTES {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    File::open(&path)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?
-        .take(MAX_LOCATOR_BYTES + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?;
-    if bytes.len() as u64 > MAX_LOCATOR_BYTES {
-        return Err(ServiceError::ProjectBindingMismatch);
-    }
+    read_locator_anchored(&project)
+}
+
+fn read_locator_anchored(
+    project: &EstateFilesystem,
+) -> Result<(EstateFilesystem, ProjectLocator, Vec<u8>)> {
+    validate_estate_directories(project, false)?;
+    let path = safe_join(project, LOCATOR_RELATIVE_PATH)?;
+    let bytes = read_regular_bounded(&path, MAX_LOCATOR_BYTES)?;
     let locator: ProjectLocator = toml::from_str(
         std::str::from_utf8(&bytes).map_err(|error| ServiceError::Contract(error.to_string()))?,
     )
     .map_err(|error| ServiceError::Contract(error.to_string()))?;
     locator.validate()?;
-    Ok((project, locator, bytes))
+    Ok((project.clone(), locator, bytes))
 }
 
-fn publish_new_file(path: &Path, temporary: &Path, bytes: &[u8]) -> Result<()> {
+fn publish_new_file(path: &AnchoredPath, temporary: &AnchoredPath, bytes: &[u8]) -> Result<()> {
+    publish_new_file_with_stage(path, temporary, bytes, &mut || Ok(()))
+}
+
+fn publish_new_file_with_stage(
+    path: &AnchoredPath,
+    temporary: &AnchoredPath,
+    bytes: &[u8],
+    staged: &mut dyn FnMut() -> Result<()>,
+) -> Result<()> {
     let parent = path.parent().ok_or(ServiceError::ProjectBindingMismatch)?;
-    if temporary.parent() != Some(parent) || bytes.len() as u64 > MAX_LOCATOR_BYTES {
+    if bytes.len() as u64 > MAX_LOCATOR_BYTES {
         return Err(ServiceError::ProjectBindingMismatch);
     }
 
-    match std::fs::symlink_metadata(path) {
+    match path.metadata() {
         Ok(_) => {
             if read_regular_bounded(path, MAX_LOCATOR_BYTES)? != bytes {
                 return Err(ServiceError::ProjectBindingMismatch);
@@ -1641,7 +1734,7 @@ fn publish_new_file(path: &Path, temporary: &Path, bytes: &[u8]) -> Result<()> {
     }
 
     let mut create_temporary = true;
-    match std::fs::symlink_metadata(temporary) {
+    match temporary.metadata() {
         Ok(_) => {
             if read_regular_bounded(temporary, MAX_LOCATOR_BYTES)? == bytes {
                 create_temporary = false;
@@ -1655,23 +1748,19 @@ fn publish_new_file(path: &Path, temporary: &Path, bytes: &[u8]) -> Result<()> {
     if create_temporary {
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt as _;
-            options.mode(0o644);
-        }
         let write_result = (|| -> std::io::Result<()> {
             let mut file = options.open(temporary)?;
             file.write_all(bytes)?;
             file.sync_all()
         })();
         if let Err(error) = write_result {
-            let _ = std::fs::remove_file(temporary);
+            let _ = temporary.remove_file();
             return Err(ServiceError::Storage(error.to_string()));
         }
     }
 
-    match std::fs::hard_link(temporary, path) {
+    staged()?;
+    match temporary.rename_new_to(path) {
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
             if read_regular_bounded(path, MAX_LOCATOR_BYTES)? != bytes {
@@ -1680,46 +1769,48 @@ fn publish_new_file(path: &Path, temporary: &Path, bytes: &[u8]) -> Result<()> {
         }
         Err(error) => return Err(ServiceError::Storage(error.to_string())),
     }
-    rrd_store::sync_directory_metadata(parent)
+    parent
+        .sync_directory()
         .map_err(|error| ServiceError::Storage(error.to_string()))?;
     cleanup_pending_file(temporary, bytes)
 }
 
 fn cleanup_locator_pending(
-    project: &Path,
+    project: &EstateFilesystem,
     layout: &EstateLayout,
     locator_bytes: &[u8],
 ) -> Result<()> {
     cleanup_pending_file(&safe_join(project, &layout.locator_pending)?, locator_bytes)
 }
 
-fn cleanup_pending_file(path: &Path, expected: &[u8]) -> Result<()> {
-    match std::fs::symlink_metadata(path) {
+fn cleanup_pending_file(path: &AnchoredPath, expected: &[u8]) -> Result<()> {
+    match path.metadata() {
         Ok(_) => {
             if read_regular_bounded(path, MAX_LOCATOR_BYTES)? != expected {
                 return Err(ServiceError::ProjectBindingMismatch);
             }
-            std::fs::remove_file(path).map_err(|error| ServiceError::Storage(error.to_string()))?;
-            rrd_store::sync_directory_metadata(
-                path.parent().ok_or(ServiceError::ProjectBindingMismatch)?,
-            )
-            .map_err(|error| ServiceError::Storage(error.to_string()))
+            path.remove_file()
+                .map_err(|error| ServiceError::Storage(error.to_string()))?;
+            path.parent()
+                .ok_or(ServiceError::ProjectBindingMismatch)?
+                .sync_directory()
+                .map_err(|error| ServiceError::Storage(error.to_string()))
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(ServiceError::Storage(error.to_string())),
     }
 }
 
-pub(super) fn read_regular_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>> {
-    let metadata = std::fs::symlink_metadata(path)
+pub(super) fn read_regular_bounded(path: &AnchoredPath, maximum: u64) -> Result<Vec<u8>> {
+    let file = path.open_read().map_err(storage_error)?;
+    let metadata = file
+        .metadata()
         .map_err(|error| ServiceError::Storage(error.to_string()))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > maximum {
         return Err(ServiceError::ProjectBindingMismatch);
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    File::open(path)
-        .map_err(|error| ServiceError::Storage(error.to_string()))?
-        .take(maximum + 1)
+    file.take(maximum + 1)
         .read_to_end(&mut bytes)
         .map_err(|error| ServiceError::Storage(error.to_string()))?;
     if bytes.len() as u64 > maximum {
@@ -1729,23 +1820,22 @@ pub(super) fn read_regular_bounded(path: &Path, maximum: u64) -> Result<Vec<u8>>
 }
 
 fn replay_installation_result(
-    project: &Path,
+    project: &EstateFilesystem,
     preview: &InstallationPreview,
     executable: &Path,
     clock: &dyn ClockSource,
 ) -> Result<InstallationResult> {
-    let report = RrdEngine::inspect_installed_with_clock_at_boundary(
-        project,
-        executable,
-        clock,
-        "install.apply.replay",
-    )?;
+    let report =
+        RrdEngine::inspect_installed_anchored(project, executable, clock, "install.apply.replay")?;
     require_accepted(&report.clock)?;
     if report.plan_sha256 != preview.installation.plan_sha256 {
         return Err(ServiceError::IdempotencyConflict);
     }
-    let (_, locator, locator_bytes) = read_locator(project)?;
-    let inspector = RrflowKvInspector::open(&safe_join(project, &locator.storage_root)?)?;
+    let (_, locator, locator_bytes) = read_locator_anchored(project)?;
+    let inspector = RrflowKvInspector::open_anchored_with_options(
+        &safe_join(project, &locator.storage_root)?,
+        super::core::installed_storage_options(&locator.storage)?,
+    )?;
     let installed: InstalledEstateRecord =
         decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
     let job_id = canonical_prefixed("job", &preview.attunement.plan_sha256)?;
@@ -1776,7 +1866,14 @@ fn build_installation_result(
 ) -> Result<InstallationResult> {
     let outputs = [
         preview.installation.project_precondition_sha256.clone(),
+        json_sha256(
+            preview
+                .installation
+                .managed_path(InstallationManagedPathKind::InstallationLease),
+        )?,
+        credential_sha256.into(),
         json_sha256(&preview.installation.managed_paths[..4])?,
+        preview.installation.bootstrap.instructions_sha256.clone(),
         json_sha256(&(
             &preview.installation.storage_root_id,
             preview
@@ -1871,6 +1968,7 @@ pub(super) fn require_locator_record_match(
         || locator.identity != installed.installation.target
         || locator.configuration_revision != installed.installation.configuration.revision
         || locator.configuration_sha256 != installed.installation.configuration.configuration_sha256
+        || locator.storage != installed.installation.configuration.storage
         || locator.storage_root
             != installed
                 .installation
@@ -1970,4 +2068,8 @@ fn is_sha256(value: &str) -> bool {
 
 fn zero_digest() -> String {
     "0".repeat(64)
+}
+
+fn storage_error(error: std::io::Error) -> ServiceError {
+    ServiceError::Storage(error.to_string())
 }

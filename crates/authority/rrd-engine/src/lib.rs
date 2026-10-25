@@ -7,6 +7,9 @@
 #[cfg(feature = "full")]
 mod capabilities;
 pub mod edge;
+#[cfg(feature = "crash-test")]
+#[doc(hidden)]
+pub use rrd_store::crash_test;
 #[cfg(feature = "full")]
 mod engine;
 #[cfg(feature = "full")]
@@ -24,9 +27,10 @@ pub use engine::{
     DefaultAttunementPhase, DefaultInstallProfile, DistributedAuthorityRead, DistributedReadRoute,
     EstateAdminAction, EstateAdminResult, EstateBackupReconcileOutcome, EstateReconcileOutcome,
     InstallationPreview, InstallationVerificationCheck, InstallationVerificationReport,
-    InstallationVerificationStatus, InstalledEstateRecord, Invocation, InvocationCompletion,
-    InvocationCredential, PreparedDistributedAuthority, ProjectLocator, Result, RrdEngine,
-    RrdOperation, ServiceError, ServiceErrorKind, CLOCK_OBSERVATION_FORMAT_VERSION,
+    InstallationVerificationStatus, InstalledEstateRecord, InstalledTailRepairPlan,
+    InstalledTailRepairReceipt, Invocation, InvocationCompletion, InvocationCredential,
+    PreparedDistributedAuthority, ProjectLocator, Result, RrdEngine, RrdOperation, ServiceError,
+    ServiceErrorKind, TransactionAdmissionSnapshot, CLOCK_OBSERVATION_FORMAT_VERSION,
     MAX_AUDIT_PAGE_RECORDS, MAX_JWT_CREDENTIAL_BYTES, TOKEN_KEY_BYTES,
 };
 #[cfg(feature = "full")]

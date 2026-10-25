@@ -8,37 +8,38 @@
 use super::DefaultInstallProfile;
 use crate::engine::{Result, ServiceError};
 use rrd_core::digest::Sha256 as IncrementalSha256;
-use std::fs::{File, Metadata};
+use rrd_store::filesystem::AnchoredPath;
+use std::fs::Metadata;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(super) fn project_inventory_sha256(
-    project: &Path,
+    project: &AnchoredPath,
     profile: &DefaultInstallProfile,
 ) -> Result<String> {
     project_inventory_sha256_excluding(project, profile, None)
 }
 
 pub(super) fn project_inventory_sha256_excluding(
-    project: &Path,
+    project: &AnchoredPath,
     profile: &DefaultInstallProfile,
     excluded_relative: Option<&Path>,
 ) -> Result<String> {
-    let mut entries = Vec::<(PathBuf, bool)>::new();
+    let mut entries = Vec::<(AnchoredPath, bool)>::new();
+    let admitted_lease = super::lease::admit_existing(project)?;
     collect_project_entries(
         project,
         excluded_relative,
+        admitted_lease.is_some(),
         profile.inventory_max_files,
         &mut entries,
     )?;
-    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    entries.sort_by(|left, right| left.0.relative_path().cmp(right.0.relative_path()));
     let mut aggregate = IncrementalSha256::new();
     aggregate.update(b"rrflow-project-inventory-v1\0");
     let mut total = 0u64;
     for (path, directory) in entries {
-        let relative = path
-            .strip_prefix(project)
-            .map_err(|error| ServiceError::Storage(error.to_string()))?;
+        let relative = path.relative_path();
         let relative = relative
             .to_str()
             .ok_or(ServiceError::ProjectBindingMismatch)?
@@ -47,7 +48,8 @@ pub(super) fn project_inventory_sha256_excluding(
         aggregate.update(&(relative.len() as u64).to_be_bytes());
         aggregate.update(relative.as_bytes());
         if !directory {
-            let metadata = std::fs::symlink_metadata(&path)
+            let metadata = path
+                .metadata()
                 .map_err(|error| ServiceError::Storage(error.to_string()))?;
             total = total.checked_add(metadata.len()).ok_or_else(|| {
                 ServiceError::Contract("project inventory byte count overflowed".into())
@@ -65,21 +67,22 @@ pub(super) fn project_inventory_sha256_excluding(
 }
 
 fn collect_project_entries(
-    root: &Path,
+    root: &AnchoredPath,
     excluded_relative: Option<&Path>,
+    lease_admitted: bool,
     max_entries: u64,
-    output: &mut Vec<(PathBuf, bool)>,
+    output: &mut Vec<(AnchoredPath, bool)>,
 ) -> Result<()> {
     let mut pending = vec![root.to_owned()];
     while let Some(current) = pending.pop() {
-        let entries = std::fs::read_dir(&current).map_err(storage_error)?;
+        let entries = current.entries().map_err(storage_error)?;
         // Do not collect or sort a whole directory before applying the bound.
         // The admitted output is sorted once, by the digest builder.
         for entry in entries {
-            let entry = entry.map_err(storage_error)?;
-            let path = entry.path();
-            let relative = path.strip_prefix(root).map_err(storage_error)?;
+            let path = entry.map_err(storage_error)?;
+            let relative = path.relative_path();
             if excluded_relative == Some(relative)
+                || lease_admitted && relative == Path::new(super::lease::RELATIVE_PATH)
                 || relative.components().next().is_some_and(|component| {
                     matches!(component.as_os_str().to_str(), Some(".git" | ".rrflow"))
                 })
@@ -91,7 +94,7 @@ fn collect_project_entries(
                     "project inventory exceeds the configured file bound".into(),
                 ));
             }
-            let metadata = std::fs::symlink_metadata(&path).map_err(storage_error)?;
+            let metadata = path.metadata().map_err(storage_error)?;
             if metadata.file_type().is_symlink() {
                 return Err(ServiceError::ProjectBindingMismatch);
             }
@@ -108,18 +111,15 @@ fn collect_project_entries(
     Ok(())
 }
 
-fn hash_inventory_file(path: &Path, admitted: &Metadata) -> Result<String> {
+fn hash_inventory_file(path: &AnchoredPath, admitted: &Metadata) -> Result<String> {
     if admitted.file_type().is_symlink() || !admitted.is_file() {
         return Err(ServiceError::ProjectBindingMismatch);
     }
-    let mut file = File::open(path).map_err(storage_error)?;
+    let mut file = path.open_read().map_err(storage_error)?;
     require_same_observation(admitted, &file.metadata().map_err(storage_error)?)?;
     let digest = hash_exact_contents(&mut file, admitted.len())?;
     require_same_observation(admitted, &file.metadata().map_err(storage_error)?)?;
-    require_same_observation(
-        admitted,
-        &std::fs::symlink_metadata(path).map_err(storage_error)?,
-    )?;
+    require_same_observation(admitted, &path.metadata().map_err(storage_error)?)?;
     Ok(digest)
 }
 
@@ -163,6 +163,38 @@ fn storage_error(error: impl std::fmt::Display) -> ServiceError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    fn project_inventory_sha256(path: &Path, profile: &DefaultInstallProfile) -> Result<String> {
+        super::project_inventory_sha256(
+            &AnchoredPath::open_root(path).map_err(storage_error)?,
+            profile,
+        )
+    }
+    fn project_inventory_sha256_excluding(
+        path: &Path,
+        profile: &DefaultInstallProfile,
+        exclude: Option<&Path>,
+    ) -> Result<String> {
+        super::project_inventory_sha256_excluding(
+            &AnchoredPath::open_root(path).map_err(storage_error)?,
+            profile,
+            exclude,
+        )
+    }
+    fn collect_project_entries(
+        path: &Path,
+        exclude: Option<&Path>,
+        max: u64,
+        output: &mut Vec<(AnchoredPath, bool)>,
+    ) -> Result<()> {
+        super::collect_project_entries(
+            &AnchoredPath::open_root(path).map_err(storage_error)?,
+            exclude,
+            false,
+            max,
+            output,
+        )
+    }
 
     #[test]
     fn project_inventory_preserves_the_version_one_digest_grammar() {
@@ -284,18 +316,18 @@ mod tests {
         std::fs::write(&path, b"abc").unwrap();
         let admitted = std::fs::metadata(&path).unwrap();
         assert_eq!(
-            hash_inventory_file(&path, &admitted).unwrap(),
+            hash_inventory_file(&AnchoredPath::from_path(&path).unwrap(), &admitted).unwrap(),
             rrd_core::digest::sha256_hex(b"abc")
         );
         std::fs::write(&path, b"abcdef").unwrap();
-        assert!(hash_inventory_file(&path, &admitted).is_err());
+        assert!(hash_inventory_file(&AnchoredPath::from_path(&path).unwrap(), &admitted).is_err());
         std::fs::write(&path, b"a").unwrap();
-        assert!(hash_inventory_file(&path, &admitted).is_err());
+        assert!(hash_inventory_file(&AnchoredPath::from_path(&path).unwrap(), &admitted).is_err());
         std::fs::write(&path, b"abc").unwrap();
         let file = File::options().write(true).open(&path).unwrap();
         let modified = admitted.modified().unwrap() + std::time::Duration::from_secs(60);
         file.set_times(std::fs::FileTimes::new().set_modified(modified))
             .unwrap();
-        assert!(hash_inventory_file(&path, &admitted).is_err());
+        assert!(hash_inventory_file(&AnchoredPath::from_path(&path).unwrap(), &admitted).is_err());
     }
 }

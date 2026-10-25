@@ -1083,7 +1083,7 @@ mod tests {
         let temporary = tempdir().unwrap();
         let local = LocalObjectStore::open(temporary.path()).unwrap();
         local.put(&bytes).unwrap();
-        std::fs::remove_file(local.verified_path(&reference).unwrap()).unwrap();
+        std::fs::remove_file(local.root().join(&reference.receipt.key)).unwrap();
         assert!(matches!(
             local.verify(&sha256),
             Err(Error::ObjectMissing(_))

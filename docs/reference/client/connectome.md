@@ -229,6 +229,15 @@ support future plan/apply and UI preparation, not a success badge. Context and
 query controls must default at or below the advertised estate ceilings rather
 than blindly sending the protocol hard maximum.
 
+The [user-selected effort contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+owns reasoning controls. H-06 must show the selected preset or custom limits,
+effective estate caps, remaining time/steps/attempts and known cost, plus Stop
+and an explicitly previewed extension. A stopped run shows partial results and
+unresolved work with the engine's reason. Resume cannot reset consumption.
+Until the runner and configuration-apply capabilities are advertised, these
+controls must be unavailable with an explanation; changing a local UI setting
+cannot claim an enforced timeout. All clients share the engine's authority.
+
 ## One object, many bounded lenses
 
 Connectome presents several lenses over the same engine result. Changing a
@@ -264,6 +273,65 @@ not tables or databases that Connectome maintains. Saved client-only layout,
 filters, focus, column widths, and panel state are preferences. A shareable
 durable lens, if later accepted, is a versioned typed rrflowDB record created
 through an authorized `RrdEngine` operation; local storage cannot promote one.
+
+## Guided project, knowledge and session journey
+
+These are H-06 target requirements, not additional capabilities of the pinned
+workbench. Keep them within the existing project, knowledge, runs and evidence
+workspaces; a new adapter or view mode does not warrant another top-level
+feature area. Nested routes and breadcrumbs retain exact instance, resource
+and permitted read coordinates. A deep link never implies authorization.
+
+Choosing a new or existing project previews the engine's exact installation
+plan. Once authorized, the installed lifecycle provisions one estate/rrflowDB
+and its rrflowKV storage automatically; users do not install three databases
+for DB, KV and QL. Reopening that project resolves and validates the existing
+identity. A missing, foreign or damaged binding requires an explicit recovery
+or installation decision, never silent creation of a replacement estate.
+Switching projects detaches the previous view's subscriptions/session handles
+and isolates cached results; it does not stop independently running projects.
+Running projects concurrently does not grant context sharing.
+
+Within the project, show knowledge paths with their supported effects,
+requirements, active binding, source revision, freshness and unavailable
+reasons. Guide a user from a source to its chunks, relationships and cited
+result through the same engine-provided evidence. Profile enrichment remains
+a proposal with provenance and an accepted configuration revision. The
+[knowledge baseline contract](../data/knowledge-connectors.md#graph-and-retrieval-baselines)
+owns capture, candidate comparison, promotion and retention semantics; its
+baseline/candidate/current views belong under knowledge and evidence.
+
+Within runs, **session replay means inspection of retained execution evidence**.
+Group the user's project conversation and linked tasks/runs without making an
+authentication session their durable identity. A fresh authenticated connection
+reads authorized prompt/output records, context/citations, observable model/tool
+attempts, transitions, receipts, timings, budgets and failures. Scrubbing and
+opening a recorded hop must not invoke a model, execute a tool or mutate the
+project. Missing/redacted content, retention gaps and unavailable historical
+artifacts are visible; the UI cannot reconstruct them as if recorded.
+Never record/replay bearer tokens or expose private model chain-of-thought.
+
+**Run again** or **compare a variant** starts new governed work, linked to the
+original run. Show changed source/configuration/model identities, current
+permissions, model/tool effects and cost/effort limits. Require the engine's
+current admission and applicable authorization; an old receipt grants no new
+effects. Distinguish deterministic retained-result inspection from a new model
+response that may differ. An uncertain prior mutation is reconciled through
+its original operation coordinates before proposing dependent new effects.
+
+Teach the workflow through plain-language explanations of source evidence,
+proposals, change previews, tests and review. Offer progressive detail for plans,
+schemas and traces. Do not force exploratory reading into a closed workflow;
+show why the durable-effect boundary needs verification. A green control must
+name what was verified and expose partial, denied or unimplemented stages.
+
+H-06 acceptance must exercise two project estates in one actual desktop build:
+install/reopen each, switch during in-flight requests, follow knowledge
+breadcrumbs, compare a baseline, inspect a retained run after engine restart,
+and explicitly fork a new authorized run. Assert no cross-project cache/session
+leakage, no external invocation during inspection, no duplicate effect after
+lost ACK and correct deep links under restricted permissions. Mocks and the
+older native workbench's installation tests do not prove this journey.
 
 ## Graph, timeline, and context interaction
 

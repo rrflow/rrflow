@@ -4,7 +4,9 @@
 //! storage, and verification remain engine-owned; the CLI only translates
 //! explicit operator arguments and renders typed results.
 
-use crate::command::{Command, Execution, InstallAction, InstallMode, RestoreAction, VerifyLevel};
+use crate::command::{
+    Command, Execution, InstallAction, InstallMode, RepairAction, RestoreAction, VerifyLevel,
+};
 use rrd_client::{ClientConfig, RequestOptions, RrdClient};
 use rrd_contract::{
     CanonicalId, CloseSession, CreateSession, InstallationTargetKind, RestorePublicationPlan,
@@ -93,6 +95,49 @@ pub fn execute(command: &Command, json: bool) -> Result<Execution, BoxError> {
             json,
         ),
         Command::Restore { action } => restore(action, json),
+        Command::Repair { action } => repair(action),
+    }
+}
+
+fn repair(action: &RepairAction) -> Result<Execution, BoxError> {
+    match action {
+        RepairAction::Plan {
+            project,
+            test_distribution_executable,
+        } => {
+            let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
+            let plan = RrdEngine::plan_installed_tail_repair(project, &executable)?;
+            Ok(serde_json::to_string_pretty(&plan)?.into())
+        }
+        RepairAction::Apply {
+            project,
+            plan,
+            expect,
+            test_distribution_executable,
+        } => {
+            let executable = distribution_executable_path(test_distribution_executable.as_deref())?;
+            if std::fs::symlink_metadata(plan)?.file_type().is_symlink() {
+                return Err("repair plan must not be a symlink".into());
+            }
+            let file = std::fs::File::open(plan)?;
+            let metadata = file.metadata()?;
+            if !metadata.is_file() || metadata.len() > MAX_INSTALLATION_PLAN_BYTES {
+                return Err("repair plan must be a bounded regular file".into());
+            }
+            let mut bytes = Vec::with_capacity(metadata.len() as usize);
+            file.take(MAX_INSTALLATION_PLAN_BYTES + 1)
+                .read_to_end(&mut bytes)?;
+            if bytes.len() as u64 != metadata.len() {
+                return Err("repair plan changed while reading".into());
+            }
+            let plan: rrd_engine::InstalledTailRepairPlan = serde_json::from_slice(&bytes)?;
+            let result =
+                RrdEngine::apply_installed_tail_repair(project, &executable, &plan, expect)?;
+            tracing::info!(target: "rrflow::installed", operation = "repair.apply",
+                plan_sha256 = %result.plan_sha256, discarded_bytes = result.storage.discarded_bytes,
+                idempotent_replay = result.idempotent_replay, "installed tail repair completed");
+            Ok(serde_json::to_string_pretty(&result)?.into())
+        }
     }
 }
 
@@ -286,6 +331,8 @@ fn serve(
     let executable = distribution_executable_path(test_distribution_executable)?;
     let locator = RrdEngine::read_project_locator(project)?;
     let project_root = std::fs::canonicalize(project)?.display().to_string();
+    #[cfg(feature = "crash-test")]
+    rrd_engine::crash_test::configure_from_stdin(&project.join(&locator.storage_root))?;
     let engine = RrdEngine::open_installed(project, &executable)?;
     let server = RrdHttpServer::bind(engine, bind)?;
     let address = server.local_addr();

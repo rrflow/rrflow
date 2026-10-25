@@ -1,10 +1,11 @@
+use crate::filesystem::{AnchorInput, AnchoredPath, OpenOptions};
 use crate::{Error, Result};
 use rrd_core::digest::Sha256;
 use rrd_core::{AuditEnvelope, Claim, RuntimeCommit, RuntimeMutation};
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Seek, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub(super) const MAGIC: &[u8; 8] = b"RRDLAR01";
 pub const LOGICAL_ARCHIVE_VERSION: u16 = 1;
@@ -211,7 +212,7 @@ pub(super) struct ArchiveWriter {
 }
 
 impl ArchiveWriter {
-    pub fn create(path: &Path, header: ArchiveHeader) -> Result<Self> {
+    pub fn create(path: &AnchoredPath, header: ArchiveHeader) -> Result<Self> {
         let mut writer = Self {
             file: OpenOptions::new()
                 .write(true)
@@ -232,8 +233,12 @@ impl ArchiveWriter {
         Ok(writer)
     }
 
-    pub fn resume(path: &Path, prefix: &PrefixInventory) -> Result<Self> {
-        let mut source = File::open(path).map_err(archive_io)?;
+    pub fn resume(path: &AnchoredPath, prefix: &PrefixInventory) -> Result<Self> {
+        let mut source = OpenOptions::new()
+            .read(true)
+            .append(true)
+            .open(path)
+            .map_err(archive_io)?;
         let mut digest = Sha256::new();
         let mut bytes = 0u64;
         let mut buffer = [0u8; 64 * 1024];
@@ -247,18 +252,15 @@ impl ArchiveWriter {
                 .checked_add(read as u64)
                 .ok_or_else(|| Error::Archive("archive prefix size overflow".into()))?;
         }
-        let digest = digest.finalize();
-        if bytes != prefix.prefix_bytes || hex(digest) != prefix.prefix_sha256 {
+        let observed_digest = digest.clone().finalize();
+        if bytes != prefix.prefix_bytes || hex(observed_digest) != prefix.prefix_sha256 {
             return Err(Error::Archive(
                 "logical archive partial bytes differ from their resume evidence".into(),
             ));
         }
         Ok(Self {
-            file: OpenOptions::new()
-                .append(true)
-                .open(path)
-                .map_err(archive_io)?,
-            digest: Sha256::from_finalized_prefix(path)?,
+            file: source,
+            digest,
             header: prefix.header,
             state: ReplayState {
                 action_count: prefix.completed_actions,
@@ -360,28 +362,8 @@ impl ArchiveWriter {
     }
 }
 
-trait Sha256Prefix {
-    fn from_finalized_prefix(path: &Path) -> Result<Sha256>;
-}
-
-impl Sha256Prefix for Sha256 {
-    fn from_finalized_prefix(path: &Path) -> Result<Sha256> {
-        let mut file = File::open(path).map_err(archive_io)?;
-        let mut digest = Sha256::new();
-        let mut buffer = [0u8; 64 * 1024];
-        loop {
-            let read = file.read(&mut buffer).map_err(archive_io)?;
-            if read == 0 {
-                break;
-            }
-            digest.update(&buffer[..read]);
-        }
-        Ok(digest)
-    }
-}
-
-pub(super) fn scan_archive_prefix(path: &Path) -> Result<PrefixInventory> {
-    let mut file = File::open(path).map_err(archive_io)?;
+pub(super) fn scan_archive_prefix(path: &AnchoredPath) -> Result<PrefixInventory> {
+    let mut file = path.open_read().map_err(archive_io)?;
     let mut digest = Sha256::new();
     let header = read_header(&mut file, &mut digest)?;
     let mut state = ReplayState::default();
@@ -417,8 +399,8 @@ pub(super) struct PrefixActionReader {
 }
 
 impl PrefixActionReader {
-    pub fn open(path: &Path, expected: &PrefixInventory) -> Result<Self> {
-        let mut file = File::open(path).map_err(archive_io)?;
+    pub fn open(path: &AnchoredPath, expected: &PrefixInventory) -> Result<Self> {
+        let mut file = path.open_read().map_err(archive_io)?;
         let mut digest = Sha256::new();
         if read_header(&mut file, &mut digest)? != expected.header {
             return Err(Error::Archive(
@@ -479,15 +461,18 @@ impl PrefixActionReader {
     }
 }
 
-pub fn inspect_logical_archive(path: &Path) -> Result<LogicalArchiveInventory> {
+pub fn inspect_logical_archive(
+    path: &(impl AnchorInput + ?Sized),
+) -> Result<LogicalArchiveInventory> {
+    let path = &path.anchor().map_err(archive_io)?;
     read_archive(path, |_, _| Ok(()))
 }
 
 pub(super) fn read_archive(
-    path: &Path,
+    path: &AnchoredPath,
     mut accept: impl FnMut(u64, &ArchiveAction) -> Result<()>,
 ) -> Result<LogicalArchiveInventory> {
-    let mut file = File::open(path).map_err(archive_io)?;
+    let mut file = path.open_read().map_err(archive_io)?;
     let mut digest = Sha256::new();
     let header = read_header(&mut file, &mut digest)?;
     let mut state = ReplayState::default();

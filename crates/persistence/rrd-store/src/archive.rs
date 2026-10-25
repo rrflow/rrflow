@@ -18,5 +18,6 @@ pub use format::{
 };
 pub use restore::{
     restore_logical_archive_to_new_root, restore_logical_archive_to_new_root_with,
+    restore_logical_archive_to_new_root_with_options,
     restore_logical_archive_to_new_root_with_progress,
 };

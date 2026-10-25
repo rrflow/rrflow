@@ -1,0 +1,4 @@
+# Bundle digests bind the same bytes on every supported checkout.
+*.json text eol=lf
+*.toml text eol=lf
+*.md text eol=lf

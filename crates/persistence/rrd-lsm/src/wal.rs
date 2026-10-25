@@ -1,8 +1,9 @@
+use crate::filesystem::{file_io, AnchoredPath, OpenOptions};
 use crate::write_diagnostics::{PhaseClock, WalAppendPhases};
 use crate::{Error, Result, WriteBatch};
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
-use std::io::{IoSlice, Read, Seek, SeekFrom, Write};
+use std::fs::File;
+use std::io::{IoSlice, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 pub const WAL_FORMAT_VERSION: u16 = 1;
@@ -89,6 +90,7 @@ pub(crate) struct RecoverySummary {
 }
 
 pub struct WalWriter {
+    recovery_reserve_bytes: u64,
     path: PathBuf,
     file: File,
     offset: u64,
@@ -102,20 +104,29 @@ impl WalWriter {
     }
 
     pub fn create_at(path: &Path, next_sequence: u64) -> Result<Self> {
+        Self::create_at_anchored(&AnchoredPath::from_path(path)?, next_sequence)
+    }
+
+    pub(crate) fn create_at_anchored(path: &AnchoredPath, next_sequence: u64) -> Result<Self> {
         if next_sequence == 0 {
             return Err(Error::InvalidBatch(
                 "WAL starting sequence must be non-zero".into(),
             ));
         }
+        path.admit_disk(FILE_HEADER_BYTES as u64, true)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create_new(true)
             .open(path)?;
-        file.write_all(&file_header())?;
-        file.sync_all()?;
+        file_io::write_all(&mut file, path.diagnostic_path(), &file_header())?;
+        file_io::sync_all(&file, path.diagnostic_path())?;
+        path.parent()
+            .ok_or_else(|| Error::InvalidBatch("WAL requires an anchored parent".into()))?
+            .sync_directory()?;
         Ok(Self {
-            path: path.to_owned(),
+            path: path.diagnostic_path().to_owned(),
+            recovery_reserve_bytes: path.recovery_reserve(),
             file,
             offset: FILE_HEADER_BYTES as u64,
             next_sequence,
@@ -128,22 +139,47 @@ impl WalWriter {
     }
 
     pub fn open_at(path: &Path, starting_sequence: u64) -> Result<Self> {
-        let recovery = replay_from(path, starting_sequence, |_| Ok(()))?;
-        Self::open_after_recovery(path, recovery)
+        Self::open_at_anchored(&AnchoredPath::from_path(path)?, starting_sequence)
     }
 
-    pub(crate) fn open_after_recovery(path: &Path, recovery: RecoverySummary) -> Result<Self> {
+    pub(crate) fn open_at_anchored(path: &AnchoredPath, starting_sequence: u64) -> Result<Self> {
+        let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+        let recovery = replay_file(&mut file, starting_sequence, |_| Ok(()))?;
+        Self::from_recovered_file(path, file, recovery)
+    }
+
+    pub(crate) fn open_empty_at_anchored(
+        path: &AnchoredPath,
+        starting_sequence: u64,
+    ) -> Result<Self> {
+        let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+        let summary = replay_file(&mut file, starting_sequence, |_| {
+            Err(Error::Corruption {
+                offset: 0,
+                reason: "unpublished successor WAL contains data".into(),
+            })
+        })?;
+        // An earlier create may have failed its sync/name barrier. This WAL is
+        // about to become reachable, so a validated header alone is insufficient.
+        file_io::sync_all(&file, path.diagnostic_path())?;
+        path.parent()
+            .ok_or_else(|| Error::InvalidBatch("WAL requires an anchored parent".into()))?
+            .sync_directory()?;
+        Self::from_recovered_file(path, file, summary)
+    }
+
+    pub(crate) fn from_recovered_file(
+        path: &AnchoredPath,
+        mut file: File,
+        recovery: RecoverySummary,
+    ) -> Result<Self> {
         if let Some(offset) = recovery.torn_tail {
             return Err(Error::TornTail { offset });
         }
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(path)
-            .map_err(|error| Error::io("opening WAL writer after recovery", path, error))?;
         file.seek(SeekFrom::Start(recovery.valid_bytes))?;
         Ok(Self {
-            path: path.to_owned(),
+            path: path.diagnostic_path().to_owned(),
+            recovery_reserve_bytes: path.recovery_reserve(),
             file,
             offset: recovery.valid_bytes,
             next_sequence: recovery
@@ -199,6 +235,22 @@ impl WalWriter {
                 .expect("phase recorder checked")
                 .record_prepare = started.finish();
         }
+        let allocation = end_offset - offset;
+        #[cfg(target_os = "linux")]
+        let allocation = if offset == FILE_HEADER_BYTES as u64
+            && batch.first_sequence == 1
+            && batch.payload.len() >= INITIAL_WAL_RESERVATION_MIN_BATCH_BYTES
+        {
+            allocation.max(INITIAL_WAL_RESERVATION_BYTES)
+        } else {
+            allocation
+        };
+        crate::filesystem::space::admit(
+            &self.file,
+            self.recovery_reserve_bytes,
+            allocation,
+            false,
+        )?;
         if offset == FILE_HEADER_BYTES as u64
             && batch.first_sequence == 1
             && batch.payload.len() >= INITIAL_WAL_RESERVATION_MIN_BATCH_BYTES
@@ -213,22 +265,31 @@ impl WalWriter {
             }
         }
         let write_started = phases.is_some().then(PhaseClock::start);
+        #[cfg(all(feature = "crash-test", not(test)))]
+        crate::crash_test::wal_before_write(&self.path, batch.payload.len());
         let write = (|| -> std::io::Result<()> {
             let written = loop {
-                match self
-                    .file
-                    .write_vectored(&[IoSlice::new(&header), IoSlice::new(batch.payload)])
-                {
+                match file_io::write_vectored(
+                    &mut self.file,
+                    &self.path,
+                    &[IoSlice::new(&header), IoSlice::new(batch.payload)],
+                ) {
                     Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
                     result => break result?,
                 }
             };
+            if written == 0 {
+                return Err(std::io::ErrorKind::WriteZero.into());
+            }
             if written < header.len() {
-                self.file.write_all(&header[written..])?;
-                self.file.write_all(batch.payload)?;
+                file_io::write_all(&mut self.file, &self.path, &header[written..])?;
+                file_io::write_all(&mut self.file, &self.path, batch.payload)?;
             } else {
-                self.file
-                    .write_all(&batch.payload[written - header.len()..])?;
+                file_io::write_all(
+                    &mut self.file,
+                    &self.path,
+                    &batch.payload[written - header.len()..],
+                )?;
             }
             Ok(())
         })();
@@ -240,11 +301,15 @@ impl WalWriter {
             phases.as_mut().expect("phase recorder checked").write = started.finish();
         }
         if durability == Durability::Authoritative {
+            #[cfg(all(feature = "crash-test", not(test)))]
+            crate::crash_test::boundary(crate::crash_test::Point::WalAppended, &self.path);
             let sync_started = phases.is_some().then(PhaseClock::start);
-            if let Err(error) = self.file.sync_data() {
+            if let Err(error) = file_io::sync_data(&self.file, &self.path) {
                 self.poisoned = true;
                 return Err(Error::Io(error));
             }
+            #[cfg(all(feature = "crash-test", not(test)))]
+            crate::crash_test::boundary(crate::crash_test::Point::WalSynced, &self.path);
             if let Some(started) = sync_started {
                 phases.as_mut().expect("phase recorder checked").sync = started.finish();
             }
@@ -324,7 +389,10 @@ impl WalWriter {
         if self.poisoned {
             return Err(Error::PoisonedWriter);
         }
-        self.file.sync_data()?;
+        if let Err(error) = file_io::sync_data(&self.file, &self.path) {
+            self.poisoned = true;
+            return Err(error.into());
+        }
         Ok(self.next_sequence.saturating_sub(1))
     }
 }
@@ -334,8 +402,12 @@ pub fn recover(path: &Path) -> Result<Recovery> {
 }
 
 pub fn recover_from(path: &Path, starting_sequence: u64) -> Result<Recovery> {
+    recover_anchored(&AnchoredPath::from_path(path)?, starting_sequence)
+}
+
+pub(crate) fn recover_anchored(path: &AnchoredPath, starting_sequence: u64) -> Result<Recovery> {
     let mut batches = Vec::new();
-    let summary = replay_from(path, starting_sequence, |batch| {
+    let summary = replay_anchored(path, starting_sequence, |batch| {
         batches.push(batch);
         Ok(())
     })?;
@@ -347,9 +419,45 @@ pub fn recover_from(path: &Path, starting_sequence: u64) -> Result<Recovery> {
     })
 }
 
-pub(crate) fn replay_from<F>(
-    path: &Path,
+pub(crate) fn replay_anchored<F>(
+    path: &AnchoredPath,
     starting_sequence: u64,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    let mut file = path.open_read()?;
+    replay_file(&mut file, starting_sequence, replay)
+}
+
+pub(crate) fn replay_file<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    replay_file_inner(file, starting_sequence, None, replay)
+}
+
+pub(crate) fn replay_file_bounded<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    budget: &mut crate::recovery_budget::RecoveryBudget,
+    replay: F,
+) -> Result<RecoverySummary>
+where
+    F: FnMut(RecoveredBatch) -> Result<()>,
+{
+    replay_file_inner(file, starting_sequence, Some(budget), replay)
+}
+
+fn replay_file_inner<F>(
+    file: &mut File,
+    starting_sequence: u64,
+    mut budget: Option<&mut crate::recovery_budget::RecoveryBudget>,
     mut replay: F,
 ) -> Result<RecoverySummary>
 where
@@ -360,9 +468,11 @@ where
             "WAL recovery sequence must be non-zero".into(),
         ));
     }
-    let mut file =
-        File::open(path).map_err(|error| Error::io("opening WAL for replay", path, error))?;
+    file.seek(SeekFrom::Start(0))?;
     let length = file.metadata()?.len();
+    if let Some(budget) = budget.as_deref_mut() {
+        budget.wal(length)?;
+    }
     if length < FILE_HEADER_BYTES as u64 {
         return Err(Error::Corruption {
             offset: 0,
@@ -370,7 +480,7 @@ where
         });
     }
     let mut file_header_bytes = [0u8; FILE_HEADER_BYTES];
-    file.read_exact(&mut file_header_bytes)?;
+    file_io::read_exact(file, &mut file_header_bytes)?;
     validate_file_header(&file_header_bytes)?;
 
     let mut offset = FILE_HEADER_BYTES as u64;
@@ -378,13 +488,16 @@ where
     let mut torn_tail = None;
     let mut payload_bytes = 0usize;
     while offset < length {
+        if let Some(budget) = budget.as_deref_mut() {
+            budget.frame()?;
+        }
         let remaining = length - offset;
         if remaining < RECORD_HEADER_BYTES as u64 {
             torn_tail = Some(offset);
             break;
         }
         let mut header = [0u8; RECORD_HEADER_BYTES];
-        file.read_exact(&mut header)?;
+        file_io::read_exact(file, &mut header)?;
         let decoded = decode_record_header(&header, offset)?;
         if decoded.first_sequence != expected_sequence {
             return Err(Error::Corruption {
@@ -407,7 +520,7 @@ where
             break;
         }
         let mut payload = vec![0u8; decoded.payload_len];
-        file.read_exact(&mut payload)?;
+        file_io::read_exact(file, &mut payload)?;
         let actual = crc32c(&[&header[4..28], &payload]);
         if actual != decoded.checksum {
             return Err(Error::Corruption {
@@ -442,6 +555,15 @@ where
                 })?;
         offset = end;
     }
+    if file.metadata()?.len() != length {
+        return Err(Error::Corruption {
+            offset,
+            reason: "WAL length changed during recovery".into(),
+        });
+    }
+    if let Some(budget) = budget {
+        budget.tick()?;
+    }
     Ok(RecoverySummary {
         recovered_through: expected_sequence.saturating_sub(1),
         valid_bytes: offset,
@@ -457,14 +579,23 @@ pub fn repair_torn_tail(path: &Path) -> Result<Recovery> {
 }
 
 pub(crate) fn repair_torn_tail_from(path: &Path, starting_sequence: u64) -> Result<Recovery> {
-    let recovery = recover_from(path, starting_sequence)?;
-    let Some(_) = recovery.torn_tail else {
-        return Ok(recovery);
-    };
-    let file = OpenOptions::new().write(true).open(path)?;
-    file.set_len(recovery.valid_bytes)?;
-    file.sync_all()?;
-    recover_from(path, starting_sequence)
+    let path = AnchoredPath::from_path(path)?;
+    let mut file = OpenOptions::new().read(true).write(true).open(&path)?;
+    let mut batches = Vec::new();
+    let summary = replay_file(&mut file, starting_sequence, |batch| {
+        batches.push(batch);
+        Ok(())
+    })?;
+    if summary.torn_tail.is_some() {
+        file.set_len(summary.valid_bytes)?;
+        file.sync_all()?;
+    }
+    Ok(Recovery {
+        batches,
+        recovered_through: summary.recovered_through,
+        valid_bytes: summary.valid_bytes,
+        torn_tail: None,
+    })
 }
 
 struct DecodedHeader {

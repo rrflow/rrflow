@@ -110,7 +110,16 @@ impl RrdEngine {
                     properties: task_properties(&task),
                 },
             });
-            if self.commit_task(&scope, session_id, now, &read, mutations, task_cursor)? {
+            if self.commit_task(
+                &scope,
+                session_id,
+                now,
+                &read,
+                mutations,
+                task_cursor,
+                request_id,
+                operation_id,
+            )? {
                 return Ok(TaskResult {
                     task,
                     idempotent_replay: false,
@@ -189,7 +198,16 @@ impl RrdEngine {
                     properties: task_properties(&task),
                 },
             }];
-            if self.commit_task(&scope, session_id, now, &read, mutations, closed_cursor)? {
+            if self.commit_task(
+                &scope,
+                session_id,
+                now,
+                &read,
+                mutations,
+                closed_cursor,
+                request_id,
+                operation_id,
+            )? {
                 return Ok(TaskResult {
                     task,
                     idempotent_replay: false,
@@ -362,6 +380,7 @@ impl RrdEngine {
 
     /// Commits one task write at its read stamp. `Ok(false)` reports a lost
     /// cursor race the caller retries at a fresh stamp.
+    #[allow(clippy::too_many_arguments)]
     fn commit_task(
         &self,
         scope: &ScopeId,
@@ -370,6 +389,8 @@ impl RrdEngine {
         read: &ReadStamp,
         mutations: Vec<RuntimeMutation>,
         record_cursor: u64,
+        request_id: &str,
+        operation_id: &str,
     ) -> Result<bool> {
         let record_offset = mutations.len() as u64 - 1;
         let commit = RuntimeCommit {
@@ -380,10 +401,7 @@ impl RrdEngine {
             mutations,
         };
         commit.validate().map_err(core_contract)?;
-        let _transaction_guard = self
-            .transaction_gate
-            .lock()
-            .map_err(|_| ServiceError::Storage("engine transaction gate is poisoned".into()))?;
+        let _transaction_guard = self.admit_transaction(&commit, request_id, operation_id)?;
         match self.storage.runtime().commit(&commit) {
             Ok(outcome) => {
                 if outcome.first_cursor + record_offset != record_cursor {

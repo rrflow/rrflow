@@ -97,10 +97,11 @@ fn journal_redacts_tokens_and_records_expiry_once() {
     ));
 
     let journal = service.storage.control().journal_since(0, 10).unwrap();
-    assert_eq!(journal.len(), 3);
+    assert_eq!(journal.len(), 4);
     assert_eq!(journal[0].action, "session.created");
     assert_eq!(journal[1].action, "transaction.began");
-    assert_eq!(journal[2].action, "session.expired");
+    assert_eq!(journal[2].action, "transaction.retained");
+    assert_eq!(journal[3].action, "session.expired");
     assert!(journal.iter().all(|entry| entry.verify()));
     assert_eq!(
         journal[1].previous_digest.as_deref(),
@@ -115,12 +116,21 @@ fn journal_redacts_tokens_and_records_expiry_once() {
             assert!(!String::from_utf8_lossy(replacement).contains(lease.token.as_str()));
         }
     }
-    let state: Value = serde_json::from_slice(journal[2].replacement.as_ref().unwrap()).unwrap();
-    assert_eq!(state["status"], "expired");
     assert_eq!(
-        state["transactions"][transaction.transaction_id.as_str()]["lease"]["state"],
-        "expired"
+        journal[3].previous_digest.as_deref(),
+        Some(journal[2].digest.as_str())
     );
+    let state: Value = serde_json::from_slice(journal[3].replacement.as_ref().unwrap()).unwrap();
+    assert_eq!(state["status"], "expired");
+    assert!(state["transactions"].as_object().unwrap().is_empty());
+    let (_, state) = service
+        .load_authenticated(&lease.session_id, &lease.token)
+        .unwrap();
+    let record = service
+        .transaction_record(&state, &transaction.transaction_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(record.lease.state, TransactionState::Expired);
 }
 
 #[test]
@@ -443,6 +453,7 @@ fn renewal_rotates_without_persisting_tokens_and_close_is_idempotent() {
             "session.created",
             "session.renewed",
             "transaction.began",
+            "transaction.retained",
             "session.closed"
         ]
     );
@@ -453,4 +464,84 @@ fn renewal_rotates_without_persisting_tokens_and_close_is_idempotent() {
     }
     drop(service);
     assert_tree_excludes(&path, &[lease.token.as_str(), renewed.token.as_str()]);
+}
+
+#[test]
+fn concurrent_session_transactions_preserve_leases_and_release_quota() {
+    let (_root, engine) = isolated_engine();
+    let session = engine
+        .create_session(
+            &session_request(9_000, 8),
+            &id("parallel-session"),
+            1_000,
+            "parallel-create",
+            "parallel-create",
+        )
+        .unwrap();
+    let barrier = std::sync::Barrier::new(8);
+    std::thread::scope(|scope| {
+        let handles = (0..8)
+            .map(|worker| {
+                let engine = &engine;
+                let session = &session;
+                let barrier = &barrier;
+                scope.spawn(move || {
+                    barrier.wait();
+                    for turn in 0..8 {
+                        let name = format!("parallel-{worker}-{turn}");
+                        let context = mutation_context(&id(&name), &name, &name);
+                        let transaction = engine
+                            .begin_transaction(
+                                &session.session_id,
+                                &session.token,
+                                &begin_request(),
+                                &context,
+                                1_100,
+                            )
+                            .unwrap();
+                        let aborted = engine
+                            .abort_transaction(
+                                &session.session_id,
+                                &session.token,
+                                &transaction.transaction_id,
+                                &AbortTransaction {},
+                                &context,
+                                1_200,
+                            )
+                            .unwrap();
+                        assert_eq!(aborted.state, TransactionState::Aborted);
+                        assert_eq!(
+                            engine
+                                .begin_transaction(
+                                    &session.session_id,
+                                    &session.token,
+                                    &begin_request(),
+                                    &context,
+                                    1_300
+                                )
+                                .unwrap(),
+                            aborted
+                        );
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    });
+    let admission = engine.transaction_admission_snapshot().unwrap();
+    assert_eq!(admission.outstanding_requests, 0);
+    assert_eq!(admission.logical_bytes, 0);
+    assert!(!admission.active);
+    let next = engine
+        .begin_transaction(
+            &session.session_id,
+            &session.token,
+            &begin_request(),
+            &mutation_context(&id("after-parallel"), "after-parallel", "after-parallel"),
+            1_400,
+        )
+        .unwrap();
+    assert_eq!(next.state, TransactionState::Open);
 }

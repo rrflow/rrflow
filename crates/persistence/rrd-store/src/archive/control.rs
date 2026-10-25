@@ -17,12 +17,12 @@ use super::format::{
     read_u64_raw,
 };
 use crate::control::{validate_control_key, ControlJournalEntry};
+use crate::filesystem::{AnchorInput, AnchoredPath, OpenOptions};
 use crate::{Error, Result};
 use rrd_core::digest::Sha256;
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
 
 pub(super) const MAGIC: &[u8; 8] = b"RRDCJA01";
 pub const CONTROL_ARCHIVE_VERSION: u16 = 1;
@@ -274,7 +274,11 @@ pub(crate) struct ControlArchiveWriter {
 }
 
 impl ControlArchiveWriter {
-    pub fn create(path: &Path, source_control_sequence: u64, families: &[String]) -> Result<Self> {
+    pub fn create(
+        path: &AnchoredPath,
+        source_control_sequence: u64,
+        families: &[String],
+    ) -> Result<Self> {
         validate_control_families(families)?;
         let mut writer = Self {
             file: OpenOptions::new()
@@ -344,7 +348,10 @@ impl ControlArchiveWriter {
 }
 
 /// Verifies a control-journal archive's digest without yielding its entries.
-pub fn inspect_control_archive(path: &Path) -> Result<ControlArchiveInventory> {
+pub fn inspect_control_archive(
+    path: &(impl AnchorInput + ?Sized),
+) -> Result<ControlArchiveInventory> {
+    let path = &path.anchor().map_err(archive_io)?;
     read_control_archive(path, |_| Ok(()))
 }
 
@@ -352,10 +359,11 @@ pub fn inspect_control_archive(path: &Path) -> Result<ControlArchiveInventory> {
 /// digest is checked after the last entry; a caller that must not act on
 /// unverified entries inspects the archive first.
 pub fn read_control_archive(
-    path: &Path,
+    path: &(impl AnchorInput + ?Sized),
     mut accept: impl FnMut(&ControlJournalEntry) -> Result<()>,
 ) -> Result<ControlArchiveInventory> {
-    let mut file = File::open(path).map_err(archive_io)?;
+    let path = &path.anchor().map_err(archive_io)?;
+    let mut file = path.open_read().map_err(archive_io)?;
     let mut digest = Sha256::new();
     let mut magic = [0u8; 8];
     read_hashed(&mut file, &mut digest, &mut magic)?;
@@ -548,7 +556,9 @@ mod tests {
             entry(6, "server/state/one/audit-head", Some(b"head")),
             entry(9, "server/state/one/audit/a", None),
         ];
-        let mut writer = ControlArchiveWriter::create(&path, 12, &families()).unwrap();
+        let mut writer =
+            ControlArchiveWriter::create(&AnchoredPath::from_path(&path).unwrap(), 12, &families())
+                .unwrap();
         for entry in &entries {
             writer.entry(entry).unwrap();
         }
@@ -574,7 +584,9 @@ mod tests {
     fn writer_rejects_out_of_scope_descending_or_overlong_entries() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("control.rrd-control-archive");
-        let mut writer = ControlArchiveWriter::create(&path, 10, &families()).unwrap();
+        let mut writer =
+            ControlArchiveWriter::create(&AnchoredPath::from_path(&path).unwrap(), 10, &families())
+                .unwrap();
         writer
             .entry(&entry(3, "server/state/install/record", Some(b"x")))
             .unwrap();
@@ -599,10 +611,11 @@ mod tests {
     fn empty_scope_archives_nothing_and_verifies() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("empty.rrd-control-archive");
-        let inventory = ControlArchiveWriter::create(&path, 0, &[])
-            .unwrap()
-            .finish()
-            .unwrap();
+        let inventory =
+            ControlArchiveWriter::create(&AnchoredPath::from_path(&path).unwrap(), 0, &[])
+                .unwrap()
+                .finish()
+                .unwrap();
         assert_eq!(inventory.entry_count, 0);
         assert_eq!(inventory.first_sequence, None);
         assert_eq!(inspect_control_archive(&path).unwrap(), inventory);
@@ -612,7 +625,9 @@ mod tests {
     fn corruption_fails_closed() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("control.rrd-control-archive");
-        let mut writer = ControlArchiveWriter::create(&path, 10, &families()).unwrap();
+        let mut writer =
+            ControlArchiveWriter::create(&AnchoredPath::from_path(&path).unwrap(), 10, &families())
+                .unwrap();
         writer
             .entry(&entry(3, "server/state/install/record", Some(b"value")))
             .unwrap();

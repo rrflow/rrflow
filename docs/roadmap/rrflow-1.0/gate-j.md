@@ -81,6 +81,12 @@ reference inputs (reviewed 2026-10-19; not benchmark results):
 - [Pinecone Nexus GA architecture and benchmark account](https://www.pinecone.io/blog/pinecone-nexus-generally-available/)
 - [Pinecone production checklist](https://docs.pinecone.io/guides/production/production-checklist)
 
+J-04's mature-project demonstration must follow the [project evidence and
+model-usage comparison contract](../../architecture/engine-data-flow.md#project-evidence-model-usage-and-reasoning-efficiency).
+Compare baseline and locally grounded arms at matched quality and account for
+initial construction and updates. A context-size reduction, provider cache hit,
+or successful storage soak alone is not proof of remote-token savings.
+
 ## Capacity and optimization qualification
 
 The [researched design rationale](../../architecture/engine-scale-and-contracts.md)

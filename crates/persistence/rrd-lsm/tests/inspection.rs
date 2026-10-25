@@ -21,10 +21,15 @@ fn inventory(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
             if path.is_dir() {
                 visit(root, &path, output);
             } else {
-                output.insert(
-                    path.strip_prefix(root).unwrap().to_owned(),
-                    std::fs::read(path).unwrap(),
-                );
+                // Windows mandatory locking rejects even a read at EOF on
+                // the empty manifest lease. Its zero length proves the empty
+                // payload without trying to read through the writer's lock.
+                let bytes = if entry.metadata().unwrap().len() == 0 {
+                    Vec::new()
+                } else {
+                    std::fs::read(&path).unwrap()
+                };
+                output.insert(path.strip_prefix(root).unwrap().to_owned(), bytes);
             }
         }
     }
@@ -66,6 +71,9 @@ fn inspector_authenticates_manifest_lineage_segments_and_wal_reads() {
     let mut database =
         Database::create_with_application_format(&root, rrd_lsm::DatabaseOptions::default(), 7)
             .unwrap();
+    // Retain the ancestry this case authenticates; ordinary write maintenance
+    // is allowed to reclaim an unpinned parent.
+    let ancestor = database.checkpoint("inspection-lineage", 1).unwrap();
     database
         .write_owned(
             WriteBatch::new(vec![put("alpha", "one"), put("beta", "two")]).unwrap(),
@@ -87,6 +95,10 @@ fn inspector_authenticates_manifest_lineage_segments_and_wal_reads() {
     assert_eq!(inspected.inspection().application_format, Some(7));
     assert_eq!(inspected.inspection().visible_sequence, expected_sequence);
     assert_eq!(inspected.inspection().manifest_lineage.len(), 2);
+    assert!(inspected
+        .inspection()
+        .manifest_lineage
+        .contains(&ancestor.manifest));
     assert!(!inspected.inspection().files.is_empty());
     assert_eq!(
         inspected.get(b"alpha").unwrap().as_deref(),

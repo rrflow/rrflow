@@ -42,9 +42,40 @@ final class RrdClientTest {
                             "storage_profile", "rrflow_kv",
                             "endpoint_presentation", "loopback_http_websocket"),
                     "configuration", Map.of(
-                            "format_version", 2,
+                            "format_version", 3,
                             "revision", 1,
                             "clock", Map.of("maximum_rollback_ms", 0),
+                            "storage", Map.ofEntries(
+                                    Map.entry("mutable_accounted_bytes", 134217728),
+                                    Map.entry("mutable_versions", 1048576),
+                                    Map.entry("projected_output_bytes", 134217728),
+                                    Map.entry("source_page_bytes", 268435456),
+                                    Map.entry("page_cache_bytes", 4194304),
+                                    Map.entry("wal_flush_target_bytes", 67108864),
+                                    Map.entry("memtable_flush_target_versions", 524288),
+                                    Map.entry("compaction_input_bytes", 1073741824L),
+                                    Map.entry("compaction_input_logical_bytes", 268435456L),
+                                    Map.entry("compaction_input_versions", 4194304L),
+                                    Map.entry("compaction_output_segments", 256L),
+                                    Map.entry("compaction_elapsed_ms", 30000L),
+                                    Map.entry("compaction_l0_segments", 64L),
+                                    Map.entry("retained_mutable_bytes", 536870912L),
+                                    Map.entry("retained_mutable_versions", 4194304L),
+                                    Map.entry("retained_mutable_generations", 64L),
+                                    Map.entry("reclamation_inventory_entries", 262144L),
+                                    Map.entry("reclamation_metadata_bytes", 67108864L),
+                                    Map.entry("reclamation_delete_files", 1024L),
+                                    Map.entry("reclamation_delete_bytes", 1073741824L),
+                                    Map.entry("reclamation_elapsed_ms", 30000L),
+                                    Map.entry("transaction_admission_requests", 64L),
+                                    Map.entry("transaction_admission_bytes", 67108864L),
+                                    Map.entry("transaction_admission_wait_ms", 30000L),
+                                    Map.entry("recovery_metadata_bytes", 67108864L),
+                                    Map.entry("recovery_files", 262144L),
+                                    Map.entry("recovery_read_bytes", 1099511627776L),
+                                    Map.entry("recovery_wal_bytes", 268435456L),
+                                    Map.entry("recovery_wal_frames", 1048576L),
+                                    Map.entry("recovery_elapsed_ms", 120000L)),
                             "reasoning", Map.of(
                                     "max_run_elapsed_ms", 900000,
                                     "max_steps", 256,
@@ -63,7 +94,7 @@ final class RrdClientTest {
                                     "max_spill_bytes", 268435456,
                                     "max_elapsed_ms", 30000),
                             "configuration_sha256",
-                            "051d57995c61833653023ba45956d784e42983ab26a8945c1650eefe26098105"),
+                            "408211d1644753c91e002a8b41af1b5aa14ceff60ce6609addf3d3fc83ded7e0"),
                     "instance", Map.of("kind", "instance", "id", "sdk-test"),
                     "capabilities", List.of())));
         });
@@ -191,7 +222,7 @@ final class RrdClientTest {
                                     "request-expired", "operation-expired", null,
                                     Instant.ofEpochMilli(1), Map.of(), null, session, null)));
             assertTrue(expired.getMessage().contains("deadline has expired"));
-            assertEquals(42, OperationId.values().length);
+            assertEquals(44, OperationId.values().length);
             assertTrue(OperationId.BACKUP_CREATE.mutation());
             assertTrue(OperationId.TRANSACTION_PREVIEW.mutation());
             assertEquals(

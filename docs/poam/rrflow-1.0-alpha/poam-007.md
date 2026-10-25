@@ -11,17 +11,18 @@ independently.
 ## Observed deficiency
 
 `AGENTS.md` is the repository instruction source and a useful seat/provider/representation
-graph persists through reopen, but there is no installed digest-bound specialization
-manifest or adapter-conformance proof across supported AI hosts. The current `MemoryEstate*`
-names conflate seat identity with an estate, CLI defaults hardcode Clyffy instead of
-consuming an installed specialization, the caller manually commits the identity plan, broad
+graph persists through reopen. The [accepted D-01 foundation](../../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
+now persists the initial digest-bound specialization subset: the default template
+is generic and the bundled Clyffy profile requires explicit selection. The full
+attuned specialization manifest and adapter-conformance proof across supported AI
+hosts remain open. The current `MemoryEstate*` names conflate seat identity with
+an estate, the caller manually commits the identity plan, broad
 snapshot reconstruction resolves it, and the authenticated
 session/representation/authorization/routing path is not joined.
 
 ## Impact
 
-Provider files can drift or claim invisible lifecycle behavior; a generic install can
-accidentally acquire this repository's persona; or a caller can label itself as a seat
+Provider files can drift or claim invisible lifecycle behavior, or a caller can label itself as a seat
 without one same-stamp authenticated and authorized causal operation.
 
 ## Owning gates

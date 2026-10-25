@@ -120,7 +120,7 @@ define the native rrflowDB SQL/client and data-portability work.
 | [x] | C-05 | [Gate C](rrflow-1.0/gate-c.md) |
 | [x] | C-06 | [Gate C](rrflow-1.0/gate-c.md) |
 | [ ] | C-07 | [Gate C](rrflow-1.0/gate-c.md) |
-| [ ] | D-01 | [Gate D](rrflow-1.0/gate-d.md) |
+| [x] | D-01 | [Gate D](rrflow-1.0/gate-d.md) |
 | [ ] | D-02 | [Gate D](rrflow-1.0/gate-d.md) |
 | [ ] | D-03 | [Gate D](rrflow-1.0/gate-d.md) |
 | [ ] | D-04 | [Gate D](rrflow-1.0/gate-d.md) |

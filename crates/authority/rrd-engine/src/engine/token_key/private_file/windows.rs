@@ -1,6 +1,8 @@
 //! Win32 handles own both file identity and security inspection. No shell ACL
 //! utility, inherited default ACL, or post-write permission repair is used.
-use super::{denied, File, Metadata, Path};
+#[cfg(test)]
+use super::Path;
+use super::{denied, File, Metadata};
 use std::ffi::c_void;
 use std::io;
 use std::mem::{offset_of, size_of};
@@ -8,7 +10,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::ptr::{null, null_mut};
 use windows_sys::Win32::Foundation::{
-    LocalFree, ERROR_INSUFFICIENT_BUFFER, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE,
+    LocalFree, ERROR_INSUFFICIENT_BUFFER, GENERIC_READ, GENERIC_WRITE,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
@@ -18,13 +20,12 @@ use windows_sys::Win32::Security::{
     EqualSid, GetAce, GetLengthSid, GetSecurityDescriptorControl, GetTokenInformation, IsValidAcl,
     IsValidSecurityDescriptor, IsValidSid, IsWellKnownSid, TokenUser, WinLocalSystemSid,
     ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
-    PSID, SECURITY_ATTRIBUTES, SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
+    PSID, SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, GetFileInformationByHandle, GetFileType, BY_HANDLE_FILE_INFORMATION, CREATE_NEW,
-    FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT,
-    FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, FILE_TYPE_DISK, OPEN_EXISTING,
-    SECURITY_IDENTIFICATION, SECURITY_SQOS_PRESENT,
+    GetFileInformationByHandle, GetFileType, BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY,
+    FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT, FILE_READ_ATTRIBUTES, FILE_SHARE_READ,
+    FILE_SHARE_WRITE, FILE_TYPE_DISK, READ_CONTROL,
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -128,51 +129,152 @@ fn descriptor(sddl: &str) -> io::Result<LocalAllocation> {
     Ok(LocalAllocation(raw))
 }
 
-pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
-    let wide: Vec<u16> = path.as_os_str().encode_wide().collect();
-    if wide.contains(&0) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "secret path contains NUL",
-        ));
+pub(super) fn open_relative(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+    directory: bool,
+) -> io::Result<File> {
+    open_relative_with_access(parent, name, create, directory, false)
+}
+
+pub(super) fn open_empty_relative(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+) -> io::Result<File> {
+    // Empty lease creation needs no payload write access. Read sharing lets
+    // contenders reach LockFileEx and lets read-only verification admit it.
+    // Deletion and writes remain excluded for this handle's entire lifetime.
+    open_relative_with_access(parent, name, create, false, true)
+}
+
+fn open_relative_with_access(
+    parent: &File,
+    name: &std::ffi::OsStr,
+    create: bool,
+    directory: bool,
+    empty_lease: bool,
+) -> io::Result<File> {
+    use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
+    use windows_sys::Wdk::Storage::FileSystem::{
+        NtCreateFile, FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN,
+        FILE_OPEN_REPARSE_POINT, FILE_SYNCHRONOUS_IO_NONALERT,
+    };
+    use windows_sys::Win32::Foundation::{RtlNtStatusToDosError, UNICODE_STRING};
+    use windows_sys::Win32::Security::{SecurityIdentification, SECURITY_QUALITY_OF_SERVICE};
+    use windows_sys::Win32::Storage::FileSystem::SYNCHRONIZE;
+    use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
+    let mut name: Vec<u16> = name.encode_wide().collect();
+    if name.is_empty() || name.contains(&0) || name.len() > 32_767 {
+        return Err(denied("invalid private leaf name"));
     }
-    let wide: Vec<u16> = wide.into_iter().chain(Some(0)).collect();
+    let length = (name.len() * 2) as u16;
+    let mut string = UNICODE_STRING {
+        Length: length,
+        MaximumLength: length,
+        Buffer: name.as_mut_ptr(),
+    };
     let security = if create {
         let user = CurrentUser::query()?.text()?;
+        let inheritance = if directory { "OICI" } else { "" };
         Some(descriptor(&format!(
-            "O:{user}D:P(A;;FA;;;{user})(A;;FA;;;SY)"
+            "O:{user}D:P(A;{inheritance};FA;;;{user})(A;{inheritance};FA;;;SY)"
         ))?)
     } else {
         None
     };
-    let attributes = SECURITY_ATTRIBUTES {
-        nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
-        lpSecurityDescriptor: security.as_ref().map_or(null_mut(), |value| value.0),
-        bInheritHandle: 0,
+    let mut qos = SECURITY_QUALITY_OF_SERVICE {
+        Length: size_of::<SECURITY_QUALITY_OF_SERVICE>() as u32,
+        ImpersonationLevel: SecurityIdentification,
+        ContextTrackingMode: 0,
+        EffectiveOnly: true,
     };
-    // SAFETY: all pointers are live for this call. CREATE_NEW cannot truncate
-    // an existing file; the explicit protected ACL applies before any write.
-    // Read handles deny sharing for write/delete and open the reparse object
-    // itself. SQOS prevents a device/pipe from impersonating this process.
-    let raw = unsafe {
-        CreateFileW(
-            wide.as_ptr(),
-            GENERIC_READ | if create { GENERIC_WRITE } else { 0 },
-            if create { 0 } else { FILE_SHARE_READ },
-            if create { &attributes } else { null() },
-            if create { CREATE_NEW } else { OPEN_EXISTING },
-            FILE_ATTRIBUTE_NORMAL
-                | FILE_FLAG_OPEN_REPARSE_POINT
-                | SECURITY_SQOS_PRESENT
-                | SECURITY_IDENTIFICATION,
-            null_mut(),
+    let attributes = OBJECT_ATTRIBUTES {
+        Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
+        RootDirectory: parent.as_raw_handle(),
+        ObjectName: &mut string,
+        Attributes: 0,
+        SecurityDescriptor: security.as_ref().map_or(null_mut(), |value| value.0.cast()),
+        SecurityQualityOfService: (&mut qos as *mut SECURITY_QUALITY_OF_SERVICE).cast(),
+    };
+    let mut status = IO_STATUS_BLOCK::default();
+    let mut raw = null_mut();
+    // One ordinary component relative to a retained directory. The descriptor
+    // is applied atomically by FILE_CREATE, before the first secret byte.
+    let result = unsafe {
+        NtCreateFile(
+            &mut raw,
+            GENERIC_READ
+                | READ_CONTROL
+                | FILE_READ_ATTRIBUTES
+                | SYNCHRONIZE
+                | if create && !empty_lease {
+                    GENERIC_WRITE
+                } else {
+                    0
+                },
+            &attributes,
+            &mut status,
+            null(),
+            if directory {
+                FILE_ATTRIBUTE_DIRECTORY
+            } else {
+                FILE_ATTRIBUTE_NORMAL
+            },
+            if directory {
+                FILE_SHARE_READ | FILE_SHARE_WRITE
+            } else if create && !empty_lease {
+                0
+            } else {
+                FILE_SHARE_READ
+            },
+            if create { FILE_CREATE } else { FILE_OPEN },
+            FILE_OPEN_REPARSE_POINT
+                | FILE_SYNCHRONOUS_IO_NONALERT
+                | if directory {
+                    FILE_DIRECTORY_FILE
+                } else {
+                    FILE_NON_DIRECTORY_FILE
+                },
+            null(),
+            0,
         )
     };
-    if raw == INVALID_HANDLE_VALUE {
-        return Err(io::Error::last_os_error());
+    if result < 0 {
+        return Err(io::Error::from_raw_os_error(
+            unsafe { RtlNtStatusToDosError(result) } as i32,
+        ));
     }
-    // SAFETY: successful CreateFileW transfers ownership of this one handle.
+    // SAFETY: a successful NtCreateFile transfers one owned file handle.
     Ok(unsafe { File::from_raw_handle(raw) })
+}
+
+#[cfg(test)]
+pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
+    let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
+    path.with_parent(|parent, name| open_relative(parent, name, create, true))
+}
+
+pub(super) fn validate_directory(file: &File) -> io::Result<()> {
+    let mut information = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: file owns the live handle and information is writable.
+    if unsafe { GetFileType(file.as_raw_handle()) } != FILE_TYPE_DISK
+        || unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) } == 0
+        || information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY == 0
+        || information.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    {
+        return Err(denied(
+            "estate directory must be a native non-reparse directory",
+        ));
+    }
+    validate_security(file, true)
+}
+
+#[cfg(test)]
+pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
+    let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
+    path.open_file_with(|parent, name| open_relative(parent, name, create, false))
 }
 
 pub(super) fn validate(file: &File) -> io::Result<Metadata> {
@@ -191,11 +293,17 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
             "secret must be a regular non-reparse file with exactly one link",
         ));
     }
+    validate_security(file, false)?;
+    file.metadata()
+}
+
+fn validate_security(file: &File, directory: bool) -> io::Result<()> {
+    let handle = file.as_raw_handle();
     let user = CurrentUser::query()?;
     let mut owner = null_mut();
     let mut dacl: *mut ACL = null_mut();
     let mut raw = null_mut();
-    // SAFETY: file grants READ_CONTROL via GENERIC_READ; outputs point into raw,
+    // SAFETY: the handle grants READ_CONTROL; outputs point into raw,
     // a LocalFree-owned security descriptor retained through all ACL inspection.
     let status = unsafe {
         GetSecurityInfo(
@@ -228,14 +336,14 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
     };
     if !valid {
         return Err(denied(
-            "secret requires the current owner and a protected non-null DACL",
+            "private object requires the current owner and a protected non-null DACL",
         ));
     }
     // SAFETY: IsValidAcl validated the header and security keeps it alive.
     let count = unsafe { (*dacl).AceCount };
     if count == 0 || count > 2 {
         return Err(denied(
-            "secret DACL must grant only its owner and optional LocalSystem",
+            "private DACL must grant only its owner and optional LocalSystem",
         ));
     }
     let mut owner_grant = false;
@@ -251,10 +359,10 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
         // ACCESS_ALLOWED_ACE_TYPE is the Win32 basic allow ACE (0). Object,
         // conditional, inherited and unknown ACE forms are not this contract.
         if header.AceType != 0
-            || header.AceFlags != 0
+            || header.AceFlags != if directory { 3 } else { 0 }
             || usize::from(header.AceSize) < sid_offset + 8
         {
-            return Err(denied("unsupported secret DACL entry"));
+            return Err(denied("unsupported private DACL entry"));
         }
         // SAFETY: the checked ACE size contains a SID header at the fixed offset.
         let sid = unsafe { ace.cast::<u8>().add(sid_offset).cast() };
@@ -263,19 +371,39 @@ pub(super) fn validate(file: &File) -> io::Result<Metadata> {
         if unsafe { GetLengthSid(sid) } as usize > usize::from(header.AceSize) - sid_offset
             || unsafe { IsValidSid(sid) } == 0
         {
-            return Err(denied("invalid secret DACL identity"));
+            return Err(denied("invalid private DACL identity"));
         }
         // SAFETY: both SIDs are valid and their owners remain alive.
         let is_owner = unsafe { EqualSid(sid, user.sid()) } != 0;
         if !is_owner && unsafe { IsWellKnownSid(sid, WinLocalSystemSid) } == 0 {
-            return Err(denied("secret DACL grants another principal access"));
+            return Err(denied("private DACL grants another principal access"));
         }
         owner_grant |= is_owner;
     }
     if !owner_grant {
-        return Err(denied("secret DACL lacks its owner grant"));
+        return Err(denied("private DACL lacks its owner grant"));
     }
-    file.metadata()
+    Ok(())
+}
+
+#[cfg(test)]
+pub(super) fn make_directory_permissive_for_test(path: &Path) {
+    let user = CurrentUser::query().unwrap().text().unwrap();
+    tests::replace_dacl(
+        path,
+        &format!("D:P(A;OICI;FA;;;{user})(A;OICI;FR;;;WD)"),
+        true,
+    );
+}
+
+#[cfg(test)]
+pub(super) fn restore_private_directory_for_test(path: &Path) {
+    let user = CurrentUser::query().unwrap().text().unwrap();
+    tests::replace_dacl(
+        path,
+        &format!("D:P(A;OICI;FA;;;{user})(A;OICI;FA;;;SY)"),
+        true,
+    );
 }
 
 #[cfg(test)]
@@ -290,7 +418,188 @@ mod tests {
     };
     use windows_sys::Win32::Storage::FileSystem::{READ_CONTROL, WRITE_DAC};
 
-    fn replace_dacl(path: &Path, text: &str, protected: bool) {
+    #[test]
+    #[ignore = "required native CI explicitly runs the privileged ownership fixture"]
+    fn foreign_owner_is_denied_without_repair() {
+        use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
+        use windows_sys::Win32::Security::{
+            AdjustTokenPrivileges, GetSecurityDescriptorOwner, LookupPrivilegeValueW,
+            LUID_AND_ATTRIBUTES, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES,
+        };
+        use windows_sys::Win32::Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS, WRITE_OWNER};
+        assert_eq!(
+            std::env::var("RRFLOW_PRIVATE_OWNER_FIXTURE").as_deref(),
+            Ok("1")
+        );
+        let mut raw = null_mut();
+        // SAFETY: current process pseudo handle and writable token output.
+        assert_ne!(
+            unsafe {
+                OpenProcessToken(
+                    GetCurrentProcess(),
+                    TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES,
+                    &mut raw,
+                )
+            },
+            0
+        );
+        // SAFETY: successful OpenProcessToken transfers ownership.
+        let token = unsafe { OwnedHandle::from_raw_handle(raw) };
+        let name: Vec<u16> = "SeRestorePrivilege\0".encode_utf16().collect();
+        let mut luid = Default::default();
+        // SAFETY: live NUL-terminated name and writable LUID.
+        assert_ne!(
+            unsafe { LookupPrivilegeValueW(null(), name.as_ptr(), &mut luid) },
+            0
+        );
+        let desired = TOKEN_PRIVILEGES {
+            PrivilegeCount: 1,
+            Privileges: [LUID_AND_ATTRIBUTES {
+                Luid: luid,
+                Attributes: SE_PRIVILEGE_ENABLED,
+            }],
+        };
+        let mut previous = TOKEN_PRIVILEGES::default();
+        let mut length = 0;
+        // SAFETY: both privilege buffers have the declared one-entry size.
+        unsafe { SetLastError(0) };
+        assert_ne!(
+            unsafe {
+                AdjustTokenPrivileges(
+                    token.as_raw_handle(),
+                    0,
+                    &desired,
+                    size_of::<TOKEN_PRIVILEGES>() as u32,
+                    &mut previous,
+                    &mut length,
+                )
+            },
+            0
+        );
+        // AdjustTokenPrivileges can succeed while reporting NOT_ALL_ASSIGNED.
+        assert_eq!(
+            unsafe { GetLastError() },
+            0,
+            "required restore privilege unavailable"
+        );
+        struct RestorePrivilege(OwnedHandle, TOKEN_PRIVILEGES);
+        impl Drop for RestorePrivilege {
+            fn drop(&mut self) {
+                // SAFETY: restore exactly the captured state of the retained token.
+                unsafe {
+                    AdjustTokenPrivileges(
+                        self.0.as_raw_handle(),
+                        0,
+                        &self.1,
+                        0,
+                        null_mut(),
+                        null_mut(),
+                    )
+                };
+            }
+        }
+        let _privilege = RestorePrivilege(token, previous);
+        let user = CurrentUser::query().unwrap();
+        let system = descriptor("O:SY").unwrap();
+        let mut foreign = null_mut();
+        let mut defaulted = 0;
+        // SAFETY: system owns the descriptor and its returned SID throughout this test.
+        assert_ne!(
+            unsafe { GetSecurityDescriptorOwner(system.0, &mut foreign, &mut defaulted) },
+            0
+        );
+        assert_eq!(unsafe { EqualSid(user.sid(), foreign) }, 0);
+        let root = tempfile::tempdir().unwrap();
+        let directory_path = root.path().join("private");
+        let directory = open_directory(&directory_path, true).unwrap();
+        let path = directory_path.join("secret");
+        write_private_new(&path, b"unchanged ownership fixture").unwrap();
+        let file = open(&path, false).unwrap();
+        validate_directory(&directory).unwrap();
+        validate(&file).unwrap();
+        struct RestoreOwner<'a>(File, &'a CurrentUser);
+        impl Drop for RestoreOwner<'_> {
+            fn drop(&mut self) {
+                // SAFETY: only the retained fixture handle, original SID and owner field.
+                unsafe {
+                    SetSecurityInfo(
+                        self.0.as_raw_handle(),
+                        SE_FILE_OBJECT,
+                        OWNER_SECURITY_INFORMATION,
+                        self.1.sid(),
+                        null_mut(),
+                        null(),
+                        null(),
+                    )
+                };
+            }
+        }
+        let mut owners = Vec::new();
+        for path in [&directory_path, &path] {
+            let handle = std::fs::OpenOptions::new()
+                .access_mode(READ_CONTROL | WRITE_OWNER)
+                .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+                .open(path)
+                .unwrap();
+            owners.push(RestoreOwner(handle, &user));
+            // SAFETY: SeRestorePrivilege admits the fixture-only foreign owner;
+            // DACL and all other security fields remain untouched.
+            assert_eq!(
+                unsafe {
+                    SetSecurityInfo(
+                        owners.last().unwrap().0.as_raw_handle(),
+                        SE_FILE_OBJECT,
+                        OWNER_SECURITY_INFORMATION,
+                        foreign,
+                        null_mut(),
+                        null(),
+                        null(),
+                    )
+                },
+                0
+            );
+        }
+        for _ in 0..2 {
+            assert!(validate_directory(&directory).is_err());
+            assert!(validate(&file).is_err());
+            assert!(read_private_bounded(&path, 64).is_err());
+            for object in [&directory, &file] {
+                let mut owner = null_mut();
+                let mut security = null_mut();
+                // SAFETY: retained readable fixture handle and writable outputs.
+                assert_eq!(
+                    unsafe {
+                        GetSecurityInfo(
+                            object.as_raw_handle(),
+                            SE_FILE_OBJECT,
+                            OWNER_SECURITY_INFORMATION,
+                            &mut owner,
+                            null_mut(),
+                            null_mut(),
+                            null_mut(),
+                            &mut security,
+                        )
+                    },
+                    0
+                );
+                let _security = LocalAllocation(security);
+                assert_ne!(
+                    unsafe { EqualSid(owner, foreign) },
+                    0,
+                    "denial must not repair ownership"
+                );
+            }
+            assert_eq!(
+                std::fs::read(&path).unwrap(),
+                b"unchanged ownership fixture"
+            );
+        }
+        drop(owners);
+        validate_directory(&directory).unwrap();
+        validate(&file).unwrap();
+    }
+
+    pub(super) fn replace_dacl(path: &Path, text: &str, protected: bool) {
         let sd = descriptor(text).unwrap();
         let mut present = 0;
         let mut dacl = null_mut();
@@ -302,6 +611,7 @@ mod tests {
         );
         let file = std::fs::OpenOptions::new()
             .access_mode(READ_CONTROL | WRITE_DAC)
+            .custom_flags(windows_sys::Win32::Storage::FileSystem::FILE_FLAG_BACKUP_SEMANTICS)
             .open(path)
             .unwrap();
         let flag = if protected {
@@ -352,5 +662,28 @@ mod tests {
     #[test]
     fn device_handles_are_not_secret_files() {
         assert!(read_private_bounded(Path::new("NUL"), 32).is_err());
+    }
+
+    #[test]
+    fn directory_acl_denials_preserve_contents_and_do_not_repair() {
+        let root = tempfile::tempdir().unwrap();
+        let user = CurrentUser::query().unwrap().text().unwrap();
+        for (index, text, protected) in [
+            (0, format!("D:P(A;OICI;FA;;;{user})(A;OICI;FR;;;WD)"), true),
+            (1, format!("D:(A;OICI;FA;;;{user})"), false),
+            (2, "D:NO_ACCESS_CONTROL".into(), true),
+            (3, format!("D:P(A;;FA;;;{user})"), true),
+        ] {
+            let path = root.path().join(format!("directory-{index}"));
+            let directory = open_directory(&path, true).unwrap();
+            validate_directory(&directory).unwrap();
+            write_private_new(&path.join("retained"), b"unchanged").unwrap();
+            replace_dacl(&path, &text, protected);
+            assert!(validate_directory(&directory).is_err());
+            assert!(validate_directory(&open_directory(&path, false).unwrap()).is_err());
+            assert_eq!(std::fs::read(path.join("retained")).unwrap(), b"unchanged");
+            restore_private_directory_for_test(&path);
+            validate_directory(&directory).unwrap();
+        }
     }
 }

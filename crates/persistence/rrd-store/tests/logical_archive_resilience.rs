@@ -413,6 +413,15 @@ fn one_commit_split_across_runtime_pages_remains_atomic() {
 
 #[test]
 fn every_canonical_runtime_family_and_transaction_audit_round_trips() {
+    all_family_round_trip(false);
+}
+
+#[test]
+fn configured_restore_preserves_all_runtime_families_and_audit() {
+    all_family_round_trip(true);
+}
+
+fn all_family_round_trip(configured: bool) {
     let root = tempfile::tempdir().unwrap();
     let source_path = root.path().join("source");
     let objects = root.path().join("objects");
@@ -456,9 +465,78 @@ fn every_canonical_runtime_family_and_transaction_audit_round_trips() {
     let archive = root.path().join("all-families.rrd-archive");
     let target = root.path().join("restored");
     export_logical_archive(runtime.engine(), &archive).unwrap();
-    restore_logical_archive_to_new_root(&archive, &target, 100).unwrap();
+    if configured {
+        rrd_store::restore_logical_archive_to_new_root_with_options(
+            &archive,
+            &target,
+            100,
+            rrd_store::DatabaseOptions {
+                mutable_limits: rrd_store::MutableLimits {
+                    accounted_bytes: 512 * 1024,
+                    versions: 4096,
+                },
+                ..Default::default()
+            },
+            |_| Ok(()),
+            |_| Ok(()),
+        )
+        .unwrap();
+    } else {
+        restore_logical_archive_to_new_root(&archive, &target, 100).unwrap();
+    }
     let restored = RrflowKvStore::open(&target).unwrap();
     assert_same_runtime(runtime.engine(), &restored);
+    let expected = runtime
+        .engine()
+        .runtime()
+        .data_snapshot(&scope, 100, 4096)
+        .unwrap();
+    let actual = restored.runtime().data_snapshot(&scope, 100, 4096).unwrap();
+    assert_eq!(actual.read, expected.read);
+    assert_eq!(actual.selected_versions, expected.selected_versions);
+    assert_eq!(actual.snapshot, expected.snapshot);
+    let data = &actual.snapshot;
+    assert_eq!(data.records.len(), 2);
+    for count in [
+        data.claims.len(),
+        data.relations.len(),
+        data.events.len(),
+        data.vectors.len(),
+        data.series.len(),
+        data.geo.len(),
+        data.objects.len(),
+    ] {
+        assert_eq!(count, 1);
+    }
+    let subject = RuntimeRef::new("entity", "a").unwrap();
+    assert_eq!(data.relations[0].value.from, subject);
+    assert_eq!(
+        data.relations[0].value.to,
+        RuntimeRef::new("entity", "b").unwrap()
+    );
+    assert_eq!(data.vectors[0].value.subject, subject);
+    assert_eq!(
+        data.vectors[0]
+            .value
+            .provenance
+            .as_ref()
+            .unwrap()
+            .source_digest,
+        "11".repeat(32)
+    );
+    assert_eq!(
+        restored.runtime().outbox_since(0, 64).unwrap(),
+        runtime.engine().runtime().outbox_since(0, 64).unwrap()
+    );
+    assert_eq!(
+        restored.runtime().projection_deltas_since(0, 64).unwrap(),
+        runtime
+            .engine()
+            .runtime()
+            .projection_deltas_since(0, 64)
+            .unwrap()
+    );
+
     assert_eq!(
         restored.runtime().audit(&outcome.commit_id).unwrap(),
         runtime
@@ -622,4 +700,219 @@ fn flip_last_byte(path: &Path) {
     file.seek(SeekFrom::End(-1)).unwrap();
     file.write_all(b"x").unwrap();
     file.sync_all().unwrap();
+}
+
+#[test]
+fn configured_restore_rejection_retains_acknowledged_prefix_and_resumes_exactly() {
+    for (limits, resource) in [
+        (
+            rrd_store::MutableLimits {
+                accounted_bytes: 128 * 1024,
+                versions: 8192,
+            },
+            rrd_store::MutableResource::AccountedBytes,
+        ),
+        (
+            rrd_store::MutableLimits {
+                accounted_bytes: 8 * 1024 * 1024,
+                versions: 64,
+            },
+            rrd_store::MutableResource::Versions,
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let source = RrflowKvStore::open(&directory.path().join("source")).unwrap();
+        let acknowledged = claim("prior", 10);
+        source
+            .claims()
+            .append_batch(std::slice::from_ref(&acknowledged))
+            .unwrap();
+        let request = RuntimeCommit {
+            scope: ScopeId::new("instance:restore-admission").unwrap(),
+            at: 20,
+            actor: "restore-admission".into(),
+            expected_cursor: 0,
+            mutations: (0..32)
+                .map(|index| {
+                    let mut value = claim(format!("large-{index}"), 20);
+                    value.object = "x".repeat(4096);
+                    RuntimeMutation::Claim { claim: value }
+                })
+                .collect(),
+        };
+        let expected = source.runtime().commit(&request).unwrap();
+        let archive = directory.path().join("source.archive");
+        let inventory = export_logical_archive(&source, &archive).unwrap();
+        let archive_bytes = std::fs::read(&archive).unwrap();
+        let target = directory.path().join("target");
+        let policy = rrd_store::DatabaseOptions {
+            mutable_limits: limits,
+            ..Default::default()
+        };
+        let error = rrd_store::restore_logical_archive_to_new_root_with_options(
+            &archive,
+            &target,
+            100,
+            policy,
+            |_| Ok(()),
+            |_| Ok(()),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(error, Error::MutableLimit { resource: actual, limit, observed }
+            if actual == resource && observed > limit),
+            "{error}"
+        );
+        assert!(!target.exists());
+        let staging = directory.path().join(format!(
+            ".target.rrd-restore-{}.staging",
+            &inventory.archive_sha256[..16]
+        ));
+        let staged = RrflowKvStore::open_existing_with_options(&staging, policy).unwrap();
+        assert_eq!(
+            staged.claims().claims_in_range(0, 64).unwrap(),
+            vec![acknowledged]
+        );
+        assert_eq!(staged.runtime().cursor().unwrap(), 0);
+        assert!(staged
+            .runtime()
+            .commit_outcome(&request.digest())
+            .unwrap()
+            .is_none());
+        drop(staged);
+        let admitted = rrd_store::DatabaseOptions {
+            mutable_limits: rrd_store::MutableLimits {
+                accounted_bytes: 8 * 1024 * 1024,
+                versions: 8192,
+            },
+            ..Default::default()
+        };
+        let restored = rrd_store::restore_logical_archive_to_new_root_with_options(
+            &archive,
+            &target,
+            101,
+            admitted,
+            |_| Ok(()),
+            |_| Ok(()),
+        )
+        .unwrap();
+        assert!(restored.resumed && restored.reopened);
+        assert!(!staging.exists());
+        assert!(!restore_receipt(directory.path(), &target, &inventory.archive_sha256).exists());
+        let reopened = RrflowKvStore::open_existing_with_options(&target, admitted).unwrap();
+        assert_same_runtime(&source, &reopened);
+        assert_eq!(reopened.claims().sequence().unwrap(), 33);
+        assert_eq!(reopened.runtime().cursor().unwrap(), 32);
+        assert_eq!(
+            reopened
+                .runtime()
+                .commit_outcome(&request.digest())
+                .unwrap(),
+            Some(expected)
+        );
+        assert_eq!(std::fs::read(&archive).unwrap(), archive_bytes);
+    }
+}
+
+#[test]
+fn configured_restore_checks_population_reopen_before_publication() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = RrflowKvStore::open(&directory.path().join("source")).unwrap();
+    source.claims().append_batch(&[claim("prior", 10)]).unwrap();
+    let archive = directory.path().join("source.archive");
+    let inventory = export_logical_archive(&source, &archive).unwrap();
+    let target = directory.path().join("target");
+    let key = "server/state/population/value";
+    let value = vec![b'x'; 256 * 1024];
+    let populate = |staging: &rrd_store::filesystem::AnchoredPath| {
+        let store = RrflowKvStore::open(staging)?;
+        if store.control().get(key)?.is_none() {
+            store.control().commit(&rrd_store::ControlTransition {
+                key: key.into(),
+                expected: None,
+                replacement: Some(value.clone()),
+                at: 20,
+                actor: "population".into(),
+                action: "populated".into(),
+                request_id: "population".into(),
+                operation_id: "population".into(),
+            })?;
+        }
+        Ok(())
+    };
+    let low = rrd_store::DatabaseOptions {
+        mutable_limits: rrd_store::MutableLimits {
+            accounted_bytes: 128 * 1024,
+            versions: 8192,
+        },
+        ..Default::default()
+    };
+    let error = rrd_store::restore_logical_archive_to_new_root_with_options(
+        &archive,
+        &target,
+        100,
+        low,
+        populate,
+        |_| Ok(()),
+    )
+    .unwrap_err();
+    assert!(matches!(error, Error::MutableLimit { .. }), "{error}");
+    assert!(!target.exists());
+    let staging = directory.path().join(format!(
+        ".target.rrd-restore-{}.staging",
+        &inventory.archive_sha256[..16]
+    ));
+    let files = restore_file_bytes(&staging);
+    let error = rrd_store::restore_logical_archive_to_new_root_with_options(
+        &archive,
+        &target,
+        101,
+        low,
+        |_| panic!("denied replay must not call population"),
+        |_| Ok(()),
+    )
+    .unwrap_err();
+    assert!(matches!(error, Error::MutableLimit { .. }), "{error}");
+    assert!(!target.exists());
+    assert_eq!(restore_file_bytes(&staging), files);
+    let admitted = rrd_store::DatabaseOptions {
+        mutable_limits: rrd_store::MutableLimits {
+            accounted_bytes: 8 * 1024 * 1024,
+            versions: 8192,
+        },
+        ..Default::default()
+    };
+    let report = rrd_store::restore_logical_archive_to_new_root_with_options(
+        &archive,
+        &target,
+        102,
+        admitted,
+        populate,
+        |_| Ok(()),
+    )
+    .unwrap();
+    assert!(report.resumed && report.reopened);
+    let restored = RrflowKvStore::open_existing_with_options(&target, admitted).unwrap();
+    assert_same_runtime(&source, &restored);
+    assert_eq!(restored.control().get(key).unwrap(), Some(value));
+    assert_eq!(restored.control().sequence().unwrap(), 1);
+}
+
+fn restore_file_bytes(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+    fn visit(root: &Path, at: &Path, files: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>) {
+        for entry in std::fs::read_dir(at).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                visit(root, &path, files);
+            } else {
+                files.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    std::fs::read(path).unwrap(),
+                );
+            }
+        }
+    }
+    let mut files = std::collections::BTreeMap::new();
+    visit(root, root, &mut files);
+    files
 }

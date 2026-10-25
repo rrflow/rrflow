@@ -21,6 +21,13 @@ either independently.
 
 ## [Accepted evidence](gate-c-evidence.md)
 
+## C-07 implementation packages
+
+The [installed durability and bounded-growth plan](gate-c-07.md) owns C-07's
+ordered packages, failure/resource oracles, native qualification and handoff
+to the existing retrieval, connector, UI and competitive-evaluation gates.
+The plan does not complete C-07 or change the accepted C-06/D-01 evidence.
+
 ## Exit condition
 
 Gate C exits only when rrflowKV is the sole local persistent implementation and
