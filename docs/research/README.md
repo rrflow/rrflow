@@ -3,7 +3,7 @@
 **Status:** active platform-industry research index; linked source records remain partially unclassified
 **Coordinate:** `rrflow://rrflow-instance/data/research-index/platform-industry`
 **Owner:** primary-source external-system research discovery; not RRFlow terminology or delivery planning
-**Reviewed:** 2026-09-14
+**Reviewed:** 2026-10-24
 **Scope:** `docs/research/`
 
 This directory is the single entry point for industry research used to shape
@@ -35,6 +35,29 @@ receives a separate full review and link-preserving classification.
 | Qdrant | collection, point, vector, payload, segment, HNSW, quantization, shard, replica, tenant, strict mode | [`v1.19.1` release](https://github.com/qdrant/qdrant/releases/tag/v1.19.1), [pinned source](https://github.com/qdrant/qdrant/tree/6ab21cac18ebb6f4ae29102c7f8f5cc11affd5de), [collections](https://qdrant.tech/documentation/manage-data/collections/), [hybrid queries](https://qdrant.tech/documentation/search/hybrid-queries/) | [`qdrant-capability-inventory.md`](qdrant-capability-inventory.md) |
 | HelixDB | labeled property graph, node, edge, label, property, index, query, workspace, project, cluster | [introduction](https://docs.helix-db.com/database/helix-db/start-here/introduction), [data model](https://docs.helix-db.com/database/helix-db/core-concepts/data-model), [run modes](https://docs.helix-db.com/database/helix-db/start-here/run-modes), [repository](https://github.com/HelixDB/helix-db) | No peer capability inventory exists yet. |
 | SurrealDB | query/document transaction pipeline, ordered keys, temporal graph, indexes, live/changefeed, permissions, RPC/MCP, installation | [`v3.2.4` release](https://surrealdb.com/releases/3.2), [pinned source](https://github.com/surrealdb/surrealdb/tree/93ab219d69f09d8f999851b0359c80ebe6726102), [architecture](https://surrealdb.com/docs/learn/data-models/architecture) | [`surrealdb-capability-inventory.md`](surrealdb-capability-inventory.md) |
+
+### Owner-requested reference families
+
+By the repository owner's direction of 2026-10-24, RRFlow also folds in the
+useful behavior of the AI memory, columnar/vector and graph-retrieval systems
+below. The current references above remain in scope. Each subject needs a
+`<subject>-capability-inventory.md` with a pinned source revision before any
+adaptation. That inventory must follow the source-adaptation rule in
+[`AGENTS.md`](../../AGENTS.md), mapping each useful behavior to one canonical
+RRFlow boundary and gate rather than copying a foreign model. The releases
+listed were the latest stable ones on 2026-10-24.
+
+| Family | Subject | Terms to inventory | Primary sources | Repository note |
+|---|---|---|---|---|
+| AI memory | Mem0 | memory extraction, add/update/delete decisions, user/agent/run scopes, vector and graph memory, memory history | [`v2.2.1` release](https://github.com/mem0ai/mem0/releases/tag/v2.2.1), [repository](https://github.com/mem0ai/mem0) | No capability inventory exists yet. |
+| AI memory | Graphiti (Zep) | bi-temporal knowledge graph, episodes, entity and edge extraction, edge invalidation, communities, hybrid search | [`v0.31.2` release](https://github.com/getzep/graphiti/releases/tag/v0.31.2), [repository](https://github.com/getzep/graphiti) | No capability inventory exists yet. |
+| AI memory | Letta | stateful agents, memory blocks, core/archival/recall memory, context-window management, sleep-time agents | [`0.16.8` release](https://github.com/letta-ai/letta/releases/tag/0.16.8), [repository](https://github.com/letta-ai/letta) | No capability inventory exists yet. |
+| Columnar/vector | Lance and LanceDB | columnar file format, fragments, versioned datasets, vector and full-text indexes, random access, schema evolution | [Lance `v13.0.0`](https://github.com/lancedb/lance/releases/tag/v13.0.0), [LanceDB `v0.40.0`](https://github.com/lancedb/lancedb/releases/tag/v0.40.0) | Already named as an upstream reference in `AGENTS.md`; no capability inventory exists yet. |
+| Columnar/vector | DuckDB | vectorized execution, morsel-driven parallelism, Arrow and Parquet exchange, out-of-core operators, extensions | [`v2.0.0` release](https://github.com/duckdb/duckdb/releases/tag/v2.0.0), [repository](https://github.com/duckdb/duckdb) | The [DuckDB interoperability contract](../reference/data/duckdb.md) owns exchange; no capability inventory exists yet. |
+| Columnar/vector | pgvector | vector, halfvec, sparsevec and bit types, HNSW and IVFFlat indexes, iterative index scans, filtered search | [`v0.8.7` tag](https://github.com/pgvector/pgvector/tree/v0.8.7), [repository](https://github.com/pgvector/pgvector) | Informs the [PostgreSQL compatibility contract](../reference/protocol/postgresql.md); no capability inventory exists yet. |
+| Graph retrieval | Microsoft GraphRAG | entity and relationship extraction, community detection, community reports, global/local/DRIFT search, indexing cost | [`v3.3.0` release](https://github.com/microsoft/graphrag/releases/tag/v3.3.0), [repository](https://github.com/microsoft/graphrag) | No capability inventory exists yet. |
+| Graph retrieval | Cognee | extract-cognify-load pipeline, knowledge graph plus vector store, ontology grounding | [`v1.6.5` release](https://github.com/topoteretes/cognee/releases/tag/v1.6.5), [repository](https://github.com/topoteretes/cognee) | No capability inventory exists yet. |
+| Graph retrieval | LightRAG | dual-level local/global retrieval, graph plus vector indexing, incremental graph update | [`v1.5.7` release](https://github.com/HKUDS/LightRAG/releases/tag/v1.5.7), [repository](https://github.com/HKUDS/LightRAG) | No capability inventory exists yet. |
 
 ## Cross-system lifecycle research
 

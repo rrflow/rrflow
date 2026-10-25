@@ -46,4 +46,5 @@
 - [POAM-034 — commit-time schema constraints load the whole scope](poam-034.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-034`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-034) — active parent-owned POA&M detail
 - [POAM-035 — installed storage failure and growth qualification](poam-035.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-035`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-035) — active parent-owned POA&M detail
 - [POAM-036 — DuckDB analytical interoperability is absent](poam-036.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-036`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-036) — active parent-owned POA&M detail
+- [POAM-037 — external knowledge providers and turnkey cloud synchronization](poam-037.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-037`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-037) — active parent-owned POA&M detail
 <!-- rrflow:generated-index:end -->

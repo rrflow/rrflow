@@ -11,8 +11,10 @@ use serde_json::Value;
 use std::path::Path;
 
 fn write(path: &Path, value: &impl Serialize) -> Result<(), Box<dyn std::error::Error>> {
-    // Value produces the same sorted projection as the checked-in goldens.
-    let mut bytes = serde_json::to_vec_pretty(&serde_json::to_value(value)?)?;
+    // Keep golden ordering independent of serde_json/preserve_order features.
+    let mut canonical = serde_json::to_value(value)?;
+    canonical.sort_all_objects();
+    let mut bytes = serde_json::to_vec_pretty(&canonical)?;
     bytes.push(b'\n');
     std::fs::write(path, bytes)?;
     Ok(())
