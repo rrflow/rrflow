@@ -2730,6 +2730,15 @@
         }
       ]
     },
+    "backup_started_ns": {
+      "description": "Launch time for the one bounded backup, possibly completed in a later segment.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
     "campaign_sha256": {
       "$ref": "#/$defs/Digest"
     },
