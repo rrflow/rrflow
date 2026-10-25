@@ -4,6 +4,9 @@ use serde::Deserialize;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
+#[path = "capacity_observation.rs"]
+mod observation;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Volume {
@@ -604,6 +607,7 @@ fn resume_after_fill(
     control: Value,
     volume: Volume,
     metadata_directory: Option<PathBuf>,
+    wal_root: PathBuf,
 ) -> (Child, Filler, Value) {
     let line = child.line();
     let hit: Value = serde_json::from_str(
@@ -619,6 +623,10 @@ fn resume_after_fill(
         assert_eq!(hit[key], control[key]);
     }
     println!("native_capacity_pause={hit}");
+    println!(
+        "native_capacity_wal_before_fill={}",
+        observation::wal_state(&wal_root)
+    );
     let filler = Filler::fill(&volume, metadata_directory.as_deref());
     println!(
         "native_capacity_fill={}",
@@ -626,6 +634,10 @@ fn resume_after_fill(
         "bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
         "metadata_files":filler.metadata_paths.len(),
         "metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes})
+    );
+    println!(
+        "native_capacity_wal_after_fill={}",
+        observation::wal_state(&wal_root)
     );
     child
         .child
@@ -638,6 +650,10 @@ fn resume_after_fill(
     let line = match child.lines.recv_timeout(Duration::from_secs(60)) {
         Ok(Ok(line)) => line,
         failure => {
+            println!(
+                "native_capacity_wal_missing_event={}",
+                observation::wal_state(&wal_root)
+            );
             child.child.terminate();
             let output = child.child.finish().expect("reap failed capacity engine");
             let tail = |bytes: &[u8]| {
@@ -796,7 +812,7 @@ fn capacity_case(point: &str, mode: &str) {
         "wal_before_write" => None,
         "segment_before_create" => Some(native_root.join("segments")),
         "manifest_before_create" => Some(native_root.join("manifests")),
-        "current_before_create" => Some(native_root),
+        "current_before_create" => Some(native_root.clone()),
         _ => panic!("unsupported native capacity point"),
     };
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
@@ -846,7 +862,7 @@ fn capacity_case(point: &str, mode: &str) {
         let (child,client) = estate.serve(&control);
         let lease = begin(&client,&session,"uncertain").await;
         let started = clock.elapsed().as_nanos() as u64;
-        let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory));
+        let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory,native_root.join("wal")));
         let result = client.commit_transaction(&session,&lease.transaction_id,target.clone(),options("uncertain")).await;
         let result_class = match &result {
             Ok(_) => "acknowledged".to_owned(),
@@ -854,7 +870,11 @@ fn capacity_case(point: &str, mode: &str) {
             Err(rrd_client::Error::Timeout) => "client-timeout".to_owned(),
             Err(_) => "client-failure".to_owned(),
         };
-        println!("native_capacity_client={}",json!({"point":point,"mode":mode,"class":result_class}));
+        let message = match &result {
+            Err(rrd_client::Error::Api {error,..}) => Some(error.message.chars().take(512).collect::<String>()),
+            _ => None,
+        };
+        println!("native_capacity_client={}",json!({"point":point,"mode":mode,"class":result_class,"message":message}));
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();

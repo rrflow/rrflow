@@ -3,7 +3,7 @@
 **Status:** active researched target design; implementation and capacity unqualified
 **Coordinate:** `rrflow://rrflow-instance/data/architecture/engine-scale-and-contracts`
 **Owner:** researched tradeoffs supporting existing schema, execution, signal and qualification owners
-**Reviewed:** 2026-10-20
+**Reviewed:** 2026-10-24
 
 Keep the native engine foundation and repair or complete its canonical paths.
 Do not replace rrflowKV with a vendor database, copy an upstream engine tree,
@@ -15,7 +15,7 @@ owns capacity experiments and release evidence. No gate is completed here.
 
 ## Code-grounded starting point
 
-Inspected development revision: `554ce4ccf1cb25aceba036dafaf4c8df79c42701`.
+Original design inspection revision (2026-10-20): `554ce4ccf1cb25aceba036dafaf4c8df79c42701`.
 These are bounded design inputs, not a replacement source inventory:
 
 | Boundary inspected | Preserve | Repair or complete, with existing owner |
@@ -36,27 +36,35 @@ the shared transaction port and the measured cache policy.
 
 ## Next executable cut
 
-The immediate work remains D-01 and its already required
-[H-05a build/signal prerequisite](../roadmap/rrflow-1.0/gate-h.md#h-05a--build-and-signal-identity).
-At this baseline, CLI `installed.rs::VersionReport` contains product/protocol
-versions and release stage, not the required source/tree/feature/format/config
-build identity. H-05a is the next concrete signal package: extend the existing
-version/discovery projection from one reproducible build identity, add the
-release-derived diagnostic profile, and prove semantic parity. Start with a
-real-binary assertion for required identity fields and altered-feature/dirty
-source qualification rejection; retain the installed lifecycle corpus.
-Embed reproducible build metadata from declared build inputs; installed
-operation cannot require Git or a checkout. Bind the effective runtime
-configuration separately to that immutable build identity. Do not introduce
-another runtime authority or claim a signed release.
+The 2026-10-24 review starts from public main `94d0567f`. The earlier
+revision of this record incorrectly treated D-01 installation and H-05a
+build identity as work to start; their owning records now carry implementation
+and evidence. Preserve those accepted boundaries and follow the current
+[C-07 execution reset](../roadmap/rrflow-1.0/gate-c-07.md#execution-reset-after-the-failed-desktop-corpus).
+Do not rebuild installation or introduce another build/configuration identity.
 
-Reconcile that evidence and PR 32 against every D-01 acceptance condition,
-especially network-denied operation, path/link replacement, native ACL/mode
-denials and interrupted installation. Record remaining gaps under POAM-006;
-do not close D-01 from ordinary CI alone. C-07 then widens fault/lifetime/
-maintenance qualification on the installed binary, followed by the existing
-inventory, E/F, G and H package order. This explicitly separates the next
-reviewable implementation from the longer growth programme.
+The next acceptance sequence is integrated growth repair, frozen full-corpus
+preflight, the required allocation/load/seed/reopen/24-hour-soak matrix, then
+the existing acceptance collector. [PR 126](https://github.com/rrflow/rrflow-development/pull/126)
+contains the integrated growth and native failure repairs; live CI and campaign
+results belong to their exact candidate receipts, not this design note. A
+successful Desktop operating point cannot qualify the other Desktop points,
+Single, Fleet or Cold profiles. A short preflight cannot qualify a 24-hour soak.
+
+During that run, the existing [local database example](../reference/sdk/rrflowdb-local.md)
+can exercise the public engine independently: initialize schema/records/edge,
+verify one committed view, update, abort, reopen and verify retained state.
+Its `read` binds both queries to one known cursor; `verify open|done` checks
+independent expected values and refuses partial or differently stamped output.
+This is usable DB/graph/QL integration evidence, not vector quality, model
+reasoning, PostgreSQL compatibility or cloud-sync qualification.
+
+After C-07 acceptance, resume the existing source-inventory/knowledge path,
+E/F index and streaming, G bounded inference, and H public-client/UI packages
+in dependency order. The [C-07 prompt/knowledge/UI handoff](../roadmap/rrflow-1.0/gate-c-07.md)
+and [engine data-flow owner](engine-data-flow.md) already describe that complete
+flow. Keep cost, freshness, cancellation and source-change readback in those
+acceptance oracles; no additional global checklist or engine authority is needed.
 
 ## One engine across desktop and service
 
@@ -225,6 +233,24 @@ correctness corpus. A change that improves latency by omitting authorization,
 durability, failure samples or recall is rejected.
 
 ## Graph, vector and knowledge research mapped to RRFlow
+
+The 2026-10-24 research refresh adds the following decisions to the existing
+owners. These are design references; no upstream source or benchmark is imported.
+
+| Primary reference | Existing owner and implementation consequence | Required counterexample |
+|---|---|---|
+| [FoundationDB SIGMOD 2021](https://www.foundationdb.org/files/fdb-paper.pdf), deterministic simulation and fault testing | C-07 keeps independent acknowledged-history oracles and native crash/disk/resource testing alongside deterministic fault coverage. Simulation does not replace the installed binary. | Lost response, interrupted publication, restart and replay must resolve the original operation once; a green isolated test is insufficient. |
+| [Linux cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html), hierarchical resource enforcement | C-07d/g binds the actual host/process allocation and resource events to workload receipts. Application reservations and measured RSS remain distinct evidence. | Reclaim pressure is not itself an OOM. Denied allocation, stalled maintenance or retained owners beyond declared drain/budget must fail the corresponding operating-point oracle; record the actual resource events. |
+| [Qdrant hybrid queries](https://qdrant.tech/documentation/search/hybrid-queries/), prefetch/fusion/reranking | E/F/G evaluate lexical, dense and graph-assisted retrieval at one authorized source/read identity; preserve exact and filtered quality baselines. | Selective filters, source deletion, stale embeddings and inconsistent cursor joins cannot be hidden by higher unfiltered recall. |
+| [Hydra hosted-memory report](https://benchmarks.hydradb.com/hydradb), versioned relational memory, context enrichment and temporal retrieval | D/G and knowledge construction preserve source time, provenance and revision through derived relationships. This hosted report is distinct from the open-source graph design below. | Updates, contradictory facts, revoked sources and temporal questions need retained expected answers. Vendor-reported scores are not independent validation or RRFlow results. |
+| [Pinecone Nexus](https://www.pinecone.io/product/nexus/), manifests and typed cited answers | Knowledge construction and G consume explicit entity/relationship requirements and bounded evidence; J-04 includes ingestion, maintenance, invalidation and inference cost. | An apparently cheap answer that omits preprocessing/update cost, cites stale evidence or crosses project authorization is not an optimization. |
+| [SurrealDB transactions](https://surrealdb.com/docs/learn/querying/concepts-and-guides/transactions), grouped atomic effects | Preserve the existing RRFlow schema/record/relation commit authority and independently verify readback through rrflowQL over rrflowKV. | A failed member must not leave a partial record, relationship or receipt; reads combined across commits must not masquerade as one snapshot. |
+
+Measure provider-reported input/output/cache usage separately from local query
+work, storage I/O, embedding work and maintenance. Local database computation
+is not an invented count of "reasoning tokens". Unknown usage remains unknown.
+Comparisons must hold corpus, authorization, freshness and answer quality
+constant and include ongoing cost; J-04 owns the measured performance claim.
 
 Primary sources reviewed on 2026-10-20 support the following engineering
 choices. Vendor descriptions and benchmarks are design inputs, not measured

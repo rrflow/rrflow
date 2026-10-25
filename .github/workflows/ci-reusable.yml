@@ -668,6 +668,13 @@ jobs:
       - name: Qualify installed native capacity failure and recovery
         timeout-minutes: 30
         run: python3 scripts/ci/run_native_capacity.py
+      - name: Require repeated APFS WAL exhaustion and recovery
+        if: matrix.os == 'macos-latest'
+        timeout-minutes: 15
+        run: >-
+          python3 scripts/ci/run_native_capacity.py --point wal_before_write
+          --mode fresh --mode existing --mode fresh --mode existing
+          --mode fresh --mode existing
       - name: Deny diagnostic-primary and oracle warnings
         run: cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
 
