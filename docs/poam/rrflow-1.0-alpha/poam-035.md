@@ -6,6 +6,13 @@
 
 ## Observed deficiency
 
+The [bounded APFS metadata-payload correction](../../evidence/change-journals/gate-c/c-07f-apfs-metadata-payload.md)
+records PR129 run 40159526278 passing six macOS cases before the existing
+manifest case exhausted the 8192-entry cap. Volume settlement alone is not
+reliable metadata exhaustion. Disposable file attributes now consume bounded
+metadata payloads under the shared byte allowance; all four failure boundaries
+are repeated. Actual native repair remains unqualified until candidate CI passes.
+
 The [owned-image settlement correction](../../evidence/change-journals/gate-c/c-07f-owned-image-settlement.md)
 records PR129 run 40158423166 passing eleven macOS native capacity/recovery
 cases before teardown exhausted five rapid EBUSY attempts. Paced retries use
