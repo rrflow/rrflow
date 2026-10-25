@@ -6,6 +6,38 @@
 
 ## Observed deficiency
 
+The [encoder candidate's native descriptor failure](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
+reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
+soft limit. Read-only installed verification passes, but full corpus readback
+and soak qualification did not complete. Bounded segment-handle ownership is
+required; the retained failed estate and its original identities remain evidence.
+
+The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
+preserves PR127/128 and records a further macOS failure: the selected WAL
+pause was reached, filler returned ENOSPC, but the required native error did
+not arrive and the API reported resource exhaustion. Bounded physical-file
+and synthetic-request diagnostics plus repeated fresh/existing APFS cases
+address missing attribution. This is not yet a causal repair or acceptance;
+original deadlines, caps, native-error and recovery oracles remain required.
+
+The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-encoder-working-set.md)
+records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
+CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
+records on the 30-second write deadline. No failed compaction or OOM was
+reported, the private estate was retained, and continuation refused soak.
+Native profiling on a separate copy led to incremental row-group encoding and
+buffer reuse in PR128. Exact-byte and component checks do not establish repair
+of that installed timeout. Full growth/profile and actual 24-hour acceptance
+remain open; no deadline or resource cap is relaxed.
+
+The [integrated public-client readback package](../../evidence/change-journals/gate-c/c-07-integrated-readback.md)
+addresses a separate demonstration gap: the existing local database example
+combined two independent HEAD queries, so a concurrent commit could yield a
+mixed-cursor view. Its fixed-cursor read and independently expected sample
+verification retain the real transaction/reopen checks. This improves the
+usable DB/graph/QL flow; it does not close native capacity, lifetime, full
+profile or 24-hour-soak acceptance. The C-07 qualification gap remains open.
+
 PR125 Ubuntu job `121000145879` also exposed a diagnostic subprocess fixture
 race: the child could exit before required stdin delivery, producing
 `BrokenPipe`. The [integrated repair journal](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md#observed-process-fixture-input-race)

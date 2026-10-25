@@ -1,4 +1,4 @@
-//! Run against an installed local estate: rrflowdb PROJECT ADDRESS init|read|update|abort.
+//! Run against an installed local estate: rrflowdb PROJECT ADDRESS COMMAND.
 //! Bootstrap only reads the installed locator and credential; all data operations
 //! use the public HTTP client. No cloud connection is made by this example.
 #[path = "support/rrflowdb.rs"]
@@ -13,10 +13,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    if args.len() != 3 || !["init", "read", "update", "abort", "schema"].contains(&args[2].as_str())
-    {
+    let ordinary = args.len() == 3
+        && ["init", "read", "update", "abort", "schema"].contains(&args[2].as_str());
+    let verify =
+        args.len() == 4 && args[2] == "verify" && ["open", "done"].contains(&args[3].as_str());
+    if !ordinary && !verify {
         return Err(
-            "usage: rrflowdb PROJECT LOOPBACK_ADDRESS init|read|update|abort|schema".into(),
+            "usage: rrflowdb PROJECT LOOPBACK_ADDRESS init|read|update|abort|schema|verify open|done".into(),
         );
     }
     let project = std::path::Path::new(&args[0]);
@@ -47,27 +50,56 @@ async fn main() -> Result<()> {
         .await?;
     let result: Result<serde_json::Value> = async {
         match args[2].as_str() {
-            "init" => Ok(serde_json::to_value(database::initialize(&client, &session, at, &key).await?)?),
-            "schema" => Ok(serde_json::to_value(client.read_data_schema(&session, ReadDataSchema {
-                scope: format!("instance:{}", client.instance_id()), max_storage_keys: 4096,
-            }, read_options(&format!("{key}-schema"))?).await?)?),
+            "init" => Ok(serde_json::to_value(
+                database::initialize(&client, &session, at, &key).await?,
+            )?),
+            "schema" => Ok(serde_json::to_value(
+                client
+                    .read_data_schema(
+                        &session,
+                        ReadDataSchema {
+                            scope: format!("instance:{}", client.instance_id()),
+                            max_storage_keys: 4096,
+                        },
+                        read_options(&format!("{key}-schema"))?,
+                    )
+                    .await?,
+            )?),
             "update" | "abort" => {
-                let transaction = database::begin(&client, &session, &format!("{key}-begin")).await?;
+                let transaction =
+                    database::begin(&client, &session, &format!("{key}-begin")).await?;
                 if args[2] == "abort" {
-                    database::abort(&client, &session, &transaction, &format!("{key}-abort")).await?;
+                    database::abort(&client, &session, &transaction, &format!("{key}-abort"))
+                        .await?;
                     Ok(serde_json::json!({"state": "aborted", "data_changed": false}))
                 } else {
-                    Ok(serde_json::to_value(database::commit(&client, &session, &transaction,
-                        vec![database::task_record("Build with rrflowDB", "done", at)], &format!("{key}-commit")).await?)?)
+                    Ok(serde_json::to_value(
+                        database::commit(
+                            &client,
+                            &session,
+                            &transaction,
+                            vec![database::task_record("Build with rrflowDB", "done", at)],
+                            &format!("{key}-commit"),
+                        )
+                        .await?,
+                    )?)
                 }
             }
-            _ => Ok(serde_json::json!({
-                "relationships": database::relationships(&client, &session, at, &format!("{key}-join")).await?,
-                "tasks": database::tasks(&client, &session, at, &format!("{key}-tasks")).await?,
-                "cloud_sync": "disabled"
-            })),
+            _ => {
+                let view = database::read_view(&client, &session, at, &key).await?;
+                if verify {
+                    view.verify(&format!("instance:{}", client.instance_id()), &args[3])?;
+                }
+                let mut result = serde_json::to_value(view)?;
+                result["cloud_sync"] = "disabled".into();
+                if verify {
+                    result["verified_expected_status"] = args[3].clone().into();
+                }
+                Ok(result)
+            }
         }
-    }.await;
+    }
+    .await;
     let closed = client
         .close_session(&session, CloseSession {}, options(&format!("{key}-close"))?)
         .await;

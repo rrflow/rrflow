@@ -144,6 +144,9 @@ impl CandidateCiReceipt {
                 crash,
                 "Qualify installed native capacity failure and recovery",
             )?;
+            if os == "macos-latest" {
+                Self::step(crash, "Require repeated APFS WAL exhaustion and recovery")?;
+            }
             Self::step(
                 crash,
                 "Test installed publication and reclamation with compound recovery",
