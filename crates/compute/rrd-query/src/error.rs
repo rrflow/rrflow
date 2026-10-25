@@ -34,7 +34,9 @@ impl From<rrd_store::Error> for Error {
     fn from(value: rrd_store::Error) -> Self {
         if matches!(
             value,
-            rrd_store::Error::SourcePageLimit { .. } | rrd_store::Error::ProjectedReadLimit { .. }
+            rrd_store::Error::SegmentHandleLimit { .. }
+                | rrd_store::Error::SourcePageLimit { .. }
+                | rrd_store::Error::ProjectedReadLimit { .. }
         ) {
             Self::StorageAdmission(value.to_string())
         } else if matches!(value, rrd_store::Error::RuntimeReadBudgetExceeded { .. }) {

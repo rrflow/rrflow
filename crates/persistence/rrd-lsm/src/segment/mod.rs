@@ -629,7 +629,7 @@ fn record_filter_probe(cache: &SharedPageCache, negative: bool) -> Result<()> {
 #[derive(Debug, Clone)]
 enum PageSource {
     File {
-        file: Arc<File>,
+        file: Arc<crate::io::SegmentFile>,
         selected: SelectedIo,
         io: SharedIoContext,
     },
@@ -911,18 +911,21 @@ impl Segment {
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<Self> {
-        let mut file = path.open_read()?;
-        let physical_bytes = validate_physical_file(&mut file)?;
+        let source_file = io.open_segment(path)?;
+        let lease = source_file.lease()?;
+        let mut file = &*lease;
+        let physical_bytes = validate_physical_file(file)?;
         let total_started = Instant::now();
         let verify_started = Instant::now();
-        let checksum = verify_file_digest(&mut file, physical_bytes)?;
+        let checksum = verify_file_digest(file, physical_bytes)?;
         let verify_ms = verify_started.elapsed().as_millis() as u64;
         let metadata_started = Instant::now();
         let metadata = parse_metadata(&mut file, physical_bytes, checksum)?;
         let metadata_ms = metadata_started.elapsed().as_millis() as u64;
         let open_evidence = SegmentOpenEvidence::for_metadata(physical_bytes, &metadata, true)?;
         let source_started = Instant::now();
-        let source = open_page_source(file, io)?;
+        drop(lease);
+        let source = open_page_source(source_file, io)?;
         let source_ms = source_started.elapsed().as_millis() as u64;
         let row_group_count = metadata.row_groups.len();
         let row_group_budget = metadata.row_group_budget;
@@ -963,18 +966,21 @@ impl Segment {
         cache: SharedPageCache,
         io: SharedIoContext,
     ) -> Result<Self> {
-        let mut file = path.open_read()?;
-        let physical_bytes = validate_physical_file(&mut file)?;
+        let source_file = io.open_segment(path)?;
+        let lease = source_file.lease()?;
+        let mut file = &*lease;
+        let physical_bytes = validate_physical_file(file)?;
         if physical_bytes != expected.bytes {
             return invalid("segment physical size differs from its manifest descriptor");
         }
-        let checksum = verify_file_digest(&mut file, physical_bytes)?;
+        let checksum = verify_file_digest(file, physical_bytes)?;
         if checksum != expected.checksum || checksum != expected.id {
             return invalid("segment content digest differs from its manifest descriptor");
         }
         let metadata = parse_metadata(&mut file, physical_bytes, checksum)?;
         let open_evidence = SegmentOpenEvidence::for_metadata(physical_bytes, &metadata, false)?;
-        let source = open_page_source(file, io)?;
+        drop(lease);
+        let source = open_page_source(source_file, io)?;
         let mut segment = build_segment(metadata, source, cache, open_evidence)?;
         segment.descriptor.level = expected.level;
         if &segment.descriptor != expected {
@@ -1976,7 +1982,7 @@ fn build_segment(
     })
 }
 
-fn validate_physical_file(file: &mut File) -> Result<u64> {
+fn validate_physical_file(mut file: &File) -> Result<u64> {
     let physical_bytes = file.metadata()?.len();
     if physical_bytes > MAX_SEGMENT_BYTES {
         return invalid("segment exceeds the 1 GiB physical safety limit");
@@ -1992,10 +1998,11 @@ fn validate_physical_file(file: &mut File) -> Result<u64> {
     Ok(physical_bytes)
 }
 
-fn open_page_source(file: File, io: SharedIoContext) -> Result<PageSource> {
+fn open_page_source(file: crate::io::SegmentFile, io: SharedIoContext) -> Result<PageSource> {
     let selected = io.file_backend()?;
     if selected == SelectedIo::Mmap {
-        let mapped = unsafe { MmapOptions::new().map(&file) };
+        let lease = file.lease()?;
+        let mapped = unsafe { MmapOptions::new().map(&*lease) };
         match mapped {
             Ok(bytes) => {
                 io.record_segment(SelectedIo::Mmap);
@@ -2069,6 +2076,8 @@ fn read_page(
         .ok_or_else(|| Error::InvalidSegment("v6 page range overflow".into()))?;
     match source {
         PageSource::File { file, selected, io } => {
+            let lease = file.lease()?;
+            let file = &*lease;
             let reservation = reserve_source(cache, descriptor.physical_bytes)?;
             let mut bytes = MutableBuffer::from_len_zeroed(descriptor.physical_bytes);
             // A row group retains a complete key/version chain and can exceed
@@ -2351,7 +2360,7 @@ fn validate_validity(validity: &[u8], rows: usize) -> Result<()> {
     Ok(())
 }
 
-fn verify_file_digest(file: &mut File, physical_bytes: u64) -> Result<String> {
+fn verify_file_digest(mut file: &File, physical_bytes: u64) -> Result<String> {
     let content_bytes = physical_bytes
         .checked_sub(FOOTER_BYTES as u64)
         .ok_or_else(|| Error::InvalidSegment("segment footer underflow".into()))?;

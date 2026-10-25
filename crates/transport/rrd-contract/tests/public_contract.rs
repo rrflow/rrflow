@@ -1255,6 +1255,13 @@ fn rrflow_kv_storage_counters() -> rrd_contract::DiagnosticRrflowKvSnapshot {
             filter_negatives: 2,
         },
         segment_io: rrd_contract::DiagnosticSegmentIoSnapshot {
+            max_open_files: 128,
+            open_files: 0,
+            peak_open_files: 0,
+            handle_evictions: 0,
+            handle_reopens: 0,
+            handle_denials: 0,
+
             requested_mode: rrd_contract::DiagnosticSegmentIoMode::Auto,
             mmap_segments: 0,
             io_uring_segments: 0,

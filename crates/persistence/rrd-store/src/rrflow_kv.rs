@@ -301,7 +301,9 @@ impl RrflowKvStore {
         let database = Database::open_anchored(path, options).map_err(|error| {
             if matches!(
                 error,
-                rrd_lsm::Error::MutableLimit { .. } | rrd_lsm::Error::SourcePageLimit { .. }
+                rrd_lsm::Error::MutableLimit { .. }
+                    | rrd_lsm::Error::SegmentHandleLimit { .. }
+                    | rrd_lsm::Error::SourcePageLimit { .. }
             ) {
                 return Error::from(error);
             }
@@ -374,7 +376,9 @@ impl RrflowKvStore {
             Database::open_anchored(path, options).map_err(|error| {
                 if matches!(
                     error,
-                    rrd_lsm::Error::MutableLimit { .. } | rrd_lsm::Error::SourcePageLimit { .. }
+                    rrd_lsm::Error::MutableLimit { .. }
+                        | rrd_lsm::Error::SegmentHandleLimit { .. }
+                        | rrd_lsm::Error::SourcePageLimit { .. }
                 ) {
                     return Error::from(error);
                 }
@@ -680,6 +684,7 @@ fn reconciliation_evidence(
     if cache_before.capacity_bytes != cache_after.capacity_bytes
         || io_before.requested_mode != io_after.requested_mode
         || io_before.configured_max_request_bytes != io_after.configured_max_request_bytes
+        || io_before.configured_max_open_files != io_after.configured_max_open_files
         || io_before.mmap_segments != io_after.mmap_segments
         || io_before.io_uring_segments != io_after.io_uring_segments
         || io_before.bounded_segments != io_after.bounded_segments
@@ -945,6 +950,12 @@ impl StorageEngine for RrflowKvStore {
             segment_io_bytes_read: Some(segment_io.bytes_read),
             segment_io_max_request_bytes: Some(segment_io.configured_max_request_bytes as u64),
             segment_io_peak_request_bytes: Some(segment_io.peak_request_bytes as u64),
+            segment_io_max_open_files: Some(segment_io.configured_max_open_files as u64),
+            segment_io_open_files: Some(segment_io.open_files as u64),
+            segment_io_peak_open_files: Some(segment_io.peak_open_files as u64),
+            segment_io_handle_evictions: Some(segment_io.handle_evictions),
+            segment_io_handle_reopens: Some(segment_io.handle_reopens),
+            segment_io_handle_denials: Some(segment_io.handle_denials),
         })
     }
 }

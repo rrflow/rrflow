@@ -246,6 +246,10 @@ pub struct StorageLimits {
     pub projected_output_bytes: u64,
     pub source_page_bytes: u64,
     pub page_cache_bytes: u64,
+    /// Immutable segment file ceiling per native store; restart required.
+    /// Omission preserves the native default of 128 and existing sealed records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub segment_open_files: Option<u64>,
     pub wal_flush_target_bytes: u64,
     pub memtable_flush_target_versions: u64,
     pub compaction_input_bytes: u64,
@@ -287,6 +291,7 @@ impl Default for StorageLimits {
             projected_output_bytes: 128 * 1024 * 1024,
             source_page_bytes: 256 * 1024 * 1024,
             page_cache_bytes: 4 * 1024 * 1024,
+            segment_open_files: None,
             wal_flush_target_bytes: 64 * 1024 * 1024,
             memtable_flush_target_versions: 524_288,
             compaction_input_bytes: 1024 * 1024 * 1024,
@@ -320,6 +325,9 @@ impl StorageLimits {
     pub fn validate(&self) -> Result<()> {
         // Fixed protocol ceilings keep admission finite across platforms;
         // the native adapter additionally checks host-size conversion.
+        if let Some(limit) = self.segment_open_files {
+            validate_nonzero_max("storage segment_open_files", limit, 4096)?;
+        }
         const MAX_BYTES: u64 = 1 << 40;
         const MAX_VERSIONS: u64 = 1 << 32;
         validate_nonzero_max(

@@ -182,6 +182,7 @@ impl Scenario {
                 mode: SegmentIoMode::Bounded,
                 allow_fallback: false,
                 max_request_bytes: 4 * 1024,
+                max_open_files: 128,
             },
             segment_row_group_budget: SegmentRowGroupBudget {
                 max_rows: row_group_rows,
