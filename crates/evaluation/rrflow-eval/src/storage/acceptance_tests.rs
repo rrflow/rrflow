@@ -17,7 +17,7 @@ fn api_fixture() -> (Value, Value, Value) {
                 "Test exact installed domain boundaries and compound recovery",
                 "Qualify installed native capacity failure and recovery",
                 "Test installed publication and reclamation with compound recovery",
-                "Require repeated APFS WAL and segment exhaustion and recovery",
+                "Require repeated APFS exhaustion and recovery",
                 "Require both complete installed publication receipts",
             ],
         );
@@ -75,8 +75,8 @@ fn raw_ci_requires_exact_tested_merge_and_every_native_step() {
     }
 }
 #[test]
-fn native_apfs_wal_and_segment_repetitions_cannot_be_missing_or_skipped() {
-    const STEP: &str = "Require repeated APFS WAL and segment exhaustion and recovery";
+fn native_apfs_repetitions_cannot_be_missing_or_skipped() {
+    const STEP: &str = "Require repeated APFS exhaustion and recovery";
     for omit in [false, true] {
         let (run, mut jobs, commit) = api_fixture();
         let mac = jobs
