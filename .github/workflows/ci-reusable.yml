@@ -239,7 +239,9 @@ jobs:
       - name: Test build provenance and diagnostic profile policy
         run: python3 scripts/test_build_rrflow.py
       - name: Enforce repository CI policy
-        run: python3 scripts/ci/check_workflow.py
+        run: |
+          python3 scripts/ci/test_candidate_admission.py
+          python3 scripts/ci/check_workflow.py
       - name: Test offline qualification input and artifact policy
         run: python3 scripts/ci/test_offline_lifecycle.py
       - name: Enforce documentation authority and local links
@@ -270,10 +272,10 @@ jobs:
         run: cargo run --locked -p rrflow-eval -- verify eval/results/2026-08-18-summary.json
       - name: Enforce kernel dependency boundary
         run: |
-          tree="$(cargo tree --locked -p rrd-core --edges normal --depth 1)"
+          tree="$(cargo tree --locked -p rrd-core --edges normal --depth 1 --prefix none --format '{p}' --color never)"
           printf '%s\n' "$tree"
-          test "$(printf '%s\n' "$tree" | tail -n +2 | wc -l)" -eq 1
-          printf '%s\n' "$tree" | tail -n 1 | grep -q 'serde v'
+          dependencies="$(printf '%s\n' "$tree" | tail -n +2 | cut -d ' ' -f 1 | sort)"
+          test "$dependencies" = "$(printf 'serde\nsha2')"
       - name: Enforce offline edge dependency and binary budgets
         run: |
           tree="$(cargo tree --locked -p rrflow-edge --edges normal)"

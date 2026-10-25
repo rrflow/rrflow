@@ -707,6 +707,29 @@ pub(crate) struct SegmentVersion {
     pub value: Option<Box<[u8]>>,
 }
 
+/// Authenticated row identity without a retained page or copied value. Keeping
+/// the segment here prevents a selected row from being read from another file.
+pub(crate) struct SelectedVersion<'a> {
+    segment: &'a Segment,
+    row_group: usize,
+    row: usize,
+    sequence: u64,
+}
+
+impl SelectedVersion<'_> {
+    pub(crate) fn sequence(&self) -> u64 {
+        self.sequence
+    }
+
+    pub(crate) fn belongs_to(&self, segment: &Segment) -> bool {
+        std::ptr::eq(self.segment, segment)
+    }
+
+    pub(crate) fn value(self) -> Result<Option<Vec<u8>>> {
+        self.segment.value_at(self.row_group, self.row)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SegmentRecord {
     pub key: Vec<u8>,
@@ -1058,12 +1081,12 @@ impl Segment {
         key: &[u8],
         read_sequence: u64,
     ) -> Result<Option<SegmentVersion>> {
-        let Some((index, row, sequence)) = self.select_version(key, read_sequence)? else {
+        let Some(selected) = self.select_version(key, read_sequence)? else {
             return Ok(None);
         };
         Ok(Some(SegmentVersion {
-            sequence,
-            value: self.value_at(index, row)?.map(Box::<[u8]>::from),
+            sequence: selected.sequence(),
+            value: selected.value()?.map(Box::<[u8]>::from),
         }))
     }
 
@@ -1072,14 +1095,14 @@ impl Segment {
     pub(crate) fn get_sequence(&self, key: &[u8], read_sequence: u64) -> Result<Option<u64>> {
         Ok(self
             .select_version(key, read_sequence)?
-            .map(|(_, _, sequence)| sequence))
+            .map(|selected| selected.sequence()))
     }
 
-    fn select_version(
+    pub(crate) fn select_version(
         &self,
         key: &[u8],
         read_sequence: u64,
-    ) -> Result<Option<(usize, usize, u64)>> {
+    ) -> Result<Option<SelectedVersion<'_>>> {
         if key < self.descriptor.first_key.as_slice()
             || key > self.descriptor.last_key.as_slice()
             || read_sequence < self.descriptor.minimum_sequence
@@ -1114,17 +1137,12 @@ impl Segment {
             }
             row += 1;
         }
-        Ok(selected.map(|(row, sequence)| (index, row, sequence)))
-    }
-
-    pub(crate) fn get_versions(
-        &self,
-        keys: &[&[u8]],
-        read_sequence: u64,
-    ) -> Result<Vec<Option<SegmentVersion>>> {
-        keys.iter()
-            .map(|key| self.get_version(key, read_sequence))
-            .collect()
+        Ok(selected.map(|(row, sequence)| SelectedVersion {
+            segment: self,
+            row_group: index,
+            row,
+            sequence,
+        }))
     }
 
     pub fn scan(

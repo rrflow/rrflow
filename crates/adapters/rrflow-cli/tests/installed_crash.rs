@@ -27,6 +27,51 @@ use std::{
 const LIMIT: usize = 1024 * 1024;
 const PREFIX: &str = "C07C_NATIVE_PAUSE_V1=";
 
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CommandPhase {
+    Version,
+    InstallIdentity,
+    InstallPlan,
+    InstallApply,
+    RepairPlan,
+    RepairApply,
+}
+
+// Only static phase names enter evidence. Arguments can contain private paths,
+// plan digests or credentials; captured stdout remains private to the caller.
+fn installed_command(
+    command: &mut Command,
+    phase: CommandPhase,
+    deadline: Duration,
+    limit: usize,
+) -> Result<std::process::Output, String> {
+    let started = Instant::now();
+    println!(
+        "native_command_phase={}",
+        json!({"phase":phase,"state":"started","deadline_ms":deadline.as_millis()})
+    );
+    let result = process::Process::start(command, deadline, limit, None)
+        .map_err(|error| format!("start child: {error}"))
+        .and_then(|mut child| child.finish());
+    let state = match &result {
+        Ok(output) if output.status.success() => "completed",
+        Ok(_) => "nonzero_exit",
+        Err(_) => "failed",
+    };
+    println!(
+        "native_command_phase={}",
+        json!({"phase":phase,"state":state,"elapsed_ms":started.elapsed().as_millis(),
+            "deadline_ms":deadline.as_millis()})
+    );
+    result.map_err(|error| {
+        format!(
+            "{phase:?} failed after {} ms: {error}",
+            started.elapsed().as_millis()
+        )
+    })
+}
+
 struct Estate {
     temp: tempfile::TempDir,
     _volume_project: Option<tempfile::TempDir>,
@@ -54,17 +99,24 @@ impl Estate {
     }
 
     fn invoke(&self, args: &[&str]) -> Value {
+        let phase = match args {
+            ["--json", "version"] => CommandPhase::Version,
+            ["install", "identity"] => CommandPhase::InstallIdentity,
+            ["install", "plan", ..] => CommandPhase::InstallPlan,
+            ["--json", "install", "apply", ..] => CommandPhase::InstallApply,
+            ["repair", "apply", ..] => CommandPhase::RepairApply,
+            _ => panic!("installed command requires a static diagnostic phase"),
+        };
         let mut command = self.command();
-        let mut child =
-            process::Process::start(command.args(args), Duration::from_secs(120), LIMIT, None)
-                .unwrap();
-        let output = child.finish().unwrap();
+        let output = installed_command(command.args(args), phase, Duration::from_secs(120), LIMIT)
+            .unwrap_or_else(|error| panic!("{error}"));
         assert!(
             output.status.success(),
-            "installed command failed: {}",
+            "installed {phase:?} command failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        serde_json::from_slice(&output.stdout).unwrap()
+        serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|error| panic!("installed {phase:?} returned invalid JSON: {error}"))
     }
 
     fn install(mode: &str) -> Self {
@@ -216,6 +268,50 @@ impl Estate {
         .unwrap();
         (child, client)
     }
+}
+
+#[test]
+fn command_timeout_identifies_phase_without_exposing_arguments_or_stdout() {
+    let temporary = tempfile::tempdir().unwrap();
+    let ready = temporary.path().join("ready");
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command.args([
+        "--exact",
+        "command_timeout_helper",
+        "--ignored",
+        "--nocapture",
+    ]);
+    command.env("RRFLOW_TEST_COMMAND_TIMEOUT", "1");
+    command.env("RRFLOW_TEST_COMMAND_READY", &ready);
+    let error = installed_command(
+        &mut command,
+        CommandPhase::RepairApply,
+        Duration::from_secs(2),
+        LIMIT,
+    )
+    .unwrap_err();
+    assert!(error.starts_with("RepairApply failed after "), "{error}");
+    assert!(error.contains("child exceeded its deadline"), "{error}");
+    assert!(!error.contains("private-command-output"));
+    assert!(!error.contains("RRFLOW_TEST_COMMAND_TIMEOUT"));
+    assert_eq!(std::fs::read(ready).unwrap(), b"ready");
+}
+
+#[test]
+#[ignore = "owned sleeping child for the bounded command-timeout regression"]
+fn command_timeout_helper() {
+    assert_eq!(
+        std::env::var("RRFLOW_TEST_COMMAND_TIMEOUT").as_deref(),
+        Ok("1")
+    );
+    println!("private-command-output");
+    std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    std::fs::write(
+        std::env::var_os("RRFLOW_TEST_COMMAND_READY").unwrap(),
+        b"ready",
+    )
+    .unwrap();
+    std::thread::sleep(Duration::from_secs(10));
 }
 
 struct Child {
