@@ -12,6 +12,10 @@ pub enum Error {
         limit: u64,
         observed: u64,
     },
+    SegmentHandleLimit {
+        limit: usize,
+        observed: usize,
+    },
     SourcePageLimit {
         limit: usize,
         observed: usize,
@@ -152,6 +156,7 @@ impl fmt::Display for Error {
         match self {
             Error::Substrate(m) => write!(f, "substrate: {m}"),
             Error::ProjectedReadLimit { resource, limit, observed } => write!(f, "projected-read {} limit {limit} would be exceeded by {observed}", resource.as_str()),
+            Error::SegmentHandleLimit { limit, observed } => write!(f, "segment open-file limit {limit} would be exceeded by {observed}"),
             Error::SourcePageLimit { limit, observed } => write!(f, "source page allocation limit {limit} would be exceeded by {observed}"),
             Error::CheckpointLimit { limit, observed } => write!(f, "checkpoint entry limit {limit} would be exceeded by {observed}"),
             Error::TransactionLimit { resource, limit, observed } => write!(f, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),
@@ -259,6 +264,9 @@ impl From<rrd_lsm::Error> for Error {
                 limit,
                 observed,
             },
+            rrd_lsm::Error::SegmentHandleLimit { limit, observed } => {
+                Self::SegmentHandleLimit { limit, observed }
+            }
             rrd_lsm::Error::SourcePageLimit { limit, observed } => {
                 Self::SourcePageLimit { limit, observed }
             }

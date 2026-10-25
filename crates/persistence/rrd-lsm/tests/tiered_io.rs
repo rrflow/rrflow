@@ -16,6 +16,7 @@ fn compacted_hot_key_history_reads_in_bounded_requests_after_reopen() {
             mode: SegmentIoMode::Bounded,
             allow_fallback: false,
             max_request_bytes: 4096,
+            max_open_files: 128,
         },
         compaction: rrd_lsm::CompactionPolicy {
             l0_compaction_trigger: 2,
@@ -98,6 +99,7 @@ fn read_with_mode(
                 mode,
                 allow_fallback: true,
                 max_request_bytes: REQUEST_BYTES,
+                max_open_files: 128,
             },
             ..DatabaseOptions::default()
         },

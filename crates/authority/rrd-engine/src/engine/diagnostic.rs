@@ -1017,6 +1017,28 @@ fn rrflow_kv_snapshot(evidence: &PhysicalStoreEvidence) -> Result<DiagnosticRrfl
             filter_negatives: counter(evidence.filter_negatives, "filter_negatives")?,
         },
         segment_io: DiagnosticSegmentIoSnapshot {
+            max_open_files: counter(
+                evidence.segment_io_max_open_files,
+                "segment_io_max_open_files",
+            )?,
+            open_files: counter(evidence.segment_io_open_files, "segment_io_open_files")?,
+            peak_open_files: counter(
+                evidence.segment_io_peak_open_files,
+                "segment_io_peak_open_files",
+            )?,
+            handle_evictions: counter(
+                evidence.segment_io_handle_evictions,
+                "segment_io_handle_evictions",
+            )?,
+            handle_reopens: counter(
+                evidence.segment_io_handle_reopens,
+                "segment_io_handle_reopens",
+            )?,
+            handle_denials: counter(
+                evidence.segment_io_handle_denials,
+                "segment_io_handle_denials",
+            )?,
+
             requested_mode: segment_io_mode(evidence.segment_io_requested_mode.as_deref())?,
             mmap_segments: counter(
                 evidence.segment_io_mmap_segments,

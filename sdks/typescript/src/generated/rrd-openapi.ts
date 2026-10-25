@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: a36ace4e6572c85913cee78d147555688ba2d87684cc45cf7d19f08de536fa07
+// OpenAPI SHA-256: 06cd649d80ec2de5fe152da49daa00533d2e5dbf56e0321fea4d86f7b432a7b3
 export interface paths {
     "/v1/audit/export": {
         parameters: {
@@ -3623,6 +3623,12 @@ export interface operations {
                                         retained_mutable_generations: number;
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Immutable segment file ceiling per native store; restart required.
+                                         *     Omission preserves the native default of 128 and existing sealed records.
+                                         */
+                                        segment_open_files?: number | null;
                                         /** Format: uint64 */
                                         source_page_bytes: number;
                                         /** Format: uint64 */
@@ -3917,6 +3923,12 @@ export interface operations {
                                         retained_mutable_generations: number;
                                         /** Format: uint64 */
                                         retained_mutable_versions: number;
+                                        /**
+                                         * Format: uint64
+                                         * @description Immutable segment file ceiling per native store; restart required.
+                                         *     Omission preserves the native default of 128 and existing sealed records.
+                                         */
+                                        segment_open_files?: number | null;
                                         /** Format: uint64 */
                                         source_page_bytes: number;
                                         /** Format: uint64 */
@@ -12978,16 +12990,28 @@ export interface operations {
                                             /** Format: uint64 */
                                             fallbacks: number;
                                             /** Format: uint64 */
+                                            handle_denials: number;
+                                            /** Format: uint64 */
+                                            handle_evictions: number;
+                                            /** Format: uint64 */
+                                            handle_reopens: number;
+                                            /** Format: uint64 */
                                             io_uring_reads: number;
                                             /** Format: uint64 */
                                             io_uring_segments: number;
                                             last_fallback_reason?: string | null;
+                                            /** Format: uint64 */
+                                            max_open_files: number;
                                             /** Format: uint64 */
                                             max_request_bytes: number;
                                             /** Format: uint64 */
                                             mmap_reads: number;
                                             /** Format: uint64 */
                                             mmap_segments: number;
+                                            /** Format: uint64 */
+                                            open_files: number;
+                                            /** Format: uint64 */
+                                            peak_open_files: number;
                                             /** Format: uint64 */
                                             peak_request_bytes: number;
                                             /** Format: uint64 */
@@ -15570,16 +15594,28 @@ export interface operations {
                                             /** Format: uint64 */
                                             fallbacks: number;
                                             /** Format: uint64 */
+                                            handle_denials: number;
+                                            /** Format: uint64 */
+                                            handle_evictions: number;
+                                            /** Format: uint64 */
+                                            handle_reopens: number;
+                                            /** Format: uint64 */
                                             io_uring_reads: number;
                                             /** Format: uint64 */
                                             io_uring_segments: number;
                                             last_fallback_reason?: string | null;
+                                            /** Format: uint64 */
+                                            max_open_files: number;
                                             /** Format: uint64 */
                                             max_request_bytes: number;
                                             /** Format: uint64 */
                                             mmap_reads: number;
                                             /** Format: uint64 */
                                             mmap_segments: number;
+                                            /** Format: uint64 */
+                                            open_files: number;
+                                            /** Format: uint64 */
+                                            peak_open_files: number;
                                             /** Format: uint64 */
                                             peak_request_bytes: number;
                                             /** Format: uint64 */
@@ -16138,16 +16174,28 @@ export interface operations {
                                         /** Format: uint64 */
                                         fallbacks: number;
                                         /** Format: uint64 */
+                                        handle_denials: number;
+                                        /** Format: uint64 */
+                                        handle_evictions: number;
+                                        /** Format: uint64 */
+                                        handle_reopens: number;
+                                        /** Format: uint64 */
                                         io_uring_reads: number;
                                         /** Format: uint64 */
                                         io_uring_segments: number;
                                         last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_open_files: number;
                                         /** Format: uint64 */
                                         max_request_bytes: number;
                                         /** Format: uint64 */
                                         mmap_reads: number;
                                         /** Format: uint64 */
                                         mmap_segments: number;
+                                        /** Format: uint64 */
+                                        open_files: number;
+                                        /** Format: uint64 */
+                                        peak_open_files: number;
                                         /** Format: uint64 */
                                         peak_request_bytes: number;
                                         /** Format: uint64 */
@@ -16381,16 +16429,28 @@ export interface operations {
                                         /** Format: uint64 */
                                         fallbacks: number;
                                         /** Format: uint64 */
+                                        handle_denials: number;
+                                        /** Format: uint64 */
+                                        handle_evictions: number;
+                                        /** Format: uint64 */
+                                        handle_reopens: number;
+                                        /** Format: uint64 */
                                         io_uring_reads: number;
                                         /** Format: uint64 */
                                         io_uring_segments: number;
                                         last_fallback_reason?: string | null;
+                                        /** Format: uint64 */
+                                        max_open_files: number;
                                         /** Format: uint64 */
                                         max_request_bytes: number;
                                         /** Format: uint64 */
                                         mmap_reads: number;
                                         /** Format: uint64 */
                                         mmap_segments: number;
+                                        /** Format: uint64 */
+                                        open_files: number;
+                                        /** Format: uint64 */
+                                        peak_open_files: number;
                                         /** Format: uint64 */
                                         peak_request_bytes: number;
                                         /** Format: uint64 */

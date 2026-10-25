@@ -105,6 +105,12 @@ pub struct PhysicalStoreEvidence {
     pub segment_io_bytes_read: Option<u64>,
     pub segment_io_max_request_bytes: Option<u64>,
     pub segment_io_peak_request_bytes: Option<u64>,
+    pub segment_io_max_open_files: Option<u64>,
+    pub segment_io_open_files: Option<u64>,
+    pub segment_io_peak_open_files: Option<u64>,
+    pub segment_io_handle_evictions: Option<u64>,
+    pub segment_io_handle_reopens: Option<u64>,
+    pub segment_io_handle_denials: Option<u64>,
 }
 
 impl PhysicalStoreEvidence {
@@ -183,6 +189,12 @@ impl PhysicalStoreEvidence {
             segment_io_bytes_read: None,
             segment_io_max_request_bytes: None,
             segment_io_peak_request_bytes: None,
+            segment_io_max_open_files: None,
+            segment_io_open_files: None,
+            segment_io_peak_open_files: None,
+            segment_io_handle_evictions: None,
+            segment_io_handle_reopens: None,
+            segment_io_handle_denials: None,
         }
     }
 }

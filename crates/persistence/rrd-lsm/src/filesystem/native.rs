@@ -7,6 +7,44 @@ use std::path::Path;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct MountIdentity(Vec<u8>);
 
+/// Native object identity plus immutable-file metadata. Page digests remain
+/// the content authority; this prevents reopening a substituted directory entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FileIdentity {
+    object: (u64, u64),
+    bytes: u64,
+    modified: std::time::SystemTime,
+}
+
+impl FileIdentity {
+    pub(crate) fn capture(file: &File) -> io::Result<Self> {
+        let metadata = file.metadata()?;
+        #[cfg(unix)]
+        let object = {
+            use std::os::unix::fs::MetadataExt;
+            (metadata.dev(), metadata.ino())
+        };
+        #[cfg(windows)]
+        let object = {
+            let info = information(file)?;
+            (
+                u64::from(info.dwVolumeSerialNumber),
+                (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+            )
+        };
+        #[cfg(not(any(unix, windows)))]
+        let object = return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "native immutable file identity is unavailable",
+        ));
+        Ok(Self {
+            object,
+            bytes: metadata.len(),
+            modified: metadata.modified()?,
+        })
+    }
+}
+
 fn denied(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::PermissionDenied, message)
 }

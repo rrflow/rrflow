@@ -4,6 +4,9 @@ use std::fs::File;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+mod handles;
+pub(crate) use handles::SegmentFile;
+
 pub const DEFAULT_SEGMENT_IO_REQUEST_BYTES: usize = 16 * 1024 * 1024;
 const MIN_SEGMENT_IO_REQUEST_BYTES: usize = 4 * 1024;
 const MAX_SEGMENT_IO_REQUEST_BYTES: usize = 64 * 1024 * 1024;
@@ -38,6 +41,8 @@ pub struct SegmentIoPolicy {
     pub mode: SegmentIoMode,
     pub allow_fallback: bool,
     pub max_request_bytes: usize,
+    /// Per-context ceiling, including leased files and initial validation.
+    pub max_open_files: usize,
 }
 
 impl Default for SegmentIoPolicy {
@@ -46,12 +51,18 @@ impl Default for SegmentIoPolicy {
             mode: SegmentIoMode::Auto,
             allow_fallback: true,
             max_request_bytes: DEFAULT_SEGMENT_IO_REQUEST_BYTES,
+            max_open_files: 128,
         }
     }
 }
 
 impl SegmentIoPolicy {
     pub(crate) fn validate(self) -> Result<Self> {
+        if !(1..=4096).contains(&self.max_open_files) {
+            return Err(Error::InvalidConfiguration(
+                "segment open-file bound must be in 1..=4096".into(),
+            ));
+        }
         if !(MIN_SEGMENT_IO_REQUEST_BYTES..=MAX_SEGMENT_IO_REQUEST_BYTES)
             .contains(&self.max_request_bytes)
         {
@@ -80,6 +91,12 @@ pub struct SegmentIoStats {
     pub bounded_read_operations: u64,
     pub bytes_read: u64,
     pub peak_request_bytes: usize,
+    pub configured_max_open_files: usize,
+    pub open_files: usize,
+    pub peak_open_files: usize,
+    pub handle_evictions: u64,
+    pub handle_reopens: u64,
+    pub handle_denials: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +111,7 @@ pub(crate) type SharedIoContext = Arc<IoContext>;
 pub(crate) struct IoContext {
     policy: SegmentIoPolicy,
     stats: Mutex<SegmentIoStats>,
+    handles: Arc<handles::HandlePool>,
     #[cfg(target_os = "linux")]
     ring: Option<Mutex<io_uring::IoUring>>,
     uring_disabled: AtomicBool,
@@ -125,6 +143,7 @@ impl IoContext {
         }
         Ok(Arc::new(Self {
             policy,
+            handles: handles::HandlePool::new(policy.max_open_files),
             stats: Mutex::new(SegmentIoStats {
                 requested_mode: policy.mode,
                 configured_max_request_bytes: policy.max_request_bytes,
@@ -202,7 +221,22 @@ impl IoContext {
     }
 
     pub(crate) fn stats(&self) -> SegmentIoStats {
-        self.lock_stats().clone()
+        let mut stats = self.lock_stats().clone();
+        let handles = self.handles.stats();
+        stats.configured_max_open_files = self.policy.max_open_files;
+        stats.open_files = handles.open;
+        stats.peak_open_files = handles.peak;
+        stats.handle_evictions = handles.evictions;
+        stats.handle_reopens = handles.reopens;
+        stats.handle_denials = handles.denials;
+        stats
+    }
+
+    pub(crate) fn open_segment(
+        &self,
+        path: &crate::filesystem::AnchoredPath,
+    ) -> Result<SegmentFile> {
+        self.handles.open(path)
     }
 
     pub(crate) fn read_exact_at(

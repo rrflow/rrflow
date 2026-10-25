@@ -98,13 +98,17 @@ fn source_page_concurrent_misses_cannot_oversubscribe_and_failed_checks_release(
 fn source_page_file_decode_reserves_overlapping_input_and_output() {
     let logical = vec![37; 4096];
     let stored = lz4_flex::block::compress(&logical);
-    let file = tempfile::tempfile().unwrap();
-    use std::io::Write;
-    (&file).write_all(&stored).unwrap();
+    let fixture = tempfile::tempdir().unwrap();
+    let path = fixture.path().join("page");
+    std::fs::write(&path, &stored).unwrap();
+    let io = IoContext::new(SegmentIoPolicy::default()).unwrap();
     let source = PageSource::File {
-        file: Arc::new(file),
+        file: Arc::new(
+            io.open_segment(&AnchoredPath::from_path(&path).unwrap())
+                .unwrap(),
+        ),
         selected: SelectedIo::Bounded,
-        io: IoContext::new(SegmentIoPolicy::default()).unwrap(),
+        io,
     };
     let desc = descriptor(&stored, logical.len(), true);
     let cache = new_page_cache_with_limits(0, PageCachePolicy::ExactLru, logical.len()).unwrap();

@@ -55,6 +55,11 @@ reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
 soft limit. Read-only installed verification passes, but full corpus readback
 and soak qualification did not complete. Bounded segment-handle ownership is
 required; the retained failed estate and its original identities remain evidence.
+The [bounded segment-handle repair](../../evidence/change-journals/gate-c/c-07g-bounded-segment-handles.md)
+implements per-database admission, idle eviction and identity-checked reopen.
+The native low-descriptor regression fails on main and passes on the working
+repair. Exact-candidate CI, full Desktop capacity and the 24-hour soak remain
+required; this prerequisite does not close C-07.
 
 The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
 preserves PR127/128 and records a further macOS failure: the selected WAL
