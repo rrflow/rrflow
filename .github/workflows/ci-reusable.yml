@@ -668,11 +668,11 @@ jobs:
       - name: Qualify installed native capacity failure and recovery
         timeout-minutes: 30
         run: python3 scripts/ci/run_native_capacity.py
-      - name: Require repeated APFS WAL exhaustion and recovery
+      - name: Require repeated APFS WAL and segment exhaustion and recovery
         if: matrix.os == 'macos-latest'
         timeout-minutes: 15
         run: >-
-          python3 scripts/ci/run_native_capacity.py --point wal_before_write
+          python3 scripts/ci/run_native_capacity.py --point wal_before_write --point segment_before_create
           --mode fresh --mode existing --mode fresh --mode existing
           --mode fresh --mode existing
       - name: Deny diagnostic-primary and oracle warnings

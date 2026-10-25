@@ -7,6 +7,10 @@ use std::io::{Read, Write};
 #[path = "capacity_observation.rs"]
 mod observation;
 
+#[cfg(target_os = "macos")]
+#[path = "capacity_apfs.rs"]
+mod apfs;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Volume {
@@ -169,6 +173,21 @@ fn sync_filler_host(file: &File) -> std::io::Result<()> {
     }
 }
 
+fn finish_allocation_barrier(
+    file_result: std::io::Result<()>,
+    settle_volume: impl FnOnce() -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    if let Err(error) = &file_result {
+        if !error.raw_os_error().is_some_and(capacity_code) {
+            return file_result;
+        }
+    }
+    // ENOSPC from the file barrier must not skip volume settlement. Retain
+    // that native error after settlement; a later write remains the oracle.
+    settle_volume()?;
+    file_result
+}
+
 // A capacity error before synchronization can leave pending allocation. Probe
 // again after the barrier; only a filler unchanged since that attempt followed by
 // a native one-byte failure is ready for the selected engine operation.
@@ -287,6 +306,17 @@ impl Filler {
         // Nonzero data prevents sparse/zero-block optimizations. Allocation and
         // sync failures are actual OS results, never injected StorageFull.
         let started = Instant::now();
+        // Open only the already admitted, private image root. File fsync alone
+        // does not wait for the volume's metadata transaction to settle.
+        #[cfg(target_os = "macos")]
+        let volume_root = File::open(&volume.root).expect("owned volume root");
+        let allocation_sync = |file: &File| {
+            finish_allocation_barrier(sync_filler_allocation(file), || {
+                #[cfg(target_os = "macos")]
+                apfs::sync_volume(&volume_root)?;
+                Ok(())
+            })
+        };
         // A full NTFS directory index does not prove that free MFT records are
         // exhausted: a small CURRENT file may still be resident. Reserve a
         // fixed set of empty, fixture-owned directory indexes before filling
@@ -305,7 +335,7 @@ impl Filler {
         // independent of the selected publication filename.
         #[cfg(target_os = "linux")]
         if let Some(directory) = &directory {
-            filler.fill_metadata(volume, directory, started);
+            filler.fill_metadata(volume, directory, started, &allocation_sync);
             use std::os::fd::AsRawFd;
             let handle = File::open(directory).unwrap();
             let mut state = std::mem::MaybeUninit::<libc::statvfs>::uninit();
@@ -323,23 +353,29 @@ impl Filler {
             filler.free_inodes = Some(state.f_ffree);
         }
         (filler.bytes, filler.native_code) =
-            fill_data(&mut file, volume.max_bytes, started, sync_filler_allocation)
+            fill_data(&mut file, volume.max_bytes, started, &allocation_sync)
                 .expect("native filler allocation");
         filler.file = Some(file);
         // Resident metadata on APFS/NTFS is exhausted after data allocation.
         if !cfg!(target_os = "linux") {
             if let Some(directory) = &directory {
-                filler.fill_metadata(volume, directory, started);
+                filler.fill_metadata(volume, directory, started, &allocation_sync);
             }
         }
         // Each empty index can consume otherwise reusable MFT records. A
         // failure in one directory must not end the global metadata fill.
         for directory in filler.metadata_directories.clone() {
-            filler.fill_metadata(volume, &directory, started);
+            filler.fill_metadata(volume, &directory, started, &allocation_sync);
         }
         filler
     }
-    fn fill_metadata(&mut self, volume: &Volume, directory: &std::path::Path, started: Instant) {
+    fn fill_metadata(
+        &mut self,
+        volume: &Volume,
+        directory: &std::path::Path,
+        started: Instant,
+        allocation_sync: &impl Fn(&File) -> std::io::Result<()>,
+    ) {
         for index in 0..8192u32 {
             assert!(self.metadata_paths.len() < 8192, "metadata entry bound");
             assert!(
@@ -376,7 +412,7 @@ impl Filler {
                             &mut self.bytes,
                             volume.max_bytes,
                             started,
-                            sync_filler_allocation,
+                            allocation_sync,
                         )
                         .expect("native metadata-phase data allocation");
                         self.data_refills += 1;
@@ -438,6 +474,34 @@ fn filler_host_sync_preserves_native_noncapacity_errors() {
 mod filler_tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn capacity_file_error_still_settles_volume_and_preserves_errors() {
+        let capacity = if cfg!(windows) { 112 } else { 28 };
+        for file_code in [None, Some(capacity), Some(5)] {
+            for volume_code in [None, Some(capacity), Some(5)] {
+                let calls = Cell::new(0);
+                let result = finish_allocation_barrier(
+                    file_code.map_or(Ok(()), |code| Err(std::io::Error::from_raw_os_error(code))),
+                    || {
+                        calls.set(calls.get() + 1);
+                        volume_code
+                            .map_or(Ok(()), |code| Err(std::io::Error::from_raw_os_error(code)))
+                    },
+                );
+                assert_eq!(calls.get(), u32::from(file_code != Some(5)));
+                let expected = if file_code == Some(5) {
+                    file_code
+                } else {
+                    volume_code.or(file_code)
+                };
+                assert_eq!(
+                    result.err().and_then(|error| error.raw_os_error()),
+                    expected
+                );
+            }
+        }
+    }
 
     struct DelayedAllocation {
         remaining: Cell<usize>,
