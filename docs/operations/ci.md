@@ -720,3 +720,8 @@ reduction, or a runner layout which exceeds the documented host allocation.
 The Rust workspace architecture test remains focused on engine ownership,
 dependency direction, and storage-opening authority rather than GitHub Actions
 implementation details.
+
+The macOS installed-crash lane additionally runs three planned fresh/existing
+WAL capacity pairs, each on a newly owned APFS image. These regress the
+intermittent selected-WAL error gap; the first failure stops the run. They do
+not replace the full native capacity matrix or permit retry-until-green.
