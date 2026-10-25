@@ -6,6 +6,14 @@
 
 ## Observed deficiency
 
+The [APFS volume-settlement correction](../../evidence/change-journals/gate-c/c-07f-volume-allocation-settlement.md)
+records PR118 run 40156063858 failing the 8192-entry cap after 64 data refills
+at the existing segment pause. Individual-file barriers did not establish
+reliable metadata exhaustion. PR129 adds waited admitted-volume settlement
+and repeated WAL/segment qualification without raising limits; causal native
+repair remains unproven until the exact candidate passes. The original failed
+job and cancelled preceding PR129 candidate retain their own identities.
+
 The [encoder candidate's native descriptor failure](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
 reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
 soft limit. Read-only installed verification passes, but full corpus readback
