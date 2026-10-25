@@ -326,3 +326,13 @@ The [installed WAL denial characterization](../../evidence/change-journals/gate-
 adds direct installed-open and verification evidence for torn/missing active
 WAL preservation. Both cases pass locally without production changes; the final
 native candidate must execute the added test before D-01 acceptance closes.
+
+## Endpoint and task contract integration
+
+The [combined integration record](../../evidence/change-journals/gate-d/endpoint-profile-task-control-integration.md)
+retains a verified evaluation-projection defect: unified Cargo dependencies
+changed JSON object ordering and failed an exact schema golden despite equal
+parsed values. Explicit sorted rendering in the existing test/refresher fixes
+that representation ambiguity without changing runtime hashing or weakening
+byte assertions. Both public feature flows remain at the existing engine
+boundary; combined candidate qualification and the wider lifecycle remain open.

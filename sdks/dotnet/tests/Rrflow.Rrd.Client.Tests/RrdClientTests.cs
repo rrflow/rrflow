@@ -278,7 +278,7 @@ public sealed class RrdClientTests
             },
             TestContext.Current.CancellationToken));
         Assert.Contains("deadline has expired", expired.Message, StringComparison.Ordinal);
-        Assert.Equal(47, EndpointCatalog.Count);
+        Assert.Equal(53, EndpointCatalog.Count);
         Assert.False(EndpointCatalog.Get(OperationId.DiagnosticsStorageCursor).Mutation);
         Assert.Equal(
             Authentication.SessionBearer,

@@ -1,9 +1,9 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100
+# OpenAPI SHA-256: 71921d69bf89de1530532adb98d5d3d1c5784c78726434facf41173d312c800b
 from typing import Final, Literal, TypedDict
 
 ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = (
-    "af89ecd555361c5f35d36265efd4c3f0b1800210039a5e77f7da4735fbcc2100"
+    "71921d69bf89de1530532adb98d5d3d1c5784c78726434facf41173d312c800b"
 )
 
 OperationId = Literal[
@@ -19,6 +19,7 @@ OperationId = Literal[
     "diagnostics-read",
     "diagnostics-storage-cursor",
     "diagnostics-storage-read",
+    "embedding-builtin-activate",
     "endpoint-catalogue",
     "endpoint-configuration-apply",
     "endpoint-configuration-preview",
@@ -41,7 +42,12 @@ OperationId = Literal[
     "session-renew",
     "subscription-close",
     "subscription-open",
+    "task-attempt-read",
+    "task-budget-configure",
+    "task-budget-read",
+    "task-budget-stop",
     "task-close",
+    "task-embedding-execute",
     "task-list",
     "task-open",
     "task-read",
@@ -136,6 +142,12 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "method": "POST",
         "mutation": False,
         "path": "/v1/diagnostics/storage/read",
+    },
+    "embedding-builtin-activate": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/embedding/builtin/activate",
     },
     "endpoint-catalogue": {
         "authentication": "public",
@@ -269,11 +281,41 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": True,
         "path": "/v1/subscriptions/open",
     },
+    "task-attempt-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/attempt/read",
+    },
+    "task-budget-configure": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/budget/configure",
+    },
+    "task-budget-read": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": False,
+        "path": "/v1/tasks/budget/read",
+    },
+    "task-budget-stop": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/budget/stop",
+    },
     "task-close": {
         "authentication": "session_bearer",
         "method": "POST",
         "mutation": True,
         "path": "/v1/tasks/close",
+    },
+    "task-embedding-execute": {
+        "authentication": "session_bearer",
+        "method": "POST",
+        "mutation": True,
+        "path": "/v1/tasks/embedding/execute",
     },
     "task-list": {
         "authentication": "session_bearer",
