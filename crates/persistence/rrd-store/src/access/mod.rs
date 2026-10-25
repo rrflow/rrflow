@@ -6,6 +6,7 @@
 
 mod function;
 mod index;
+mod proof_nodes;
 pub(crate) mod runtime_state;
 mod semantic_commit;
 mod vector;

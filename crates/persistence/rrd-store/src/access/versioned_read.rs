@@ -7,6 +7,7 @@
 //! change log is not a range source here; replay, changefeed, archive, and
 //! recovery keep their explicit paged-log APIs.
 
+use super::proof_nodes::ProofNodes;
 use super::runtime_state::{read_accumulator_node, validate_read_stamp, AccessRead};
 use crate::key_codec::{prefix_end, KeyCodec};
 use crate::keyspaces::{self, Space};
@@ -315,6 +316,8 @@ pub(crate) fn read_versioned_expanding(
     });
     let stamp_validation = reader.preserve_budget_error(stamp_validation)?;
     let mut accumulator = None;
+    // Owned by this one immutable transaction/stamp, never by the store.
+    let mut proof_nodes = ProofNodes::new();
     let mut changes = BTreeMap::<u64, RuntimeChange>::new();
     while !step.is_empty() {
         let mut selected = BTreeMap::<u64, RuntimeChange>::new();
@@ -333,12 +336,13 @@ pub(crate) fn read_versioned_expanding(
         let authentication = reader.with_path(RuntimeReadAccessPath::AccumulatorProof, || {
             let accumulator = match &mut accumulator {
                 Some(accumulator) => accumulator,
-                empty => empty.insert(open_accumulator(&reader, read)?),
+                empty => empty.insert(open_accumulator(&reader, read, &mut proof_nodes)?),
             };
             authenticate_changes(
                 &reader,
                 read,
                 accumulator,
+                &mut proof_nodes,
                 selected
                     .values()
                     .filter(|change| !changes.contains_key(&change.cursor)),
@@ -900,6 +904,7 @@ fn version_space_for_model(model: RuntimeLogicalModel) -> Result<Space> {
 fn open_accumulator(
     reader: &(impl AccessRead + ?Sized),
     read: &ReadStamp,
+    nodes: &mut ProofNodes,
 ) -> Result<RuntimeLogAccumulator> {
     let root = read
         .accumulator_root
@@ -908,7 +913,7 @@ fn open_accumulator(
     Ok(RuntimeLogAccumulator::from_nodes(
         read.commit_cursor,
         root,
-        |level, index| read_accumulator_node(reader, level, index),
+        |level, index| nodes.read(level, index, || read_accumulator_node(reader, level, index)),
     )?)
 }
 
@@ -916,6 +921,7 @@ fn authenticate_changes<'a>(
     reader: &(impl AccessRead + ?Sized),
     read: &ReadStamp,
     accumulator: &RuntimeLogAccumulator,
+    nodes: &mut ProofNodes,
     changes: impl Iterator<Item = &'a RuntimeChange>,
 ) -> Result<()> {
     let root = read
@@ -924,7 +930,7 @@ fn authenticate_changes<'a>(
         .ok_or_else(|| Error::ReadStampMismatch(read.manifest_id.clone()))?;
     for change in changes {
         let proof = accumulator.inclusion_proof(change.cursor - 1, |level, index| {
-            read_accumulator_node(reader, level, index)
+            nodes.read(level, index, || read_accumulator_node(reader, level, index))
         })?;
         proof.verify_change(change, root)?;
     }

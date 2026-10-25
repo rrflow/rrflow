@@ -4,6 +4,14 @@
 **Coordinate:** `rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-035`
 **Owner:** [RRFlow 1.0 alpha POA&M](../rrflow-1.0-alpha.md)
 
+The [authenticated read-cost repair](../../evidence/change-journals/gate-c/c-07g-proof-node-reuse.md)
+records the next full Desktop failure: candidate `8a6752b2` acknowledged all
+100000 corpus operations but verified only 34191 before its original two-hour
+setup deadline. Segment handles stayed bounded with zero denials. Scoped proof
+node reuse addresses measured repeated backing reads without skipping change
+verification. Component tests are not full-profile or actual soak acceptance;
+C-07 and the repository-wide review remain open.
+
 ## Observed deficiency
 
 The [fill-write recovery correction](../../evidence/change-journals/gate-c/c-07f-fill-write-recovery.md)
@@ -55,6 +63,11 @@ reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
 soft limit. Read-only installed verification passes, but full corpus readback
 and soak qualification did not complete. Bounded segment-handle ownership is
 required; the retained failed estate and its original identities remain evidence.
+The [bounded segment-handle repair](../../evidence/change-journals/gate-c/c-07g-bounded-segment-handles.md)
+implements per-database admission, idle eviction and identity-checked reopen.
+The native low-descriptor regression fails on main and passes on the working
+repair. Exact-candidate CI, full Desktop capacity and the 24-hour soak remain
+required; this prerequisite does not close C-07.
 
 The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
 preserves PR127/128 and records a further macOS failure: the selected WAL
@@ -970,3 +983,13 @@ point-read, backup scheduling, startup diagnostic and metadata-pressure repairs
 in one current-main landing PR. Its own complete candidate pipeline must pass;
 predecessor checks and short native characterizations cannot substitute.
 Full profile and actual 24-hour acceptance remain open.
+
+
+The [bounded allocation settlement package](../../evidence/change-journals/gate-c/c-07f-batched-allocation-settlement.md)
+records PR130's macOS candidate timeout before existing-project manifest
+creation: 693 metadata files, 260046848 data bytes and the shared 25-second
+limit. It batches disposable metadata settlement and separates periodic file
+barriers from final waited volume settlement, preserving all caps and the
+selected native-error/readback oracle. Local deterministic and installed crash
+checks pass; native APFS repetitions remain required. This fixture gap and the
+independent full-profile/actual 24-hour qualification remain open.

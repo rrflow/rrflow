@@ -6,6 +6,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    SegmentHandleLimit {
+        limit: usize,
+        observed: usize,
+    },
     SourcePageLimit {
         limit: usize,
         observed: usize,
@@ -118,6 +122,8 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::SegmentHandleLimit { limit, observed } => write!(formatter,
+                "segment open-file limit {limit} would be exceeded by {observed}"),
             Self::SourcePageLimit { limit, observed } => write!(formatter, "source page allocation limit {limit} would be exceeded by {observed}"),
             Self::CheckpointLimit { limit, observed } => write!(formatter, "checkpoint entry limit {limit} would be exceeded by {observed}"),
             Self::TransactionLimit { resource, limit, observed } => write!(formatter, "transaction {} limit {limit} would be exceeded by {observed}", resource.as_str()),

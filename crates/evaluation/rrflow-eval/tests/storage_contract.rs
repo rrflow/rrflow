@@ -65,7 +65,7 @@ fn fixtures() -> (StorageManifest, StorageResult) {
         page_cache[field] = json!(0);
     }
     page_cache["capacity_bytes"] = json!(1048576);
-    let mut io = json!({"requested_mode":"bounded", "max_request_bytes":65536});
+    let mut io = json!({"requested_mode":"bounded", "max_request_bytes":65536, "max_open_files":128, "open_files":0, "peak_open_files":0, "handle_evictions":0, "handle_reopens":0, "handle_denials":0});
     for field in [
         "mmap_segments",
         "io_uring_segments",

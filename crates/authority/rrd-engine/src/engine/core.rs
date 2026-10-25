@@ -35,6 +35,9 @@ pub(super) fn installed_storage_options(
         native("projected_output_bytes", policy.projected_output_bytes)?;
     options.source_page_bytes = native("source_page_bytes", policy.source_page_bytes)?;
     options.page_cache_bytes = native("page_cache_bytes", policy.page_cache_bytes)?;
+    if let Some(limit) = policy.segment_open_files {
+        options.segment_io.max_open_files = native("segment_open_files", limit)?;
+    }
     options.maintenance.wal_payload_max_bytes =
         native("wal_flush_target_bytes", policy.wal_flush_target_bytes)?;
     options.maintenance.memtable_max_versions = native(

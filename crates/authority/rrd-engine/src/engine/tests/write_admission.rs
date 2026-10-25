@@ -434,3 +434,48 @@ fn rejection_history(
         .unwrap()
         .is_none());
 }
+
+#[test]
+fn segment_handle_policy_and_pressure_preserve_durable_outcome_classification() {
+    let mut policy = rrd_contract::StorageLimits::default();
+    assert_eq!(
+        crate::engine::core::installed_storage_options(&policy)
+            .unwrap()
+            .segment_io
+            .max_open_files,
+        128
+    );
+    let sealed = serde_json::to_value(&policy).unwrap();
+    assert!(sealed.get("segment_open_files").is_none());
+    assert_eq!(
+        serde_json::from_value::<rrd_contract::StorageLimits>(sealed).unwrap(),
+        policy
+    );
+    policy.segment_open_files = Some(3);
+    assert_eq!(
+        crate::engine::core::installed_storage_options(&policy)
+            .unwrap()
+            .segment_io
+            .max_open_files,
+        3
+    );
+    for invalid in [0, 4097] {
+        policy.segment_open_files = Some(invalid);
+        assert!(crate::engine::core::installed_storage_options(&policy).is_err());
+    }
+    let denial = || rrd_store::Error::SegmentHandleLimit {
+        limit: 3,
+        observed: 4,
+    };
+    assert_eq!(
+        ServiceError::from(denial()).kind(),
+        crate::ServiceErrorKind::Internal
+    );
+    for read in [
+        crate::engine::error::storage_read_error(denial()),
+        crate::engine::error::query_storage_error(denial()),
+        ServiceError::from(rrd_query::Error::from(denial())),
+    ] {
+        assert_eq!(read.kind(), crate::ServiceErrorKind::ResourceExhausted);
+    }
+}

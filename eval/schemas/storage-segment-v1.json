@@ -978,6 +978,21 @@
           "minimum": 0,
           "type": "integer"
         },
+        "handle_denials": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "handle_evictions": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "handle_reopens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "io_uring_reads": {
           "format": "uint64",
           "minimum": 0,
@@ -994,6 +1009,11 @@
             "null"
           ]
         },
+        "max_open_files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "max_request_bytes": {
           "format": "uint64",
           "minimum": 0,
@@ -1005,6 +1025,16 @@
           "type": "integer"
         },
         "mmap_segments": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "open_files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "peak_open_files": {
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -1035,7 +1065,13 @@
         "bounded_reads",
         "bytes_read",
         "max_request_bytes",
-        "peak_request_bytes"
+        "peak_request_bytes",
+        "max_open_files",
+        "open_files",
+        "peak_open_files",
+        "handle_evictions",
+        "handle_reopens",
+        "handle_denials"
       ],
       "type": "object"
     },
@@ -2508,6 +2544,15 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "segment_open_files": {
+          "description": "Immutable segment file ceiling per native store; restart required.\nOmission preserves the native default of 128 and existing sealed records.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "source_page_bytes": {
           "format": "uint64",

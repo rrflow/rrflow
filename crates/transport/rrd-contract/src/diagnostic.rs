@@ -427,6 +427,12 @@ pub struct DiagnosticSegmentIoSnapshot {
     pub bytes_read: u64,
     pub max_request_bytes: u64,
     pub peak_request_bytes: u64,
+    pub max_open_files: u64,
+    pub open_files: u64,
+    pub peak_open_files: u64,
+    pub handle_evictions: u64,
+    pub handle_reopens: u64,
+    pub handle_denials: u64,
 }
 
 /// rrflowKV physical state and counters.
@@ -509,6 +515,13 @@ impl DiagnosticStorageSnapshot {
                 DiagnosticStorageEvidenceLevel::RrflowKvCounters,
                 Some(rrflow_kv),
             ) => {
+                let io = &rrflow_kv.segment_io;
+                if !(1..=4096).contains(&io.max_open_files)
+                    || io.open_files > io.peak_open_files
+                    || io.peak_open_files > io.max_open_files
+                {
+                    return invalid("diagnostic segment file ownership exceeds its bound");
+                }
                 if rrflow_kv
                     .segment_io
                     .last_fallback_reason
