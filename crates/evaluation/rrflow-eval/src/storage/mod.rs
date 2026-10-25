@@ -17,6 +17,7 @@ mod progress;
 mod reader_interference;
 pub use reader_interference::ReaderInterferenceEvidence;
 mod sustained;
+mod sustained_backup;
 mod validation;
 
 pub use capacity::{
