@@ -323,7 +323,7 @@ fn supported_sdks_share_one_strict_semantic_corpus() {
     .unwrap();
     corpus.validate().unwrap();
     assert_eq!(corpus.required_domains.len(), 13);
-    assert_eq!(corpus.expected.endpoint_count, 44);
+    assert_eq!(corpus.expected.endpoint_count, 55);
     assert_eq!(
         rrd_contract::transaction_operation_sha256(&corpus.transaction.commit.mutations),
         corpus.transaction.commit.operation_sha256
@@ -1348,7 +1348,7 @@ fn diagnostic_storage_observation_matches_its_profile_and_evidence_level() {
 fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
     let catalogue = rrd_contract::endpoint_catalogue();
     catalogue.validate().unwrap();
-    assert_eq!(catalogue.endpoints.len(), 44);
+    assert_eq!(catalogue.endpoints.len(), 55);
     assert_eq!(catalogue.endpoints[0].operation.as_str(), "audit-export");
     let create = catalogue
         .endpoints
@@ -1374,6 +1374,40 @@ fn endpoint_catalogue_is_complete_sorted_and_transport_neutral() {
         Some(rrd_contract::SecurityAction::MemoryContextRead)
     );
     assert_eq!(context.path, "/v1/context/assemble");
+    for (operation, path, action, mutation, request, response) in [
+        (
+            "knowledge-tree-list",
+            "/v1/knowledge/trees/list",
+            rrd_contract::SecurityAction::KnowledgeTreeRead,
+            false,
+            "ListKnowledgeTrees",
+            "KnowledgeTreeCatalogue",
+        ),
+        (
+            "knowledge-tree-replace",
+            "/v1/knowledge/trees/replace",
+            rrd_contract::SecurityAction::KnowledgeTreeWrite,
+            true,
+            "ReplaceKnowledgeTrees",
+            "ReplaceKnowledgeTreesResult",
+        ),
+    ] {
+        let descriptor = catalogue
+            .endpoints
+            .iter()
+            .find(|endpoint| endpoint.operation.as_str() == operation)
+            .unwrap();
+        assert_eq!(descriptor.path, path);
+        assert_eq!(descriptor.method, rrd_contract::HttpMethod::Post);
+        assert_eq!(
+            descriptor.authentication,
+            rrd_contract::EndpointAuthentication::SessionBearer
+        );
+        assert_eq!(descriptor.action.fixed_action(), Some(action));
+        assert_eq!(descriptor.mutation, mutation);
+        assert_eq!(descriptor.request_type, request);
+        assert_eq!(descriptor.response_type, response);
+    }
     let encoded = serde_json::to_value(&catalogue).unwrap();
     assert_eq!(
         serde_json::from_value::<rrd_contract::EndpointCatalogue>(encoded).unwrap(),
@@ -2323,7 +2357,7 @@ fn prompt_flight_contract_is_bounded_strict_and_separately_authorized() {
             Some(rrd_contract::SecurityAction::FlightRead)
         );
     }
-    assert_eq!(rrd_contract::SecurityAction::ALL.len(), 51);
+    assert_eq!(rrd_contract::SecurityAction::ALL.len(), 53);
 }
 
 fn task_record() -> rrd_contract::TaskRecord {

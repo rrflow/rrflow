@@ -69,6 +69,17 @@ integration and proof; this source registration supplies none of those effects.
 
 ### Native local workbench
 
+The current engine exposes the [public task effort flow](../inference/lfg-swag.md#public-task-effort-flow)
+for configuration, explicit reference-adapter activation, bounded embedding
+execution, Stop and retained-result readback. The pinned workbench below does
+not yet consume those operations. H-06 should place these controls inside the
+existing task detail/replay area, after updating its engine/SDK and installation
+adapter together. Display the exact effective limits, original deadline,
+reserved steps and outstanding-work flag; send Stop with the observed budget
+digest and refresh on conflict. A browser timer is display only. Label the
+bundled FeatureHash adapter as a CPU reference baseline, not a local LLM.
+No UI pin or UI qualification is changed by this engine package.
+
 [Connectome PR12](https://github.com/rrflow/connectome-development/pull/12)
 implements visible local startup, a DB/QL/KV guide, and a native model browser
 on the existing authenticated Rust SDK session. The packaged engine/SDK input
@@ -76,6 +87,22 @@ is RRFlow `4860a253663c9c757800aafeb40890b76114c4f0`; the parent gitlink records
 the reviewed UI revision independently. The
 [workbench guide](https://github.com/rrflow/connectome-development/blob/main/docs/native-workbench.md)
 owns build and desktop-use instructions.
+
+[Connectome PR13](https://github.com/rrflow/connectome-development/pull/13)
+adds selected-project workspaces with nested Overview, Knowledge, Activity,
+Learning and Services sections. Basic descriptions lead to advanced engine
+identity and evidence; native model, record/relationship, vector and storage
+views remain bounded public-operation projections. Manage project engines owns
+at most four local processes, and authenticated native connections are keyed by
+project profile (at most eight), so opening or stopping one does not replace
+another project's session. Context sharing is not implied by parallel execution.
+
+The [project workspaces pin receipt](../../evidence/change-journals/gate-h/h-06-project-workspaces-pin.md)
+binds the merged UI to its Windows/Linux/macOS, frontend and real-engine process
+CI. Knowledge-path activation, replay, supervised/unsupervised learning and
+cloud sync remain visibly unavailable. This UI revision retains the same older
+engine/SDK pair named above; neither source association nor parallel process
+control is proof of those downstream capabilities or full H-06 acceptance.
 
 Newer RRFlow installation-plan contract v2 requires an explicit identity from
 `rrflow install identity`, retained across preview regeneration and supplied
@@ -547,3 +574,14 @@ No Anytype identity, space/channel hierarchy, middleware, command, schema,
 storage, source layout, or renderer becomes an RRFlow contract. The accepted
 ideas above are independently specified and must pass RRFlow's own security,
 semantic, resource, and conformance evidence.
+
+## Knowledge-tree configuration
+
+The optional UI must negotiate `knowledge-tree-catalogue` before using the
+[project-bound configuration operations](../knowledge-trees.md). Display saved
+external paths as configuration, not proof of connector availability or import.
+Native collection and named-vector references are validated by the engine.
+Replacement uses the observed catalogue revision and preserves the editor draft
+on conflict. Engine grants, admission and durable receipts remain authoritative.
+The current parent pin and PR114's workspace pin are separate from this engine
+API integration; neither is advanced implicitly here.

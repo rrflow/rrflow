@@ -340,7 +340,9 @@ max_step_elapsed_ms = 15000
 ```
 
 This is a two-minute, sixteen-step, fifteen-second-per-step configuration
-example, not a complete configuration file or a running timeout feature.
+example, not a complete configuration file. The current engine embedding path
+uses the fifteen-second step ceiling for waiting and result acceptance. Total
+run time and step-count enforcement still require the governed reasoning runner.
 The full input must retain its required storage/clock/recall/query sections.
 Preview and apply the sealed installation plan through the existing commands;
 do not edit an installed `.rrflow/config.toml` to bypass the active revision.
@@ -349,11 +351,19 @@ Post-install governed configuration changes remain D-06 work.
 The existing parser requires positive limits, per-step time no greater than
 total time, and compiled maxima of one hour per run, 10,000 steps and five
 minutes per step. The default is fifteen minutes, 256 steps and one minute
-per step. `governed-reasoning-runner` is unavailable: these values are currently
-validated configuration and advertised ceilings, not evidence of end-to-end
-loop prevention. The [LFG/SWAG budget contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
+per step. `governed-reasoning-runner` is unavailable. A synchronous embedding
+adapter may continue after its caller times out; its execution slot remains
+occupied until it actually returns. The engine returns a non-retryable deadline
+error and does not accept late output. This bounded wait is not proof of
+end-to-end loop prevention, cancellation or a provider cost ceiling. The
+[LFG/SWAG budget contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
 owns aggregate accounting, retries, effort presets, stop/resume and required
 runtime proof. Existing query/context limits remain separately enforced.
+
+The Rust embedded generation API additionally accepts a process-local
+cancellation handle. FeatureHash observes it cooperatively; other adapters
+may finish their current blocking call before releasing admission. This is
+not an installed daemon/UI Stop operation or durable cancellation after restart.
 
 ### Native storage limits
 

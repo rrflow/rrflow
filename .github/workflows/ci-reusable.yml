@@ -363,7 +363,7 @@ jobs:
           python-version: 3.15.0
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
-          version: 0.13.1
+          version: 0.13.2
           enable-cache: true
           cache-dependency-glob: sdks/python/uv.lock
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -668,6 +668,13 @@ jobs:
       - name: Qualify installed native capacity failure and recovery
         timeout-minutes: 30
         run: python3 scripts/ci/run_native_capacity.py
+      - name: Require repeated APFS exhaustion and recovery
+        if: matrix.os == 'macos-latest'
+        timeout-minutes: 15
+        run: >-
+          python3 scripts/ci/run_native_capacity.py
+          --mode fresh --mode existing --mode fresh --mode existing
+          --mode fresh --mode existing
       - name: Deny diagnostic-primary and oracle warnings
         run: cargo clippy -p rrflow-cli --bin rrflow --test installed_crash --test lifecycle_process --features crash-test --locked -- -D warnings
 

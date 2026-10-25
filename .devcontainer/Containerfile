@@ -8,14 +8,14 @@
 # .github/workflows/ci-reusable.yml; scripts/ci/check_workflow.py enforces it.
 # Usage and limits: docs/operations/ci.md#local-development-container.
 
-FROM docker.io/library/ubuntu:24.04@sha256:496754492fb28b4d3049432f2ca787449331e23fb14f0dd3fffea86bf5a93eb4 AS rust
+FROM docker.io/library/ubuntu:24.04@sha256:a2d43bffc46670d7108bb3c0468c67c5557c4c92e83e1e34cbff1322ad1b94dc AS rust
 
-ARG UBUNTU_SNAPSHOT=20260922T000000Z
+ARG UBUNTU_SNAPSHOT=20261019T000000Z
 ARG RUSTUP_VERSION=1.29.1
 ARG RUSTUP_SHA256=dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71
 ARG RUST_VERSION=1.99.1
-ARG UV_VERSION=0.13.1
-ARG UV_SHA256=eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220
+ARG UV_VERSION=0.13.2
+ARG UV_SHA256=e14d48c117ec33601d6f860dda47aa5ea490d77a5a9ef770529c448fa6747d9f
 # The actions/python-versions build that setup-python installs on CI's
 # ubuntu-24.04 runners; the digest is GitHub's published asset SHA-256.
 ARG PYTHON_VERSION=3.15.0

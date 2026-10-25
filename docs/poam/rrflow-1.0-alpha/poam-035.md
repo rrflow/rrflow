@@ -6,6 +6,74 @@
 
 ## Observed deficiency
 
+The [fill-write recovery correction](../../evidence/change-journals/gate-c/c-07f-fill-write-recovery.md)
+retains PR114 run 40167630906: after 24 successful native macOS cases, disposable
+filling exceeded its original 25-second deadline. A deterministic regression
+exposes the helper retaining one-byte requests after allocation becomes
+available. Bulk requests now resume after progress; bounds and the synchronized
+native-error oracle remain unchanged. Exact integrated qualification is pending.
+
+The [joint APFS pressure correction](../../evidence/change-journals/gate-c/c-07f-apfs-joint-pressure.md)
+retains run 40162479866: 29 native cases passed before an existing segment
+case failed to produce the selected native error. One metadata pass and final
+data drain did not establish exhaustion. The fixture now requires a complete
+round with no added data or metadata entries under the same original limits.
+Native qualification remains pending; prior successes do not clear this failure.
+
+The [APFS WAL metadata-pressure correction](../../evidence/change-journals/gate-c/c-07f-apfs-wal-pressure.md)
+records PR113 run 40161414466: a data-only ENOSPC did not prevent the selected
+WAL append, and the later disk-admission rejection left the native-event
+oracle unsatisfied. APFS WAL now uses the same bounded metadata pressure as
+publication cases, followed by a final shared-budget data drain. The native
+failure and all earlier results remain retained; exact-candidate qualification
+is still required and this deficiency remains open.
+
+The [bounded APFS metadata-payload correction](../../evidence/change-journals/gate-c/c-07f-apfs-metadata-payload.md)
+records PR129 run 40159526278 passing six macOS cases before the existing
+manifest case exhausted the 8192-entry cap. Volume settlement alone is not
+reliable metadata exhaustion. Disposable file attributes now consume bounded
+metadata payloads under the shared byte allowance; all four failure boundaries
+are repeated. Actual native repair remains unqualified until candidate CI passes.
+
+The [owned-image settlement correction](../../evidence/change-journals/gate-c/c-07f-owned-image-settlement.md)
+records PR129 run 40158423166 passing eleven macOS native capacity/recovery
+cases before teardown exhausted five rapid EBUSY attempts. Paced retries use
+the same five attempts and 30-second deadline, retaining ownership and absence
+checks. This candidate failed cleanup; its passing cases and Linux/Windows
+matrix do not establish complete qualification. Native validation remains open.
+
+The [APFS volume-settlement correction](../../evidence/change-journals/gate-c/c-07f-volume-allocation-settlement.md)
+records PR118 run 40156063858 failing the 8192-entry cap after 64 data refills
+at the existing segment pause. Individual-file barriers did not establish
+reliable metadata exhaustion. PR129 adds waited admitted-volume settlement
+and repeated WAL/segment qualification without raising limits; causal native
+repair remains unproven until the exact candidate passes. The original failed
+job and cancelled preceding PR129 candidate retain their own identities.
+
+The [encoder candidate's native descriptor failure](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
+reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
+soft limit. Read-only installed verification passes, but full corpus readback
+and soak qualification did not complete. Bounded segment-handle ownership is
+required; the retained failed estate and its original identities remain evidence.
+
+The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
+preserves PR127/128 and records a further macOS failure: the selected WAL
+pause was reached, filler returned ENOSPC, but the required native error did
+not arrive and the API reported resource exhaustion. Bounded physical-file
+and synthetic-request diagnostics plus repeated fresh/existing APFS cases
+address missing attribution. This is not yet a causal repair or acceptance;
+original deadlines, caps, native-error and recovery oracles remain required.
+
+The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-encoder-working-set.md)
+records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
+CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
+records on the 30-second write deadline. No failed compaction or OOM was
+reported, the private estate was retained, and continuation refused soak.
+Native profiling on a separate copy led to incremental row-group encoding and
+buffer reuse in PR128. Exact-byte and component checks do not establish repair
+of that installed timeout. Full growth/profile and actual 24-hour acceptance
+remain open; no deadline or resource cap is relaxed.
+
 The [integrated public-client readback package](../../evidence/change-journals/gate-c/c-07-integrated-readback.md)
 addresses a separate demonstration gap: the existing local database example
 combined two independent HEAD queries, so a concurrent commit could yield a
@@ -13,6 +81,7 @@ mixed-cursor view. Its fixed-cursor read and independently expected sample
 verification retain the real transaction/reopen checks. This improves the
 usable DB/graph/QL flow; it does not close native capacity, lifetime, full
 profile or 24-hour-soak acceptance. The C-07 qualification gap remains open.
+
 PR125 Ubuntu job `121000145879` also exposed a diagnostic subprocess fixture
 race: the child could exit before required stdin delivery, producing
 `BrokenPipe`. The [integrated repair journal](../../evidence/change-journals/gate-c/c-07-final-growth-candidate.md#observed-process-fixture-input-race)
@@ -580,6 +649,13 @@ before restart. Fleet and Linux small runs have exact histories and no rejected
 or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
 All remain characterization. Required corpus profiles, complete 24-hour evidence,
 current-candidate CI and final acceptance reconciliation remain open.
+
+The [retained native failure record](../../evidence/change-journals/gate-c/c-07h-retained-native-failures.md)
+preserves Windows13's coverage failure and Linux04/05's frozen setup deadline
+failures with exact source/binary/campaign identities and confirmed cleanup.
+Combined component checks at d209218d pass but do not override those native
+failures. The repaired pipeline candidate and ongoing long characterization
+remain separate evidence; full profiles and completed soak are still required.
 
 The [overlapping resource-window repair](../../evidence/change-journals/gate-c/c-07g-overlapping-resource-windows.md)
 preserves real samples collected by a preceding late segment inside the next

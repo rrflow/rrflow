@@ -53,10 +53,13 @@ def detach_owned_image(image: Path) -> None:
         # Darwin EBUSY=16 is the only retryable command failure. A success also
         # needs a fresh absence observation; it never authorizes blind deletion.
         require(result.returncode in (0, 16), last_error)
-        if result.returncode == 16:
+        if result.returncode == 16 and attempts < 5:
             remaining = deadline - time.monotonic()
             require(remaining > 0, "owned image cleanup deadline exceeded: " + last_error)
-            time.sleep(min(0.25, remaining))
+            # Give asynchronous native teardown time to settle instead of
+            # exhausting all five attempts in a tight burst. The same deadline
+            # and attempt cap apply; the next iteration rechecks ownership.
+            time.sleep(min(2 ** (attempts - 1), remaining))
 
 
 def main() -> None:

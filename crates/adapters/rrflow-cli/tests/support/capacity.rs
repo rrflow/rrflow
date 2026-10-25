@@ -4,6 +4,13 @@ use serde::Deserialize;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
+#[path = "capacity_observation.rs"]
+mod observation;
+
+#[cfg(target_os = "macos")]
+#[path = "capacity_apfs.rs"]
+mod apfs;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Volume {
@@ -133,6 +140,7 @@ struct Filler {
     bytes: u64,
     native_code: i32,
     data_refills: u32,
+    metadata_payload_bytes: u64,
     metadata_paths: Vec<PathBuf>,
     metadata_directories: Vec<PathBuf>,
     metadata_native_code: Option<i32>,
@@ -166,6 +174,21 @@ fn sync_filler_host(file: &File) -> std::io::Result<()> {
     }
 }
 
+fn finish_allocation_barrier(
+    file_result: std::io::Result<()>,
+    settle_volume: impl FnOnce() -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    if let Err(error) = &file_result {
+        if !error.raw_os_error().is_some_and(capacity_code) {
+            return file_result;
+        }
+    }
+    // ENOSPC from the file barrier must not skip volume settlement. Retain
+    // that native error after settlement; a later write remains the oracle.
+    settle_volume()?;
+    file_result
+}
+
 // A capacity error before synchronization can leave pending allocation. Probe
 // again after the barrier; only a filler unchanged since that attempt followed by
 // a native one-byte failure is ready for the selected engine operation.
@@ -180,21 +203,28 @@ fn fill_data<W: Write>(
     let mut bytes_at_barrier = 0;
     let mut barrier_since_write = false;
     let mut write_size = buffer.len();
+    let mut writes = 0u64;
     loop {
         assert!(
             started.elapsed() < Duration::from_secs(25),
-            "bounded owned-volume fill"
+            "bounded owned-volume fill: bytes={bytes} writes={writes} request_bytes={write_size} elapsed_ms={}",
+            started.elapsed().as_millis()
         );
         assert!(
             bytes < max_bytes,
             "owned filesystem did not enforce its capacity"
         );
         let attempt = write_size.min((max_bytes - bytes) as usize);
+        writes += 1;
         match file.write(&buffer[..attempt]) {
             Ok(0) => panic!("zero-length filler write"),
             Ok(n) => {
                 bytes += n as u64;
                 barrier_since_write = false;
+                // A reduced probe can succeed as allocation becomes available.
+                // Resume bulk writes instead of draining that space bytewise.
+                // Subsequent capacity errors still reduce to the one-byte oracle.
+                write_size = buffer.len();
             }
             Err(error) => {
                 let Some(code) = error.raw_os_error().filter(|code| capacity_code(*code)) else {
@@ -250,6 +280,52 @@ fn fill_remaining_data<W: Write>(
     Ok(code)
 }
 
+// Charge before the native effect, including uncertain/error outcomes. Metadata
+// and file contents share the admitted volume's existing payload allowance.
+fn allocate_metadata_payload(
+    charged: &mut u64,
+    data_bytes: u64,
+    max_bytes: u64,
+    payload_bytes: u64,
+    allocate: impl FnOnce() -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    let next = charged
+        .checked_add(payload_bytes)
+        .expect("metadata byte overflow");
+    assert!(
+        data_bytes
+            .checked_add(next)
+            .is_some_and(|total| total <= max_bytes),
+        "metadata payload exceeds aggregate filler byte bound"
+    );
+    *charged = next;
+    allocate()
+}
+
+// One category can release allocation usable by the other. Admission to the
+// selected engine operation requires a whole pressure round without progress.
+fn settle_pressure(
+    started: Instant,
+    mut previous: (u64, usize),
+    mut round: impl FnMut() -> (u64, usize),
+) {
+    loop {
+        assert!(
+            started.elapsed() < Duration::from_secs(25),
+            "bounded joint pressure"
+        );
+        let current = round();
+        assert!(
+            current.0 >= previous.0 && current.1 >= previous.1,
+            "owned pressure accounting must be monotonic"
+        );
+        if current == previous {
+            return;
+        }
+        previous = current;
+    }
+}
+
 impl Filler {
     fn fill(volume: &Volume, metadata_directory: Option<&std::path::Path>) -> Self {
         let directory = metadata_directory.map(|path| {
@@ -276,6 +352,7 @@ impl Filler {
             bytes: 0,
             native_code: 0,
             data_refills: 0,
+            metadata_payload_bytes: 0,
             metadata_paths: Vec::new(),
             metadata_directories: Vec::new(),
             metadata_native_code: None,
@@ -284,6 +361,17 @@ impl Filler {
         // Nonzero data prevents sparse/zero-block optimizations. Allocation and
         // sync failures are actual OS results, never injected StorageFull.
         let started = Instant::now();
+        // Open only the already admitted, private image root. File fsync alone
+        // does not wait for the volume's metadata transaction to settle.
+        #[cfg(target_os = "macos")]
+        let volume_root = File::open(&volume.root).expect("owned volume root");
+        let allocation_sync = |file: &File| {
+            finish_allocation_barrier(sync_filler_allocation(file), || {
+                #[cfg(target_os = "macos")]
+                apfs::sync_volume(&volume_root)?;
+                Ok(())
+            })
+        };
         // A full NTFS directory index does not prove that free MFT records are
         // exhausted: a small CURRENT file may still be resident. Reserve a
         // fixed set of empty, fixture-owned directory indexes before filling
@@ -302,7 +390,7 @@ impl Filler {
         // independent of the selected publication filename.
         #[cfg(target_os = "linux")]
         if let Some(directory) = &directory {
-            filler.fill_metadata(volume, directory, started);
+            filler.fill_metadata(volume, directory, started, &allocation_sync);
             use std::os::fd::AsRawFd;
             let handle = File::open(directory).unwrap();
             let mut state = std::mem::MaybeUninit::<libc::statvfs>::uninit();
@@ -320,24 +408,55 @@ impl Filler {
             filler.free_inodes = Some(state.f_ffree);
         }
         (filler.bytes, filler.native_code) =
-            fill_data(&mut file, volume.max_bytes, started, sync_filler_allocation)
+            fill_data(&mut file, volume.max_bytes, started, &allocation_sync)
                 .expect("native filler allocation");
         filler.file = Some(file);
-        // Resident metadata on APFS/NTFS is exhausted after data allocation.
-        if !cfg!(target_os = "linux") {
+        if cfg!(target_os = "macos") {
+            let directory = directory
+                .as_ref()
+                .expect("APFS metadata pressure directory");
+            // Either category can release allocation usable by the other. A
+            // single final drain is insufficient: finish a whole round with no
+            // additional files or data before resuming the selected operation.
+            settle_pressure(started, (filler.bytes, filler.metadata_paths.len()), || {
+                filler.fill_metadata(volume, directory, started, &allocation_sync);
+                filler.native_code = fill_remaining_data(
+                    filler.file.as_mut().expect("data filler remains owned"),
+                    &mut filler.bytes,
+                    volume
+                        .max_bytes
+                        .checked_sub(filler.metadata_payload_bytes)
+                        .expect("metadata payload byte bound"),
+                    started,
+                    &allocation_sync,
+                )
+                .expect("native joint metadata-phase data allocation");
+                filler.data_refills += 1;
+                (filler.bytes, filler.metadata_paths.len())
+            });
+        } else if !cfg!(target_os = "linux") {
             if let Some(directory) = &directory {
-                filler.fill_metadata(volume, directory, started);
+                filler.fill_metadata(volume, directory, started, &allocation_sync);
             }
         }
         // Each empty index can consume otherwise reusable MFT records. A
         // failure in one directory must not end the global metadata fill.
         for directory in filler.metadata_directories.clone() {
-            filler.fill_metadata(volume, &directory, started);
+            filler.fill_metadata(volume, &directory, started, &allocation_sync);
         }
         filler
     }
-    fn fill_metadata(&mut self, volume: &Volume, directory: &std::path::Path, started: Instant) {
-        for index in 0..8192u32 {
+    fn fill_metadata(
+        &mut self,
+        volume: &Volume,
+        directory: &std::path::Path,
+        started: Instant,
+        allocation_sync: &impl Fn(&File) -> std::io::Result<()>,
+    ) {
+        // A new round must observe its own capacity error, and must not reuse
+        // names belonging to successfully created entries from an earlier round.
+        self.metadata_native_code = None;
+        for index in self.metadata_paths.len()..8192 {
             assert!(self.metadata_paths.len() < 8192, "metadata entry bound");
             assert!(
                 started.elapsed() < Duration::from_secs(25),
@@ -355,6 +474,21 @@ impl Filler {
                     // Register before sync so an allocation failure still cleans
                     // up this exact owned entry. Drop ignores close errors.
                     self.metadata_paths.push(path);
+                    #[cfg(target_os = "macos")]
+                    if let Err(error) = allocate_metadata_payload(
+                        &mut self.metadata_payload_bytes,
+                        self.bytes,
+                        volume.max_bytes,
+                        apfs::METADATA_PAYLOAD_BYTES as u64,
+                        || apfs::allocate_metadata(&file),
+                    ) {
+                        // Attribute exhaustion alone does not prove that the
+                        // smaller create/publication operation is exhausted.
+                        // Keep the registered file and continue native creates.
+                        if !error.raw_os_error().is_some_and(capacity_code) {
+                            return Err(error);
+                        }
+                    }
                     if cfg!(target_os = "macos") {
                         sync_filler_allocation(&file)?;
                     }
@@ -371,9 +505,12 @@ impl Filler {
                         self.native_code = fill_remaining_data(
                             self.file.as_mut().expect("data filler remains owned"),
                             &mut self.bytes,
-                            volume.max_bytes,
+                            volume
+                                .max_bytes
+                                .checked_sub(self.metadata_payload_bytes)
+                                .expect("metadata payload byte bound"),
                             started,
-                            sync_filler_allocation,
+                            allocation_sync,
                         )
                         .expect("native metadata-phase data allocation");
                         self.data_refills += 1;
@@ -435,6 +572,157 @@ fn filler_host_sync_preserves_native_noncapacity_errors() {
 mod filler_tests {
     use super::*;
     use std::cell::Cell;
+
+    #[test]
+    fn successful_small_write_recovers_bulk_allocation_without_bytewise_drain() {
+        struct ReopenedAllocation {
+            written: usize,
+            calls: usize,
+        }
+        const AVAILABLE: usize = 1024 * 1024 + 1;
+        impl Write for ReopenedAllocation {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.calls += 1;
+                assert!(
+                    self.calls < 128,
+                    "available allocation drained byte by byte"
+                );
+                if self.written == AVAILABLE || (self.written == 0 && bytes.len() > 1) {
+                    return Err(std::io::Error::from_raw_os_error(if cfg!(windows) {
+                        112
+                    } else {
+                        28
+                    }));
+                }
+                let count = bytes.len().min(AVAILABLE - self.written);
+                self.written += count;
+                Ok(count)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut file = ReopenedAllocation {
+            written: 0,
+            calls: 0,
+        };
+        let mut syncs = 0;
+        let (bytes, code) = fill_data(&mut file, 2 * 1024 * 1024, Instant::now(), |_| {
+            syncs += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(bytes, AVAILABLE as u64);
+        assert_eq!(syncs, 1);
+        assert!(capacity_code(code));
+    }
+
+    #[test]
+    fn settle_pressure_repeats_after_either_category_allocates() {
+        let mut calls = 0;
+        let states = [(8, 1), (8, 2), (12, 2), (12, 2)];
+        settle_pressure(Instant::now(), (0, 0), || {
+            let state = states[calls];
+            calls += 1;
+            state
+        });
+        assert_eq!(
+            calls,
+            states.len(),
+            "stopped before both categories settled"
+        );
+    }
+
+    #[test]
+    fn settle_pressure_stable_state_stops_and_expired_clock_has_no_effect() {
+        let calls = Cell::new(0);
+        settle_pressure(Instant::now(), (8, 2), || {
+            calls.set(calls.get() + 1);
+            (8, 2)
+        });
+        assert_eq!(calls.get(), 1);
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            settle_pressure(Instant::now() - Duration::from_secs(25), (8, 2), || {
+                calls.set(calls.get() + 1);
+                (8, 2)
+            });
+        }))
+        .is_err());
+        assert_eq!(
+            calls.get(),
+            1,
+            "expired original clock allowed a new effect"
+        );
+    }
+
+    #[test]
+    fn metadata_payload_is_charged_before_effect_and_reduces_data_allowance() {
+        let mut charged = 0;
+        let calls = Cell::new(0);
+        for code in [28, 5] {
+            let error = allocate_metadata_payload(&mut charged, 8, 16, 3, || {
+                calls.set(calls.get() + 1);
+                Err(std::io::Error::from_raw_os_error(code))
+            })
+            .unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(code));
+        }
+        assert_eq!(charged, 6, "failed native effects retain their allowance");
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = allocate_metadata_payload(&mut charged, 8, 16, 3, || {
+                calls.set(calls.get() + 1);
+                Ok(())
+            });
+        }))
+        .is_err());
+        assert_eq!(calls.get(), 2, "over-budget metadata must not reach the OS");
+        assert_eq!(charged, 6);
+        let mut file = DelayedAllocation::new();
+        let mut data_bytes = 8;
+        assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = fill_remaining_data(
+                &mut file,
+                &mut data_bytes,
+                16 - charged,
+                Instant::now(),
+                |_| Ok(()),
+            );
+        }))
+        .is_err());
+        assert_eq!(
+            file.remaining.get(),
+            6,
+            "data refill ignored metadata charge"
+        );
+    }
+
+    #[test]
+    fn capacity_file_error_still_settles_volume_and_preserves_errors() {
+        let capacity = if cfg!(windows) { 112 } else { 28 };
+        for file_code in [None, Some(capacity), Some(5)] {
+            for volume_code in [None, Some(capacity), Some(5)] {
+                let calls = Cell::new(0);
+                let result = finish_allocation_barrier(
+                    file_code.map_or(Ok(()), |code| Err(std::io::Error::from_raw_os_error(code))),
+                    || {
+                        calls.set(calls.get() + 1);
+                        volume_code
+                            .map_or(Ok(()), |code| Err(std::io::Error::from_raw_os_error(code)))
+                    },
+                );
+                assert_eq!(calls.get(), u32::from(file_code != Some(5)));
+                let expected = if file_code == Some(5) {
+                    file_code
+                } else {
+                    volume_code.or(file_code)
+                };
+                assert_eq!(
+                    result.err().and_then(|error| error.raw_os_error()),
+                    expected
+                );
+            }
+        }
+    }
 
     struct DelayedAllocation {
         remaining: Cell<usize>,
@@ -604,6 +892,7 @@ fn resume_after_fill(
     control: Value,
     volume: Volume,
     metadata_directory: Option<PathBuf>,
+    wal_root: PathBuf,
 ) -> (Child, Filler, Value) {
     let line = child.line();
     let hit: Value = serde_json::from_str(
@@ -619,13 +908,21 @@ fn resume_after_fill(
         assert_eq!(hit[key], control[key]);
     }
     println!("native_capacity_pause={hit}");
+    println!(
+        "native_capacity_wal_before_fill={}",
+        observation::wal_state(&wal_root)
+    );
     let filler = Filler::fill(&volume, metadata_directory.as_deref());
     println!(
         "native_capacity_fill={}",
         json!({"point":control["point"],
-        "bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
+        "bytes":filler.bytes,"metadata_payload_bytes":filler.metadata_payload_bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
         "metadata_files":filler.metadata_paths.len(),
         "metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes})
+    );
+    println!(
+        "native_capacity_wal_after_fill={}",
+        observation::wal_state(&wal_root)
     );
     child
         .child
@@ -638,6 +935,10 @@ fn resume_after_fill(
     let line = match child.lines.recv_timeout(Duration::from_secs(60)) {
         Ok(Ok(line)) => line,
         failure => {
+            println!(
+                "native_capacity_wal_missing_event={}",
+                observation::wal_state(&wal_root)
+            );
             child.child.terminate();
             let output = child.child.finish().expect("reap failed capacity engine");
             let tail = |bytes: &[u8]| {
@@ -787,18 +1088,60 @@ fn wal_bytes(estate: &Estate) -> u64 {
         .unwrap()
 }
 
+fn metadata_pressure_directory(
+    point: &str,
+    native_root: &std::path::Path,
+    filesystem: &str,
+) -> Option<PathBuf> {
+    match point {
+        // APFS can deny growth of the data filler while another existing file
+        // still allocates. Consume metadata pressure outside the WAL directory,
+        // where disposable entries must never be mistaken for authoritative WAL.
+        "wal_before_write" if filesystem == "apfs" => Some(native_root.to_path_buf()),
+        "wal_before_write" => None,
+        "segment_before_create" => Some(native_root.join("segments")),
+        "manifest_before_create" => Some(native_root.join("manifests")),
+        "current_before_create" => Some(native_root.to_path_buf()),
+        _ => panic!("unsupported native capacity point"),
+    }
+}
+
+#[test]
+fn apfs_wal_consumes_metadata_pressure_outside_authoritative_wal_directory() {
+    let estate = tempfile::tempdir().unwrap();
+    let root = estate.path();
+    // A failed write to one APFS filler file did not prevent another existing
+    // file from allocating. WAL pressure must include the metadata phase too.
+    assert_eq!(
+        metadata_pressure_directory("wal_before_write", root, "apfs"),
+        Some(root.to_path_buf())
+    );
+    for filesystem in ["ext4", "ntfs"] {
+        assert_eq!(
+            metadata_pressure_directory("wal_before_write", root, filesystem),
+            None
+        );
+    }
+    for filesystem in ["apfs", "ext4", "ntfs"] {
+        for (point, directory) in [
+            ("segment_before_create", root.join("segments")),
+            ("manifest_before_create", root.join("manifests")),
+            ("current_before_create", root.to_path_buf()),
+        ] {
+            assert_eq!(
+                metadata_pressure_directory(point, root, filesystem),
+                Some(directory)
+            );
+        }
+    }
+}
+
 fn capacity_case(point: &str, mode: &str) {
     let volume = Volume::admitted();
     let estate = Estate::install_at(mode, Some(&volume.root), point != "wal_before_write");
     let locator = RrdEngine::read_project_locator(&estate.project).unwrap();
     let native_root = estate.project.join(locator.storage_root);
-    let metadata_directory = match point {
-        "wal_before_write" => None,
-        "segment_before_create" => Some(native_root.join("segments")),
-        "manifest_before_create" => Some(native_root.join("manifests")),
-        "current_before_create" => Some(native_root),
-        _ => panic!("unsupported native capacity point"),
-    };
+    let metadata_directory = metadata_pressure_directory(point, &native_root, &volume.filesystem);
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
     let mut ledger = AcknowledgementLedger::default();
     let clock = Instant::now();
@@ -846,7 +1189,7 @@ fn capacity_case(point: &str, mode: &str) {
         let (child,client) = estate.serve(&control);
         let lease = begin(&client,&session,"uncertain").await;
         let started = clock.elapsed().as_nanos() as u64;
-        let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory));
+        let controller = tokio::task::spawn_blocking(move ||resume_after_fill(child,control,volume,metadata_directory,native_root.join("wal")));
         let result = client.commit_transaction(&session,&lease.transaction_id,target.clone(),options("uncertain")).await;
         let result_class = match &result {
             Ok(_) => "acknowledged".to_owned(),
@@ -854,11 +1197,15 @@ fn capacity_case(point: &str, mode: &str) {
             Err(rrd_client::Error::Timeout) => "client-timeout".to_owned(),
             Err(_) => "client-failure".to_owned(),
         };
-        println!("native_capacity_client={}",json!({"point":point,"mode":mode,"class":result_class}));
+        let message = match &result {
+            Err(rrd_client::Error::Api {error,..}) => Some(error.message.chars().take(512).collect::<String>()),
+            _ => None,
+        };
+        println!("native_capacity_client={}",json!({"point":point,"mode":mode,"class":result_class,"message":message}));
         let (child,filler,native) = controller.await.unwrap();
         assert!(result.is_err(),"capacity operation unexpectedly acknowledged");
         child.kill();
-        let fill = json!({"bytes":filler.bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
+        let fill = json!({"bytes":filler.bytes,"metadata_payload_bytes":filler.metadata_payload_bytes,"native_code":filler.native_code,"data_refills":filler.data_refills,
             "metadata_files":filler.metadata_paths.len(),"metadata_native_code":filler.metadata_native_code,"free_inodes":filler.free_inodes});
         drop(filler);
         ledger.attempts.push(Attempt {attempt_id:"capacity-uncertain".to_owned().try_into().unwrap(),

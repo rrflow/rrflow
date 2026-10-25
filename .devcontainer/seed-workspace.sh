@@ -40,5 +40,11 @@ if [ -n "$upstream_remote" ] && [ -n "$upstream_merge" ]; then
   git -C "$destination" config "branch.$branch.merge" "$upstream_merge"
 fi
 
+# Declared submodules are pinned public HTTPS source inputs; materialize the
+# exact gitlink revisions so the workspace matches a recursive CI checkout.
+if [ -f "$destination/.gitmodules" ]; then
+  git -C "$destination" submodule update --init --recursive
+fi
+
 echo "seed-workspace: cloned $branch at $(git -C "$destination" rev-parse --short HEAD) into $destination"
 git -C "$destination" remote -v

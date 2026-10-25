@@ -165,6 +165,49 @@ fn embedding_request(id: &str, bytes: &[u8]) -> EmbeddingRequest {
     }
 }
 
+#[test]
+fn feature_hash_rejects_zero_norm_before_returning_output_and_releases_admission() {
+    use rrd_inference::{EmbeddingCancellation, EmbeddingExecutionControl};
+    use std::time::{Duration, Instant};
+    let mut backend = FeatureHashBackend::new(32, 44).unwrap();
+    let bad = embedding_request("zero", b"source-1");
+    let good = embedding_request("nonzero", b"source0");
+    // The two tokens hash to bucket 20 with opposite signs. Direct callers
+    // must receive a failure, not rely on a later registry validation layer.
+    let error = backend.embed(&bad).unwrap_err();
+    assert!(error.to_string().contains("no finite nonzero norm"));
+    assert!(backend.embed_batch(&[good.clone(), bad.clone()]).is_err());
+    let descriptor = backend.descriptor().clone();
+    let mut registry = EmbeddingBackendRegistry::default();
+    registry.install(Box::new(backend)).unwrap();
+    let error = registry
+        .try_acquire(&descriptor.id)
+        .unwrap()
+        .embed_batch_with_control(
+            descriptor.model.clone(),
+            NetworkPolicy::Deny,
+            vec![bad],
+            EmbeddingExecutionControl::new(
+                Instant::now() + Duration::from_secs(5),
+                EmbeddingCancellation::default(),
+            ),
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("no finite nonzero norm"));
+    let recovered = registry
+        .try_acquire(&descriptor.id)
+        .unwrap()
+        .embed_batch(&descriptor.model, NetworkPolicy::Deny, &[good])
+        .unwrap();
+    let VectorValue::Dense { values } = &recovered.vectors[0] else {
+        panic!("expected dense vector")
+    };
+    assert_eq!(values.len(), 32);
+    assert!(values.iter().all(|v| v.is_finite()));
+    let norm: f64 = values.iter().map(|v| f64::from(*v).powi(2)).sum();
+    assert!((norm - 1.0).abs() < 1e-4);
+}
+
 impl EmbeddingBackend for MalformedBackend {
     fn descriptor(&self) -> &rrd_inference::EmbeddingBackendDescriptor {
         &self.descriptor

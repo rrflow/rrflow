@@ -365,7 +365,7 @@ def verify_sdk_conformance(block: str) -> None:
         "node-version: 24.22.0",
         "version: 12.14.0",
         "python-version: 3.15.0",
-        "version: 0.13.1",
+        "version: 0.13.2",
         "go-version: 1.27.2",
         "cache: false",
         "java-version: 25.0.4+101.0.LTS",
