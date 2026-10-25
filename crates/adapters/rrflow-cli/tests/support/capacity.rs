@@ -391,6 +391,24 @@ impl Filler {
         for directory in filler.metadata_directories.clone() {
             filler.fill_metadata(volume, &directory, started, &allocation_sync);
         }
+        if cfg!(target_os = "macos") {
+            // The final partial metadata interval can release data allocation.
+            // Drain it before resuming the engine, using the original clock and
+            // aggregate allowance. Neither a create error nor this drain alone
+            // substitutes for the selected engine syscall's native error.
+            filler.native_code = fill_remaining_data(
+                filler.file.as_mut().expect("data filler remains owned"),
+                &mut filler.bytes,
+                volume
+                    .max_bytes
+                    .checked_sub(filler.metadata_payload_bytes)
+                    .expect("metadata payload byte bound"),
+                started,
+                &allocation_sync,
+            )
+            .expect("native final metadata-phase data allocation");
+            filler.data_refills += 1;
+        }
         filler
     }
     fn fill_metadata(
@@ -950,18 +968,60 @@ fn wal_bytes(estate: &Estate) -> u64 {
         .unwrap()
 }
 
+fn metadata_pressure_directory(
+    point: &str,
+    native_root: &std::path::Path,
+    filesystem: &str,
+) -> Option<PathBuf> {
+    match point {
+        // APFS can deny growth of the data filler while another existing file
+        // still allocates. Consume metadata pressure outside the WAL directory,
+        // where disposable entries must never be mistaken for authoritative WAL.
+        "wal_before_write" if filesystem == "apfs" => Some(native_root.to_path_buf()),
+        "wal_before_write" => None,
+        "segment_before_create" => Some(native_root.join("segments")),
+        "manifest_before_create" => Some(native_root.join("manifests")),
+        "current_before_create" => Some(native_root.to_path_buf()),
+        _ => panic!("unsupported native capacity point"),
+    }
+}
+
+#[test]
+fn apfs_wal_consumes_metadata_pressure_outside_authoritative_wal_directory() {
+    let estate = tempfile::tempdir().unwrap();
+    let root = estate.path();
+    // A failed write to one APFS filler file did not prevent another existing
+    // file from allocating. WAL pressure must include the metadata phase too.
+    assert_eq!(
+        metadata_pressure_directory("wal_before_write", root, "apfs"),
+        Some(root.to_path_buf())
+    );
+    for filesystem in ["ext4", "ntfs"] {
+        assert_eq!(
+            metadata_pressure_directory("wal_before_write", root, filesystem),
+            None
+        );
+    }
+    for filesystem in ["apfs", "ext4", "ntfs"] {
+        for (point, directory) in [
+            ("segment_before_create", root.join("segments")),
+            ("manifest_before_create", root.join("manifests")),
+            ("current_before_create", root.to_path_buf()),
+        ] {
+            assert_eq!(
+                metadata_pressure_directory(point, root, filesystem),
+                Some(directory)
+            );
+        }
+    }
+}
+
 fn capacity_case(point: &str, mode: &str) {
     let volume = Volume::admitted();
     let estate = Estate::install_at(mode, Some(&volume.root), point != "wal_before_write");
     let locator = RrdEngine::read_project_locator(&estate.project).unwrap();
     let native_root = estate.project.join(locator.storage_root);
-    let metadata_directory = match point {
-        "wal_before_write" => None,
-        "segment_before_create" => Some(native_root.join("segments")),
-        "manifest_before_create" => Some(native_root.join("manifests")),
-        "current_before_create" => Some(native_root.clone()),
-        _ => panic!("unsupported native capacity point"),
-    };
+    let metadata_directory = metadata_pressure_directory(point, &native_root, &volume.filesystem);
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
     let mut ledger = AcknowledgementLedger::default();
     let clock = Instant::now();

@@ -6,6 +6,14 @@
 
 ## Observed deficiency
 
+The [APFS WAL metadata-pressure correction](../../evidence/change-journals/gate-c/c-07f-apfs-wal-pressure.md)
+records PR113 run 40161414466: a data-only ENOSPC did not prevent the selected
+WAL append, and the later disk-admission rejection left the native-event
+oracle unsatisfied. APFS WAL now uses the same bounded metadata pressure as
+publication cases, followed by a final shared-budget data drain. The native
+failure and all earlier results remain retained; exact-candidate qualification
+is still required and this deficiency remains open.
+
 The [bounded APFS metadata-payload correction](../../evidence/change-journals/gate-c/c-07f-apfs-metadata-payload.md)
 records PR129 run 40159526278 passing six macOS cases before the existing
 manifest case exhausted the 8192-entry cap. Volume settlement alone is not
