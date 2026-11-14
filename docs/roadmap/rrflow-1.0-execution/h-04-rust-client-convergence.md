@@ -61,6 +61,17 @@ Surveyed on `development/main` at `a4e32942`:
 - Existing suites pass unchanged: `rrd-client` (including `real_server`, `generated_catalogue` and `sdk_conformance`), and the callers in `rrflow-cli`, `rrflow-mcp` and the Lab.
 - The generated OpenAPI and SDK projections are regenerated and `--check` clean, since the descriptor gains `retry`.
 
+## Progress
+
+- **Landed, 2026-11-14:** the typed catalogue rows, the `rrd_contract::operations` markers, and the retry classes with their evidence ([journal](../../evidence/change-journals/gate-h/h-04-typed-catalogue-retry-classes-20261114.md)).
+- **Open:**
+  - the `OperationContract` validation impls;
+  - validators for the 38 request and response types that have none;
+  - the client's single call path;
+  - retry by class.
+
+  The owner put the prototype first on 2026-11-14 (Connectome reaches every operation through the TypeScript SDK), so these wait behind the development loop and the second brain.
+
 ## Not in this package
 
 These are recorded so they stay open under H-04:
