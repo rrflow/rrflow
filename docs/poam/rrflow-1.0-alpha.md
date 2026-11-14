@@ -94,3 +94,4 @@
 | POAM-078 | High | Open | [the estate-to-engram rename is half applied](rrflow-1.0-alpha/poam-078.md) |
 | POAM-079 | High | Open | [most engine tests run on built-in defaults, not the installed configuration](rrflow-1.0-alpha/poam-079.md) |
 | POAM-080 | High | Open | [vector scans pay fixed per-candidate work and the planner prices codecs like exact scans](rrflow-1.0-alpha/poam-080.md) |
+| POAM-081 | High | Open | [task and flight lists read every version before paging](rrflow-1.0-alpha/poam-081.md) |
