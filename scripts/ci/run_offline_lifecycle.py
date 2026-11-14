@@ -29,7 +29,11 @@ import tempfile
 import threading
 import time
 
-from selected_tests import LIFECYCLE_CASES
+# The isolated stage runs this file as root; a cached .pyc of a staged module
+# would be root-owned and the unprivileged cleanup could not remove it.
+sys.dont_write_bytecode = True
+
+from selected_tests import LIFECYCLE_CASES  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:

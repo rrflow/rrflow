@@ -391,6 +391,9 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(stage / "runner.py"), "--help"], cwd=stage,
                                     env=environment, capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stderr)
+            # A root-owned cache file in the stage would defeat cleanup.
+            self.assertEqual(sorted(path.name for path in stage.iterdir()),
+                             sorted(["runner.py", *runner.STAGED_MODULES]))
 
     def test_every_primary_lifecycle_case_is_required(self):
         cases = set(LIFECYCLE_CASES)

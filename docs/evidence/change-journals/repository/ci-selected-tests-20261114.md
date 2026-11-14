@@ -62,6 +62,8 @@ Every test passed. Nine native jobs then failed when their harnesses could not f
 - `test_the_staged_runner_imports_only_what_is_staged` runs the staged runner from a directory holding only the staged files. It fails when `STAGED_MODULES` is empty.
 - `test_offline_lifecycle.py` now runs 28 tests.
 
+**Second candidate CI failure, and its fix.** Run [43630588902](https://github.com/rrflow/rrflow-development/actions/runs/43630588902): the Linux lifecycle passed inside the stage, then cleanup failed with `PermissionError` on `selected_tests.cpython-314.pyc`. The stage runs as root, so Python's bytecode cache of the staged module was root-owned. The runner now sets `sys.dont_write_bytecode` before importing, and the staging test asserts that the stage holds only the staged files afterwards.
+
 **Not established:**
 - macOS and Linux runs of the refactored harness scripts happen only in candidate CI.
 - The resolver does not expand `macro_rules!`-generated tests; none of the selected targets has them.
