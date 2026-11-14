@@ -19,7 +19,7 @@ import sys
 import time
 import uuid
 
-from run_offline_lifecycle import require, run
+from run_offline_lifecycle import STAGED_MODULES, require, run
 
 
 P = c.c_void_p
@@ -359,7 +359,7 @@ def private_desktop(stack, sid_text):
 
 def probe_runtime_access(token, stage):
     """Check only known qualification dependencies under the actual token."""
-    paths = [Path(sys.executable), Path(encodings.__file__), stage / "runner.py"]
+    paths = [Path(sys.executable), Path(encodings.__file__), stage / "runner.py", *(stage / name for name in STAGED_MODULES)]
     module_name = api(kernel, "GetModuleFileNameW", U32, P, w.LPWSTR, U32)
     for handle in [sys.dllhandle, kernel._handle, adv._handle, user32._handle]:
         buffer = c.create_unicode_buffer(32768)

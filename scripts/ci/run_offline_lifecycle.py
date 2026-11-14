@@ -29,6 +29,12 @@ import tempfile
 import threading
 import time
 
+# The isolated stage runs this file as root; a cached .pyc of a staged module
+# would be root-owned and the unprivileged cleanup could not remove it.
+sys.dont_write_bytecode = True
+
+from selected_tests import LIFECYCLE_CASES  # noqa: E402
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -113,19 +119,10 @@ def filesystem_profile(path: Path) -> dict:
     return {"type": kind, "device": os.stat(path).st_dev}
 
 
-REQUIRED_CASES = frozenset({
-    "primary_help_exposes_only_the_installed_product_lifecycle",
-    "raw_database_and_development_commands_fail_during_argument_parsing",
-    "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
-    "installed_plan_accepts_selected_attunement_and_rejects_tampering",
-    "fresh_installed_engine_survives_restart_and_restore",
-    "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
-    "a_served_engram_is_found_proved_and_not_served_twice",
-    "installed_source_read_choice_is_explicit_and_reopens",
-    "repository_discovery_is_read_only_without_an_installed_engine",
-    "adaptive_installed::selected_inventory_completes_and_replans_across_primary_process_restarts",
-    "configured_cold_history_publishes_and_reads_after_process_restart",
-})
+REQUIRED_CASES = LIFECYCLE_CASES
+# Modules the runner imports. The isolated stage holds only the binary, the
+# harness, `runner.py` and these, so each must be staged beside the runner.
+STAGED_MODULES = ("selected_tests.py",)
 
 
 def require_lifecycle_tests(output: str) -> None:
@@ -653,7 +650,9 @@ def main() -> None:
             probes.callback(Path(probe.name).unlink)
         binary_name, harness_name = (("rrflow.exe", "installed_lifecycle.exe") if sys.platform == "win32" else ("rrflow", "installed_lifecycle"))
         source_hashes = {binary_name: sha256(binary), harness_name: sha256(harness)}
-        for source, name in [(binary, binary_name), (harness, harness_name), (Path(__file__), "runner.py")]:
+        staged = [(binary, binary_name), (harness, harness_name), (Path(__file__), "runner.py")]
+        staged += [(Path(__file__).with_name(name), name) for name in STAGED_MODULES]
+        for source, name in staged:
             shutil.copy2(source, stage / name)
         for name, expected in source_hashes.items():
             require(sha256(stage / name) == expected, f"staging changed the source artifact: {name}")

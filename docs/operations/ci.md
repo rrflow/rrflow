@@ -121,31 +121,46 @@ their own diff against the queue base, exactly as pull requests do. The caller
 has no path filter; lane selection lives inside the reusable workflow, where
 `ci-gate` can see it.
 
-## Proportional lanes
+## Development gate and qualification matrix
 
-Candidate CI is proportional to the change (owner decision, 2026-11-09, which
-replaces the 2026-11-01 decision to run the full matrix on every candidate).
-The first job, `changes`, diffs the candidate against its base and runs
-`scripts/ci/select_ci_lanes.py`, which maps every changed path to a lane:
+Owner decision, 2026-11-14: during pre-release, candidates run a development
+gate, and release qualification runs apart from it ("dev build, normal build
+later"). This replaces the 2026-11-09 proportional-lanes decision, under which
+most engine changes still selected the full matrix.
+
+**Development gate (every candidate).** The first job, `changes`, diffs the
+candidate against its base and runs `scripts/ci/select_ci_lanes.py`, which maps
+every changed path to light, Linux-only lanes. No changed path selects the full
+matrix.
 
 | Lane | Selected by | Partitions |
 |---|---|---|
 | `docs` | `docs/**`, Markdown anywhere, issue and PR templates, `LICENSE` | `docs-policy`: documentation authority and local links, generated navigation, execution inventory, capacity projection rendering, whitespace |
-| `scripts` | `scripts/**` except `scripts/ci`, `eval/**` | `scripts-policy`: the repository's Python test files that need no build |
-| `engine` | `crates/**` outside the full-lane paths | `engine-fast` on Linux: formatting, generated-surface parity, `cargo test` and clippy for the changed crates, `cargo check --all-targets` for every workspace dependent |
+| `scripts` | `scripts/**`, `eval/**`, `.github/workflows/**`, `.devcontainer/**`, `deploy/**`, `.gitmodules`, `.gitignore`, `.gitattributes`, `VERSION`, the Connectome gitlink | `scripts-policy`: the repository's Python test files that need no build, plus the CI policy tests and `check_workflow.py` |
+| `engine` | `crates/**`; also `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` and `.cargo/**` | `engine-fast` on Linux: formatting, generated-surface parity, `cargo test` and clippy for the changed crates, `cargo check --all-targets` for every workspace dependent. A workspace input selects no single crate, so the whole workspace is compiled |
 | `sdk` | `sdks/**`, `fixtures/**`, `crates/transport/**` | `sdk-conformance`; transport crate edits also run `engine-fast` |
-| `full` | `.github/**` except templates, `scripts/ci/**`, `.cargo/**`, `.devcontainer/**`, `.gitmodules`, `rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`, `VERSION`, `deploy/**`, the Connectome gitlink, `crates/kernel/**`, `crates/persistence/**`, `crates/adapters/rrflow-cli/**`, `rrd-maintenance`, and the engine's transaction, installation, estate layout, token key, maintenance, attunement supervisor, backup, control, configuration, estate-control, flight, function, knowledge, observation, reasoning-budget persistence, restore, session, subscription, task, query, and tail-repair effect modules; also engine test modules, `.gitignore`, `.gitattributes`, any path the classifier does not recognize, a manual dispatch, a `scope: full` call, or an event without a base revision | every partition below, exactly as before |
 
-The code-shape ratchet (`scripts/ci/check_code_shape.py`, owned by the code
-structure and conventions standard) runs in `verify` on the full matrix and in
-`repository-invariants` otherwise. It holds non-test Rust files to 800 lines,
-`lib.rs` and `main.rs` to 200 and test files to 1,500. It also counts `mod.rs`
-files, `#[path]` attributes, string and boxed errors, allowed
-`too_many_arguments`, and direct use of the `sha2` crate outside the digest owner. Every file or site that broke a
-rule on 2026-11-13 is recorded in `scripts/ci/code_shape_baseline.json` with its
-size or count. A recorded entry may only shrink, a new violation fails, and an
-improvement must be locked in with `--tighten`, which never admits a
-violation.
+A path the classifier does not recognize runs every light lane, compiles the
+whole workspace, and is named in the job log.
+
+**Qualification matrix (`full`).** The full matrix covers the native installed
+lifecycle on Linux, macOS, Windows and Linux ARM64, crash injection, the
+100-cycle reopen, native capacity, the partitioned engine suites, optional
+features and SDK conformance. It runs:
+
+- nightly against `main` (`.github/workflows/ci-nightly.yml`, `scope: full`);
+- on a manual dispatch of `ci` or the nightly workflow; and
+- before a release decision, as Gate J requires.
+
+A failed nightly or manual qualification run of `main` opens the
+`Main is red: <workflow>` alarm issue, and a later passing run closes it
+(`merge-alarm.yml` watches both workflows). A red qualification run is repaired
+before new work, like a blocked merge, but it does not hold a candidate that
+passed the development gate.
+
+What the development gate does not prove is exactly that matrix: behavior on
+macOS, Windows and ARM64, crash recovery, and capacity. Evidence for a gate
+that needs those comes from a qualification run, cited by its run id.
 
 Alongside whichever light lanes a change selects, `repository-invariants` runs
 the engine's repository-wide architecture tests
@@ -158,16 +173,8 @@ main failing two of them for every engine-lane candidate. The job costs one
 cached `rrd-engine` test build; the full matrix already runs the same tests
 inside `engine-suites`, so it skips there.
 
-A `full` selection absorbs the light lanes, so their jobs skip and the full
-partitions carry their checks. The `engine` lane never links the whole
-workspace in one target graph; a root manifest or lock change takes the
-partitioned full matrix instead. The classifier fails closed: an unrecognized
-path routes to `full` and is named in the job log.
-
-`.github/workflows/ci-nightly.yml` calls the reusable workflow with
-`scope: full` against `main` once a day and on manual dispatch, so a dated
-complete result exists for the current main revision regardless of what the
-day's candidates selected. It is evidence about main, not candidate acceptance.
+A `full` run absorbs the light lanes, so their jobs skip and the full
+partitions carry their checks.
 
 `scripts/ci/check_workflow.py` requires every partition to declare exactly its
 lane condition and the gate to check each result by lane;

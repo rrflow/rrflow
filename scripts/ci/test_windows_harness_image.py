@@ -12,6 +12,7 @@ import tempfile
 import time
 import unittest
 
+from selected_tests import NATIVE_SAMPLE_HELPER
 from windows_harness_image import pin_harness_image, verify_receipt_digest
 
 HARNESS = None
@@ -49,7 +50,7 @@ class WindowsHarnessImageTests(unittest.TestCase):
         request = {"pid": os.getpid(), "harness_pid": os.getpid(), "allocation": None,
                    "hold_marker": str(marker)}
         env = dict(os.environ, RRFLOW_NATIVE_SAMPLE_WORKER_V1=json.dumps(request))
-        process = subprocess.Popen([str(self.exe), "--exact", "sustained::native_worker::native_sample_helper",
+        process = subprocess.Popen([str(self.exe), "--exact", NATIVE_SAMPLE_HELPER,
                                     "--ignored", "--nocapture", "--quiet"],
                                    env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:

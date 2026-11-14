@@ -83,7 +83,7 @@ class LanePolicyTests(unittest.TestCase):
 
     def test_engine_fast_lane_tests_the_selection_and_compiles_dependents(self):
         for command in (
-            'test -n "$PACKAGES"',
+            'test -n "$PACKAGES$DEPENDENTS"',
             "cargo test $PACKAGES --locked --no-fail-fast",
             "cargo clippy $PACKAGES --all-targets --locked -- -D warnings",
             "cargo check $DEPENDENTS --all-targets --locked",
@@ -92,6 +92,21 @@ class LanePolicyTests(unittest.TestCase):
                 self.assertIn(command, self.reusable)
                 with self.assertRaisesRegex(PolicyError, "engine fast lane is missing"):
                     self.check(self.reusable.replace(command, "true", 1))
+
+    def test_engine_fast_lane_handles_a_workspace_only_selection(self):
+        guard = "        if: ${{ env.PACKAGES != '' }}\n"
+        self.assertEqual(self.reusable.count(guard), 2)
+        with self.assertRaisesRegex(PolicyError, "workspace-only selection"):
+            self.check(self.reusable.replace(guard, "", 1))
+
+    def test_script_lane_enforces_the_ci_policy_candidates_no_longer_get_from_verify(self):
+        for command in ("python3 scripts/ci/check_workflow.py", "python3 scripts/ci/test_merge_alarm.py",
+                        "python3 scripts/ci/test_ci_lanes_policy.py"):
+            with self.subTest(command=command):
+                marker = "\n  scripts-policy:\n"
+                before, after = self.reusable.split(marker, 1)
+                with self.assertRaisesRegex(PolicyError, "script lane"):
+                    self.check(before + marker + after.replace(f"          {command}\n", "", 1))
 
     def test_repository_invariants_run_on_every_light_candidate(self):
         jobs = job_blocks(self.reusable)

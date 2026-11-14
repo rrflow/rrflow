@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Choose which candidate CI lanes a change needs.
 
-The candidate pipeline is proportional to the change. A documentation edit
-runs the documentation checks; a script edit runs the script tests; a crate
-edit tests that crate and compiles everything that depends on it, on Linux;
-a change to storage, the installer, the native harness, the workflows, the
-workspace manifest or lock file, or anything this module does not recognize
-runs the full matrix. The engine lane never links the whole workspace in one
-target graph, which the hosted runners cannot hold. Unknown paths
-fail closed into the full lane.
+Candidates run the development gate: light, Linux-only lanes proportional to
+the change. A documentation edit runs the documentation checks; a script,
+workflow or repository-policy edit runs the script and CI-policy tests; a crate
+edit tests that crate and compiles everything that depends on it; a workspace
+manifest, lock file or toolchain change compiles the whole workspace. A path
+this module does not recognize runs every light lane.
+
+No changed path selects the full matrix. The full matrix is release
+qualification (native installed lifecycle on three operating systems, crash
+injection, reopen and capacity): it runs nightly against main and on demand
+(`scope: full`), and a failure there sounds the main alarm instead of holding
+a candidate.
 
 The classifier is pure: it maps a list of repository-relative paths to lanes.
 Dependents are resolved from `cargo metadata`, which the caller supplies or
@@ -31,59 +35,26 @@ from workspace_packages import member_directories, package_of
 ROOT = Path(__file__).resolve().parents[2]
 LANES = ("full", "docs", "scripts", "engine", "sdk")
 
-# Any match sends the change through the complete matrix.
-FULL_PATTERNS = (
-    ".github/workflows/*",
-    ".github/workflows/**",
-    "scripts/ci/*",
-    "scripts/ci/**",
-    ".cargo/**",
-    ".devcontainer/**",
-    ".gitmodules",
-    "connectome",
-    "rust-toolchain.toml",
+# Inputs every crate builds against: the whole workspace is compiled, and the
+# nightly full matrix tests it.
+WORKSPACE_PATTERNS = (
     "Cargo.toml",
     "Cargo.lock",
+    "rust-toolchain.toml",
+    ".cargo/**",
+)
+# Workflows, CI scripts and repository policy files: the script lane runs the
+# script tests and the workflow policy checks.
+POLICY_PATTERNS = (
+    ".github/workflows/*",
+    ".github/workflows/**",
+    ".devcontainer/**",
+    ".gitmodules",
+    ".gitignore",
+    ".gitattributes",
+    "connectome",
     "VERSION",
     "deploy/**",
-    "crates/kernel/**",
-    "crates/persistence/**",
-    # Transactional semantics and durable mutations require native recovery
-    # qualification even when their source sits in the engine crate.
-    "crates/authority/rrd-engine/src/engine/transaction*",
-    "crates/authority/rrd-engine/src/engine/session_transactions.rs",
-    "crates/authority/rrd-engine/src/engine/query_transaction.rs",
-    "crates/authority/rrd-engine/src/engine/*mutation*",
-    # Known engine modules that publish durable runtime or control effects.
-    "crates/authority/rrd-engine/src/engine/attunement.rs",
-    "crates/authority/rrd-engine/src/engine/backup.rs",
-    "crates/authority/rrd-engine/src/engine/control.rs",
-    "crates/authority/rrd-engine/src/engine/endpoint_configuration.rs",
-    "crates/authority/rrd-engine/src/engine/estate_control.rs",
-    "crates/authority/rrd-engine/src/engine/flight.rs",
-    "crates/authority/rrd-engine/src/engine/function/**",
-    "crates/authority/rrd-engine/src/engine/knowledge.rs",
-    "crates/authority/rrd-engine/src/engine/observation_delivery/**",
-    "crates/authority/rrd-engine/src/engine/observation_source.rs",
-    "crates/authority/rrd-engine/src/engine/reasoning_budget/persistence.rs",
-    "crates/authority/rrd-engine/src/engine/restore_publication.rs",
-    "crates/authority/rrd-engine/src/engine/session.rs",
-    "crates/authority/rrd-engine/src/engine/subscription.rs",
-    "crates/authority/rrd-engine/src/engine/task.rs",
-    "crates/authority/rrd-engine/src/engine/tail_repair/**",
-    "crates/authority/rrd-engine/src/engine/tests/**",
-    "crates/authority/rrd-engine/src/engine/query.rs",
-    "crates/adapters/rrflow-cli/**",
-    "crates/operations/rrd-maintenance/**",
-    "crates/authority/rrd-engine/src/engine/installation.rs",
-    "crates/authority/rrd-engine/src/engine/installation/**",
-    "crates/authority/rrd-engine/src/engine/estate_layout.rs",
-    "crates/authority/rrd-engine/src/engine/token_key.rs",
-    "crates/authority/rrd-engine/src/engine/token_key/**",
-    "crates/authority/rrd-engine/src/engine/maintenance.rs",
-    "crates/authority/rrd-engine/src/engine/maintenance/**",
-    "crates/authority/rrd-engine/src/engine/attunement/*supervisor*",
-    "crates/authority/rrd-engine/src/engine/attunement/*supervisor*/**",
 )
 SDK_PATTERNS = ("sdks/**", "fixtures/**", "crates/transport/**")
 ENGINE_PATTERNS = ("crates/**",)
@@ -156,14 +127,19 @@ def select(paths: list[str], *, metadata: dict | None = None, root: Path = ROOT,
     lanes = {lane: False for lane in LANES}
     packages: set[str] = set()
     unknown: list[str] = []
+    workspace = False
     for raw in paths:
         path = raw.strip().replace("\\", "/")
         if not path:
             continue
-        if matches(path, FULL_PATTERNS):
-            lanes["full"] = True
-            continue
         known = False
+        if matches(path, WORKSPACE_PATTERNS):
+            lanes["engine"] = True
+            workspace = True
+            known = True
+        if matches(path, POLICY_PATTERNS):
+            lanes["scripts"] = True
+            known = True
         if matches(path, SDK_PATTERNS):
             lanes["sdk"] = True
             known = True
@@ -172,8 +148,8 @@ def select(paths: list[str], *, metadata: dict | None = None, root: Path = ROOT,
             known = True
             crate = crate_of(path, root)
             if crate is None:
-                # A crate directory this checkout does not know is unknown.
-                lanes["full"] = True
+                # A crate directory this checkout does not know: compile everything.
+                workspace = True
                 unknown.append(path)
             else:
                 packages.add(crate)
@@ -184,20 +160,23 @@ def select(paths: list[str], *, metadata: dict | None = None, root: Path = ROOT,
             lanes["docs"] = True
             known = True
         if not known:
-            lanes["full"] = True
+            # Unrecognized: every light lane runs, and the workspace compiles.
+            for lane in ("docs", "scripts", "engine", "sdk"):
+                lanes[lane] = True
+            workspace = True
             unknown.append(path)
-    if force_full or not paths:
-        lanes["full"] = True
     selection, dependents = "", ""
-    if lanes["full"]:
+    if force_full:
         # The full matrix already covers every light lane.
-        for lane in ("docs", "scripts", "engine", "sdk"):
-            lanes[lane] = False
-    elif lanes["engine"] and packages:
-        graph = workspace_graph(metadata if metadata is not None else cargo_metadata(root))
-        closure = with_dependents(packages, graph) - packages
+        lanes = {lane: lane == "full" for lane in LANES}
+    elif lanes["engine"]:
         selection = " ".join(f"-p {name}" for name in sorted(packages))
-        dependents = " ".join(f"-p {name}" for name in sorted(closure))
+        if workspace:
+            dependents = "--workspace"
+        elif packages:
+            graph = workspace_graph(metadata if metadata is not None else cargo_metadata(root))
+            closure = with_dependents(packages, graph) - packages
+            dependents = " ".join(f"-p {name}" for name in sorted(closure))
     return {**lanes, "packages": selection, "dependents": dependents, "unknown": sorted(unknown)}
 
 
@@ -232,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     for line in lines:
         print(line)
     if result["unknown"]:
-        print("unknown paths routed to the full matrix:", *result["unknown"], sep="\n  ", file=sys.stderr)
+        print("unknown paths routed to every light lane:", *result["unknown"], sep="\n  ", file=sys.stderr)
     if args.github_output is not None:
         with args.github_output.open("a", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")

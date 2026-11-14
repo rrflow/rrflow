@@ -25,6 +25,21 @@ NIGHTLY = ROOT / ".github/workflows/ci-nightly.yml"
 # with any other condition could be skipped without the gate noticing.
 FULL_LANE_IF = "    if: ${{ needs.changes.outputs.full == 'true' }}\n"
 SDK_LANE_IF = "    if: ${{ needs.changes.outputs.full == 'true' || needs.changes.outputs.sdk == 'true' }}\n"
+SCRIPT_LANE_POLICY_COMMANDS = (
+    "python3 scripts/ci/test_merge_alarm.py",
+    "python3 scripts/ci/test_candidate_admission.py",
+    "python3 scripts/ci/test_linux_arm64_policy.py",
+    "python3 scripts/ci/test_native_sample_policy.py",
+    "python3 scripts/ci/test_sdk_attunement_policy.py",
+    "python3 scripts/ci/test_rrflowdb_standalone.py",
+    "python3 scripts/ci/test_cache_warm_policy.py",
+    "python3 scripts/ci/test_inspect_merge_conflicts.py",
+    "python3 scripts/ci/test_ci_lanes_policy.py",
+    "python3 scripts/ci/test_merge_conflict_policy.py",
+    "python3 scripts/ci/check_workflow.py",
+    "python3 scripts/ci/test_inspect_candidate_runs.py",
+)
+
 LANE_CONDITIONS = {
     "docs-policy": "    if: ${{ needs.changes.outputs.docs == 'true' }}\n",
     "scripts-policy": "    if: ${{ needs.changes.outputs.scripts == 'true' }}\n",
@@ -186,8 +201,9 @@ def verify_linux_arm64_ci(caller: str, reusable: str) -> None:
             and "ARM64_RESULT: ${{ needs.native-arm64.result }}" in gate
             and 'expect "$FULL_LANE" "$ARM64_RESULT" native-arm64' in gate,
             "candidate gate must require the native ARM64 result on the full lane")
-    require(reusable.count("python3 scripts/ci/test_linux_arm64_policy.py") == 1,
-            "native ARM64 policy regressions must run exactly once")
+    require(jobs["verify"].count("python3 scripts/ci/test_linux_arm64_policy.py") == 1
+            and reusable.count("python3 scripts/ci/test_linux_arm64_policy.py") == 2,
+            "native ARM64 policy regressions must run once in verify and once in the script lane")
 
 
 def verify_native_sample_worker_ci(reopen: str, verify: str) -> None:
@@ -200,8 +216,8 @@ def verify_native_sample_worker_ci(reopen: str, verify: str) -> None:
         "        shell: bash\n"
         "        run: |\n"
         "          set -euo pipefail\n"
-        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'\n"
-        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture\n"
+        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'\n"
+        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture\n"
     )
     require(block == required, "installed conflict safety step must retain its exact matrix-wide list check, timeout and command")
     marker = "      - name: Require bounded native sampler failure\n"
@@ -1062,7 +1078,7 @@ def verify_lane_selection(jobs: dict[str, str], reusable: str) -> None:
     for required in (
         "PACKAGES: ${{ needs.changes.outputs.packages }}",
         "DEPENDENTS: ${{ needs.changes.outputs.dependents }}",
-        'test -n "$PACKAGES"',
+        'test -n "$PACKAGES$DEPENDENTS"',
         "cargo test $PACKAGES --locked --no-fail-fast",
         "cargo clippy $PACKAGES --all-targets --locked -- -D warnings",
         "cargo check $DEPENDENTS --all-targets --locked",
@@ -1073,6 +1089,15 @@ def verify_lane_selection(jobs: dict[str, str], reusable: str) -> None:
     require(jobs["repository-invariants"].count(
         "cargo test -p rrd-engine --locked --test workspace_architecture") == 1,
         "repository invariants must run the workspace architecture tests on every light candidate")
+    require(fast.count("        if: ${{ env.PACKAGES != '' }}\n") == 2
+            and fast.count("        if: ${{ env.DEPENDENTS != '' }}\n") == 1,
+            "engine fast lane must skip package steps for a workspace-only selection and "
+            "dependent compilation when nothing depends on the change")
+    # Candidates never run the full matrix, so workflow and CI-script edits
+    # must meet the CI policy in the script lane.
+    for command in SCRIPT_LANE_POLICY_COMMANDS:
+        require(jobs["scripts-policy"].count(command) == 1 and jobs["verify"].count(command) == 1,
+                f"CI policy must run once in the script lane and once in verify: {command}")
     require(reusable.count("python3 scripts/ci/test_select_ci_lanes.py") == 2
             and jobs["verify"].count("python3 scripts/ci/test_ci_lanes_policy.py") == 1,
             "lane selection regressions must run in the changes job and the verify policy step")
@@ -1114,8 +1139,9 @@ def main() -> None:
     verify_execution_inventory_ci(jobs["verify"])
     verify_native_sample_worker_ci(jobs["installed-reopen"], jobs["verify"])
     require(
-        reusable.count("python3 scripts/ci/test_candidate_admission.py") == 1,
-        "candidate admission regressions must run exactly once",
+        jobs["verify"].count("python3 scripts/ci/test_candidate_admission.py") == 1
+        and reusable.count("python3 scripts/ci/test_candidate_admission.py") == 2,
+        "candidate admission regressions must run once in verify and once in the script lane",
     )
 
     for trigger in ["pull_request:", "merge_group:", "workflow_dispatch:"]:
@@ -1239,7 +1265,7 @@ def main() -> None:
         "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
         "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
-        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::capacity_workload::installed_capacity_workload_smoke --exact --ignored --nocapture",
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
         "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
         "RRFLOW_REOPEN_RECEIPT_DIR:",

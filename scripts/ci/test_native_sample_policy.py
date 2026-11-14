@@ -41,8 +41,8 @@ class NativeSamplePolicyTests(unittest.TestCase):
             "        shell: bash\n"
             "        run: |\n"
             "          set -euo pipefail\n"
-            "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'\n"
-            "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture\n"
+            "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'\n"
+            "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture\n"
         )
         self.assertEqual(self.reopen.count(step), 1)
         verify_native_sample_worker_ci(self.reopen, self.verify)

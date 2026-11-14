@@ -2,7 +2,8 @@
 
 use super::*;
 
-pub(super) fn installed_plan_accepts_selected_attunement_and_rejects_tampering() {
+#[test]
+fn installed_plan_accepts_selected_attunement_and_rejects_tampering() {
     let root = tempfile::tempdir().unwrap();
     let project = root.path().join("project");
     std::fs::create_dir(&project).unwrap();
@@ -224,7 +225,8 @@ pub(super) fn installed_plan_accepts_selected_attunement_and_rejects_tampering()
     assert_success(&verified, "verify installed selected plan");
 }
 
-pub(super) fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape() {
+#[test]
+fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape() {
     let apply = invoke(&["install", "apply", "--project", "."]);
     assert!(!apply.status.success());
     let error = String::from_utf8(apply.stderr).unwrap();
@@ -240,7 +242,8 @@ pub(super) fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_b
     assert!(!help.contains("restore"));
 }
 
-pub(super) fn installed_engine_plans_applies_serves_discovers_authenticates_and_reopens() {
+#[test]
+fn installed_engine_plans_applies_serves_discovers_authenticates_and_reopens() {
     installed_lifecycle("existing");
     // Parse runs only where a native supervisor contains its worker; on any
     // other platform the derived plan must not select it.
@@ -250,11 +253,13 @@ pub(super) fn installed_engine_plans_applies_serves_discovers_authenticates_and_
     )));
 }
 
-pub(super) fn fresh_installed_engine_survives_restart_and_restore() {
+#[test]
+fn fresh_installed_engine_survives_restart_and_restore() {
     installed_lifecycle("fresh");
 }
 
-pub(super) fn installed_source_read_choice_is_explicit_and_reopens() {
+#[test]
+fn installed_source_read_choice_is_explicit_and_reopens() {
     let root = tempfile::tempdir().unwrap();
     for (name, opt_in) in [("default", false), ("source", true)] {
         let project = root.path().join(name);

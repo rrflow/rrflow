@@ -19,11 +19,12 @@ import threading
 import time
 
 from run_offline_lifecycle import require, run
+from selected_tests import NATIVE_SAMPLE_MEMBERSHIP, NATIVE_SAMPLE_TIMEOUT
 from run_sustained_capacity import linux_allocation, proof
 
 ROOT = Path(__file__).resolve().parents[2]
-CASE = "sustained::native_worker::tests::native_job_contains_engine_harness_and_worker"
-TIMEOUT = "sustained::native_worker::tests::native_allocation_timeout_cleanup_fixture"
+CASE = NATIVE_SAMPLE_MEMBERSHIP
+TIMEOUT = NATIVE_SAMPLE_TIMEOUT
 
 
 def artifact(profile: str, offline: bool) -> Path:

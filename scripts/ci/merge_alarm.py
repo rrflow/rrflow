@@ -128,7 +128,9 @@ def candidate_pull(run_data: dict[str, Any], run: Gh) -> int | None:
 def on_workflow_run(event: dict[str, Any], run: Gh) -> None:
     run_data = event["workflow_run"]
     conclusion, name, url = run_data["conclusion"], run_data["name"], run_data["html_url"]
-    if run_data["event"] == "push" and run_data["head_branch"] == event["repository"]["default_branch"]:
+    # A push to main, or the nightly or a manual qualification run of main.
+    if (run_data["event"] in ("push", "schedule", "workflow_dispatch")
+            and run_data["head_branch"] == event["repository"]["default_branch"]):
         title = main_title(name)
         if conclusion == "success":
             silence(run, title, f"Resolved: {url} passed on main.")

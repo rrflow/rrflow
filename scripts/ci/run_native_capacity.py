@@ -21,10 +21,11 @@ import tempfile
 import time
 
 from run_filesystem_containment import detach_owned_image
+from selected_tests import NATIVE_CAPACITY_CASE
 from run_offline_lifecycle import (CommandDeadlineExceeded, CommandOutputNotClosed,
                                    filesystem_profile, require, run, sha256)
 
-CASE = "capacity::installed_native_capacity_recovers_acknowledged_history"
+CASE = NATIVE_CAPACITY_CASE
 POINTS = ("wal_before_write", "segment_before_create", "manifest_before_create", "current_before_create")
 SCRIPT = Path(__file__).resolve()
 

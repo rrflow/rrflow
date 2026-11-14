@@ -43,37 +43,8 @@ pub(super) fn expired_fill_clock() -> Instant {
 mod cases;
 #[path = "capacity/filler.rs"]
 mod filler;
-#[path = "capacity/filler_tests.rs"]
-mod filler_tests;
 #[path = "capacity/volume.rs"]
 mod volume;
 
 use filler::*;
 use volume::*;
-
-#[test]
-fn apfs_wal_consumes_metadata_pressure_outside_authoritative_wal_directory() {
-    cases::apfs_wal_consumes_metadata_pressure_outside_authoritative_wal_directory()
-}
-
-#[test]
-#[ignore = "requires runner-owned ext4/APFS/NTFS image; never fill a developer volume"]
-fn installed_native_capacity_recovers_acknowledged_history() {
-    cases::installed_native_capacity_recovers_acknowledged_history()
-}
-
-#[test]
-fn installed_capacity_wal_payload_is_observed_before_domain_commit() {
-    cases::installed_capacity_wal_payload_is_observed_before_domain_commit()
-}
-
-#[test]
-fn filler_allocation_sync_preserves_regular_file_contents() {
-    filler::filler_allocation_sync_preserves_regular_file_contents()
-}
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-#[test]
-fn filler_host_sync_preserves_native_noncapacity_errors() {
-    filler::filler_host_sync_preserves_native_noncapacity_errors()
-}

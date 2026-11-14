@@ -7,6 +7,8 @@ from pathlib import Path
 import plistlib
 import re
 import sys
+
+from selected_tests import MOUNT_CROSSING_LINUX, MOUNT_CROSSING_OTHER
 import tempfile
 import time
 
@@ -117,8 +119,7 @@ def main() -> None:
     }
     require(len(artifacts) == 1, "Cargo must identify one filesystem test executable")
     executable = str(artifacts.pop())
-    case = ("bind_mount_crossing_is_denied_before_any_effect" if sys.platform == "linux"
-            else "mounted_volume_crossing_is_denied_before_any_effect")
+    case = MOUNT_CROSSING_LINUX if sys.platform == "linux" else MOUNT_CROSSING_OTHER
     listing = run(executable, "--list").stdout
     require(listing.splitlines().count(f"{case}: test") == 1, "required mount case is absent")
     args = [executable, "--ignored", "--exact", case, "--nocapture"]

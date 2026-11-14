@@ -3,6 +3,7 @@
 import json
 import copy
 import os
+import shutil
 import signal
 import subprocess
 from pathlib import Path
@@ -14,6 +15,7 @@ import unittest
 from unittest.mock import patch
 
 import run_offline_lifecycle as runner
+from selected_tests import LIFECYCLE_CASES
 
 
 def held_output_command(pid_file, stdout, stderr, status=1, message="hdiutil: create failed - Resource busy"):
@@ -302,7 +304,7 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
         summary = f"test result: ok. {len(runner.REQUIRED_CASES)} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s"
         output = "\n".join(lines + [summary])
         self.assertEqual(runner.require_lifecycle_results(output), sorted(runner.REQUIRED_CASES))
-        source_case = "installed_source_read_choice_is_explicit_and_reopens"
+        source_case = "plans::installed_source_read_choice_is_explicit_and_reopens"
         duplicate_source_result = "\n".join(
             lines + [f"test {source_case} ... ok", summary]
         )
@@ -376,27 +378,32 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
         self.assertNotIn("never retain me", json.dumps(progress))
         self.assertNotIn("unknown_secret_case", json.dumps(progress))
 
+    def test_the_staged_runner_imports_only_what_is_staged(self):
+        # CI runs runner.py inside an isolated stage that holds only the staged
+        # files; an unstaged import fails there with no other signal.
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            here = Path(runner.__file__).resolve()
+            shutil.copy2(here, stage / "runner.py")
+            for name in runner.STAGED_MODULES:
+                shutil.copy2(here.with_name(name), stage / name)
+            environment = {key: value for key, value in os.environ.items() if key in ("PATH", "SYSTEMROOT")}
+            result = subprocess.run([sys.executable, str(stage / "runner.py"), "--help"], cwd=stage,
+                                    env=environment, capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # A root-owned cache file in the stage would defeat cleanup.
+            self.assertEqual(sorted(path.name for path in stage.iterdir()),
+                             sorted(["runner.py", *runner.STAGED_MODULES]))
+
     def test_every_primary_lifecycle_case_is_required(self):
-        cases = {
-            "primary_help_exposes_only_the_installed_product_lifecycle",
-            "raw_database_and_development_commands_fail_during_argument_parsing",
-            "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
-            "installed_plan_accepts_selected_attunement_and_rejects_tampering",
-            "fresh_installed_engine_survives_restart_and_restore",
-            "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
-            "a_served_engram_is_found_proved_and_not_served_twice",
-            "installed_source_read_choice_is_explicit_and_reopens",
-            "repository_discovery_is_read_only_without_an_installed_engine",
-            "adaptive_installed::selected_inventory_completes_and_replans_across_primary_process_restarts",
-            "configured_cold_history_publishes_and_reads_after_process_restart",
-        }
+        cases = set(LIFECYCLE_CASES)
         runner.require_lifecycle_tests("\n".join(f"{case}: test" for case in sorted(cases)))
         for missing in sorted(cases):
             with self.subTest(missing=missing), self.assertRaises(RuntimeError):
                 runner.require_lifecycle_tests(
                     "\n".join(f"{case}: test" for case in sorted(cases - {missing}))
                 )
-        source_case = "installed_source_read_choice_is_explicit_and_reopens"
+        source_case = "plans::installed_source_read_choice_is_explicit_and_reopens"
         duplicate_listing = "\n".join(
             [f"{case}: test" for case in sorted(cases)] + [f"{source_case}: test"]
         )
