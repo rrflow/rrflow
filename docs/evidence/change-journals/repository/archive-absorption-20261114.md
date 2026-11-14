@@ -40,6 +40,12 @@ A verified deficiency that `main` does not track goes into the POA&M. The bundle
 | `head/d03-snapshot-visibility`, `head/parser-241-reconcile-20261107`, `head/rrflow`, `head/vector-read-path-worktree` | Exact duplicates of branch refs still open below |
 | `branch/agent/c07-run-progress`, `branch/codex/ci-alpha-throughput`, `branch/codex/connectome-real-graph-evidence` | Empty: 0 bytes of diff since leaving `main` (package-opening commits) |
 | 31 `head/*` refs of worktrees | Ancestor: each checked-out commit is already on `main` |
+| `branch/codex/d02-historical-plan-replay`, `branch/codex/d02-immutable-job-design` | Reviewed: 206 of 210 added lines verbatim in `docs/architecture/source-bound-plan-design.md`; the other 4 are the same passage in `main`'s later wording (lines 125-136) |
+| `branch/codex/ci-macos-cache-warm` | Every added line on `main` (109 of 109) |
+| `branch/codex/ci-conflict-reconciliation` | Every added line on `main` (20 of 20) |
+| `branch/agent/leftovers-20261110` | Every added line on `main` (15 of 15) |
+| `branch/tmp/agent/lab-definitions-automatic` | Its one file is byte-identical on `main` |
+| `wip/comparison-pr258-integration-trial-20261106` | Every added line on `main` (65 of 65) |
 
 ## Reviewed
 
@@ -60,6 +66,15 @@ Uncommitted work: an LSM change and a review document with six findings.
 | Finding 6: context rebuilds BM25 and bypasses the planner | Tracked | Kernel package K4, POAM-075 |
 
 Verdict: absorbed. One deficiency was recovered.
+
+### `branch/agent/lsm-database-split-20261113` (left `main` 2026-11-13)
+
+| Item | Status | Evidence |
+|---|---|---|
+| Split of `rrd-lsm/src/database.rs` into `database/*.rs` | On `main` | 573 of 573 added lines in `database/transactions.rs`; the other 9 changed files are byte-identical on `main` |
+| Its journal, with the module table and the characterization results (253 `rrd-lsm` tests) | **Was missing; ported** | Restored unchanged as [lsm-database-split-20261113.md](lsm-database-split-20261113.md) |
+
+Verdict: absorbed.
 
 ## Kept in the archive deliberately
 
