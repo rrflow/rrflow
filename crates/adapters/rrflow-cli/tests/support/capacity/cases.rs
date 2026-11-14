@@ -229,7 +229,6 @@ pub(super) fn metadata_pressure_directory(
     }
 }
 
-#[test]
 pub(super) fn apfs_wal_consumes_metadata_pressure_outside_authoritative_wal_directory() {
     let estate = tempfile::tempdir().unwrap();
     let root = estate.path();
@@ -424,8 +423,6 @@ pub(super) fn record(
     });
 }
 
-#[test]
-#[ignore = "requires runner-owned ext4/APFS/NTFS image; never fill a developer volume"]
 pub(super) fn installed_native_capacity_recovers_acknowledged_history() {
     let point = std::env::var("RRFLOW_CAPACITY_POINT").unwrap();
     assert!([
@@ -442,7 +439,6 @@ pub(super) fn installed_native_capacity_recovers_acknowledged_history() {
 
 /// Characterize the actual installed domain's first WAL append without filling
 /// a filesystem. Native exhaustion remains the separate owned-image oracle.
-#[test]
 pub(super) fn installed_capacity_wal_payload_is_observed_before_domain_commit() {
     let estate = Estate::install("existing");
     let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();

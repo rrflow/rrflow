@@ -192,7 +192,6 @@ pub(super) fn stop_gracefully(child: &process::Process) {
     }
 }
 
-#[test]
 pub(super) fn repository_discovery_is_read_only_without_an_installed_engine() {
     let project = tempfile::tempdir().unwrap();
     std::fs::write(project.path().join("source.txt"), b"project-owned").unwrap();
@@ -217,7 +216,6 @@ pub(super) fn repository_discovery_is_read_only_without_an_installed_engine() {
     assert!(!project.path().join(".rrflow").exists());
 }
 
-#[test]
 pub(super) fn primary_help_exposes_only_the_installed_product_lifecycle() {
     let output = invoke(&["--help"]);
     assert_success(&output, "primary help");
@@ -253,7 +251,6 @@ pub(super) fn primary_help_exposes_only_the_installed_product_lifecycle() {
     }
 }
 
-#[test]
 pub(super) fn raw_database_and_development_commands_fail_during_argument_parsing() {
     for removed in [
         "assert",

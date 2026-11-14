@@ -632,7 +632,6 @@ pub(super) fn failure_code(error: &str) -> Id {
     evidence_id("request-or-oracle-failed")
 }
 
-#[test]
 pub(super) fn failed_campaign_preserves_closed_cause_and_readback_provenance() {
     assert_eq!(
         failure_code("operation-deadline").as_str(),

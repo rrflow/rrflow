@@ -2,8 +2,6 @@
 
 use super::*;
 
-#[test]
-#[ignore = "explicit native capacity-driver smoke; candidate portability job"]
 pub(super) fn installed_capacity_workload_smoke() {
     let estate = Estate::install("fresh");
     let clock = Instant::now();

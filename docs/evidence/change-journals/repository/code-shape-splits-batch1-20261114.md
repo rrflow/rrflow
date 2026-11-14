@@ -95,6 +95,39 @@ Evaluation:
 - `build_execution_inventory.py` maps the moved integration-test roots to their `main.rs` paths.
 - `workspace_architecture` reads every split module through `module_source`, which includes its child folder.
 
+**First candidate CI failure, and its fix.** Run [43574694617](https://github.com/rrflow/rrflow-development/actions/runs/43574694617) failed the following jobs:
+- installed lifecycle;
+- engram process on Windows and macOS;
+- installed domain crash on all three platforms;
+- 100-cycle reopen on all three platforms.
+
+Every test that ran passed. The failures came from CI selecting tests by their full names:
+- `run_offline_lifecycle.py` requires the exact set of eleven root lifecycle cases.
+- `run_native_capacity.py` requires `capacity::installed_native_capacity_recovers_acknowledged_history`.
+- The reopen jobs run `sustained::…` cases with `--exact`.
+- The same names are cited by the workflow policy checks and by earlier evidence journals.
+
+Moving test bodies into child modules had renamed those tests, for example to `commands::primary_help_…` and `campaign::installed_sustained_capacity`.
+
+A test's name is a contract, so the fix restores the names rather than editing every place that cites them:
+- Each moved body stays in its child as a plain function.
+- A `#[test]` entry with the original name, `#[ignore]` reason and `cfg` returns to the original parent and calls the body.
+- This was done for the ten `installed_lifecycle` cases, seven `sustained` cases and five `capacity` cases.
+- `filler_tests` moved back under `capacity` as `capacity/filler_tests.rs`, so its 13 tests keep the `capacity::filler_tests::` prefix.
+
+Every module-qualified test name cited in CI, the scripts and the evidence journals was then checked against the `--list` output of every workspace test binary: 2,277 tests.
+- **CI and its scripts:** every pinned name resolves. Two Linux-only fixtures are compiled out on Windows.
+- **Historical evidence:** some citations now name pre-split paths. These are journals, and the case list in `docs/evidence/d01-native-qualification.json`, under `engine::tests::installation::*` and three other engine test modules. Each records the revision it ran on and is not rewritten. Four of those `installation::` citations already named moved tests on `main` before this branch.
+
+**Local reruns after the fix:**
+- `installed_crash` with `crash-test`: 25 passed.
+- Its `capacity::` cases: 21 passed.
+- `installed_lifecycle`: 11 passed.
+- `installed_reopen`: 39 passed.
+- Clippy on those targets: clean.
+
+One earlier local capacity timeout came from a concurrent `--all-features` build rewriting the shared `rrflow` binary. Rebuilding with exactly CI's features made it pass.
+
 **Result.** `scripts/ci/code_shape_baseline.json` is tightened. These files remain over their limits:
 - `crates/transport/rrd-contract/src/lib.rs` (329 lines). It is module declarations plus explicit re-export lists, and shrinking it would widen what the crate exports.
 - `rrd-maintenance/src/lib.rs` (1,556 lines). It is removed under R11, not split, in its own package with an implementation-traceability map.

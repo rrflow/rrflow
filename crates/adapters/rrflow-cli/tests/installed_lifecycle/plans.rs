@@ -2,7 +2,6 @@
 
 use super::*;
 
-#[test]
 pub(super) fn installed_plan_accepts_selected_attunement_and_rejects_tampering() {
     let root = tempfile::tempdir().unwrap();
     let project = root.path().join("project");
@@ -225,7 +224,6 @@ pub(super) fn installed_plan_accepts_selected_attunement_and_rejects_tampering()
     assert_success(&verified, "verify installed selected plan");
 }
 
-#[test]
 pub(super) fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape() {
     let apply = invoke(&["install", "apply", "--project", "."]);
     assert!(!apply.status.success());
@@ -242,7 +240,6 @@ pub(super) fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_b
     assert!(!help.contains("restore"));
 }
 
-#[test]
 pub(super) fn installed_engine_plans_applies_serves_discovers_authenticates_and_reopens() {
     installed_lifecycle("existing");
     // Parse runs only where a native supervisor contains its worker; on any
@@ -253,12 +250,10 @@ pub(super) fn installed_engine_plans_applies_serves_discovers_authenticates_and_
     )));
 }
 
-#[test]
 pub(super) fn fresh_installed_engine_survives_restart_and_restore() {
     installed_lifecycle("fresh");
 }
 
-#[test]
 pub(super) fn installed_source_read_choice_is_explicit_and_reopens() {
     let root = tempfile::tempdir().unwrap();
     for (name, opt_in) in [("default", false), ("source", true)] {

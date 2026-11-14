@@ -5,7 +5,6 @@ use super::*;
 /// H-07h: an instance started from the project folder records its endpoint,
 /// another process proves it through `ready` without an address, and a second
 /// serve of the same estate fails before binding.
-#[test]
 pub(super) fn a_served_engram_is_found_proved_and_not_served_twice() {
     let root = tempfile::tempdir().unwrap();
     let project = root.path().join("project");
@@ -113,7 +112,6 @@ pub(super) fn a_served_engram_is_found_proved_and_not_served_twice() {
         .contains(credential.credential()));
 }
 
-#[test]
 pub(super) fn configured_cold_history_publishes_and_reads_after_process_restart() {
     let root = tempfile::tempdir().unwrap();
     let project = root.path().join("project");

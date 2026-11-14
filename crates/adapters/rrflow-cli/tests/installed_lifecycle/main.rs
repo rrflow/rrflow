@@ -135,3 +135,53 @@ mod replan;
 use commands::*;
 use lifecycle::*;
 use replan::*;
+
+#[test]
+fn repository_discovery_is_read_only_without_an_installed_engine() {
+    commands::repository_discovery_is_read_only_without_an_installed_engine()
+}
+
+#[test]
+fn primary_help_exposes_only_the_installed_product_lifecycle() {
+    commands::primary_help_exposes_only_the_installed_product_lifecycle()
+}
+
+#[test]
+fn raw_database_and_development_commands_fail_during_argument_parsing() {
+    commands::raw_database_and_development_commands_fail_during_argument_parsing()
+}
+
+#[test]
+fn installed_plan_accepts_selected_attunement_and_rejects_tampering() {
+    plans::installed_plan_accepts_selected_attunement_and_rejects_tampering()
+}
+
+#[test]
+fn install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape() {
+    plans::install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape()
+}
+
+#[test]
+fn installed_engine_plans_applies_serves_discovers_authenticates_and_reopens() {
+    plans::installed_engine_plans_applies_serves_discovers_authenticates_and_reopens()
+}
+
+#[test]
+fn fresh_installed_engine_survives_restart_and_restore() {
+    plans::fresh_installed_engine_survives_restart_and_restore()
+}
+
+#[test]
+fn installed_source_read_choice_is_explicit_and_reopens() {
+    plans::installed_source_read_choice_is_explicit_and_reopens()
+}
+
+#[test]
+fn a_served_engram_is_found_proved_and_not_served_twice() {
+    engrams_and_history::a_served_engram_is_found_proved_and_not_served_twice()
+}
+
+#[test]
+fn configured_cold_history_publishes_and_reads_after_process_restart() {
+    engrams_and_history::configured_cold_history_publishes_and_reads_after_process_restart()
+}
