@@ -5,11 +5,74 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+/// Declares one family's operations once. Each row emits the catalogue
+/// descriptor (type names via `stringify!`) and a marker whose associated
+/// request and response are the real contract types, so a wrong type name is
+/// a compile error rather than a string that drifts.
+macro_rules! operations {
+    ($(
+        $marker:ident = $operation:literal,
+        $method:ident $path:literal,
+        $authentication:ident,
+        $mutation:literal,
+        $action:ident,
+        $request:ident => $response:ident,
+        $retry:ident;
+    )+) => {
+        /// Typed markers for this family's operations.
+        pub mod markers {
+            $(
+                #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+                pub struct $marker;
+                impl crate::Operation for $marker {
+                    type Request = crate::$request;
+                    type Response = crate::$response;
+                    const ID: &'static str = $operation;
+                    const METHOD: crate::HttpMethod = crate::HttpMethod::$method;
+                    const PATH: &'static str = $path;
+                    const AUTHENTICATION: crate::EndpointAuthentication =
+                        crate::EndpointAuthentication::$authentication;
+                    const MUTATION: bool = $mutation;
+                    const RETRY: crate::EndpointRetry = crate::EndpointRetry::$retry;
+                }
+            )+
+        }
+
+        pub(crate) fn endpoints() -> Vec<EndpointDescriptor> {
+            vec![$(
+                endpoint(
+                    $operation,
+                    HttpMethod::$method,
+                    $path,
+                    EndpointAuthentication::$authentication,
+                    $mutation,
+                    SecurityAction::$action,
+                    (stringify!($request), stringify!($response)),
+                    EndpointRetry::$retry,
+                ),
+            )+]
+        }
+    };
+}
+
 mod data;
 mod lifecycle;
+mod operation;
 mod platform;
 mod reasoning;
 mod vector;
+
+pub use operation::{Empty, EndpointRetry, OpenApiDocument, Operation};
+
+/// One typed marker per catalogue operation, generated from the same rows as
+/// `endpoint_catalogue()`.
+pub mod operations {
+    pub use super::data::markers::*;
+    pub use super::lifecycle::markers::*;
+    pub use super::platform::markers::*;
+    pub use super::reasoning::markers::*;
+    pub use super::vector::markers::*;
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
@@ -58,6 +121,8 @@ pub struct EndpointDescriptor {
     pub action: EndpointAction,
     pub request_type: String,
     pub response_type: String,
+    /// What a client may do when the outcome of an attempt is unknown.
+    pub retry: EndpointRetry,
     /// The reference group; it carries no authorization meaning.
     pub family: OperationFamily,
     /// One plain line naming what the operation does.
@@ -132,6 +197,9 @@ impl EndpointCatalogue {
             }
             if endpoint.mutation && endpoint.method == HttpMethod::Get {
                 return invalid("mutating endpoints may not use GET");
+            }
+            if (endpoint.retry == EndpointRetry::Read) == endpoint.mutation {
+                return invalid("only non-mutating endpoints may declare read retry");
             }
             if !operation_reference::valid_summary(&endpoint.summary)
                 || !operation_reference::valid_description(&endpoint.description)
@@ -257,8 +325,8 @@ pub(crate) fn endpoint(
     authentication: EndpointAuthentication,
     mutation: bool,
     action: SecurityAction,
-    request_type: &str,
-    response_type: &str,
+    (request_type, response_type): (&str, &str),
+    retry: EndpointRetry,
 ) -> EndpointDescriptor {
     let reference = operation_reference::operation_reference(operation)
         .expect("every catalogue operation has reference text");
@@ -271,6 +339,7 @@ pub(crate) fn endpoint(
         action: EndpointAction::fixed(action),
         request_type: request_type.into(),
         response_type: response_type.into(),
+        retry,
         family: reference.family,
         summary: reference.summary.into(),
         description: reference.description.into(),

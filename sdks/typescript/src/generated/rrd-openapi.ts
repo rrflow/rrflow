@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 5c8f066adccbabf9860d0a1fc3569267fda2760816c3402e884e4a00a4832f0d
+// OpenAPI SHA-256: 0e688c6bb9e5bf122ef959d097be3bbddf5c813d46f094cec1268d51f7d265ab
 export interface paths {
     "/v1/attunement/cancel": {
         parameters: {
@@ -33343,6 +33343,8 @@ export interface operations {
                                     path: string;
                                     request_type: string;
                                     response_type: string;
+                                    /** @description What a client may do when the outcome of an attempt is unknown. */
+                                    retry: "read" | "keyed_mutation" | "single_attempt";
                                     /** @description One plain line naming what the operation does. */
                                     summary: string;
                                 }[];
@@ -33446,6 +33448,8 @@ export interface operations {
                                     path: string;
                                     request_type: string;
                                     response_type: string;
+                                    /** @description What a client may do when the outcome of an attempt is unknown. */
+                                    retry: "read" | "keyed_mutation" | "single_attempt";
                                     /** @description One plain line naming what the operation does. */
                                     summary: string;
                                 }[];

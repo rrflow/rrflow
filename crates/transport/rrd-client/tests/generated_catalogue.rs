@@ -87,6 +87,12 @@ fn changed_owner_metadata_and_additions_flow_into_the_projection() {
     added.operation = rrd_contract::CanonicalId::new("zz-projection-probe").unwrap();
     added.path.push_str("/projection-probe");
     added.mutation = !added.mutation;
+    // The catalogue rejects a retry class that contradicts the mutation flag.
+    added.retry = if added.mutation {
+        rrd_contract::EndpointRetry::KeyedMutation
+    } else {
+        rrd_contract::EndpointRetry::Read
+    };
     let marker = "pub struct ZzProjectionProbe;";
     assert!(!build_support::render(&catalogue).unwrap().contains(marker));
     catalogue.endpoints.push(added.clone());

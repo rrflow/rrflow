@@ -57,6 +57,11 @@ pub fn openapi_document() -> Result<serde_json::Value> {
             serde_json::Value::Bool(descriptor.mutation),
         );
         operation.insert(
+            "x-rrd-retry".into(),
+            serde_json::to_value(descriptor.retry)
+                .map_err(|error| ContractError(error.to_string()))?,
+        );
+        operation.insert(
             "security".into(),
             match descriptor.authentication {
                 EndpointAuthentication::Public => serde_json::json!([]),
