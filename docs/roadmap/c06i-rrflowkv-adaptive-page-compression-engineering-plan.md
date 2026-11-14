@@ -402,7 +402,7 @@ plan before that path changes.
 |---|---|
 | `crates/persistence/rrd-lsm/Cargo.toml`, root `Cargo.lock` | promote safe checked LZ4 block support; retain Zstandard as laboratory-only |
 | `rrd-lsm/src/segment/format.rs` | policy type/default/validation; v6 identity; header and descriptor bytes; adaptive selection; stored-byte digest; logical envelope |
-| `rrd-lsm/src/segment/mod.rs` | policy propagation; stored-page acquisition; checksum-before-decode; owned aligned decode; cache charge; open/write evidence |
+| `rrd-lsm/src/segment.rs` | policy propagation; stored-page acquisition; checksum-before-decode; owned aligned decode; cache charge; open/write evidence |
 | `rrd-lsm/src/segment/reader.rs` | retain request-before-load logical budgets; make existing decompression/allocation counters exact; no query semantic change |
 | `rrd-lsm/src/database.rs` | `DatabaseOptions` policy; flush/compaction propagation; accessors and low-cardinality traces |
 | `rrd-lsm/src/lib.rs` | one public policy/default/evidence export surface |

@@ -224,7 +224,7 @@ path, stop and revise the machine plan before editing it.
 **Files changed**
 
 - `crates/persistence/rrd-lsm/src/memtable.rs`
-- `crates/persistence/rrd-lsm/src/segment/mod.rs`
+- `crates/persistence/rrd-lsm/src/segment.rs`
 - new `crates/persistence/rrd-lsm/src/segment/reader.rs`
 - `crates/persistence/rrd-lsm/src/lib.rs`
 - `crates/persistence/rrd-lsm/src/error.rs`
@@ -297,7 +297,7 @@ path, stop and revise the machine plan before editing it.
 
 - `crates/persistence/rrd-lsm/src/io.rs`
 - `crates/persistence/rrd-lsm/src/segment/format.rs`
-- `crates/persistence/rrd-lsm/src/segment/mod.rs`
+- `crates/persistence/rrd-lsm/src/segment.rs`
 - `crates/persistence/rrd-store/src/rrflow_kv.rs`
 - `crates/persistence/rrd-store/src/lib.rs`
 - `crates/persistence/rrd-store/tests/rrflow_kv_open.rs`
