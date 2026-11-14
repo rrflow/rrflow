@@ -370,6 +370,10 @@ jobs:
         run: |
           python3 scripts/ci/test_code_shape.py
           python3 scripts/ci/check_code_shape.py
+      - name: Check that every test name CI selects still exists
+        run: |
+          python3 scripts/ci/test_selected_tests.py
+          python3 scripts/ci/check_selected_tests.py
       - name: Enforce repository CI policy
         run: |
           python3 scripts/ci/test_merge_alarm.py
@@ -1078,6 +1082,12 @@ jobs:
         run: |
           python3 scripts/ci/test_code_shape.py
           python3 scripts/ci/check_code_shape.py
+      - name: Check that every test name CI selects still exists
+        # Moving a test into a child module renames it; a selector that names
+        # nothing fails here in seconds instead of in a native lane an hour later.
+        run: |
+          python3 scripts/ci/test_selected_tests.py
+          python3 scripts/ci/check_selected_tests.py
 
   ci-gate:
     name: ci-gate

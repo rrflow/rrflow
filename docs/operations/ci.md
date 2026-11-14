@@ -147,6 +147,25 @@ size or count. A recorded entry may only shrink, a new violation fails, and an
 improvement must be locked in with `--tighten`, which never admits a
 violation.
 
+**Selected-test check.** `scripts/ci/check_selected_tests.py` runs next to the
+ratchet in both lanes, in seconds and without compiling. A Rust test's name is
+its module path, so moving a test into a child module renames it. A filter that
+then matches nothing still passes. The check resolves every name CI selects from
+the Rust module tree, including `#[path]` modules and inline modules:
+
+- **Owned names.** The harness scripts import the names they run from
+  `scripts/ci/selected_tests.py`, the one owner, and every one must name a test.
+  The installed lifecycle harness must contain exactly its required set.
+- **Workflow filters.** In every `cargo test … -- FILTER` in the workflows, an
+  `--exact` filter must name a test, and a substring filter must match at least one.
+- **Self-spawned tests.** A string literal in a selected target that names one of
+  that target's test paths, such as a test that respawns itself as a child, must
+  still resolve.
+
+A failure names each moved test's new path. This check was added after PR #384
+moved CI-selected tests into child modules: every test passed, but nine native
+jobs failed when the harnesses could not find their cases.
+
 Alongside whichever light lanes a change selects, `repository-invariants` runs
 the engine's repository-wide architecture tests
 (`cargo test -p rrd-engine --test workspace_architecture`) on every candidate

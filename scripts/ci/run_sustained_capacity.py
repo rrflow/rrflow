@@ -17,10 +17,11 @@ import sys
 import time
 
 from run_offline_lifecycle import require, run, sha256
+from selected_tests import SUSTAINED_CAPACITY_CASE
 from sustained_progress import ProgressObserver
 
 ROOT = Path(__file__).resolve().parents[2]
-CASE = "sustained::installed_sustained_capacity"
+CASE = SUSTAINED_CAPACITY_CASE
 MAX_DOCUMENT = 8 * 1024 * 1024
 MAX_LAUNCH_RECEIPT = 8192
 
