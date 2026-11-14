@@ -95,9 +95,12 @@ class CheckTests(Fixture):
             run: cargo test -p demo --test suite --locked -- damage:: --nocapture
             run: cargo test -p demo --test suite --locked -- gone --exact
             run: cargo test -p demo --test suite --locked -- nothing_matches::
+            run: cargo test -p demo --test suite --locked -- --ignored --list | grep -Fx 'listed_gone: test'
+            run: cargo test -p demo --test suite --locked -- --ignored --list | grep -Fx 'present: test'
             """)
         errors = checker.check()
-        self.assertEqual(len(errors), 2, errors)
+        self.assertEqual(len(errors), 3, errors)
+        self.assertTrue(any("`listed_gone`" in e for e in errors))
         self.assertTrue(any("`gone`" in e and "names no test" in e for e in errors))
         self.assertTrue(any("`nothing_matches::`" in e and "matches no test" in e for e in errors))
 

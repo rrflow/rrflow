@@ -19,20 +19,20 @@ ROOT = Path(__file__).resolve().parents[2]
 # ---------------------------------------------------------------------------
 
 LIFECYCLE_CASES = frozenset({
-    "primary_help_exposes_only_the_installed_product_lifecycle",
-    "raw_database_and_development_commands_fail_during_argument_parsing",
-    "install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
-    "installed_plan_accepts_selected_attunement_and_rejects_tampering",
-    "fresh_installed_engine_survives_restart_and_restore",
-    "installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
-    "a_served_engram_is_found_proved_and_not_served_twice",
-    "repository_discovery_is_read_only_without_an_installed_engine",
-    "installed_source_read_choice_is_explicit_and_reopens",
-    "configured_cold_history_publishes_and_reads_after_process_restart",
+    "commands::primary_help_exposes_only_the_installed_product_lifecycle",
+    "commands::raw_database_and_development_commands_fail_during_argument_parsing",
+    "plans::install_requires_an_explicit_plan_digest_and_verify_is_read_only_by_shape",
+    "plans::installed_plan_accepts_selected_attunement_and_rejects_tampering",
+    "plans::fresh_installed_engine_survives_restart_and_restore",
+    "plans::installed_engine_plans_applies_serves_discovers_authenticates_and_reopens",
+    "engrams_and_history::a_served_engram_is_found_proved_and_not_served_twice",
+    "commands::repository_discovery_is_read_only_without_an_installed_engine",
+    "plans::installed_source_read_choice_is_explicit_and_reopens",
+    "engrams_and_history::configured_cold_history_publishes_and_reads_after_process_restart",
     "adaptive_installed::selected_inventory_completes_and_replans_across_primary_process_restarts",
 })
-NATIVE_CAPACITY_CASE = "capacity::installed_native_capacity_recovers_acknowledged_history"
-SUSTAINED_CAPACITY_CASE = "sustained::installed_sustained_capacity"
+NATIVE_CAPACITY_CASE = "capacity::cases::installed_native_capacity_recovers_acknowledged_history"
+SUSTAINED_CAPACITY_CASE = "sustained::campaign::installed_sustained_capacity"
 NATIVE_SAMPLE_MEMBERSHIP = "sustained::native_worker::tests::native_job_contains_engine_harness_and_worker"
 NATIVE_SAMPLE_ABRUPT = "sustained::native_worker::tests::native_job_abrupt_parent_fixture"
 NATIVE_SAMPLE_TIMEOUT = "sustained::native_worker::tests::native_allocation_timeout_cleanup_fixture"
@@ -257,4 +257,12 @@ def workflow_selectors(text: str) -> list[Selector]:
             for word in positional:
                 found.append(Selector(packages[0], targets[0], word, "--exact" in match.group("rest"),
                                       owner="workflow"))
+    # Listing guards ("cargo test … -- --list | grep -Fx 'NAME: test'") name one test exactly.
+    for match in re.finditer(
+            r"cargo test\s+(?P<args>[^\n|&;]*?)\s--\s[^\n|]*--list[^\n|]*\|\s*grep -Fx '(?P<name>[^']+): test'",
+            text):
+        packages = re.findall(r"-p\s+(\S+)", match.group("args"))
+        targets = re.findall(r"--test\s+(\S+)", match.group("args"))
+        if len(packages) == 1 and len(targets) == 1:
+            found.append(Selector(packages[0], targets[0], match.group("name"), True, owner="workflow"))
     return found

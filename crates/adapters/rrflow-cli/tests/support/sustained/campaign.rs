@@ -119,7 +119,9 @@ pub(super) fn collect(
     Ok(())
 }
 
-pub(super) fn installed_sustained_capacity() {
+#[test]
+#[ignore = "explicit frozen campaign and new evidence directory required; never substitutes for 24-hour evidence"]
+fn installed_sustained_capacity() {
     let campaign_path = PathBuf::from(
         std::env::var_os("RRFLOW_SUSTAINED_CAMPAIGN").expect("explicit campaign path"),
     );
@@ -235,7 +237,8 @@ pub(super) fn smoke_campaign() -> StorageCampaign {
     }
 }
 
-pub(super) fn backup_is_due_only_for_the_selected_lane_and_first_measured_mixed_write() {
+#[test]
+fn backup_is_due_only_for_the_selected_lane_and_first_measured_mixed_write() {
     let mut campaign = smoke_campaign();
     // The default characterization requests warm only.
     assert!(!backup_due(&campaign, LoadPhase::Measured, 14));
@@ -254,7 +257,9 @@ pub(super) fn backup_is_due_only_for_the_selected_lane_and_first_measured_mixed_
     assert!(!backup_due(&campaign, LoadPhase::Measured, 15));
 }
 
-pub(super) fn installed_sampler_trace_matches_server_and_store() {
+#[test]
+#[ignore = "explicit installed trace correlation; not capacity qualification"]
+fn installed_sampler_trace_matches_server_and_store() {
     let estate = Estate::install("fresh");
     let clock = Instant::now();
     let (mut child, client, _) = estate.start_for_with_trace(clock, Duration::from_secs(300), true);
@@ -381,7 +386,9 @@ pub(super) fn check_sample_trace(bytes: &[u8], request_id: &str, credential: &st
     ]
 }
 
-pub(super) fn installed_sampler_trace_during_write_load() {
+#[test]
+#[ignore = "explicit bounded loaded diagnostic characterization; not capacity qualification"]
+fn installed_sampler_trace_during_write_load() {
     const RECORDS: u64 = 4_000;
     const PERIOD: u64 = 125;
     let estate = Estate::install("fresh");
@@ -529,7 +536,9 @@ pub(super) fn installed_sampler_trace_during_write_load() {
     restarted.finish().expect("reap reopened server");
 }
 
-pub(super) fn installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect() {
+#[test]
+#[ignore = "explicit installed controlled conflict oracle"]
+fn installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect() {
     use rrd_contract::{
         AbortTransaction, BeginTransaction, CanonicalId, ErrorCode, TransactionState,
     };

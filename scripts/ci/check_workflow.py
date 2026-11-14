@@ -200,8 +200,8 @@ def verify_native_sample_worker_ci(reopen: str, verify: str) -> None:
         "        shell: bash\n"
         "        run: |\n"
         "          set -euo pipefail\n"
-        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'\n"
-        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture\n"
+        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'\n"
+        "          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture\n"
     )
     require(block == required, "installed conflict safety step must retain its exact matrix-wide list check, timeout and command")
     marker = "      - name: Require bounded native sampler failure\n"
@@ -1239,7 +1239,7 @@ def main() -> None:
         "cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run",
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
         "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
-        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::capacity_workload::installed_capacity_workload_smoke --exact --ignored --nocapture",
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
         "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
         "RRFLOW_REOPEN_RECEIPT_DIR:",

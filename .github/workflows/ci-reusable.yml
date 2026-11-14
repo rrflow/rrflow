@@ -745,14 +745,14 @@ jobs:
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked --no-run
       - name: Exercise installed capacity workload and backup readback
         timeout-minutes: 10
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_capacity_workload_smoke --exact --ignored --nocapture
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::capacity_workload::installed_capacity_workload_smoke --exact --ignored --nocapture
       - name: Require installed stale-snapshot conflict safety
         timeout-minutes: 5
         shell: bash
         run: |
           set -euo pipefail
-          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'
-          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture
+          cargo test -p rrflow-cli --test installed_reopen --release --locked -- --ignored --list | grep -Fx 'sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect: test'
+          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::campaign::installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect --exact --ignored --nocapture
       - name: Require bounded native sampler failure
         timeout-minutes: 5
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::native_worker::tests::acquisition_deadline_keeps_unfinished_cleanup_owned_and_blocks_reuse --exact --nocapture
@@ -770,7 +770,7 @@ jobs:
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::native_worker::tests::replaced_harness_path_cannot_redirect_linux_worker_or_receipt_digest --exact --nocapture
       - name: Correlate installed sampler and storage traces
         timeout-minutes: 10
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::installed_sampler_trace_matches_server_and_store --exact --ignored --nocapture
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::campaign::installed_sampler_trace_matches_server_and_store --exact --ignored --nocapture
       - name: Independent installed engrams under concurrent load
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture
       - name: Require fresh and existing installed damage denial

@@ -2,7 +2,9 @@
 
 use super::*;
 
-pub(super) fn installed_capacity_workload_smoke() {
+#[test]
+#[ignore = "explicit native capacity-driver smoke; candidate portability job"]
+fn installed_capacity_workload_smoke() {
     let estate = Estate::install("fresh");
     let clock = Instant::now();
     let (child, client, _) = estate.start_for(clock, Duration::from_secs(300));
