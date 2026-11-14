@@ -2,13 +2,15 @@
 
 **Status:** active canonical engineering plan; supersedes seven planning records (listed at the end); the roadmap gates and the POA&M keep status authority
 **Coordinate:** `rrflow://rrflow-instance/data/work-package/kernel-contract`
-**Owner:** the one ordered engineering plan and the canonical schemas (S1 to S8) for RRFlow's development kernel; changes no gate, objective or POA&M status by itself
+**Owner:** the one ordered engineering plan and the canonical schemas (S1 to S9) for RRFlow's development kernel; changes no gate, objective or POA&M status by itself
 **Approved:** by the repository owner on 2026-11-13 ("yes"), as the single plan that replaces the competing ones
 **Baseline:** engine `main` at `297bd98f`, Connectome at `19ee075c`, described in the [as-built baseline](../architecture/as-built-baseline.md)
 
 ## 1. What the owner asked for
 
 The owner's words of 2026-11-13: "Connectome/RRFlow is all about the kernel of development". Classification, the System One controller and the semantic router "all work off the engine" with "clean boundaries and ways to fold in all of the proven optimizations". The system is "vibe coder proof while being enterprise supported", with "schema driven canonical consistency". QL "is pivotal and reacts to the context". LFG is rebuilt as "pure machine code" classification and a submodule, with "toggles for testing its limits". Connectome "must support every action configuration input". A development harness runs "tests with arango surrealdb and others". SWAG "weaves in and out for binary score choice", is "tunable and configurable with templates populated at install with suggested defaults", and "pod" toggles ensure "parallel running agents are never dealing with noise of multiple projects".
+
+The owner's words of 2026-11-14 add memory behaviour. rrflowKV must be "truly absolutely modern bleeding edge", drawing on "lessons learned from surreal, hydraDB, qdrant". QL, DB and KV "are going to always likely be a hit"; what must balance dynamically is "the prompt context" and having "rrflowLSM rrflowCLD turboquant all properly dynamically available properly tuneable". The owner proposed "LSM short term CLD long term memory", perhaps with "LSM favors KV CLD favors postgres". Storage is "truly grouped and organized and clearly nested". Idle processes rebuild "neurons and improving hops to one another based on relationship". The second brain holds "the operators preferences globally, with use of AI". LFG and SWAG must be shown to "greatly improve efficiency and the accuracy, quality of the answer", with schemas that "dynamically trigger based on context to ensure that the AI keeps honest". Every answer ends with "a summary at the bottom about assumptions still being made, gaps, and if you want another pass". Sections 3.8 and 3.9, sections 4.1 and 4.2, and the K16 row carry this.
 
 Earlier direction that still binds, from the records this plan replaces:
 
@@ -184,10 +186,47 @@ Rules:
 - A generated structure is a proposal until accepted, and it is accepted through the same governed plan-and-apply path as settings (S1).
 - The harness (S5) measures answers with and without a structure, so a structure must earn its place.
 
+**Default provided structure `answer-close-v1`.** This is the owner's example of 2026-11-14: every answer ends with what it still assumes, what it did not cover, and an offer of another pass. It is on by default in every install template, and a project can switch it off.
+
+| Point | Required | Fill rule |
+|---|---|---|
+| `assumptions` | yes | Each item names its basis: a code identity and stamp, a preference level, or `none`. Unbacked (`none`) items are listed first. The list may be empty only when every claim in the answer cites evidence |
+| `gaps` | yes | What the request asked for that the answer did not do or did not verify, including checks not run |
+| `evidence` | yes | The checks that actually ran and their results. A claim of "done" or "works" without one is refused |
+| `next_pass` | yes | `offered`, with what another pass would do, or `not_needed`, with the reason. The person chooses; the engine never assumes the answer satisfies the request |
+
+The harness (K3) measures whether the closing block is truthful. Each listed assumption is checked against the trace, and an unlisted assumption that the judge finds counts as a failure.
+
 Connectome:
 - Toggles for **schema-driven reasoning** and **generate from examples**, as S1 settings with project, user and org scope.
 - A structure editor showing each point, its fill source and its value for the current request.
 - Generated proposals shown beside the examples they came from.
+
+### 3.9 S9 Memory tiers and consolidation
+
+Owner, 2026-11-14: "LSM short term CLD long term memory", with idle processes "rebuilding neurons and improving hops". Every tier holds the same versioned records at one read stamp. Tiering changes where bytes live and which path is cheap, never what a read at a stamp returns.
+
+| Tier | Holds | Cheap paths (S4) | Moves down when (S1 settings) |
+|---|---|---|---|
+| Working set | Memtable, page cache and vector caches | KV point reads, the current session's context, recent graph neighbourhoods | `storage.working.max_bytes`, with scan-resistant eviction (exists today) |
+| rrflowLSM hot (short-term) | Recent and frequently read versions in LSM segments | KV reads, transactions, commit and scalar indexes, BM25 postings, HNSW and TurboQuant | `storage.cld.demote.age`, `storage.cld.demote.access_half_life` and `storage.cld.watermark`, all `unmeasured` until K3 |
+| rrflowCLD cold (long-term) | Columnar history below the watermark, knowledge paths, consolidated memories | Scans, history, aggregates (the SQL reads of rrflowDB), time travel, bulk re-embedding | Never deleted by tiering; retention is a separate setting |
+
+**Where this plan differs from the owner's phrasing.** "LSM favors KV, CLD favors postgres" holds for reads: cold columnar data suits rrflowDB's analytical SQL reads, and hot LSM suits KV. rrflowDB *writes* must land on the hot tier, because a write needs the WAL and conflict checks, and a Parquet file is immutable. The contract is therefore: CLD serves rrflowDB's analytical reads, and every rrflowDB write lands hot and is demoted later.
+
+**What exists today** (as built on `development/main` at `1b283d40`) is one tier in practice. CLD is a derived Parquet copy of the changefeed that ordinary queries and context never read (F-06 journal). Nothing demotes data by age, access or size, and nothing consolidates. HydraDB describes the same three-tier shape (memory, NVMe, object storage) with movement by access pattern; that is a vendor claim and unverified.
+
+**Consolidation** runs when the engine is idle. Idle means no admitted request for `consolidation.idle_after` and CPU use under the LFG CPU lane's budget. It never uses SWAG's GPU (owner direction of 2026-11-10). A job yields within `consolidation.yield_ms` when a request arrives. Each job is a governed durable effect: it writes derived records with provenance and a receipt, and replaying it gives the same result.
+
+| Job | What it does | Basis |
+|---|---|---|
+| Merge | Joins duplicate or near-duplicate claims into one consolidated record that cites every source | A-MEM note evolution; the merge lever in the consolidation literature |
+| Reinforce and decay | Raises the weight of relations used by accepted answers and decays unused ones by `consolidation.decay_half_life`; a contradicted fact is invalidated with a time, never deleted | MemoryBank forgetting curve; Zep Graphiti bi-temporal invalidation |
+| Shortcut hops | Materializes a frequently traversed multi-hop path as a derived edge, recording its path, support count and expiry, so a later question needs fewer hops | Kept only if K3 measures fewer hops at equal quality |
+| Re-embed and re-index | Re-embeds only changed chunks; rebuilds filters during compaction rather than in a separate pass | K5 rule; compaction already rewrites filters |
+| Demote | Moves versions below the watermark to CLD and records the bytes moved | The tier table above |
+
+In Connectome, "rebuilding neurons" is the view of these jobs: weights before and after, merged records and new shortcut edges, each linked to its receipt.
 
 ## 4. Packages, in order
 
@@ -210,13 +249,36 @@ The first package is a working skeleton: one end-to-end test that every later pa
 | K12 | **Connectome kernel UI**, under the [code structure and conventions](../architecture/code-structure-and-conventions.md) (feature folders, arktype schemas generated from the engine, devkit, ratchets). TanStack file-based routes replacing wouter; the S8 schema-driven reasoning toggles and structure editor; generated settings forms; trigger and trace visual; reasoning-graph replay; second-brain neural visuals on a pre-made SVG art library; active instances and pods; Lab routes; client repinned to engine `main`; inherited SurrealDB-era views re-authored or retired | every K-package setting and action is reachable in the UI; the trigger record of a real question is shown; the visual-parity rule holds | T7; second-mind steps 3, 8, 9; baseline section 6 |
 | K13 | **Repository convergence**, continuous, starting with the enforcement ratchets and file splits in the [code structure and conventions](../architecture/code-structure-and-conventions.md). Fragmentation from the baseline (the unused `rrd-maintenance`, the cluster, Kubernetes and pgvector scope decision, lab crate merges, Python duplicates, `sha256_hex` copies, workspace lists, stale `rrflow-eval` docs); the estate-to-engram rename; delivery | each removal keeps every test; one owner per concept | baseline section 8; d02 P11; one-engine P0, P10 |
 | K15 | **Cloud tier and synchronization.** The local engram synchronizes with the cloud offering, which is comparable to SurrealDB Cloud or ArangoDB's managed service and backed by shippinAI. `rrd-cluster` provides replication; `rrd-kubernetes` deploys it for shippin.cloud; the shippin panel manages it. Optional and feature-gated, consuming only public engine contracts, never required for local readiness | implements S7: two replicas and a team member's replica converge after concurrent edits, deletes, schema changes, interruption and reconnect, from every trigger; each conflict kind resolves by its S7 rule and is recorded; a member without a scope's grant never receives it; the shippin panel reads the same contracts | owner direction of 2026-11-13; the roadmap's optional enterprise control plane; `rrd-cluster`, `rrd-kubernetes`, pgvector adapter |
+| K16 | **Idle consolidation (S9).** Merge, reinforce and decay, shortcut hops and demotion, each run as a governed derived effect while idle; a Connectome view of the "neurons" before and after | replaying gives the same result; every consolidated record traces to its sources; a request arriving mid-job waits no more than `consolidation.yield_ms`; K3 shows equal or better answer quality with fewer hops or keys examined, or the job stays off by default | owner direction of 2026-11-14; ADR-0005 second brain; S9 |
 | K14 | **Second-mind extensions**, after K3 shows a working baseline. Honesty layer and lexicon on the 743 saved prompts; connectors and importers (ArangoDB, SurrealDB, MongoDB, Atlassian); external harness import; UI library within render and memory budgets | each with its own real-run exit from the second-mind ledger | second-mind steps 7, 8, 10 |
 
 Order: K0, then K1, K2, K3, K4. K5, K6 and K7 follow; K7 can start once K2 has landed. K8 needs K3 and K7. K9 needs K4 and K7. K10 starts its measurement after K1 and K3, with the CLD move last. K11 follows K2 and K3. K12 ships with each package. K13 is continuous, and K14 comes after K3's baseline. K15 starts after K4 and K10, once the local engine's planner and storage tiers are measured, because synchronization replicates them.
 
+### 4.1 K10 rrflowKV technique queue
+
+A technique is adopted only after a K3 comparison on this repository's workload, and its default is then recorded as `measured`. The "Today" column comes from a survey of `development/main` on 2026-11-14.
+
+| Technique | Today | Source of the idea | Adopt when |
+|---|---|---|---|
+| Settings for the LSM constants (L0 trigger 8, 8 MiB target, 6 levels, memtable of 524,288 versions) | hard-coded (POAM-077) | K2 | always: this comes before any tuning |
+| Filter bits set per level, instead of 10 bits everywhere | fixed Bloom filter, 10 bits per key | Monkey (SIGMOD 2017) | point-read misses dominate the K1 trace |
+| Ribbon filters | absent | RocksDB, which reports about 30% less filter memory at the same false-positive rate | filter memory is a measured cost |
+| Block key prefix compression | absent | RocksDB restart points | key bytes are a large share of the K10 byte breakdown (236 MB for 7.2 MB of source today) |
+| Value separation for large values | absent | WiscKey, RocksDB BlobDB, DumpKV (2025) | the trace shows write amplification from large values |
+| Leveled, tiered or lazy-leveled compaction, chosen by a setting | leveled only | Dostoevsky (SIGMOD 2018) | write-heavy indexing runs |
+| WAL group commit | the WAL syncs every append; only the claim writer batches | standard practice | concurrent writers wait on sync |
+| Learned tuning of these settings | none | AXE (VLDB 2025), CAMAL | K3 has enough runs to train on |
+| Filtered vector search through payload indexes; quantization with rescoring | TurboQuant is chosen by cost; filters are not yet pushed into HNSW | Qdrant; SurrealDB `KnnScan` pushdown (planner probe) | K4 |
+
+The latest diagnostic comparison shows how far behind RRFlow is. On 20k vectors at recall 0.95, RRFlow with TurboQuant served 15.3 queries/s; Qdrant served 567 and SurrealDB 64. That report makes no parity claim (`eval/lab/evidence/arm-20k-20261106/report.json`).
+
+### 4.2 Proving LFG and SWAG
+
+K3 runs every question in four arms at each effort level: neither, LFG only, SWAG only, and both. For each it reports latency at p50 and p90, model tokens, keys examined, hops, and the judge's answer-quality score. LFG and SWAG stay on by default only at the effort levels where they win: better quality at equal cost, or lower cost at equal quality. Where they don't, the install template turns them off and says why. No such evidence exists today. The only receipt from a real model proves that dispatch works, not quality. Measuring answer quality needs the judge decision in section 6.
+
 ## 5. Contradictions resolved
 
-1. **Identifiers.** Packages are K0–K14. The old P, J and T ids appear only in the "Carries" column.
+1. **Identifiers.** Packages are K0–K16. The old P, J and T ids appear only in the "Carries" column.
 2. **What comes first.** The working skeleton, then the trace. The superseded records disagreed (instrumentation first, slice first, or CLD first).
 3. **CLD format.** The 2026-11-11 decision stands: a versioned reader, the Parquet generation first, and the custom format from measurements.
 4. **Lab location.** `crates/evaluation/lab/`. The `eval/lab` paths in older records are stale.
@@ -241,6 +303,8 @@ Each has a default this plan proceeds with unless the owner says otherwise.
 | Atlassian scope (Jira, Confluence or both) | asked when K14 starts |
 | Connectome parking lot 008 as the A2UI design | asked when K12 reaches A2UI |
 | Global configuration operations (owner, admission, grant) | defined by K2 |
+| What "LD" means in "improving hops … based on relationship and LD" (2026-11-14) | read as link distance (hop count and relation weight) until the owner says otherwise |
+| Thresholds for demoting data from LSM to CLD | `unmeasured` settings; K3 chooses the values, and demotion stays off until then |
 | Pre-release installed v2 plans and jobs | reinstall for pre-release; no migration lane |
 
 ## 7. Superseded records
