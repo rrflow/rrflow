@@ -116,6 +116,9 @@ def filesystem_profile(path: Path) -> dict:
 
 
 REQUIRED_CASES = LIFECYCLE_CASES
+# Modules the runner imports. The isolated stage holds only the binary, the
+# harness, `runner.py` and these, so each must be staged beside the runner.
+STAGED_MODULES = ("selected_tests.py",)
 
 
 def require_lifecycle_tests(output: str) -> None:
@@ -643,7 +646,9 @@ def main() -> None:
             probes.callback(Path(probe.name).unlink)
         binary_name, harness_name = (("rrflow.exe", "installed_lifecycle.exe") if sys.platform == "win32" else ("rrflow", "installed_lifecycle"))
         source_hashes = {binary_name: sha256(binary), harness_name: sha256(harness)}
-        for source, name in [(binary, binary_name), (harness, harness_name), (Path(__file__), "runner.py")]:
+        staged = [(binary, binary_name), (harness, harness_name), (Path(__file__), "runner.py")]
+        staged += [(Path(__file__).with_name(name), name) for name in STAGED_MODULES]
+        for source, name in staged:
             shutil.copy2(source, stage / name)
         for name, expected in source_hashes.items():
             require(sha256(stage / name) == expected, f"staging changed the source artifact: {name}")

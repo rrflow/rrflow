@@ -56,6 +56,12 @@ Every test passed. Nine native jobs then failed when their harnesses could not f
   - clippy on those targets: clean.
   - `run_offline_lifecycle.require_lifecycle_tests` accepts the compiled harness's `--list` output.
 
+**First candidate CI failure, and its fix.** Run [43624082216](https://github.com/rrflow/rrflow-development/actions/runs/43624082216) failed installed lifecycle and engram process on Windows and macOS. The preflight passed with 11 cases. The isolated qualification stage copies only the binary, the harness and `runner.py`, so the runner's new `selected_tests` import failed inside the sandbox. A local reproduction with the same file set showed `ModuleNotFoundError`.
+- The fix stages the runner's imported modules, listed once as `STAGED_MODULES`.
+- The Windows runtime probe checks them.
+- `test_the_staged_runner_imports_only_what_is_staged` runs the staged runner from a directory holding only the staged files. It fails when `STAGED_MODULES` is empty.
+- `test_offline_lifecycle.py` now runs 28 tests.
+
 **Not established:**
 - macOS and Linux runs of the refactored harness scripts happen only in candidate CI.
 - The resolver does not expand `macro_rules!`-generated tests; none of the selected targets has them.

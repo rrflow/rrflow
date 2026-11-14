@@ -3,6 +3,7 @@
 import json
 import copy
 import os
+import shutil
 import signal
 import subprocess
 from pathlib import Path
@@ -376,6 +377,20 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
         self.assertEqual(progress["readiness_observations"], 1)
         self.assertNotIn("never retain me", json.dumps(progress))
         self.assertNotIn("unknown_secret_case", json.dumps(progress))
+
+    def test_the_staged_runner_imports_only_what_is_staged(self):
+        # CI runs runner.py inside an isolated stage that holds only the staged
+        # files; an unstaged import fails there with no other signal.
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            here = Path(runner.__file__).resolve()
+            shutil.copy2(here, stage / "runner.py")
+            for name in runner.STAGED_MODULES:
+                shutil.copy2(here.with_name(name), stage / name)
+            environment = {key: value for key, value in os.environ.items() if key in ("PATH", "SYSTEMROOT")}
+            result = subprocess.run([sys.executable, str(stage / "runner.py"), "--help"], cwd=stage,
+                                    env=environment, capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_every_primary_lifecycle_case_is_required(self):
         cases = set(LIFECYCLE_CASES)
