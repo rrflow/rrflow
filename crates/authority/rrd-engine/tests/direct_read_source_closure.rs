@@ -44,7 +44,7 @@ struct AllowedUse {
 
 const ALLOWED_USES: &[AllowedUse] = &[
     AllowedUse {
-        path: "crates/authority/rrd-engine/src/engine/tests/attunement.rs",
+        path: "crates/authority/rrd-engine/src/engine/tests/attunement/inventory.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 4,
         operation: "bounded Inventory mutation, partial-publication and resume-uniqueness oracles",
@@ -56,7 +56,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "interrupted-reopen inventory snapshot record oracle",
     },
     AllowedUse {
-        path: "crates/operations/rrd-cluster/src/artifact_transfer.rs",
+        path: "crates/operations/rrd-cluster/src/artifact_transfer/session.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 1,
         operation: "bounded cluster artifact-transfer replay",
@@ -92,7 +92,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "explicit rollback current/target graph comparison",
     },
     AllowedUse {
-        path: "crates/authority/rrd-engine/src/runtime/data_plane.rs",
+        path: "crates/authority/rrd-engine/src/runtime/data_plane/attributes.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 1,
         operation: "embedding trace-only conflict recovery verification",
@@ -104,25 +104,25 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "exact vector candidate oracle",
     },
     AllowedUse {
-        path: "crates/kernel/rrd-core/src/runtime.rs",
+        path: "crates/kernel/rrd-core/src/runtime/tests.rs",
         kind: SensitiveReadUse::DataSnapshotReducer,
         count: 1,
         operation: "kernel data reducer missing-table rejection self-test",
     },
     AllowedUse {
-        path: "crates/kernel/rrd-core/src/runtime.rs",
+        path: "crates/kernel/rrd-core/src/runtime/tests.rs",
         kind: SensitiveReadUse::GraphSnapshotReducer,
         count: 1,
         operation: "kernel graph reducer self-test",
     },
     AllowedUse {
-        path: "crates/authority/rrd-engine/src/engine/diagnostic.rs",
+        path: "crates/authority/rrd-engine/src/engine/diagnostic/graph.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 1,
         operation: "explicit bounded diagnostic replay",
     },
     AllowedUse {
-        path: "crates/authority/rrd-engine/src/engine/diagnostic.rs",
+        path: "crates/authority/rrd-engine/src/engine/diagnostic/graph.rs",
         kind: SensitiveReadUse::GraphSnapshotReducer,
         count: 2,
         operation: "explicit diagnostic graph comparison",
@@ -194,7 +194,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "public change-feed page at a caller-supplied cursor",
     },
     AllowedUse {
-        path: "crates/persistence/rrd-store/src/backup.rs",
+        path: "crates/persistence/rrd-store/src/backup/retention.rs",
         kind: SensitiveReadUse::UnstampedCausalLogPage,
         count: 1,
         operation: "explicit backup object-reference scan to the backup watermark",
@@ -242,7 +242,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "runtime trace-phase oracle",
     },
     AllowedUse {
-        path: "crates/authority/rrd-engine/src/engine/cold_history.rs",
+        path: "crates/authority/rrd-engine/src/engine/cold_history/tests.rs",
         kind: SensitiveReadUse::CausalLogPage,
         count: 1,
         operation: "cold-history publication test oracle",
@@ -326,7 +326,7 @@ const ALLOWED_USES: &[AllowedUse] = &[
         operation: "store trace oracle over committed changes",
     },
     AllowedUse {
-        path: "crates/transport/rrd-server/tests/http_process.rs",
+        path: "crates/transport/rrd-server/tests/http_process/data_transaction.rs",
         kind: SensitiveReadUse::UnstampedCausalLogPage,
         count: 1,
         operation: "public data-transaction replay oracle after restart",

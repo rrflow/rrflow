@@ -51,7 +51,7 @@ following:
 
 ## Current implementation audit
 
-At the baseline, `crates/persistence/rrd-lsm/src/segment/mod.rs` owns one
+At the baseline, `crates/persistence/rrd-lsm/src/segment.rs` owns one
 process-local cache shared by all segments in a `Database`:
 
 - the key is `(segment_generation_id, page_ordinal)`;

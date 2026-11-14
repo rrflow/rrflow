@@ -164,7 +164,7 @@ code is implementation inventory until its owning roadmap evidence passes.
 | `crates/persistence/rrd-lsm/src/transaction.rs` | snapshot sequence capture and write/write conflict validation |
 | `crates/persistence/rrd-lsm/src/manifest.rs` | content-addressed manifests, checksummed CURRENT pointer, publication ordering, checkpoints and reachability |
 | `crates/persistence/rrd-lsm/src/segment/format.rs` | authenticated segment-v6 metadata, row groups, persisted membership filters, none/adaptive-LZ4 policy, raw/LZ4 page descriptors, 64-byte alignment, and format/schema/key/page identities |
-| `crates/persistence/rrd-lsm/src/segment/mod.rs` | mmap/bounded/io_uring page sources, checksum-before-decode page acquisition, bounded aligned LZ4 reconstruction, decoded-byte page cache, table reads, evidence, and frozen bytes |
+| `crates/persistence/rrd-lsm/src/segment.rs` | mmap/bounded/io_uring page sources, checksum-before-decode page acquisition, bounded aligned LZ4 reconstruction, decoded-byte page cache, table reads, evidence, and frozen bytes |
 | `crates/persistence/rrd-lsm/src/database.rs` | single-writer composition, write preparation, flush/publication ordering, compaction, snapshot install, GC |
 | `crates/persistence/rrd-lsm/src/snapshot_bundle.rs` | portable checksummed snapshot closure and restore validation |
 | `crates/persistence/rrd-store/src/rrflow_kv.rs` | RRFlow key-format binding, startup checkpoint reconciliation, storage-profile integration |

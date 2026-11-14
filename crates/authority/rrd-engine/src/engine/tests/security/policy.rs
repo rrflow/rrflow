@@ -1,0 +1,749 @@
+//! Revisioned identity authority, compiled role policy and context authorization.
+
+use super::*;
+
+#[test]
+pub(super) fn engine_identity_paths_share_one_revisioned_authority_across_reopen() {
+    let (root, engine) = isolated_engine();
+    let admin_id = CanonicalId::new("security-admin").unwrap();
+    let service_id = CanonicalId::new("external-service").unwrap();
+    let issuer_id = CanonicalId::new("engine-issuer").unwrap();
+    let binding_id = CanonicalId::new("engine-binding").unwrap();
+    let resource = ResourcePath {
+        segments: vec![ResourceId::new(ResourceKind::Instance, instance().as_str()).unwrap()],
+    };
+    let grant = |action| ResourceGrant {
+        action,
+        resource_prefix: resource.clone(),
+        data_policy: None,
+    };
+    let admin = Principal {
+        id: admin_id.clone(),
+        kind: PrincipalKind::User,
+        credential_sha256: digest::sha256_hex(b"admin-key"),
+        credential_revision: 1,
+        not_before_unix_ms: 1,
+        expires_at_unix_ms: u64::MAX,
+        disabled: false,
+        role_ids: BTreeSet::new(),
+        grants: vec![
+            grant(SecurityAction::SessionCreate),
+            grant(SecurityAction::SecurityAdmin),
+        ],
+    };
+    let service = Principal {
+        id: service_id.clone(),
+        kind: PrincipalKind::Service,
+        credential_sha256: digest::sha256_hex(b"service-key"),
+        credential_revision: 1,
+        not_before_unix_ms: 1,
+        expires_at_unix_ms: u64::MAX,
+        disabled: false,
+        role_ids: BTreeSet::new(),
+        grants: vec![
+            grant(SecurityAction::SessionCreate),
+            grant(SecurityAction::QueryExecute),
+        ],
+    };
+    let authority = SecurityState {
+        format_version: rrd_security::SECURITY_FORMAT,
+        revision: 1,
+        principals: BTreeMap::from([(admin_id.clone(), admin), (service_id.clone(), service)]),
+        roles: BTreeMap::new(),
+        identity_bindings: BTreeMap::from([(
+            binding_id.clone(),
+            IdentityBinding {
+                id: binding_id,
+                issuer: "https://identity.example".into(),
+                subject: "workload-42".into(),
+                audience: "rrd-engine".into(),
+                principal_id: service_id.clone(),
+                disabled: false,
+            },
+        )]),
+        jwt_issuers: BTreeMap::from([(
+            issuer_id.clone(),
+            JwtIssuer {
+                id: issuer_id.clone(),
+                issuer: "https://rrd.example".into(),
+                audience: "rrd-engine".into(),
+                key_id: CanonicalId::new("engine-key-1").unwrap(),
+                signing_key_sha256: digest::sha256_hex(b"engine-jwt-signing-key-material"),
+                not_before_unix_ms: 1,
+                expires_at_unix_ms: u64::MAX,
+                disabled: false,
+            },
+        )]),
+    };
+    SecurityRepository::new(&engine.storage, instance())
+        .initialize(
+            authority,
+            1,
+            "security-test",
+            "request-engine-identity-bootstrap",
+            "operation-engine-identity-bootstrap",
+        )
+        .unwrap();
+    let admin_lease = engine
+        .create_authenticated_session(
+            &admin_id,
+            b"admin-key",
+            &session_request(5_000, 2),
+            &id("admin-session"),
+            100,
+            "request-admin-session",
+            "operation-admin-session",
+        )
+        .unwrap();
+    let jwt = engine
+        .issue_principal_jwt(
+            &service_id,
+            b"service-key",
+            b"engine-jwt-signing-key-material",
+            &JwtIssueRequest {
+                issuer_id,
+                token_id: CanonicalId::new("engine-token-1").unwrap(),
+                issued_at_unix_ms: 100,
+                not_before_unix_ms: 100,
+                expires_at_unix_ms: 5_000,
+            },
+        )
+        .unwrap();
+    let jwt_lease = engine
+        .create_jwt_authenticated_session(
+            &jwt.token,
+            b"engine-jwt-signing-key-material",
+            &session_request(5_000, 2),
+            &id("jwt-session"),
+            110,
+            "request-jwt-session",
+            "operation-jwt-session",
+        )
+        .unwrap();
+    let identity_lease = engine
+        .create_verified_identity_session(
+            "https://identity.example",
+            "workload-42",
+            "rrd-engine",
+            &session_request(5_000, 2),
+            &id("external-session"),
+            111,
+            "request-external-session",
+            "operation-external-session",
+        )
+        .unwrap();
+
+    let repository = SecurityRepository::new(&engine.storage, instance());
+    let mut rotated = repository.load().unwrap().unwrap();
+    rotated.revision = 2;
+    let service = rotated.principals.get_mut(&service_id).unwrap();
+    service.credential_revision = 2;
+    service.credential_sha256 = digest::sha256_hex(b"rotated-service-key");
+    engine
+        .replace_security_authority(
+            &admin_lease.session_id,
+            &admin_lease.token,
+            1,
+            rotated.clone(),
+            200,
+            "request-rotate-service",
+            "operation-rotate-service",
+        )
+        .unwrap();
+    engine
+        .replace_security_authority(
+            &admin_lease.session_id,
+            &admin_lease.token,
+            1,
+            rotated,
+            200,
+            "request-rotate-service",
+            "operation-rotate-service",
+        )
+        .unwrap();
+    drop(engine);
+
+    let reopened = RrdEngine::open(root.path(), instance(), TOKEN_KEY).unwrap();
+    let query_invocation = |request_id: &str| Invocation {
+        context: RequestContext {
+            request_id: id(request_id),
+            operation_id: id("operation-revoked-query"),
+            idempotency_key: None,
+            deadline_unix_ms: Some(1_000),
+        },
+        resource: resource.clone(),
+        observed_at_unix_ms: 210,
+        attempt: 1,
+        request_sha256: digest::sha256_hex(b"revoked-query"),
+    };
+    for (lease, request_id) in [
+        (&jwt_lease, "request-revoked-jwt-lease"),
+        (&identity_lease, "request-revoked-external-lease"),
+    ] {
+        let denied = reopened.begin_invocation(
+            query_invocation(request_id),
+            RrdOperation::QueryExecute,
+            InvocationCredential::Session {
+                session_id: &lease.session_id,
+                token: &lease.token,
+            },
+        );
+        assert!(
+            matches!(denied, Err(ServiceError::Unauthenticated)),
+            "rotated credential must invalidate {request_id}: {denied:?}"
+        );
+    }
+    assert!(matches!(
+        reopened.create_jwt_authenticated_session(
+            &jwt.token,
+            b"engine-jwt-signing-key-material",
+            &session_request(5_000, 2),
+            &id("rejected-old-jwt"),
+            210,
+            "request-rejected-old-jwt",
+            "operation-rejected-old-jwt",
+        ),
+        Err(ServiceError::Unauthenticated)
+    ));
+    reopened
+        .create_authenticated_session(
+            &service_id,
+            b"rotated-service-key",
+            &session_request(5_000, 2),
+            &id("rotated-service-session"),
+            211,
+            "request-rotated-service-session",
+            "operation-rotated-service-session",
+        )
+        .unwrap();
+    let persisted = SecurityRepository::new(&reopened.storage, instance())
+        .load()
+        .unwrap()
+        .unwrap();
+    assert_eq!(persisted.revision, 2);
+    assert_eq!(persisted.principals[&service_id].credential_revision, 2);
+}
+
+#[test]
+pub(super) fn compiled_role_policy_injects_tenant_rows_and_fields_before_query_planning() {
+    let (_root, engine) = isolated_engine();
+    let principal_id = CanonicalId::new("tenant-alpha-reader").unwrap();
+    let base_role_id = CanonicalId::new("data-session-writer").unwrap();
+    let reader_role_id = CanonicalId::new("tenant-alpha-viewer").unwrap();
+    let resource = ResourcePath {
+        segments: vec![ResourceId::new(ResourceKind::Instance, instance().as_str()).unwrap()],
+    };
+    let base_role = Role {
+        id: base_role_id.clone(),
+        inherits: BTreeSet::new(),
+        grants: [
+            SecurityAction::SessionCreate,
+            SecurityAction::TransactionBegin,
+            SecurityAction::TransactionCommit,
+        ]
+        .into_iter()
+        .map(|action| ResourceGrant {
+            action,
+            resource_prefix: resource.clone(),
+            data_policy: None,
+        })
+        .collect(),
+    };
+    let reader_role = Role {
+        id: reader_role_id.clone(),
+        inherits: BTreeSet::from([base_role_id.clone()]),
+        grants: vec![ResourceGrant {
+            action: SecurityAction::QueryExecute,
+            resource_prefix: resource.clone(),
+            data_policy: Some(DataPolicy {
+                tenant: Some(PolicyPredicate {
+                    field: "tenant_id".into(),
+                    value: RuntimeValue::String("tenant-alpha".into()),
+                }),
+                rows: vec![PolicyPredicate {
+                    field: "classification".into(),
+                    value: RuntimeValue::String("public".into()),
+                }],
+                allowed_fields: Some(BTreeSet::from(["body".into(), "id".into()])),
+            }),
+        }],
+    };
+    let principal = Principal {
+        id: principal_id.clone(),
+        kind: PrincipalKind::User,
+        credential_sha256: digest::sha256_hex(b"tenant-alpha-key"),
+        credential_revision: 1,
+        not_before_unix_ms: 1,
+        expires_at_unix_ms: u64::MAX,
+        disabled: false,
+        role_ids: BTreeSet::from([reader_role_id.clone()]),
+        grants: Vec::new(),
+    };
+    SecurityRepository::new(&engine.storage, instance())
+        .initialize(
+            SecurityState {
+                format_version: rrd_security::SECURITY_FORMAT,
+                revision: 1,
+                principals: BTreeMap::from([(principal_id.clone(), principal)]),
+                roles: BTreeMap::from([(base_role_id, base_role), (reader_role_id, reader_role)]),
+                identity_bindings: BTreeMap::new(),
+                jwt_issuers: BTreeMap::new(),
+            },
+            1,
+            "security-test",
+            "request-tenant-policy-bootstrap",
+            "operation-tenant-policy-bootstrap",
+        )
+        .unwrap();
+    let lease = engine
+        .create_authenticated_session(
+            &principal_id,
+            b"tenant-alpha-key",
+            &session_request(9_000, 2),
+            &id("tenant-policy-session"),
+            10,
+            "request-tenant-policy-session",
+            "operation-tenant-policy-session",
+        )
+        .unwrap();
+    let transaction = engine
+        .begin_transaction(
+            &lease.session_id,
+            &lease.token,
+            &BeginTransaction {
+                scope: CanonicalId::new("data").unwrap(),
+                timeout_ms: 1_000,
+            },
+            &mutation_context(
+                &id("tenant-policy-begin"),
+                "request-tenant-policy-begin",
+                "operation-tenant-policy-begin",
+            ),
+            20,
+        )
+        .unwrap();
+    let property = |value_type| DataPropertySchema {
+        value_type,
+        required: true,
+    };
+    let record = |id: &str, tenant: &str, classification: &str, body: &str, secret: &str| {
+        TransactionMutation::PutRecord {
+            reference: DataReference {
+                kind: CanonicalId::new("document").unwrap(),
+                id: CanonicalId::new(id).unwrap(),
+            },
+            valid_from: 20,
+            valid_to: None,
+            properties: BTreeMap::from([
+                ("body".into(), QueryValue::String(body.into())),
+                (
+                    "classification".into(),
+                    QueryValue::String(classification.into()),
+                ),
+                ("secret".into(), QueryValue::String(secret.into())),
+                ("tenant_id".into(), QueryValue::String(tenant.into())),
+            ]),
+        }
+    };
+    let mutations = vec![
+        TransactionMutation::PutSchema {
+            registry: DataSchemaRegistry {
+                revision: 1,
+                migration: "install tenant policy fixture".into(),
+                organisation: DataEstateOrganisation::default(),
+                tables: BTreeMap::from([(
+                    CanonicalId::new("document").unwrap(),
+                    DataTableSchema {
+                        model: DataLogicalModel::Relational,
+                        mode: DataSchemaMode::Strict,
+                        properties: BTreeMap::new(),
+                        allow_additional_properties: false,
+                    },
+                )]),
+                records: BTreeMap::from([(
+                    CanonicalId::new("document").unwrap(),
+                    DataRecordSchema {
+                        properties: BTreeMap::from([
+                            ("body".into(), property(DataValueType::String)),
+                            ("classification".into(), property(DataValueType::String)),
+                            ("secret".into(), property(DataValueType::String)),
+                            ("tenant_id".into(), property(DataValueType::String)),
+                        ]),
+                        ..DataRecordSchema::default()
+                    },
+                )]),
+                relations: BTreeMap::new(),
+                events: BTreeMap::new(),
+            },
+        },
+        record(
+            "alpha-public",
+            "tenant-alpha",
+            "public",
+            "visible",
+            "alpha-secret",
+        ),
+        record(
+            "alpha-private",
+            "tenant-alpha",
+            "private",
+            "hidden",
+            "private-secret",
+        ),
+        record(
+            "beta-public",
+            "tenant-beta",
+            "public",
+            "other",
+            "beta-secret",
+        ),
+    ];
+    engine
+        .commit_transaction(
+            &lease.session_id,
+            &lease.token,
+            &transaction.transaction_id,
+            &id("tenant-policy-commit"),
+            &CommitTransaction {
+                operation_sha256: rrd_contract::transaction_operation_sha256(&mutations),
+                mutations,
+            },
+            20,
+            "request-tenant-policy-commit",
+            "operation-tenant-policy-commit",
+        )
+        .unwrap();
+    let query = ExecuteQuery {
+        scope: format!("instance:{}", instance()),
+        query: "FROM record:document AT VALID 20 KNOWN HEAD PROJECT *".into(),
+        parameters: BTreeMap::new(),
+        budget: QueryBudget::default(),
+    };
+    let result = engine
+        .execute_query(
+            &lease.session_id,
+            &lease.token,
+            &query,
+            30,
+            "request-tenant-query",
+            "operation-tenant-query",
+        )
+        .unwrap();
+    assert_eq!(result.plan.security_policy_revision, 1);
+    assert_eq!(result.plan.authorization_sha256.len(), 64);
+    assert_eq!(result.rows.len(), 1);
+    assert_eq!(result.rows[0].identity, "record:document:alpha-public");
+    assert_eq!(
+        result.rows[0]
+            .values
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["body".into(), "id".into()])
+    );
+    assert!(result
+        .canonical_query
+        .contains("tenant_id = \"tenant-alpha\""));
+    assert!(result
+        .canonical_query
+        .contains("classification = \"public\""));
+    let export_request = rrd_contract::ExportQuery {
+        query: query.clone(),
+        max_output_bytes: 524288,
+    };
+    let export = engine
+        .export_query_scoped(
+            &lease.session_id,
+            &lease.token,
+            &export_request,
+            &resource,
+            30,
+            "request-tenant-export",
+            "operation-tenant-export",
+        )
+        .unwrap();
+    assert_eq!(export.source.execution.returned_rows, 1);
+    assert_eq!(export.columns, 3); // identity plus the two authorized fields
+    assert_eq!(export.source.plan, result.plan);
+    let bytes = export.decode_artifact().unwrap();
+    for forbidden in [
+        "alpha-secret",
+        "private-secret",
+        "beta-secret",
+        "beta-public",
+        "alpha-private",
+    ] {
+        assert!(!bytes
+            .windows(forbidden.len())
+            .any(|window| window == forbidden.as_bytes()));
+    }
+    assert!(matches!(
+        engine.export_query_scoped(
+            &lease.session_id,
+            &id("incorrect-token"),
+            &export_request,
+            &resource,
+            30,
+            "request-denied-export",
+            "operation-denied-export",
+        ),
+        Err(ServiceError::Unauthenticated)
+    ));
+    let mut secret_export = export_request.clone();
+    secret_export.query.query = "FROM record:document AT VALID 20 KNOWN HEAD PROJECT secret".into();
+    assert!(matches!(
+        engine.export_query_scoped(
+            &lease.session_id,
+            &lease.token,
+            &secret_export,
+            &resource,
+            30,
+            "request-secret-export",
+            "operation-secret-export",
+        ),
+        Err(ServiceError::PermissionDenied)
+    ));
+    let denied = engine.execute_query(
+        &lease.session_id,
+        &lease.token,
+        &ExecuteQuery {
+            query: "FROM record:document AT VALID 20 KNOWN HEAD PROJECT secret".into(),
+            ..query
+        },
+        31,
+        "request-secret-query",
+        "operation-secret-query",
+    );
+    assert!(matches!(denied, Err(ServiceError::PermissionDenied)));
+}
+
+#[test]
+pub(super) fn context_records_authorization_and_denies_unenforced_data_policy_before_snapshot_read()
+{
+    let (_root, engine) = isolated_engine();
+    let bootstrap = engine
+        .create_session(
+            &session_request(5_000, 2),
+            &id("context-policy-bootstrap-session"),
+            10,
+            "request-context-policy-bootstrap-session",
+            "operation-context-policy-bootstrap-session",
+        )
+        .unwrap();
+    let transaction = engine
+        .begin_transaction(
+            &bootstrap.session_id,
+            &bootstrap.token,
+            &BeginTransaction {
+                scope: CanonicalId::new("data").unwrap(),
+                timeout_ms: 1_000,
+            },
+            &mutation_context(
+                &id("context-policy-bootstrap-begin"),
+                "request-context-policy-bootstrap-begin",
+                "operation-context-policy-bootstrap-begin",
+            ),
+            20,
+        )
+        .unwrap();
+    let mutations = vec![
+        TransactionMutation::PutSchema {
+            registry: DataSchemaRegistry {
+                revision: 1,
+                migration: "install context authorization fixture".into(),
+                organisation: DataEstateOrganisation::default(),
+                tables: BTreeMap::from([(
+                    CanonicalId::new("document").unwrap(),
+                    DataTableSchema {
+                        model: DataLogicalModel::Relational,
+                        mode: DataSchemaMode::Strict,
+                        properties: BTreeMap::new(),
+                        allow_additional_properties: false,
+                    },
+                )]),
+                records: BTreeMap::from([(
+                    CanonicalId::new("document").unwrap(),
+                    DataRecordSchema {
+                        properties: BTreeMap::from([(
+                            "body".into(),
+                            DataPropertySchema {
+                                value_type: DataValueType::String,
+                                required: true,
+                            },
+                        )]),
+                        ..DataRecordSchema::default()
+                    },
+                )]),
+                relations: BTreeMap::new(),
+                events: BTreeMap::new(),
+            },
+        },
+        TransactionMutation::PutRecord {
+            reference: DataReference {
+                kind: CanonicalId::new("document").unwrap(),
+                id: CanonicalId::new("private-context").unwrap(),
+            },
+            valid_from: 20,
+            valid_to: None,
+            properties: BTreeMap::from([(
+                "body".into(),
+                QueryValue::String("authorization protected memory".into()),
+            )]),
+        },
+    ];
+    engine
+        .commit_transaction(
+            &bootstrap.session_id,
+            &bootstrap.token,
+            &transaction.transaction_id,
+            &id("context-policy-bootstrap-commit"),
+            &CommitTransaction {
+                operation_sha256: rrd_contract::transaction_operation_sha256(&mutations),
+                mutations,
+            },
+            20,
+            "request-context-policy-bootstrap-commit",
+            "operation-context-policy-bootstrap-commit",
+        )
+        .unwrap();
+
+    let resource = ResourcePath {
+        segments: vec![ResourceId::new(ResourceKind::Instance, instance().as_str()).unwrap()],
+    };
+    let unrestricted_id = CanonicalId::new("context-unrestricted-reader").unwrap();
+    let restricted_id = CanonicalId::new("context-restricted-reader").unwrap();
+    let principal = |principal_id: CanonicalId, credential: &[u8], data_policy| Principal {
+        id: principal_id,
+        kind: PrincipalKind::User,
+        credential_sha256: digest::sha256_hex(credential),
+        credential_revision: 1,
+        not_before_unix_ms: 1,
+        expires_at_unix_ms: u64::MAX,
+        disabled: false,
+        role_ids: BTreeSet::new(),
+        grants: vec![
+            ResourceGrant {
+                action: SecurityAction::SessionCreate,
+                resource_prefix: resource.clone(),
+                data_policy: None,
+            },
+            ResourceGrant {
+                action: SecurityAction::MemoryContextRead,
+                resource_prefix: resource.clone(),
+                data_policy,
+            },
+        ],
+    };
+    let unrestricted = principal(unrestricted_id.clone(), b"context-unrestricted-key", None);
+    let restricted = principal(
+        restricted_id.clone(),
+        b"context-restricted-key",
+        Some(DataPolicy {
+            tenant: None,
+            rows: Vec::new(),
+            allowed_fields: Some(BTreeSet::from(["body".into()])),
+        }),
+    );
+    let repository = SecurityRepository::new(&engine.storage, instance());
+    repository
+        .initialize(
+            SecurityState {
+                format_version: rrd_security::SECURITY_FORMAT,
+                revision: 1,
+                principals: BTreeMap::from([
+                    (unrestricted_id.clone(), unrestricted),
+                    (restricted_id.clone(), restricted),
+                ]),
+                roles: BTreeMap::new(),
+                identity_bindings: BTreeMap::new(),
+                jwt_issuers: BTreeMap::new(),
+            },
+            30,
+            "security-test",
+            "request-context-policy-security",
+            "operation-context-policy-security",
+        )
+        .unwrap();
+    let unrestricted_lease = engine
+        .create_authenticated_session(
+            &unrestricted_id,
+            b"context-unrestricted-key",
+            &session_request(5_000, 2),
+            &id("context-unrestricted-session"),
+            40,
+            "request-context-unrestricted-session",
+            "operation-context-unrestricted-session",
+        )
+        .unwrap();
+    let restricted_lease = engine
+        .create_authenticated_session(
+            &restricted_id,
+            b"context-restricted-key",
+            &session_request(5_000, 2),
+            &id("context-restricted-session"),
+            40,
+            "request-context-restricted-session",
+            "operation-context-restricted-session",
+        )
+        .unwrap();
+    let request = AssembleContext {
+        scope: format!("instance:{}", instance()),
+        query: "authorization memory".into(),
+        valid_at: 40,
+        seeds: Vec::new(),
+        max_graph_depth: 1,
+        max_items: 8,
+        max_output_bytes: 64 * 1024,
+        max_storage_keys: 16,
+    };
+    let packet = engine
+        .assemble_context(
+            &unrestricted_lease.session_id,
+            &unrestricted_lease.token,
+            &request,
+            50,
+            "request-context-unrestricted",
+            "operation-context-unrestricted",
+        )
+        .unwrap();
+    let expected = repository
+        .authorize_principal(
+            &unrestricted_id,
+            SecurityAction::MemoryContextRead,
+            &resource,
+            50,
+        )
+        .unwrap();
+    assert_eq!(packet.plan.security_policy_revision, 1);
+    assert_eq!(
+        packet.plan.authorization_sha256,
+        expected.authorization_sha256
+    );
+    assert!(packet
+        .items
+        .iter()
+        .any(|item| item.identity == "record:document:private-context"));
+
+    let mut denied_request = request;
+    denied_request.max_storage_keys = 1;
+    let denied = engine.assemble_context(
+        &restricted_lease.session_id,
+        &restricted_lease.token,
+        &denied_request,
+        51,
+        "request-context-restricted",
+        "operation-context-restricted",
+    );
+    assert!(matches!(denied, Err(ServiceError::PermissionDenied)));
+    let denied_audit = repository
+        .audit_since(0, 128)
+        .unwrap()
+        .records
+        .into_iter()
+        .map(|(_, record)| record)
+        .find(|record| record.request_id == "request-context-restricted")
+        .expect("the unenforceable context data policy denial is audited");
+    assert_eq!(denied_audit.action, SecurityAction::MemoryContextRead);
+    assert_eq!(denied_audit.phase, AuditPhase::Completed);
+    assert_eq!(denied_audit.decision, AuditDecision::Denied);
+}
