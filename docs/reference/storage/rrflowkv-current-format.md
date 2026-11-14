@@ -61,7 +61,7 @@ otherwise.
 | Mutation batch | 2 | Canonical put/delete payload inside one WAL frame | [`batch.rs`](../../../crates/persistence/rrd-lsm/src/batch.rs) |
 | Manifest | 3 | Immutable reachable-state inventory, sequence boundary, and authenticated segment schema/codec/page-format identities | [`manifest.rs`](../../../crates/persistence/rrd-lsm/src/manifest.rs) |
 | `CURRENT` and checkpoint controls | 1 | Authenticated manifest and retention pointers | [`manifest.rs`](../../../crates/persistence/rrd-lsm/src/manifest.rs) |
-| Immutable segment | 6 | Ordered key/version spine plus raw or adaptive-LZ4 aligned Arrow-layout column pages and authenticated row-group membership filters | [`segment/mod.rs`](../../../crates/persistence/rrd-lsm/src/segment/mod.rs) and [`segment/format.rs`](../../../crates/persistence/rrd-lsm/src/segment/format.rs) |
+| Immutable segment | 6 | Ordered key/version spine plus raw or adaptive-LZ4 aligned Arrow-layout column pages and authenticated row-group membership filters | [`segment/mod.rs`](../../../crates/persistence/rrd-lsm/src/segment.rs) and [`segment/format.rs`](../../../crates/persistence/rrd-lsm/src/segment/format.rs) |
 | Physical snapshot bundle | 1 | Authenticated flush-bounded manifest closure | [`snapshot_bundle.rs`](../../../crates/persistence/rrd-lsm/src/snapshot_bundle.rs) |
 
 Current default and hard bounds are implementation policy, not values for

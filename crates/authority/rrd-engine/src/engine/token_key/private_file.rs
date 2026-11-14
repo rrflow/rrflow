@@ -9,11 +9,13 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 
 #[cfg(unix)]
-#[path = "private_file/unix.rs"]
-mod platform;
+mod unix;
+#[cfg(unix)]
+use unix as platform;
 #[cfg(windows)]
-#[path = "private_file/windows.rs"]
-mod platform;
+mod windows;
+#[cfg(windows)]
+use windows as platform;
 #[cfg(not(any(unix, windows)))]
 mod platform {
     use super::*;
