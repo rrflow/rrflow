@@ -10,7 +10,7 @@
 
 The owner's words of 2026-11-13: "Connectome/RRFlow is all about the kernel of development". Classification, the System One controller and the semantic router "all work off the engine" with "clean boundaries and ways to fold in all of the proven optimizations". The system is "vibe coder proof while being enterprise supported", with "schema driven canonical consistency". QL "is pivotal and reacts to the context". LFG is rebuilt as "pure machine code" classification and a submodule, with "toggles for testing its limits". Connectome "must support every action configuration input". A development harness runs "tests with arango surrealdb and others". SWAG "weaves in and out for binary score choice", is "tunable and configurable with templates populated at install with suggested defaults", and "pod" toggles ensure "parallel running agents are never dealing with noise of multiple projects".
 
-The owner's words of 2026-11-14 add memory behaviour. rrflowKV must be "truly absolutely modern bleeding edge", drawing on "lessons learned from surreal, hydraDB, qdrant". QL, DB and KV "are going to always likely be a hit"; what must balance dynamically is "the prompt context" and having "rrflowLSM rrflowCLD turboquant all properly dynamically available properly tuneable". The owner proposed "LSM short term CLD long term memory", perhaps with "LSM favors KV CLD favors postgres". Storage is "truly grouped and organized and clearly nested". Idle processes rebuild "neurons and improving hops to one another based on relationship". The second brain holds "the operators preferences globally, with use of AI". LFG and SWAG must be shown to "greatly improve efficiency and the accuracy, quality of the answer", with schemas that "dynamically trigger based on context to ensure that the AI keeps honest". Every answer ends with "a summary at the bottom about assumptions still being made, gaps, and if you want another pass". Sections 3.8 and 3.9, sections 4.1 and 4.2, and the K16 row carry this.
+The owner's words of 2026-11-14 add memory behaviour. rrflowKV must be "truly absolutely modern bleeding edge", drawing on "lessons learned from surreal, hydraDB, qdrant". QL, DB and KV "are going to always likely be a hit"; what must balance dynamically is "the prompt context" and having "rrflowLSM rrflowCLD turboquant all properly dynamically available properly tuneable". The owner proposed "LSM short term CLD long term memory", perhaps with "LSM favors KV CLD favors postgres". Storage is "truly grouped and organized and clearly nested". Idle processes rebuild "neurons and improving hops to one another based on relationship". The second brain holds "the operators preferences globally, with use of AI". LFG and SWAG must be shown to "greatly improve efficiency and the accuracy, quality of the answer", with schemas that "dynamically trigger based on context to ensure that the AI keeps honest". Every answer ends with "a summary at the bottom about assumptions still being made, gaps, and if you want another pass". Sections 3.8 and 3.9, sections 4.1 to 4.3, and the K16 row carry this.
 
 Earlier direction that still binds, from the records this plan replaces:
 
@@ -117,8 +117,8 @@ The planner chooses paths by condition and records the matched row, the rejected
 | Filter pushdown | a filter on an indexed field beside text or vector search | `ql.pushdown.enabled` (default on) | both pushed the crate filter into the text index; Surreal pushed it into HNSW; this put `rrd-lsm/src/database.rs` first |
 | Vector | `NEAR` or a context semantic stage with an admitted embedding binding | `vector.recall_target` (default 0.95, owner decision of 2026-11-11), then cost within that target | Arango `use-vector-index`, Surreal `KnnScan` |
 | Graph traversal | a relation question or seed expansion | `graph.max_depth` and `graph.max_width` (default 3 and 3, Think-on-Graph), relation weights | cost grows with edges touched: 17 reads at 1 hop, 37 at 2 |
-| rrflowLSM hot | versions above the hot watermark | `storage.lsm.*` (today's constants become settings) | — |
-| rrflowCLD cold | versions below the watermark, or knowledge paths, which default to cold | `storage.cld.watermark` (unmeasured) | — |
+| rrflowLSM hot | every current read, point read, transaction and index path | `storage.lsm.*` (today's constants become settings) | — |
+| rrflowCLD columnar copy | a scan, aggregate, history or bulk read whose stamp the copy covers (the copy's watermark is at or after the read stamp); otherwise LSM | `storage.cld.copy_lag` (unmeasured); `storage.cld.prefer_rows` (unmeasured) | TiDB chooses its row store, its columnar replica or both per query at one timestamp |
 | rrflowDB transaction | mutation, or a read that needs multi-record consistency | `db.isolation` | — |
 | System One question | a decision point listed in S3 | `swag.points.<point>.enabled` | neither system decides what to search; the caller's model does |
 
@@ -206,13 +206,15 @@ Connectome:
 
 Owner, 2026-11-14: "LSM short term CLD long term memory", with idle processes "rebuilding neurons and improving hops". Every tier holds the same versioned records at one read stamp. Tiering changes where bytes live and which path is cheap, never what a read at a stamp returns.
 
+**Owner decision, 2026-11-14: CLD is a columnar copy first, not a demotion tier.** Every version stays in rrflowLSM. CLD holds a columnar copy of settled versions, kept up to date by a copy watermark, and the planner reads it only for scans, aggregates, history and bulk reads that the watermark covers. This is the HTAP pattern TiDB published (VLDB 2020): a row store for writes, plus an asynchronously built columnar replica that the planner selects per query at one timestamp. Removing versions from LSM to reclaim space is a later, separate setting, off by default. It is built only if K10's byte breakdown shows LSM space is a real cost.
+
 | Tier | Holds | Cheap paths (S4) | Moves down when (S1 settings) |
 |---|---|---|---|
 | Working set | Memtable, page cache and vector caches | KV point reads, the current session's context, recent graph neighbourhoods | `storage.working.max_bytes`, with scan-resistant eviction (exists today) |
-| rrflowLSM hot (short-term) | Recent and frequently read versions in LSM segments | KV reads, transactions, commit and scalar indexes, BM25 postings, HNSW and TurboQuant | `storage.cld.demote.age`, `storage.cld.demote.access_half_life` and `storage.cld.watermark`, all `unmeasured` until K3 |
-| rrflowCLD cold (long-term) | Columnar history below the watermark, knowledge paths, consolidated memories | Scans, history, aggregates (the SQL reads of rrflowDB), time travel, bulk re-embedding | Never deleted by tiering; retention is a separate setting |
+| rrflowLSM (short-term, and the store of record) | Every version | KV reads, transactions, commit and scalar indexes, BM25 postings, HNSW and TurboQuant | Copied to CLD once settled (`storage.cld.copy_lag`); reclaimed from LSM only if `storage.lsm.reclaim_copied` is enabled (off) |
+| rrflowCLD (long-term columnar copy) | A columnar copy of settled versions, knowledge paths, consolidated memories | Scans, history, aggregates (the SQL reads of rrflowDB), time travel, bulk re-embedding | Never deleted by copying; retention is a separate setting |
 
-**Where this plan differs from the owner's phrasing.** "LSM favors KV, CLD favors postgres" holds for reads: cold columnar data suits rrflowDB's analytical SQL reads, and hot LSM suits KV. rrflowDB *writes* must land on the hot tier, because a write needs the WAL and conflict checks, and a Parquet file is immutable. The contract is therefore: CLD serves rrflowDB's analytical reads, and every rrflowDB write lands hot and is demoted later.
+**Where this plan differs from the owner's phrasing.** "LSM favors KV, CLD favors postgres" holds for reads: cold columnar data suits rrflowDB's analytical SQL reads, and hot LSM suits KV. rrflowDB *writes* must land on the hot tier, because a write needs the WAL and conflict checks, and a Parquet file is immutable. The contract is therefore: CLD serves rrflowDB's analytical reads, and every rrflowDB write lands in LSM and is copied later.
 
 **What exists today** (as built on `development/main` at `1b283d40`) is one tier in practice. CLD is a derived Parquet copy of the changefeed that ordinary queries and context never read (F-06 journal). Nothing demotes data by age, access or size, and nothing consolidates. HydraDB describes the same three-tier shape (memory, NVMe, object storage) with movement by access pattern; that is a vendor claim and unverified.
 
@@ -224,7 +226,7 @@ Owner, 2026-11-14: "LSM short term CLD long term memory", with idle processes "r
 | Reinforce and decay | Raises the weight of relations used by accepted answers and decays unused ones by `consolidation.decay_half_life`; a contradicted fact is invalidated with a time, never deleted | MemoryBank forgetting curve; Zep Graphiti bi-temporal invalidation |
 | Shortcut hops | Materializes a frequently traversed multi-hop path as a derived edge, recording its path, support count and expiry, so a later question needs fewer hops | Kept only if K3 measures fewer hops at equal quality |
 | Re-embed and re-index | Re-embeds only changed chunks; rebuilds filters during compaction rather than in a separate pass | K5 rule; compaction already rewrites filters |
-| Demote | Moves versions below the watermark to CLD and records the bytes moved | The tier table above |
+| Copy to CLD | Writes settled versions into the columnar copy, advances its watermark and records the bytes written | The tier table above; TiFlash's learner replica |
 
 In Connectome, "rebuilding neurons" is the view of these jobs: weights before and after, merged records and new shortcut edges, each linked to its receipt.
 
@@ -247,7 +249,7 @@ The first package is a working skeleton: one end-to-end test that every later pa
 | K10 | **Storage made real and tuned.** Byte breakdown of the store (236 MB for 7.2 MB of source, 33×, against about 3× for Zoekt); parse throughput (1.7–2.5 files/s); hot then cold at one stamp with a versioned CLD reader (Parquet generation first, custom format later from measured access); LSM against Fjall; C-07; transactional conformance; SQL aggregates | each tier's bytes reported; hot, cold and retained reads agree across update, delete, interruption and restart; a cold-on/cold-off comparison at each effort | J8; second-mind steps 2 and "cold storage may never be needed"; one-engine P9; d02 P12; F-03; indexing embedded-columnar direction |
 | K11 | **Instances, pods and second brain.** S6; resource-managed instances; pod placement toggles; personal and org engrams with linked reads | parallel agents on two projects show no cross-project latency rise beyond a declared tolerance in `dedicated`; a link read is audited | H-06, H-07, H-10, H-11; ADR-0005; Surreal multi-project evidence |
 | K12 | **Connectome kernel UI**, under the [code structure and conventions](../architecture/code-structure-and-conventions.md) (feature folders, arktype schemas generated from the engine, devkit, ratchets). TanStack file-based routes replacing wouter; the S8 schema-driven reasoning toggles and structure editor; generated settings forms; trigger and trace visual; reasoning-graph replay; second-brain neural visuals on a pre-made SVG art library; active instances and pods; Lab routes; client repinned to engine `main`; inherited SurrealDB-era views re-authored or retired | every K-package setting and action is reachable in the UI; the trigger record of a real question is shown; the visual-parity rule holds | T7; second-mind steps 3, 8, 9; baseline section 6 |
-| K13 | **Repository convergence**, continuous, starting with the enforcement ratchets and file splits in the [code structure and conventions](../architecture/code-structure-and-conventions.md). Fragmentation from the baseline (the unused `rrd-maintenance`, the cluster, Kubernetes and pgvector scope decision, lab crate merges, Python duplicates, `sha256_hex` copies, workspace lists, stale `rrflow-eval` docs); the estate-to-engram rename; delivery | each removal keeps every test; one owner per concept | baseline section 8; d02 P11; one-engine P0, P10 |
+| K13 | **Repository convergence**, continuous, starting with the enforcement ratchets and file splits in the [code structure and conventions](../architecture/code-structure-and-conventions.md). Fragmentation from the baseline (the unused `rrd-maintenance`, the cluster, Kubernetes and pgvector scope decision, lab crate merges, Python duplicates, `sha256_hex` copies, workspace lists, stale `rrflow-eval` docs); the estate-to-engram rename; rrflowMX folded into rrflowKV (section 5, item 10); delivery | each removal keeps every test; one owner per concept | baseline section 8; d02 P11; one-engine P0, P10 |
 | K15 | **Cloud tier and synchronization.** The local engram synchronizes with the cloud offering, which is comparable to SurrealDB Cloud or ArangoDB's managed service and backed by shippinAI. `rrd-cluster` provides replication; `rrd-kubernetes` deploys it for shippin.cloud; the shippin panel manages it. Optional and feature-gated, consuming only public engine contracts, never required for local readiness | implements S7: two replicas and a team member's replica converge after concurrent edits, deletes, schema changes, interruption and reconnect, from every trigger; each conflict kind resolves by its S7 rule and is recorded; a member without a scope's grant never receives it; the shippin panel reads the same contracts | owner direction of 2026-11-13; the roadmap's optional enterprise control plane; `rrd-cluster`, `rrd-kubernetes`, pgvector adapter |
 | K16 | **Idle consolidation (S9).** Merge, reinforce and decay, shortcut hops and demotion, each run as a governed derived effect while idle; a Connectome view of the "neurons" before and after | replaying gives the same result; every consolidated record traces to its sources; a request arriving mid-job waits no more than `consolidation.yield_ms`; K3 shows equal or better answer quality with fewer hops or keys examined, or the job stays off by default | owner direction of 2026-11-14; ADR-0005 second brain; S9 |
 | K14 | **Second-mind extensions**, after K3 shows a working baseline. Honesty layer and lexicon on the 743 saved prompts; connectors and importers (ArangoDB, SurrealDB, MongoDB, Atlassian); external harness import; UI library within render and memory budgets | each with its own real-run exit from the second-mind ledger | second-mind steps 7, 8, 10 |
@@ -272,7 +274,26 @@ A technique is adopted only after a K3 comparison on this repository's workload,
 
 The latest diagnostic comparison shows how far behind RRFlow is. On 20k vectors at recall 0.95, RRFlow with TurboQuant served 15.3 queries/s; Qdrant served 567 and SurrealDB 64. That report makes no parity claim (`eval/lab/evidence/arm-20k-20261106/report.json`).
 
-### 4.2 Proving LFG and SWAG
+### 4.2 Borrow or build
+
+Owner decision, 2026-11-14. Each layer gets a floor check on this repository's workload against a proven implementation:
+
+| Layer | Floor check against |
+|---|---|
+| rrflowKV point reads and writes | Fjall |
+| BM25 | Tantivy |
+| Vector search at recall 0.95 | Qdrant, and a Rust approximate-nearest-neighbour library |
+| CLD columnar scans | Parquet read through Arrow, as today |
+
+If the RRFlow layer is more than 3× slower after one recorded tuning pass, a locked third-party library goes behind the same RRFlow interface, under the source-adaptation rule in `AGENTS.md`: a build input, never a renamed copy. RRFlow builds its own only where it measures better or where no library fits the boundary.
+
+The vector index goes first, because the measured gap is 15.3 against 567 queries/s. This follows what the field did: Stonebraker and Pavlo (SIGMOD Record, 2024) note that most systems added vector search by integrating an open-source library rather than writing their own. RRFlow's own work goes into what no one else offers:
+- schema-driven reasoning;
+- the planner and its trace;
+- prompt flights with provenance;
+- governed effects.
+
+### 4.3 Proving LFG and SWAG
 
 K3 runs every question in four arms at each effort level: neither, LFG only, SWAG only, and both. For each it reports latency at p50 and p90, model tokens, keys examined, hops, and the judge's answer-quality score. LFG and SWAG stay on by default only at the effort levels where they win: better quality at equal cost, or lower cost at equal quality. Where they don't, the install template turns them off and says why. No such evidence exists today. The only receipt from a real model proves that dispatch works, not quality. Measuring answer quality needs the judge decision in section 6.
 
@@ -287,6 +308,10 @@ K3 runs every question in four arms at each effort level: neither, LFG only, SWA
 7. **Handoff schema.** `one-engine-handoff-v1` is the one schema; the other shapes are historical.
 8. **PR size.** Advisory only.
 9. **Rejected owner direction.** The owner withdrew the DuckDB adapter direction, and pgrust (AGPL-3.0) is study only.
+10. **rrflowMX.** It was modelled on SurrealDB's in-memory backend (SurrealMX), but RRFlow ships no in-memory deployment, and installation refuses it. Owner decision, 2026-11-14: rrflowMX folds into rrflowKV inside K13.
+    - It is no longer a product storage profile: it leaves the contract, OpenAPI, SDKs and deployment docs.
+    - Non-durable use runs rrflowKV itself on a temporary root.
+    - Its simple MVCC model stays as a test-only reference that checks rrflowKV's answers (53 test files use it), renamed and outside the product.
 
 ## 6. Owner decisions still open
 
@@ -304,7 +329,7 @@ Each has a default this plan proceeds with unless the owner says otherwise.
 | Connectome parking lot 008 as the A2UI design | asked when K12 reaches A2UI |
 | Global configuration operations (owner, admission, grant) | defined by K2 |
 | What "LD" means in "improving hops … based on relationship and LD" (2026-11-14) | read as link distance (hop count and relation weight) until the owner says otherwise |
-| Thresholds for demoting data from LSM to CLD | `unmeasured` settings; K3 chooses the values, and demotion stays off until then |
+| CLD copy lag and the planner's row-or-column threshold | `unmeasured` settings that K3 chooses; until then the planner reads CLD only for history and aggregate reads |
 | Pre-release installed v2 plans and jobs | reinstall for pre-release; no migration lane |
 
 ## 7. Superseded records
