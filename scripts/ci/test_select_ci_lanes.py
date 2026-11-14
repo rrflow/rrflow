@@ -65,14 +65,13 @@ class LaneSelectionTests(unittest.TestCase):
         self.assertEqual(packages, "-p rrd-engine")
         self.assertEqual(self.dependents("crates/authority/rrd-engine/src/engine/vector/search.rs"), "-p rrflow-cli")
 
-    def test_root_manifest_or_lock_change_runs_the_full_matrix(self):
-        # The hosted runners cannot link the whole workspace in one target
-        # graph, so a dependency change takes the partitioned full matrix.
-        for path in ("Cargo.toml", "Cargo.lock"):
+    def test_workspace_inputs_compile_the_whole_workspace_without_the_full_matrix(self):
+        for path in ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"):
             with self.subTest(path=path):
-                selected, packages = self.lanes(path)
-                self.assertEqual(selected, {"full"})
-                self.assertEqual(packages, "")
+                result = select([path], metadata=METADATA, root=self.root)
+                self.assertEqual({lane for lane in LANES if result[lane]}, {"engine"})
+                self.assertEqual(result["packages"], "")
+                self.assertEqual(result["dependents"], "--workspace")
 
     def test_sdk_edit_runs_conformance_without_an_empty_engine_package_lane(self):
         selected, packages = self.lanes("sdks/python/src/rrd_client/operation.py")
@@ -84,45 +83,51 @@ class LaneSelectionTests(unittest.TestCase):
         self.assertEqual(selected, {"sdk", "engine"})
         self.assertEqual(packages, "-p rrd-contract")
 
-    def test_repository_policy_files_and_transaction_mutations_run_full_matrix(self):
-        for path in (".gitignore", ".gitattributes",
-                     "crates/authority/rrd-engine/src/engine/transaction.rs",
-                     "crates/authority/rrd-engine/src/engine/query_transaction.rs",
-                     "crates/authority/rrd-engine/src/engine/session_transactions.rs",
-                     "crates/authority/rrd-engine/src/engine/endpoint_configuration.rs",
-                     "crates/authority/rrd-engine/src/engine/estate_control.rs",
-                     "crates/authority/rrd-engine/src/engine/attunement.rs",
-                     "crates/authority/rrd-engine/src/engine/function/execution.rs",
-                     "crates/authority/rrd-engine/src/engine/observation_delivery/persistence.rs",
-                     "crates/authority/rrd-engine/src/engine/reasoning_budget/persistence.rs",
-                     "crates/authority/rrd-engine/src/engine/tests/recovery.rs"):
-            with self.subTest(path=path):
-                self.assertEqual(self.lanes(path)[0], {"full"})
-
-    def test_storage_installer_native_harness_and_workflows_run_the_full_matrix(self):
+    def test_no_changed_path_selects_the_full_matrix(self):
+        # The full matrix is release qualification: nightly and on demand only.
         for path in (
             "crates/persistence/rrd-lsm/src/database.rs",
             "crates/kernel/rrd-core/src/lib.rs",
             "crates/adapters/rrflow-cli/src/main.rs",
+            "crates/authority/rrd-engine/src/engine/transaction.rs",
             "crates/authority/rrd-engine/src/engine/installation/admission.rs",
-            "crates/authority/rrd-engine/src/engine/estate_layout.rs",
-            "crates/authority/rrd-engine/src/engine/token_key/private_file/windows.rs",
-            "crates/authority/rrd-engine/src/engine/attunement/windows_supervisor.rs",
+            "crates/authority/rrd-engine/src/engine/tests/recovery.rs",
             ".github/workflows/ci-reusable.yml",
             "scripts/ci/run_native_capacity.py",
             "rust-toolchain.toml",
+            "Cargo.lock",
             "connectome",
             "deploy/compose.yml",
+            ".gitignore",
+            "tools/new-thing.toml",
         ):
             with self.subTest(path=path):
-                selected, packages = self.lanes(path, "docs/README.md")
-                self.assertEqual(selected, {"full"}, path)
-                self.assertEqual(packages, "")
+                self.assertNotIn("full", self.lanes(path, "docs/README.md")[0], path)
 
-    def test_unknown_path_fails_closed_into_the_full_matrix(self):
-        selected, _ = self.lanes("tools/new-thing.toml")
-        self.assertEqual(selected, {"full"})
+    def test_durable_engine_and_storage_edits_test_their_crate(self):
+        selected, packages = self.lanes("crates/persistence/rrd-lsm/src/database.rs")
+        self.assertEqual(selected, {"engine"})
+        self.assertEqual(packages, "-p rrd-lsm")
+        self.assertEqual(self.dependents("crates/persistence/rrd-lsm/src/database.rs"), "-p rrd-engine -p rrflow-cli")
+        selected, packages = self.lanes("crates/authority/rrd-engine/src/engine/transaction.rs",
+                                        "crates/authority/rrd-engine/src/engine/tests/recovery.rs")
+        self.assertEqual(selected, {"engine"})
+        self.assertEqual(packages, "-p rrd-engine")
+        selected, packages = self.lanes("crates/adapters/rrflow-cli/src/main.rs")
+        self.assertEqual(selected, {"engine"})
+        self.assertEqual(packages, "-p rrflow-cli")
+
+    def test_workflow_ci_script_and_policy_files_run_the_script_lane(self):
+        for path in (".github/workflows/ci-reusable.yml", "scripts/ci/run_native_capacity.py", ".gitignore",
+                     ".gitattributes", ".gitmodules", "connectome", "deploy/compose.yml", "VERSION",
+                     ".devcontainer/devcontainer.json"):
+            with self.subTest(path=path):
+                self.assertEqual(self.lanes(path)[0], {"scripts"}, path)
+
+    def test_unknown_path_runs_every_light_lane_and_compiles_the_workspace(self):
         result = select(["tools/new-thing.toml"], metadata=METADATA, root=self.root)
+        self.assertEqual({lane for lane in LANES if result[lane]}, {"docs", "scripts", "engine", "sdk"})
+        self.assertEqual(result["dependents"], "--workspace")
         self.assertEqual(result["unknown"], ["tools/new-thing.toml"])
 
     def test_a_nested_member_is_its_own_package_not_an_unknown_path(self):
@@ -136,18 +141,16 @@ class LaneSelectionTests(unittest.TestCase):
         self.assertEqual(packages, "-p rrflow-eval")
         self.assertNotIn("fuzz", packages)
 
-    def test_unknown_crate_directory_fails_closed(self):
-        selected, _ = self.lanes("crates/compute/not-a-crate/src/lib.rs")
-        self.assertEqual(selected, {"full"})
+    def test_unknown_crate_directory_compiles_the_workspace(self):
+        result = select(["crates/compute/not-a-crate/src/lib.rs"], metadata=METADATA, root=self.root)
+        self.assertEqual({lane for lane in LANES if result[lane]}, {"engine"})
+        self.assertEqual(result["dependents"], "--workspace")
+        self.assertEqual(result["unknown"], ["crates/compute/not-a-crate/src/lib.rs"])
 
-    def test_forced_or_empty_selection_is_the_full_matrix(self):
-        self.assertEqual(self.lanes()[0], {"full"})
+    def test_only_a_forced_selection_is_the_full_matrix(self):
+        self.assertEqual(self.lanes()[0], set())
         self.assertEqual(self.lanes("README.md", force_full=True)[0], {"full"})
-
-    def test_full_lane_absorbs_the_light_lanes(self):
-        selected, _ = self.lanes("README.md", "scripts/x.py", "crates/evaluation/rrflow-eval/src/lib.rs",
-                                 "crates/persistence/rrd-lsm/src/lib.rs")
-        self.assertEqual(selected, {"full"})
+        self.assertEqual(self.lanes("crates/persistence/rrd-lsm/src/lib.rs", force_full=True), ({"full"}, ""))
 
     def test_dependents_close_over_the_workspace_only(self):
         graph = workspace_graph(METADATA)

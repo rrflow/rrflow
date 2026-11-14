@@ -132,6 +132,17 @@ class MergeAlarmTests(unittest.TestCase):
         dispatch("workflow_run", run_event(event="push", head_branch="main", conclusion="success"), green)
         self.assertEqual(len(green.wrote("issue", "close", "9")), 1)
 
+    def test_a_failed_nightly_or_manual_qualification_of_main_sounds_the_main_alarm(self):
+        # Candidates no longer run the full matrix, so its failures must surface here.
+        for trigger in ("schedule", "workflow_dispatch"):
+            with self.subTest(trigger=trigger):
+                red = FakeGitHub()
+                dispatch("workflow_run", run_event(event=trigger, head_branch="main"), red)
+                self.assertEqual(len(red.wrote("issue", "create")), 1)
+        other = FakeGitHub()
+        dispatch("workflow_run", run_event(event="workflow_dispatch", head_branch="agent/x"), other)
+        self.assertEqual(other.wrote("issue", "create"), [])
+
     def test_a_bot_author_is_not_mentioned(self):
         github = FakeGitHub(pull={"author": {"login": "app/x", "is_bot": True}})
         dispatch("workflow_run", run_event(), github)

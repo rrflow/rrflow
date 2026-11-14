@@ -65,8 +65,9 @@ jobs:
           set -euo pipefail
           python3 scripts/ci/test_select_ci_lanes.py
           # A manual, scheduled or scope=full run, and any event without a base
-          # revision, is the complete matrix. A pull request or merge-group
-          # candidate runs the lanes its changed paths select.
+          # revision, is the complete qualification matrix. A pull request or
+          # merge-group candidate runs the development gate: the light lanes
+          # its changed paths select, never the full matrix.
           if [ "$SCOPE" = full ] || [ -z "$BASE_SHA" ]; then
             python3 scripts/ci/select_ci_lanes.py --full --github-output "$GITHUB_OUTPUT"
           else
@@ -1008,6 +1009,22 @@ jobs:
           python3 scripts/ci/test_collect_storage_acceptance.py
           python3 scripts/ci/test_sustained_launch.py
           python3 scripts/ci/test_analyze_sustained_conflicts.py
+      - name: Enforce repository CI policy
+        # Workflow and CI-script edits run this lane, not the full matrix.
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/test_merge_alarm.py
+          python3 scripts/ci/test_candidate_admission.py
+          python3 scripts/ci/test_linux_arm64_policy.py
+          python3 scripts/ci/test_native_sample_policy.py
+          python3 scripts/ci/test_sdk_attunement_policy.py
+          python3 scripts/ci/test_rrflowdb_standalone.py
+          python3 scripts/ci/test_cache_warm_policy.py
+          python3 scripts/ci/test_inspect_merge_conflicts.py
+          python3 scripts/ci/test_ci_lanes_policy.py
+          python3 scripts/ci/test_merge_conflict_policy.py
+          python3 scripts/ci/check_workflow.py
+          python3 scripts/ci/test_inspect_candidate_runs.py
 
   engine-fast:
     name: engine fast lane
@@ -1038,13 +1055,16 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Enforce generated product-surface parity
         run: python3 scripts/ci/check_generated_surfaces.py
+      - name: Require a package or dependent selection
+        run: test -n "$PACKAGES$DEPENDENTS"
       - name: Test the changed crates
-        run: |
-          set -euo pipefail
-          test -n "$PACKAGES"
-          cargo test $PACKAGES --locked --no-fail-fast
+        if: ${{ env.PACKAGES != '' }}
+        run: cargo test $PACKAGES --locked --no-fail-fast
       - name: Deny warnings in the changed crates
+        if: ${{ env.PACKAGES != '' }}
         run: cargo clippy $PACKAGES --all-targets --locked -- -D warnings
+      # A workspace input (manifest, lock file, toolchain) selects no single
+      # crate: DEPENDENTS is then --workspace and everything is compiled.
       - name: Compile the crates that depend on them
         if: ${{ env.DEPENDENTS != '' }}
         run: cargo check $DEPENDENTS --all-targets --locked
