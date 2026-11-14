@@ -22,9 +22,9 @@ A project that has run for a while cannot list its tasks or prompt flights cheap
 
 ## Owning gates
 
-Kernel package K4 owns "keys examined proportional to the result" for planner reads ([kernel contract](../../roadmap/kernel-contract.md)). These two lists bypass the planner, so they need the same property through a cursor-ordered index on each kind.
+E-02 owns persisted scalar indexes; these two lists need a cursor-ordered index on their record kind. The kernel contract's planner package asks for keys examined in proportion to the result, and these lists bypass the planner.
 
-Roadmap owner: [Gate G](../../roadmap/rrflow-1.0/gate-g.md).
+Roadmap owner: [Gate E](../../roadmap/rrflow-1.0/gate-e.md).
 
 ## Closure evidence
 
