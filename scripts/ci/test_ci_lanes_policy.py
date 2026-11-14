@@ -74,7 +74,7 @@ class LanePolicyTests(unittest.TestCase):
     def test_selection_must_see_the_base_revision_and_full_history(self):
         with self.assertRaisesRegex(PolicyError, "lane selection is missing"):
             self.check(self.reusable.replace(
-                "BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}",
+                "BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}",
                 "BASE_SHA: ${{ github.event.pull_request.base.sha }}", 1))
         marker = "\n  changes:\n"
         before, after = self.reusable.split(marker, 1)

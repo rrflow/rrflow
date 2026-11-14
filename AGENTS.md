@@ -1,5 +1,25 @@
 # RRFlow engineering instructions
 
+> ## PRE-RELEASE: ONE BRANCH
+>
+> **Owner's rule, 2026-11-14. It overrides anything below that disagrees.**
+>
+> - **All work happens on `main`, in one folder: the repository's own checkout.**
+> - **No feature branches. No worktrees. No pull request per package.** Do not
+>   run `git worktree add`, `git switch -c`, `git checkout -b` or `gh pr create`.
+> - Commit to `main` and push `main`. The development gate runs on every push
+>   and takes minutes; a red gate opens `Main is red: ci`, and that is repaired
+>   before anything else.
+> - Never force push, and never rewrite history.
+> - Connectome work happens in the `connectome/` submodule on its `main`, the
+>   same way.
+> - If something is not actually done and verified, say so. Do not move on and
+>   do not describe it as done.
+>
+> Why: every session used to open its own branch and worktree. By 2026-11-14
+> this repository had 35 worktrees and 172 local branches, the owner could not
+> tell which checkout held the real work, and weeks were lost to it.
+
 `README.md` is the bootstrap product entry point and knowledge map. It owns
 product identity and current status, and it links to the single owning memory
 record for each detailed subject. The RRFlow 1.0 release checklist is owned by
@@ -26,8 +46,8 @@ gates, optimization evidence, and release decision are complete.
 The public `rrflow/rrflow-development` repository is the only push target for
 incremental pre-release source, evidence, and candidate history. The private
 `rrflow/rrflow` repository is the official promotion target, not a development
-remote. Changes reach `main` only through pull requests whose candidate CI
-checks pass; a direct push to `main` is not a landing path. Before every push,
+remote. During pre-release, changes are committed and pushed directly to
+`main`, and the development gate runs on each push. Before every push,
 resolve the destination URL and record its remote, ref, and exact revision. Do
 not push a source ref, tag, binary, artifact, or release to the official
 repository until every Gate J prerequisite passes and the repository owner
@@ -107,12 +127,12 @@ private or chat checklist is not evidence. This is a repository engineering
 procedure, not an RRFlow runtime routine, hook, trigger, skill, or lifecycle.
 It governs repository effects and claimed evidence, not exploratory reasoning
 or private analysis.
-Each bounded package lands as one pull request against `main`. Its description
-carries the change brief: owning outcome and roadmap item, current and target
-behavior, exact scope, failure oracle, acceptance commands, research and
-trace/resource/debug decisions, and stop conditions. The pull request merges
-only after the candidate CI pipeline in `docs/operations/ci.md` passes.
-An open `merge-blocked` issue means a pull request could not land; resolve it
+Each bounded package lands as commits on `main`. Its journal carries the
+change brief: owning outcome and roadmap item, current and target behavior,
+exact scope, failure oracle, acceptance commands, research and
+trace/resource/debug decisions, and stop conditions. The development gate in
+`docs/operations/ci.md` runs on every push.
+An open `Main is red` issue means `main` is failing its gate; repair it
 before starting new work.
 Derive mechanical baseline and navigation facts with repository tooling; authors
 own intent, risk, evidence, and stop decisions rather than a duplicate prose
@@ -128,9 +148,10 @@ other than `main`, whose merge base with `main` is older than three days,
 that changes more than 400 lines, or that would make more than five open
 pull requests, or more than three by one author. The repository owner lifts
 the size and count limits for one pull request by applying the
-`integration` label. One agent owns one pull request in one worktree; two
+`integration` label. Those limits apply only to a pull request someone
+outside the project opens; project work does not use pull requests. Two
 agents that could touch the same files have the wrong task split, and a
-shared interface lands first in its own pull request. A session ends only
+shared interface lands first. A session ends only
 when `python3 scripts/ci/check_session_end.py` passes: the worktree is clean,
 or its work is committed and pushed to a `*-wip-*` branch named in the
 pull request. Agents never merge; the merge queue and the owner do. The

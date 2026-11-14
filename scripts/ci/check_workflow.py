@@ -125,11 +125,12 @@ def verify_candidate_admission(caller: str) -> None:
     trigger = re.search(r"(?ms)^on:\n(.*?)(?=^\S)", caller)
     require(trigger is not None, "candidate CI must declare its event envelope")
     events = re.fullmatch(
+        r"  push:\n    branches: \[main\]\n"
         r"  pull_request:\n    types: \[([a-z_, ]+)\]\n"
         r"  merge_group:\n  workflow_dispatch:\n\n",
         trigger.group(1),
     )
-    require(events is not None, "candidate events must not add filters or omit merge/manual dispatch")
+    require(events is not None, "candidate events must run on pushes to main and must not add filters or omit merge/manual dispatch")
     activities = [item.strip() for item in events.group(1).split(",")]
     required = {"opened", "synchronize", "reopened", "ready_for_review", "converted_to_draft"}
     require(
@@ -1048,7 +1049,7 @@ def verify_lane_selection(jobs: dict[str, str], reusable: str) -> None:
         'python3 scripts/ci/select_ci_lanes.py --full --github-output "$GITHUB_OUTPUT"',
         'python3 scripts/ci/select_ci_lanes.py --base "$BASE_SHA" --head "$HEAD_SHA" --github-output "$GITHUB_OUTPUT"',
         'if [ "$SCOPE" = full ] || [ -z "$BASE_SHA" ]; then',
-        "BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}",
+        "BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}",
     ):
         require(changes.count(required) == 1, f"lane selection is missing: {required}")
     require(not re.search(r"(?m)^    if:", changes) and "continue-on-error:" not in changes,
@@ -1149,9 +1150,12 @@ def main() -> None:
             re.search(rf"(?m)^  {re.escape(trigger)}\s*$", caller) is not None,
             f"candidate CI must include {trigger}",
         )
+    # Pre-release work is committed straight to main (AGENTS.md), so the
+    # development gate must run on exactly those pushes and on no other branch.
     require(
-        re.search(r"(?m)^\s*push:\s*$", caller) is None,
-        "candidate CI must not duplicate PR work on push",
+        len(re.findall(r"(?m)^  push:\n    branches: \[main\]$", caller)) == 1
+        and len(re.findall(r"(?m)^\s*push:\s*$", caller)) == 1,
+        "the development gate must run on pushes to main, and only main",
     )
     require(
         "pull_request_target" not in caller,

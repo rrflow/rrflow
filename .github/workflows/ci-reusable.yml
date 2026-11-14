@@ -57,7 +57,7 @@ jobs:
         env:
           SCOPE: ${{ inputs.scope }}
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           # checkout resolves the PR merge ref or merge-queue candidate. Use
           # that fetched revision so fork head objects need not be fetched.
           HEAD_SHA: ${{ github.sha }}
@@ -1009,6 +1009,7 @@ jobs:
           python3 scripts/ci/test_collect_storage_acceptance.py
           python3 scripts/ci/test_sustained_launch.py
           python3 scripts/ci/test_analyze_sustained_conflicts.py
+          python3 scripts/dev/test_connectome_dev.py
       - name: Enforce repository CI policy
         # Workflow and CI-script edits run this lane, not the full matrix.
         run: |

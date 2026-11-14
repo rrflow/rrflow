@@ -128,7 +128,14 @@ gate, and release qualification runs apart from it ("dev build, normal build
 later"). This replaces the 2026-11-09 proportional-lanes decision, under which
 most engine changes still selected the full matrix.
 
-**Development gate (every candidate).** The first job, `changes`, diffs the
+**One branch.** Owner's rule, 2026-11-14 (`AGENTS.md`): pre-release work is
+committed and pushed directly to `main`. The `ci` workflow therefore also runs
+on every push to `main`, selecting lanes from that push's own changes. The
+ruleset on `main` forbids only deletion and force pushes; the pull-request
+requirement, the required check and the merge queue were removed that day. A
+failed push run opens `Main is red: ci`.
+
+**Development gate (every push and every candidate).** The first job, `changes`, diffs the
 candidate against its base and runs `scripts/ci/select_ci_lanes.py`, which maps
 every changed path to light, Linux-only lanes. No changed path selects the full
 matrix.

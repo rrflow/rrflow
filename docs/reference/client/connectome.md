@@ -200,6 +200,35 @@ is never engine-capability evidence. The authoritative result is the validated
 public response, persisted state, read stamp, commit receipt, or correlated
 evidence supplied by the one `RrdEngine`.
 
+## Development loop
+
+Owner direction, 2026-11-14: "we should have dev build, normal build later",
+with Connectome as the UI for the engine's live state.
+
+```text
+python scripts/dev/connectome_dev.py            # build the engine in debug, then open Connectome
+python scripts/dev/connectome_dev.py --check    # build and report; open nothing
+```
+
+The launcher builds `rrflow` from this checkout and stages a private copy under
+`target/dev-loop/`: Cargo hard-links its output, and the engine refuses to
+install from an executable with more than one link. It puts that directory
+first on `PATH`, verifies that `PATH` now resolves to exactly that file, prints the
+engine's path, SHA-256, version and both revisions, and starts the desktop app
+(`pnpm tauri:dev`). It installs nothing and serves nothing. Connectome's Project
+engines panel installs, serves and stops one engine process per project through
+that `rrflow`, which the app reports as found on `PATH`.
+
+Two limits are stated rather than hidden:
+
+- An installation records the SHA-256 of the executable that applied it, and
+  the engine refuses to open a project under a different executable. A debug
+  rebuild therefore needs the project installed again. Binding an installation
+  to a signer identity instead of one binary's bytes, so that trust survives an
+  update, is separate engine work.
+- A sidecar staged beside the application takes precedence over `PATH`. The
+  development loop expects none.
+
 ## Connection and session sequence
 
 Every new connection and endpoint rotation follows one fail-closed sequence:
