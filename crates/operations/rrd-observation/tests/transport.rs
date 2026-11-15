@@ -39,6 +39,39 @@ fn references() -> EngineReferences {
         plan_sha256: None,
         source_sha256: None,
         configuration_sha256: Some("b".repeat(64)),
+        selector_policy_id: None,
+        selector_routing_sha256: None,
+        selector_narrowed_candidate_count: None,
+    }
+}
+#[test]
+fn selector_references_are_validated_and_stay_absent_when_unrouted() {
+    let unrouted = references();
+    unrouted.validate().unwrap();
+    let encoded = serde_json::to_value(&unrouted).unwrap();
+    assert!(encoded.get("selector_policy_id").is_none());
+    assert!(encoded.get("selector_routing_sha256").is_none());
+    assert!(encoded.get("selector_narrowed_candidate_count").is_none());
+
+    let mut routed = references();
+    routed.selector_policy_id = Some("semantic-router-v1".into());
+    routed.selector_routing_sha256 = Some("c".repeat(64));
+    routed.selector_narrowed_candidate_count = Some(2);
+    routed.validate().unwrap();
+    let reopened: EngineReferences =
+        serde_json::from_value(serde_json::to_value(&routed).unwrap()).unwrap();
+    assert_eq!(reopened, routed);
+
+    for corrupt in [
+        |references: &mut EngineReferences| references.selector_policy_id = Some(String::new()),
+        |references: &mut EngineReferences| {
+            references.selector_routing_sha256 = Some("short".into())
+        },
+        |references: &mut EngineReferences| references.selector_narrowed_candidate_count = Some(0),
+    ] {
+        let mut invalid = routed.clone();
+        corrupt(&mut invalid);
+        assert!(invalid.validate().is_err());
     }
 }
 fn payload() -> Vec<u8> {

@@ -176,6 +176,36 @@ impl RrdEngine {
             .runtime()
             .read_stamp(&self.query_scope(&request.scope)?)?;
         let task = self.read_task_record_at(&read, &task_read(request))?;
+        // A request that names a prompt flight is admitted only against the
+        // retained flight: its task, cohort and context request must match.
+        if let Some(flight) = request.flight.as_ref() {
+            let observed = self
+                .read_prompt_flight(
+                    session,
+                    token,
+                    &rrd_contract::ReadPromptFlight {
+                        scope: request.scope.clone(),
+                        flight_id: flight.flight_id.clone(),
+                        max_storage_keys: request.max_storage_keys,
+                    },
+                    now,
+                    request_id,
+                    operation_id,
+                )?
+                .flight;
+            validate_flight_identity(request, flight, &observed.record)?;
+        }
+        // A routed request is offered only the candidates its router narrowed
+        // to. The packet validator requires exactly this allowance.
+        let allowance = policy
+            .allowance(&configuration)
+            .map_err(|e| ServiceError::Contract(e.to_string()))?;
+        let allowance = match &request.routing {
+            Some(routing) => routing
+                .narrow_allowance(&allowance)
+                .map_err(|e| ServiceError::Contract(e.to_string()))?,
+            None => allowance,
+        };
         let mut packet = EndpointSelectionPacket {
             contract_version: ENDPOINT_SELECTION_VERSION,
             purpose: policy.purpose,
@@ -184,9 +214,7 @@ impl RrdEngine {
             read_manifest_sha256: read.manifest_id.clone(),
             read_cursor: read.commit_cursor,
             controller_binding_id: policy.controller_binding_id.clone(),
-            allowance: policy
-                .allowance(&configuration)
-                .map_err(|e| ServiceError::Contract(e.to_string()))?,
+            allowance,
             lfg: None,
             routing: request.routing.clone(),
         };
@@ -643,6 +671,31 @@ fn prepare_controller<'a>(
     PreparedEndpointChat::new(configuration, &binding.id, &packet.allowance, &chat)
         .map_err(endpoint_failure)
 }
+fn validate_flight_identity(
+    request: &EndpointSelectionRequest,
+    expected: &rrd_contract::EndpointSelectionFlightIdentity,
+    observed: &rrd_contract::PromptFlightRecord,
+) -> Result<()> {
+    if observed.scope != request.scope
+        || observed.task_id.as_ref() != Some(&request.task_id)
+        || observed.cohort_sha256 != expected.prompt_cohort_sha256
+    {
+        return Err(ServiceError::TaskAttemptInvalidated(
+            TaskAttemptInvalidation::InputsChanged,
+        ));
+    }
+    let observed_context = observed
+        .context
+        .as_ref()
+        .map(|context| context.request_sha256.as_str());
+    if observed_context != expected.context_request_sha256.as_deref() {
+        return Err(ServiceError::TaskAttemptInvalidated(
+            TaskAttemptInvalidation::InputsChanged,
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn endpoint_failure(error: EndpointChatFailure) -> ServiceError {
     ServiceError::EndpointCallFailed {
         reason: error.reason,

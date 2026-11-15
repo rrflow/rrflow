@@ -116,6 +116,9 @@ fn source_references(
         plan_sha256: None,
         source_sha256: None,
         configuration_sha256: None,
+        selector_policy_id: None,
+        selector_routing_sha256: None,
+        selector_narrowed_candidate_count: None,
     };
     match source {
         ObservationSource::TaskAttempt {
@@ -145,12 +148,33 @@ fn source_references(
             // the later configuration authorizing this observation export.
             references.configuration_sha256 = attempt
                 .endpoint_proposal
-                .map(|proposal| proposal.configuration_sha256)
+                .as_ref()
+                .map(|proposal| proposal.configuration_sha256.clone())
                 .or_else(|| {
                     attempt
                         .worker_output
-                        .map(|worker| worker.configuration_sha256)
+                        .as_ref()
+                        .map(|worker| worker.configuration_sha256.clone())
                 });
+            let routing = attempt
+                .endpoint_proposal
+                .as_ref()
+                .and_then(|proposal| proposal.routing.as_ref())
+                .or_else(|| {
+                    attempt
+                        .worker_output
+                        .as_ref()
+                        .and_then(|worker| worker.routing.as_ref())
+                });
+            if let Some(routing) = routing {
+                references.selector_policy_id =
+                    Some(routing.semantic_router.policy_id.as_str().to_owned());
+                references.selector_routing_sha256 = Some(
+                    rrd_contract::endpoint_selection_routing_sha256(routing).map_err(contract)?,
+                );
+                references.selector_narrowed_candidate_count =
+                    Some(routing.semantic_router.narrowed_candidate_count);
+            }
         }
         ObservationSource::AttunementJob {
             request,

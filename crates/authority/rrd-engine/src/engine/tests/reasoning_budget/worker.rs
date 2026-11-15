@@ -748,6 +748,7 @@ fn a_selection_must_match_the_prompt_flight_it_names() {
             "{name}"
         );
     }
+    listener.set_nonblocking(true).unwrap();
     assert_eq!(
         listener.accept().unwrap_err().kind(),
         std::io::ErrorKind::WouldBlock,

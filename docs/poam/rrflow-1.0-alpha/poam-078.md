@@ -19,6 +19,12 @@ A code read at `de435238` on 2026-11-11 found the following:
   - "Organisation" and "Organization" are both used.
   - "CLD" names both the process-local hit counters (`crates/authority/rrd-engine/src/runtime/coldlight.rs`) and the cold tier.
 
+## Plan input
+
+The archived rename attempt was reviewed on 2026-11-14: [the review](../../evidence/change-journals/repository/engram-rename-review-20261114.md) holds the old-to-new map, the compatibility hazards, an inventory and a recommended order, and [the attempt's own journal](../../evidence/change-journals/gate-h/engram-connectome-repair-2026-11-07.md) holds its measured compatibility cost. The review is a reading, not a verified plan. Five behaviours the attempt kept and `main` had lost are handled separately ([journal](../../evidence/change-journals/repository/engram-rename-dropped-behaviours-20261114.md)).
+
+The 2026-11-14 attempts through the editor were case-insensitive text replacements and corrupted identifiers (`LifecycleState` became `Lifecyclengram`). The rename needs a case-preserving, whole-word map applied by hand, files renamed in the same change as the paths that name them, and recorded captures left untouched.
+
 ## Impact
 
 One concept has several names in the public contract and generated SDKs. A reader can't tell which name is canonical, and AI clients learn both.

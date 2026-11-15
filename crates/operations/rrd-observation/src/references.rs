@@ -17,6 +17,16 @@ pub struct EngineReferences {
     pub plan_sha256: Option<String>,
     pub source_sha256: Option<String>,
     pub configuration_sha256: Option<String>,
+    /// The routing input admitted for the attempt, when it had one: the
+    /// semantic router's policy, the digest of the whole routing input and how
+    /// many candidates it narrowed to. Derived by the engine from the retained
+    /// attempt, never supplied by a client.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_policy_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_routing_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_narrowed_candidate_count: Option<u32>,
 }
 
 pub(super) fn id(value: &str) -> bool {
@@ -57,9 +67,15 @@ impl EngineReferences {
                 &self.plan_sha256,
                 &self.source_sha256,
                 &self.configuration_sha256,
+                &self.selector_routing_sha256,
             ]
             .iter()
             .any(|value| value.as_deref().is_some_and(|value| !digest(value)))
+            || self
+                .selector_policy_id
+                .as_deref()
+                .is_some_and(|value| !id(value))
+            || self.selector_narrowed_candidate_count == Some(0)
             || (self.task_id.is_none() && self.job_id.is_none())
             || (self.attempt_id.is_some() && self.task_id.is_none())
         {
