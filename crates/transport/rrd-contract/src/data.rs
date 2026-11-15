@@ -245,10 +245,6 @@ impl DataEstateOrganisation {
     }
 }
 
-/// Internal engram terminology maps to the existing public organization type.
-/// There is one serialized and validated representation.
-pub type DataengramOrganisation = DataEstateOrganisation;
-
 pub(crate) fn default_data_domain(identity: &str) -> &'static str {
     if identity.starts_with(DATA_ENGINE_OWNED_PREFIX) {
         DATA_ENGINE_DOMAIN

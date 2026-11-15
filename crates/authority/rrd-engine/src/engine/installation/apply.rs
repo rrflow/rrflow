@@ -359,7 +359,7 @@ impl RrdEngine {
         let installed_at_unix_ms = intent.clock_anchor().observed_at_unix_ms;
 
         let memory_plan = build_memory_engram_plan(
-            &PersistMemoryengram {
+            &PersistMemoryEstate {
                 scope: format!("instance:{instance_id}"),
                 seat: preview.installation.initial_seat.clone(),
                 representations: Vec::new(),
@@ -438,7 +438,7 @@ impl RrdEngine {
             &operation_id,
         )?;
         let bootstrap_control_sequence = transitions.len() as u64 + 5;
-        let mut installed = InstalledengramRecord {
+        let mut installed = InstalledEstateRecord {
             format_version: INSTALLED_RECORD_FORMAT,
             installation: preview.installation.clone(),
             attunement_plan_sha256: preview.attunement.plan_sha256.clone(),

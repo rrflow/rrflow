@@ -7,7 +7,7 @@
  },
  "oversize": {
   "crates/operations/rrd-maintenance/src/lib.rs": 1556,
-  "crates/transport/rrd-contract/src/lib.rs": 329
+  "crates/transport/rrd-contract/src/lib.rs": 327
  },
  "patterns": {
   "boxed_error": {
@@ -65,7 +65,7 @@
    "crates/transport/rrd-server": 2
   },
   "too_many_arguments_allow": {
-   "crates/authority/rrd-engine": 109,
+   "crates/authority/rrd-engine": 108,
    "crates/compute/rrd-query": 1,
    "crates/compute/rrd-vector": 2,
    "crates/kernel/rrd-core": 6,

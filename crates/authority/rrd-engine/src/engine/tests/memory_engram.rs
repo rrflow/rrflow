@@ -1,6 +1,6 @@
 use super::*;
 use rrd_contract::{
-    DataReference, MemorySeatDefinition, PersistMemoryengram, ProviderRepresentationDefinition,
+    DataReference, MemorySeatDefinition, PersistMemoryEstate, ProviderRepresentationDefinition,
     ResolveMemoryWarp, ResolveSeatIdentity, MEMORY_PROVIDER_IDENTITY_KIND, MEMORY_REPRESENTS_KIND,
 };
 
@@ -9,7 +9,7 @@ fn memory_engram(
     representation: Option<&str>,
     provider: Option<&str>,
     valid_from: u64,
-) -> PersistMemoryengram {
+) -> PersistMemoryEstate {
     let representations = match (provider_identity, representation, provider) {
         (Some(provider_identity), Some(representation), Some(provider)) => {
             vec![ProviderRepresentationDefinition {
@@ -24,7 +24,7 @@ fn memory_engram(
         (None, None, None) => Vec::new(),
         _ => panic!("provider fixture must be complete"),
     };
-    PersistMemoryengram {
+    PersistMemoryEstate {
         scope: "instance:test-instance".into(),
         seat: MemorySeatDefinition {
             id: CanonicalId::new("clyffy").unwrap(),
@@ -39,7 +39,7 @@ fn memory_engram(
 fn commit_engram_plan(
     engine: &RrdEngine,
     lease: &rrd_contract::SessionLease,
-    request: &PersistMemoryengram,
+    request: &PersistMemoryEstate,
     at: u64,
     suffix: &str,
 ) {

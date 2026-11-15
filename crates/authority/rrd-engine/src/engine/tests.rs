@@ -92,12 +92,13 @@ mod flight;
 mod function;
 mod index_foundation;
 mod installation;
+
 mod installation_bootstrap;
 mod installation_concurrency;
 mod installation_recovery;
 mod knowledge;
 mod lifecycle;
-mod memory_estate;
+mod memory_engram;
 mod native_inference;
 mod observation_source;
 mod query_admission;

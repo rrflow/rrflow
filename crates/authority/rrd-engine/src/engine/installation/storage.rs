@@ -173,7 +173,7 @@ pub(super) fn replay_installation_result(
         &safe_join(project, &locator.storage_root)?,
         super::super::core::installed_storage_options(&locator.storage)?,
     )?;
-    let installed: InstalledengramRecord =
+    let installed: InstalledEstateRecord =
         decode_control(&inspector, INSTALLED_RECORD_KEY, "installed engram record")?;
     let job_id = canonical_prefixed("job", &preview.attunement.plan_sha256)?;
     build_installation_result(
@@ -193,7 +193,7 @@ pub(super) fn replay_installation_result(
 pub(super) fn build_installation_result(
     preview: &InstallationPreview,
     job_id: &CanonicalId,
-    installed: &InstalledengramRecord,
+    installed: &InstalledEstateRecord,
     runtime_manifest_sha256: &str,
     runtime_cursor: u64,
     control_journal_sequence: u64,
@@ -295,7 +295,7 @@ pub(super) fn decode_json<T: DeserializeOwned>(bytes: &[u8], label: &str) -> Res
 
 pub(in super::super) fn require_locator_record_match(
     locator: &ProjectLocator,
-    installed: &InstalledengramRecord,
+    installed: &InstalledEstateRecord,
 ) -> Result<()> {
     if locator.plan_sha256 != installed.installation.plan_sha256
         || locator.profile_id != installed.installation.profile_id
@@ -354,7 +354,7 @@ pub(in super::super) fn runtime_manifest_from_inspection(
     Ok(read.manifest_id)
 }
 
-pub(super) fn installed_record_sha256(record: &InstalledengramRecord) -> Result<String> {
+pub(super) fn installed_record_sha256(record: &InstalledEstateRecord) -> Result<String> {
     json_sha256(&(
         record.format_version,
         &record.installation,

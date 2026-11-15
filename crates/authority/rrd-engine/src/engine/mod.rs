@@ -129,7 +129,6 @@ mod invocation;
 mod knowledge;
 mod maintenance;
 mod memory_engram;
-mod memory_estate;
 mod model;
 mod query;
 mod query_export;

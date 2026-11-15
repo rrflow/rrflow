@@ -54,7 +54,7 @@ operation.
 The provider-neutral schemas are implemented in
 [`memory_estate.rs`](../../crates/transport/rrd-contract/src/memory_estate.rs),
 and their authorized planning and resolution are composed by
-[`RrdEngine`](../../crates/authority/rrd-engine/src/engine/memory_estate.rs).
+[`RrdEngine`](../../crates/authority/rrd-engine/src/engine/memory_engram.rs).
 
 ## Stable record warps
 
@@ -101,7 +101,7 @@ from that owner. Documentation examples cannot make that operation available.
 ## Executable proof and remaining boundary
 
 The focused engine corpus
-[`seat_becomes_self_through_provider_neutral_edges_and_survives_reopen`](../../crates/authority/rrd-engine/src/engine/tests/memory_estate.rs)
+[`seat_becomes_self_through_provider_neutral_edges_and_survives_reopen`](../../crates/authority/rrd-engine/src/engine/tests/memory_engram.rs)
 binds an identity through an authenticated transaction, proves the persisted
 provider value is a subject digest, reopens the persistent engine, resolves the
 same seat URI, follows the warp through context assembly, and verifies the

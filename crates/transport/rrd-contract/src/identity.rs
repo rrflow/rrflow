@@ -75,7 +75,6 @@ impl<'de> Deserialize<'de> for CanonicalId {
 pub enum ResourceKind {
     Organization,
     Estate,
-    Engram,
     Project,
     Instance,
     Tenant,

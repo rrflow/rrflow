@@ -10,7 +10,7 @@ mod replan;
 use super::installation::{
     attunement_job_key, attunement_plan_key, canonical_prefixed, engram_configuration_key,
     project_inventory_sha256, validate_parse_policies, DefaultInstallProfile,
-    InstalledengramRecord, INSTALLED_RECORD_KEY,
+    InstalledEstateRecord, INSTALLED_RECORD_KEY,
 };
 
 use super::*;

@@ -48,7 +48,6 @@ mod inference;
 mod knowledge;
 mod knowledge_tree;
 mod memory_context;
-mod memory_engram;
 mod memory_estate;
 mod model_manifest;
 mod operation_reference;
@@ -196,7 +195,6 @@ pub use memory_context::{
     ContextPlanStageStatus, ContextReadStamp, MAX_CONTEXT_GRAPH_DEPTH, MAX_CONTEXT_ITEMS,
     MAX_CONTEXT_OUTPUT_BYTES, MAX_CONTEXT_QUERY_BYTES, MAX_CONTEXT_SEEDS, MAX_CONTEXT_STORAGE_KEYS,
 };
-pub use memory_engram::{MemoryengramPlan, PersistMemoryengram};
 pub use memory_estate::{
     MemoryEstatePlan, MemorySeatDefinition, MemoryWarp, PersistMemoryEstate,
     ProviderRepresentation, ProviderRepresentationDefinition, ResolveMemoryWarp,

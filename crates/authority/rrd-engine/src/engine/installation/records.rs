@@ -102,7 +102,7 @@ impl ProjectLocator {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct InstalledengramRecord {
+pub struct InstalledEstateRecord {
     pub format_version: u16,
     pub installation: InstallationPlan,
     pub attunement_plan_sha256: String,
@@ -115,9 +115,7 @@ pub struct InstalledengramRecord {
     pub record_sha256: String,
 }
 
-pub type InstalledEstateRecord = InstalledengramRecord;
-
-impl InstalledengramRecord {
+impl InstalledEstateRecord {
     pub(in super::super) fn validate(&self) -> Result<()> {
         self.installation
             .validate()

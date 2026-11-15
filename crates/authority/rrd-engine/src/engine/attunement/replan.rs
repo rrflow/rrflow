@@ -95,8 +95,8 @@ impl RrdEngine {
             .map(Some)
     }
 
-    pub(in super::super) fn attunement_installed_record(&self) -> Result<InstalledengramRecord> {
-        let record: InstalledengramRecord = decode(
+    pub(in super::super) fn attunement_installed_record(&self) -> Result<InstalledEstateRecord> {
+        let record: InstalledEstateRecord = decode(
             &self
                 .storage
                 .control()

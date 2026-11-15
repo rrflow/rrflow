@@ -49,7 +49,7 @@ impl RrdEngine {
             .control()
             .get(INSTALLED_RECORD_KEY)?
             .ok_or_else(|| ServiceError::Storage("installed engram record is missing".into()))?;
-        let installed: InstalledengramRecord = decode_json(&bytes, "installed engram record")?;
+        let installed: InstalledEstateRecord = decode_json(&bytes, "installed engram record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
         bootstrap::verify(&project, &installed.installation)?;
@@ -222,7 +222,7 @@ impl RrdEngine {
             &storage_root,
             super::super::core::installed_storage_options(&locator.storage)?,
         )?;
-        let installed: InstalledengramRecord =
+        let installed: InstalledEstateRecord =
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed engram record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
