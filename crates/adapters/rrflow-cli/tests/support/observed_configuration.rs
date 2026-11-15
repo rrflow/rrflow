@@ -7,6 +7,8 @@
 //! projected configuration, because the digest covers the renamed field.
 //! Nothing else in a capture changes.
 
+#![allow(dead_code)] // each test crate uses the part of this shared helper it needs
+
 use std::path::Path;
 
 /// The recorded configuration with `identity.estate_id` read as `engram_id`.
