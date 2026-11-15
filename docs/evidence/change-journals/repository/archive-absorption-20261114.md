@@ -300,7 +300,25 @@ All five dropped behaviours are in [one journal](engram-rename-dropped-behaviour
 
 **Resolved.** The ref was in the bundle (`d7ef0a13b`) and was deleted from `refs/archive` on 2026-11-15 after the rename landed.
 
-Verdict: everything that can be taken without doing the rename is on `main`. The ref stays open until the rename lands or the owner accepts the review as its replacement.
+Verdict: the rename landed; this ref is resolved.
+
+### `branch/backup/main-before-sync-fix-2026-10-30` (left `main` 2026-10-30)
+
+One file, `.claude/settings.json`: two permission rules pointing at a long-gone scratchpad and two `additionalDirectories` under a deleted worktree. Nothing in it applies to any other checkout, and the owner's standing rule is that permission rules live in the ignored `.claude/settings.local.json`. **Dropped, nothing absorbed.** It was in the bundle and was deleted from `refs/archive` on 2026-11-15.
+
+## Remote branches on `rrflow/rrflow-development` (checked 2026-11-15)
+
+The archive covered local refs only. The remote also holds 37 branches. 19 appear above. The rest:
+
+| Branch | Verdict | Evidence |
+|---|---|---|
+| 13 branches with no commit that `main` lacks (`as-built-baseline`, `ci-test-selectors`, `core-runtime-split`, `core-trace-split`, `lab-benchmarks`, `lab-datasets`, `lab-definitions-20261113`, `lab-evals`, `lab-tool`, `lsm-segment-split`, `qualification-split`, `store-backup-split`, `vector-hnsw-split`) | Contained in `main` | `git rev-list development/main..<branch>` is 0 for each |
+| `agent/c07-windows-characterization-evidence` | Content on `main`; only a merge commit differs | `c-07g-windows-characterization-terminal.md` exists on `main` |
+| `agent/poam-flush-stalls` | Content on `main`; merge commits only | `gate-e/e-04-flush-stall-record.md` exists on `main` |
+| `copilot/fix-installed-domain-crash` | **Superseded** | Retry on a busy `hdiutil create`; `main`'s `run_native_capacity.py` has its own, wider `is_busy_darwin_create` retry (five attempts, partial-image cleanup) |
+| `gh-readonly-queue/main/pr-285-…` | Merge-queue scratch ref for PRs #285 and #287 | `docs/guides/getting-started.md` (from #287) is on `main`; #285's content not re-proven |
+
+No remote branch has been deleted.
 
 ## Kept in the archive deliberately
 
@@ -310,4 +328,4 @@ Verdict: everything that can be taken without doing the rename is on `main`. The
 
 ## Still open
 
-Every other ref under `refs/archive/20261114/`. Each gets its own section above when it is resolved.
+`wip/rrflow-existing-project` (1,360 lines of unfinished work, one design decision), and the kept ref above.
