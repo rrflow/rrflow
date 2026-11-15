@@ -37,6 +37,15 @@ fn at_parse_with(
     policy: rrd_contract::SourceParsePolicy,
     write: impl FnOnce(&std::path::Path),
 ) -> (Installed, RrdEngine, SessionLease, AttunementJob) {
+    at_parse_configured(policy, None, write)
+}
+
+/// As `at_parse_with`, installed with an engram configuration file.
+fn at_parse_configured(
+    policy: rrd_contract::SourceParsePolicy,
+    configuration: Option<&std::path::Path>,
+    write: impl FnOnce(&std::path::Path),
+) -> (Installed, RrdEngine, SessionLease, AttunementJob) {
     let proposal = crate::AttunementProposal {
         format_version: crate::ATTUNEMENT_PROPOSAL_FORMAT_VERSION,
         steps: [
@@ -57,10 +66,11 @@ fn at_parse_with(
         estimated_min_duration_ms: 0,
         estimated_max_duration_ms: 30_000,
     };
-    let (installed, engine, session) = Installed::with_source(
+    let (installed, engine, session) = Installed::with_configuration(
         InstallationTargetKind::ExistingProject,
         Some(&proposal),
         write,
+        configuration,
     );
     let started = call(
         &engine,
@@ -255,6 +265,155 @@ fn facts_larger_than_one_physical_batch_are_published_across_steps() {
         states.iter().all(|(_, status)| status == "parsed"),
         "{states:?}"
     );
+}
+
+/// Step a job at Parse until Parse has its checkpoint; returns the job and the Steps taken.
+fn finish_parse(
+    engine: &RrdEngine,
+    session: &SessionLease,
+    mut job: AttunementJob,
+    label: &str,
+) -> (AttunementJob, usize) {
+    let mut steps = 0;
+    while job.current_phase == Some(Phase::Parse) {
+        steps += 1;
+        assert!(steps <= 60, "{label}: Parse did not finish in 60 Steps");
+        job = call(
+            engine,
+            session,
+            &step(&job),
+            &format!("{label}-parse-{steps}"),
+            job.updated_at_unix_ms + 1,
+        )
+        .unwrap_or_else(|error| panic!("{label}: Parse Step {steps} was refused: {error:?}"))
+        .status
+        .job;
+    }
+    assert_eq!(job.checkpoints.last().unwrap().phase, Phase::Parse);
+    (job, steps)
+}
+
+/// Replan a job against the project as it is now and step its successor to Parse.
+fn replan_to_parse(
+    engine: &RrdEngine,
+    session: &SessionLease,
+    done: &AttunementJob,
+    label: &str,
+) -> AttunementJob {
+    let at = done.updated_at_unix_ms + 10;
+    let preview = engine
+        .preview_attunement_replan(
+            &session.session_id,
+            &session.token,
+            &done.id,
+            done.revision,
+            at,
+            &format!("request-{label}-preview"),
+            &format!("operation-{label}-preview"),
+        )
+        .unwrap();
+    let successor = engine
+        .accept_attunement_replan(
+            &session.session_id,
+            &session.token,
+            &preview,
+            &preview.proposal_sha256,
+            &context(&format!("{label}-accept")),
+            at + 1,
+        )
+        .unwrap()
+        .successor
+        .job;
+    let mut job = call(
+        engine,
+        session,
+        &AttunementCommand::Start {
+            job_id: successor.id.clone(),
+            plan_sha256: successor.plan_sha256.clone(),
+            expected_revision: successor.revision,
+            lease_ms: 60_000,
+        },
+        &format!("{label}-start"),
+        successor.updated_at_unix_ms + 1,
+    )
+    .unwrap()
+    .status
+    .job;
+    for phase in ["connect", "inventory"] {
+        job = call(
+            engine,
+            session,
+            &step(&job),
+            &format!("{label}-{phase}"),
+            job.updated_at_unix_ms + 1,
+        )
+        .unwrap()
+        .status
+        .job;
+    }
+    assert_eq!(job.current_phase, Some(Phase::Parse));
+    job
+}
+
+/// Files that leave a project are retired within the same commit bound that
+/// publishing them obeyed. Before this, every departed file's retirement went
+/// into one commit whatever its size: a large deletion broke the selected
+/// policy's commit bound, and one larger than the engram's transaction
+/// admission was refused on every Step, so the job could never finish.
+#[test]
+fn a_deletion_larger_than_one_commit_retires_across_steps() {
+    const REMOVED: usize = 40;
+    const ADMISSION: &str = "transaction_admission_bytes = 524288";
+    let directory = tempfile::tempdir().unwrap();
+    let configuration = directory.path().join("small-admission.toml");
+    let default = include_str!("../../../../assets/install/default-estate-configuration-v3.toml");
+    let small = default.replace("transaction_admission_bytes = 67108864", ADMISSION);
+    assert!(
+        small.contains(ADMISSION),
+        "the default changed its admission line"
+    );
+    std::fs::write(&configuration, small).unwrap();
+
+    let (installed, engine, session, job) =
+        at_parse_configured(policy(1_000), Some(&configuration), |root| {
+            std::fs::write(root.join("kept.rs"), b"fn kept() {}\n").unwrap();
+            for file in 0..REMOVED {
+                let mut text = String::new();
+                for function in 0..100 {
+                    text.push_str(&format!(
+                        "fn removed_{file}_{function}() {{\n    kept();\n}}\n"
+                    ));
+                }
+                std::fs::write(root.join(format!("removed_{file:02}.rs")), text).unwrap();
+            }
+        });
+    let (first, _) = finish_parse(&engine, &session, job, "delete-first");
+    assert_eq!(
+        parse_states(&engine, &session, first.updated_at_unix_ms + 1).len(),
+        REMOVED + 1
+    );
+
+    for file in 0..REMOVED {
+        std::fs::remove_file(installed.root.path().join(format!("removed_{file:02}.rs"))).unwrap();
+    }
+    let successor = replan_to_parse(&engine, &session, &first, "delete-second");
+    let (second, steps) = finish_parse(&engine, &session, successor, "delete-second");
+    assert!(
+        steps > 1,
+        "the retirements were meant to need more than one commit"
+    );
+
+    let at = second.updated_at_unix_ms + 1;
+    assert_eq!(
+        parse_states(&engine, &session, at),
+        BTreeSet::from([("kept.rs".to_owned(), "parsed".to_owned())]),
+        "Parse finished before every departed file was retired"
+    );
+    let names: BTreeSet<String> = symbols(&engine, &session, at)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(names, BTreeSet::from(["kept".to_owned()]));
 }
 
 /// Rows and the selected access path of one rrflowQL query.
