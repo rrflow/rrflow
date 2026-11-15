@@ -308,17 +308,11 @@ One file, `.claude/settings.json`: two permission rules pointing at a long-gone 
 
 ### `wip/rrflow-existing-project` (left `main` 2026-11-14)
 
-The uncommitted work of draft PR #247 on a `main` of 2026-11-02 (838 commits behind): 18 files, +1,360 −121. It is a competing design for installing into a project that already holds a `.rrflow` folder. It records the existing `.rrflow` and `.rrflow/rrd` ancestors in the sealed plan with their native identity and security descriptor, leaves their contents and permissions untouched, and stages the locator and bootstrap in the private credential directory behind a publication proof.
+**Open: being ported by hand.** An earlier entry here called this ref superseded by an owner decision and deleted it. That was wrong: the owner never decided the move-aside behaviour. The 2026-10-31 journal says the folder "must be adopted in place, not refused"; the relocation into `.rrflow/previous/` was an agent's reading of that sentence (#236). The ref was restored from the bundle (`d76fee096`) on 2026-11-15.
 
-| Item | Verdict | Evidence |
-|---|---|---|
-| The design: retain the existing folder untouched, bind its descriptor | **Superseded by the owner's decision, not absorbed** | The owner decided on 2026-10-31 that a leftover `.rrflow` "must be adopted in place, not refused" ([journal](../gate-d/adopt-leftover-rrflow-folder.md)). `main` implements that (#236): `adopted_engram_entries` in the plan, `.rrflow` made private in place, each entry moved with no-replace renames into `.rrflow/previous/<plan id>/`, nothing deleted. Commit `d6af8fc90` (2026-11-10) settled #236 against #247 and left #247's preservation oracle ignored |
-| The preservation oracle (bytes and ACLs unchanged in place) | **Already on `main`, ignored** | `existing_project_preserves_inherited_engram_and_opens_after_replay`, `#[ignore]` under POAM-006. Run with `--ignored` on 2026-11-15 it fails at `configuration_and_adoption.rs:563`: the file it reads back is no longer in place because adoption moved it into `previous/`. That is the documented difference between the two designs, not a defect found here |
-| Its own list of defects: unproven staging after a crash refuses instead of recovering; no re-admission after a changed ancestor ACL; non-Linux Unix descriptors unimplemented; Linux, macOS, full suite, CI never run | **Kept as a record** | The ref is in the bundle as `d76fee096`; its intermediate journal is `docs/evidence/change-journals/gate-d/existing-project-retained-admission-wip.md` on that commit |
+The uncommitted work of draft PR #247 on a `main` of 2026-11-02 (838 commits behind): 18 files, +1,360 −121. It leaves an existing `.rrflow` and its contents and permissions untouched, records the retained ancestors with their native identity and security descriptor in the sealed plan, and stages the locator and bootstrap in the private credential directory behind a publication proof. `main` has its oracle for it, `existing_project_preserves_inherited_engram_and_opens_after_replay`, ignored under POAM-006; run with `--ignored` it fails because the adoption moves the entries aside.
 
-**Open tension, for the owner:** the ignored oracle and the owner-decided behaviour ask for different things (leave bytes and ACLs untouched, versus move entries aside). Nothing was changed to hide that; the oracle stays ignored with its reason. Changing `main` to the retained design would replace #236, change the sealed plan's digest and rewrite its tests, so it needs the owner's word, not an inference from an agent-written oracle.
-
-**Resolved.** The ref was in the bundle and was deleted from `refs/archive` on 2026-11-15.
+Port, in order, each step its own commit with the failing test first: (1) contract fields and digest stability, (2) native directory security descriptors, (3) retained layout and ancestor binding, (4) installation and recovery, (5) the oracle enabled and #236's relocation removed, (6) documentation and journal.
 
 ## Remote branches on `rrflow/rrflow-development` (checked 2026-11-15)
 
@@ -342,4 +336,4 @@ No remote branch has been deleted.
 
 ## Still open
 
-Only the ref kept deliberately above.
+`wip/rrflow-existing-project` (being ported) and the ref kept deliberately above.
