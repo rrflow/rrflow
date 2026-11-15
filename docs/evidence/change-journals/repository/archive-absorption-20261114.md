@@ -271,7 +271,8 @@ Uncommitted F-06 cold-storage hardening on top of a head `main` already has. Its
 | Kill-at-each-boundary publication test | **Ported; passes on `main`** | `engine/cold_history/tests.rs`, `publication_survives_process_termination_at_each_boundary`, with test-only checkpoints in `files.rs` and `maintain.rs` |
 | Restricted-grant denial test | **Ported; passes on `main`** | `cold_history_denies_row_or_field_restricted_changefeed_grants`, same file |
 | Lock-free admission test | **Ported; passes on `main`** | `rrd-store/src/rrflow_kv/tests.rs`, `immutable_file_admission_skips_held_database_locks` |
-| Exact-once installed read-back; SDK cold-history conformance in all five SDKs | Open: to port | Tests `main` does not have |
+| Installed read-back proves coverage, not just existence | **Ported; passes on `main`** | `rrflow-cli/tests/installed_lifecycle/engrams_and_history.rs`: three known transactions, the copy must reach their last cursor, and each acknowledged cursor appears exactly once with its exact mutation, before and after a restart |
+| SDK cold-history conformance in the Rust, Python, Go, Java, .NET and TypeScript clients | Open: to port | No SDK test on `main` reads cold history. It changes the shared corpus digest; the .NET client cannot be built on this machine |
 
 Also recorded while verifying this ref, though not from it: the 2026-11-14 nightly failed on Windows creating its disposable account, [POAM-084](../../../poam/rrflow-1.0-alpha/poam-084.md).
 

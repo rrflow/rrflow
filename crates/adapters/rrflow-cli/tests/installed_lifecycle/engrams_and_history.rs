@@ -187,7 +187,9 @@ fn configured_cold_history_publishes_and_reads_after_process_restart() {
         .build()
         .unwrap();
     let mut captured = Vec::new();
-    let mut first = None;
+    let mut first: Option<Vec<rrd_contract::ColdHistoryReadResult>> = None;
+    let mut expected = Vec::<(u64, TransactionMutation)>::new();
+    let mut last_cursor = 0;
     for pass in 0..2 {
         let (mut child, address) = RunningEngine::start(&project, &mut captured);
         let client = RrdClient::connect_local(
@@ -196,7 +198,7 @@ fn configured_cold_history_publishes_and_reads_after_process_restart() {
             ClientConfig::default(),
         )
         .unwrap();
-        let result = runtime.block_on(async {
+        let generations = runtime.block_on(async {
             let session = client
                 .create_session(
                     credential.principal_id.clone(),
@@ -213,14 +215,96 @@ fn configured_cold_history_publishes_and_reads_after_process_restart() {
                 )
                 .await
                 .unwrap();
+            let scope = format!("instance:{}", client.instance_id());
+            if pass == 0 {
+                let mut schema = client
+                    .read_data_schema(
+                        &session,
+                        rrd_contract::ReadDataSchema {
+                            scope: scope.clone(),
+                            max_storage_keys: 10_000,
+                        },
+                        RequestOptions::read("cold-schema", "cold-schema").unwrap(),
+                    )
+                    .await
+                    .unwrap()
+                    .schema
+                    .expect("installed schema must exist");
+                schema.revision += 1;
+                schema.migration = "add cold history fixture table".into();
+                let kind = CanonicalId::new("cold-fixture").unwrap();
+                schema.tables.insert(
+                    kind.clone(),
+                    rrd_contract::DataTableSchema {
+                        model: rrd_contract::DataLogicalModel::Relational,
+                        mode: rrd_contract::DataSchemaMode::Schemaless,
+                        properties: BTreeMap::new(),
+                        allow_additional_properties: false,
+                    },
+                );
+                let reference = rrd_contract::DataReference {
+                    kind,
+                    id: CanonicalId::new("note-one").unwrap(),
+                };
+                let record = |body: &str, valid_from| TransactionMutation::PutRecord {
+                    reference: reference.clone(),
+                    valid_from,
+                    valid_to: None,
+                    properties: BTreeMap::from([("body".into(), QueryValue::String(body.into()))]),
+                };
+                let batches = vec![
+                    vec![
+                        TransactionMutation::PutSchema { registry: schema },
+                        record("before", 100),
+                    ],
+                    vec![record("after", 200)],
+                    vec![TransactionMutation::RetireData {
+                        model: rrd_contract::DataLogicalModel::Relational,
+                        target: rrd_contract::DataTarget::Reference { reference },
+                        effective_at: 300,
+                    }],
+                ];
+                for (ordinal, mutations) in batches.into_iter().enumerate() {
+                    let begin = format!("cold-fixture-begin-{ordinal}");
+                    let commit = format!("cold-fixture-commit-{ordinal}");
+                    let lease = client
+                        .begin_transaction(
+                            &session,
+                            BeginTransaction {
+                                scope: CanonicalId::new("data").unwrap(),
+                                timeout_ms: 10_000,
+                            },
+                            RequestOptions::mutation(&begin, &begin, &begin).unwrap(),
+                        )
+                        .await
+                        .unwrap();
+                    let expected_mutation = mutations.last().unwrap().clone();
+                    let receipt = client
+                        .commit_transaction(
+                            &session,
+                            &lease.transaction_id,
+                            CommitTransaction {
+                                operation_sha256: transaction_operation_sha256(&mutations),
+                                mutations,
+                            },
+                            RequestOptions::new(&commit, &commit, Some(&commit), Some(u64::MAX))
+                                .unwrap(),
+                        )
+                        .await
+                        .unwrap();
+                    assert!(!receipt.idempotent_replay);
+                    last_cursor = receipt.last_runtime_cursor.expect("runtime cursor");
+                    expected.push((last_cursor, expected_mutation));
+                }
+            }
             let mut request = rrd_contract::ReadColdHistory {
-                scope: format!("instance:{}", client.instance_id()),
+                scope,
                 generation: None,
                 max_artifact_bytes: 1024 * 1024,
                 budget: QueryBudget::default(),
             };
             let deadline = std::time::Instant::now() + Duration::from_secs(30);
-            loop {
+            let status = loop {
                 let status = client
                     .read_cold_history(
                         &session,
@@ -230,32 +314,61 @@ fn configured_cold_history_publishes_and_reads_after_process_restart() {
                     .await
                     .unwrap();
                 assert!(status.enabled);
-                if status.current_generation > 0 {
-                    break;
+                if status.current_generation > 0 && status.through_cursor >= last_cursor {
+                    break status;
                 }
                 assert!(
                     std::time::Instant::now() < deadline,
-                    "cold history was not published"
+                    "cold history did not cover acknowledged fixture cursors"
                 );
                 tokio::time::sleep(Duration::from_millis(100)).await;
+            };
+            let generation_count = first
+                .as_ref()
+                .map_or(status.current_generation, |prior| prior.len() as u64);
+            assert!(generation_count > 0 && generation_count <= 64);
+            assert!(status.current_generation >= generation_count);
+            let mut results = Vec::new();
+            for generation in 1..=generation_count {
+                request.generation = Some(generation);
+                results.push(
+                    client
+                        .read_cold_history(
+                            &session,
+                            request.clone(),
+                            RequestOptions::read("cold-read", "cold-read").unwrap(),
+                        )
+                        .await
+                        .unwrap(),
+                );
             }
-            request.generation = Some(1);
-            client
-                .read_cold_history(
-                    &session,
-                    request,
-                    RequestOptions::read("cold-read", "cold-read").unwrap(),
-                )
-                .await
-                .unwrap()
+            results
         });
-        assert!(!result.changes.is_empty());
+        assert_eq!(expected.len(), 3);
+        for (cursor, mutation) in &expected {
+            let matches = generations
+                .iter()
+                .flat_map(|generation| &generation.changes)
+                .filter(|change| change.cursor == *cursor)
+                .collect::<Vec<_>>();
+            assert_eq!(matches.len(), 1, "fixture cursor must appear exactly once");
+            match &matches[0].mutation {
+                rrd_contract::ChangeMutationSnapshot::Data { mutation: actual } => {
+                    assert_eq!(actual, mutation);
+                }
+                other => panic!("fixture cursor had unexpected mutation: {other:?}"),
+            }
+        }
         if pass == 0 {
-            first = Some(result);
+            first = Some(generations);
             child.terminate(&mut captured);
         } else {
-            assert_eq!(first.as_ref().unwrap().generation, result.generation);
-            assert_eq!(first.as_ref().unwrap().changes, result.changes);
+            let previous = first.as_ref().unwrap();
+            assert_eq!(previous.len(), generations.len());
+            for (before, after) in previous.iter().zip(&generations) {
+                assert_eq!(before.generation, after.generation);
+                assert_eq!(before.changes, after.changes);
+            }
             child.stop(&mut captured);
         }
     }

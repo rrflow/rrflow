@@ -79,6 +79,12 @@ Each passes on `main` as it is; they guard behaviour that had no test.
 
 The crash test's source oracle is one helper in the test file, which the existing restart test now uses too, so the file still has exactly one direct read of the change log.
 
+## 5. The installed read-back proves coverage (landed)
+
+**Before.** The installed-binary test waited until some generation existed and required the first one to be non-empty. A cold copy that lost or duplicated a change would have passed.
+
+**After.** `configured_cold_history_publishes_and_reads_after_process_restart` commits three known transactions through the client (a schema with a record, an update, a retirement), waits until the copy's `through_cursor` reaches the last acknowledged cursor, reads every generation, and requires each acknowledged cursor to appear exactly once with its exact mutation. It then terminates the process, restarts it and requires the same generations with the same changes. Passes on `main` (2026-11-14, Windows, real binary); the whole `installed_lifecycle` target passes with it.
+
 ## Not established
 
 - Not run on Linux or macOS here.
