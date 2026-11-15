@@ -205,6 +205,25 @@ Each was checked the same way as the trial worktrees: every added line searched 
 | | Architecture rules read the whole crate | On `main` | `rrd-engine/tests/workspace_architecture/support.rs:631` (`module_source`) |
 | | Its journal: method, owner direction, characterization results | **Was missing; ported unchanged** | [contract-lib-split-20261113.md](contract-lib-split-20261113.md) |
 
+### The four Parse refs (left `main` 2026-11-11)
+
+`branch/local/p3-stack` is a restack of `branch/agent/p3-parse-executor-20261111`: the two tips differ only in five documentation files, four of which `main` has. Whole-tree checks: `p3-enable-parse` 16 lines, 10 nowhere on `main`; `p3-parse-step-executor` 479 and 28; `p3-parse-executor` 1,236 and 602; `p3-stack` 1,111 and 604.
+
+| Ref | Item | Status | Evidence |
+|---|---|---|---|
+| `p3-enable-parse` | Parse is executable, so derived plans select it | On `main`, narrower on purpose | `engine/attunement/evidence.rs:12-25` enables it only where a supervisor exists (Windows and Linux); the branch enabled it everywhere |
+| `p3-parse-step-executor` | The step, publish and worker split | Superseded | Every function it declares exists on `main`. `main` replaced its JSON-size budget with a physical measurement (`parse/step.rs`), which fixed the 2026-11-12 batch-size failure |
+| `p3-parse-executor`, `p3-stack` | Source facts, worker protocol, supervisors | On `main` | `rrd-attunement/src/{facts.rs,worker.rs}` byte-identical; supervisors at `engine/attunement/{windows,linux}_supervisor.rs` |
+| | The first executor (`run_batch`, `FileOutcome`, `ParseCommit`, commit shares, physical retries) | Superseded | `main`'s rewrite: `parse/step.rs`, `parse/worker.rs`, `parse/publish.rs`, `parse/records/` |
+| | Retirements stop when a commit is full | **Was lost in the rewrite; restored** | On `main` every departed file was retired in one unbounded batch. Deleting 40 small files made every Parse Step fail (35.8 MB against a 16 MiB limit) and the job could never finish. Fixed in `parse/step.rs` |
+| | Test `a_deletion_larger_than_one_commit_retires_across_steps` | **Ported; it failed on `main`** | `engine/tests/attunement/parse_step.rs`, rewritten on `main`'s helpers; committed failing as `6a2b6d013`, then fixed |
+| | Test `an_edit_reparses_only_the_edited_file_and_a_deletion_retires_its_facts` | **Ported** | Same file; `main` had no end-to-end test of the deletion half or of the change feed |
+| | Removal of the unused node proposal (`parse_source`, `ParseProposal`, `SyntaxNode`) | **Ported** | `rrd-attunement/src/parse.rs`, `tests/parse.rs`; only its own tests called it |
+| | Tests for query read-back, multi-step parsing and oversize rejection | On `main`, later form | `parse_step.rs`: `parsed_facts_are_read_through_their_commit_indexes`, `a_file_limit_spreads_parse_over_steps_without_a_checkpoint_until_done`, `facts_larger_than_one_physical_batch_are_published_across_steps` |
+| | Test that a Step replay commits nothing | Superseded | The general replay path returns the stored receipt before dispatch (`engine/attunement/control.rs:58-72`); no Parse-specific test was added |
+
+Verdict: all four absorbed. The work is recorded in [its journal](../gate-d/d-02-parse-retirement-across-steps-20261114.md).
+
 ## Kept in the archive deliberately
 
 | Ref | Why |
