@@ -482,6 +482,8 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
     validate_security(file, true)
 }
 
+// Stage 2 of the retained-directory port; its first caller lands with the retained layout.
+#[cfg_attr(not(test), allow(dead_code))]
 /// Hash the owner, group, and DACL returned for this exact handle. SDDL is used only
 /// inside this process; no security descriptor or principal names are logged.
 pub(super) fn directory_security_sha256(file: &File) -> io::Result<String> {

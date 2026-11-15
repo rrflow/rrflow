@@ -71,6 +71,8 @@ pub(in crate::engine) fn pin_private_directory(path: &AnchoredPath) -> io::Resul
     path.pin_directory_checked(platform::validate_directory)
 }
 
+// Stage 2 of the retained-directory port; its first caller lands with the retained layout.
+#[cfg_attr(not(test), allow(dead_code))]
 /// Read security from a retained, no-follow directory handle, without changing it.
 pub(in crate::engine) fn directory_security_sha256(path: &AnchoredPath) -> io::Result<String> {
     let mut digest = None;
