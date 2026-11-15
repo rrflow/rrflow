@@ -163,17 +163,15 @@ pub(in crate::engine::attunement) fn execute(
             .transaction_admission_bytes,
     );
 
-    let mut mutations: Vec<RuntimeMutation> = records::schema_mutation(engine, &scope, &read)?
+    let mutations: Vec<RuntimeMutation> = records::schema_mutation(engine, &scope, &read)?
         .into_iter()
         .collect();
     let kept: std::collections::BTreeSet<&str> =
         wanted.iter().map(|file| file.state.path.as_str()).collect();
-    for state in states
+    let departed: Vec<&FileState> = states
         .values()
         .filter(|state| !kept.contains(state.path.as_str()))
-    {
-        mutations.extend(records::retire_file(state, at)?);
-    }
+        .collect();
     let base_bytes = encoded_len(&mutations)?;
     let mut used = base_bytes;
     let pending: Vec<&Wanted<'_>> = wanted
@@ -186,13 +184,53 @@ pub(in crate::engine::attunement) fn execute(
     let mut groups: Vec<Group> = Vec::new();
     let timeout = Duration::from_millis(policy.max_elapsed_ms);
     let limit = rrd_store::PHYSICAL_BATCH_PAYLOAD_BYTES;
-    // The store's physical encoding of facts is several times their JSON
-    // size, so one measurement early in the batch sets how much JSON can be
+    // The store's physical encoding of a batch is many times its JSON size,
+    // so one measurement early in the batch sets how much JSON can be
     // gathered; the exact measurement before publishing is the authority.
-    let mut calibrated = false;
     let mut cap = budget;
-    for file in &pending {
-        if groups.len() as u64 >= policy.max_files {
+    // Files that left the project are retired first, one group each, within
+    // the same bound as publication. What does not fit waits for the next
+    // Step, so a large deletion spreads over Steps like a large project does.
+    for state in &departed {
+        check()?;
+        let retirement = records::retire_file(state, at)?;
+        let size = encoded_len(&retirement)?;
+        if used.saturating_add(size) > cap && !groups.is_empty() {
+            break;
+        }
+        used = used.saturating_add(size);
+        groups.push(Group {
+            mutations: retirement,
+            answer: None,
+        });
+        // Removing a fact from its indexes costs far more than its JSON, so
+        // retirements are measured from their first group.
+        if groups.len() == 1 {
+            let measured = measure_gathered(
+                engine,
+                &work,
+                &check,
+                &scope,
+                &Gathered {
+                    states: &states,
+                    kept: &kept,
+                    base: &mutations,
+                    groups: &groups,
+                },
+            )?;
+            cap = cap.min(fitting(used, measured, limit).max(base_bytes.saturating_add(1)));
+        }
+    }
+    let retired = groups.len();
+    // Parsing waits until every departed file is retired: a Step that cannot
+    // publish what it parsed would only parse it again.
+    let mut calibrated = false;
+    for file in pending.iter().take(if retired == departed.len() {
+        usize::MAX
+    } else {
+        0
+    }) {
+        if (groups.len() - retired) as u64 >= policy.max_files {
             break;
         }
         check()?;
@@ -265,32 +303,34 @@ pub(in crate::engine::attunement) fn execute(
         }
         used = used.saturating_add(size);
         groups.push(Group {
-            previous,
-            next,
             mutations: outcome_mutations,
-            rejected: false,
+            answer: Some(FileAnswer {
+                previous,
+                next,
+                rejected: false,
+            }),
         });
         if !calibrated && used >= (limit as u64) / 16 {
             calibrated = true;
-            let summary = summary(&states, &groups, &kept)?;
-            let measured = measure(
+            let measured = measure_gathered(
                 engine,
                 &work,
                 &check,
                 &scope,
-                Batch {
-                    mutations: assemble(&mutations, &groups),
-                    finished: false,
-                    summary_sha256: &summary,
+                &Gathered {
+                    states: &states,
+                    kept: &kept,
+                    base: &mutations,
+                    groups: &groups,
                 },
-            )? as u64;
-            // Gather at most nine tenths of the ceiling at the measured ratio.
-            let fit =
-                (u128::from(used) * (limit as u128 * 9 / 10) / u128::from(measured.max(1))) as u64;
-            cap = cap.min(fit.max(base_bytes.saturating_add(1)));
+            )?;
+            cap = cap.min(fitting(used, measured, limit).max(base_bytes.saturating_add(1)));
         }
     }
     drop(worker);
+    // Parse is finished when every departed file is retired and every pending
+    // file has its answer.
+    let everything = departed.len() + pending.len();
     // Publish the longest prefix of the batch the store admits. A single file
     // whose facts cannot fit any batch is refused with the measured size and
     // is not retried until its content changes.
@@ -305,7 +345,7 @@ pub(in crate::engine::attunement) fn execute(
             &scope,
             Batch {
                 mutations: batch_mutations.clone(),
-                finished: take == pending.len(),
+                finished: take == everything,
                 summary_sha256: &summary,
             },
         )?;
@@ -318,25 +358,38 @@ pub(in crate::engine::attunement) fn execute(
                     "the Parse batch's base records measure {measured} bytes against the physical batch limit {limit}"
                 )))
             }
-            1 if !groups[0].rejected => {
-                let group = &mut groups[0];
-                group.mutations = records::file_mutations(
-                    group.previous.as_ref(),
-                    group.next.clone(),
-                    Outcome::Rejected(format!("facts_exceed_physical_batch:{measured}>{limit}")),
-                    &[],
-                    at,
-                )?;
-                group.rejected = true;
-            }
-            1 => take = 0,
+            1 => match &mut groups[0].answer {
+                // One file's retirement is not divisible here: its facts are
+                // addressed by its state's counts. It is refused by name
+                // rather than retried under another shape.
+                None => {
+                    return Err(ServiceError::StorageAdmission(format!(
+                        "retiring {} measures {measured} bytes against the physical batch limit {limit}",
+                        departed[0].path
+                    )))
+                }
+                Some(answer) if !answer.rejected => {
+                    let rejected = records::file_mutations(
+                        answer.previous.as_ref(),
+                        answer.next.clone(),
+                        Outcome::Rejected(format!(
+                            "facts_exceed_physical_batch:{measured}>{limit}"
+                        )),
+                        &[],
+                        at,
+                    )?;
+                    answer.rejected = true;
+                    groups[0].mutations = rejected;
+                }
+                Some(_) => take = 0,
+            },
             _ => {
                 let fit = (take as u128 * (limit as u128 * 9 / 10) / measured as u128) as usize;
                 take = fit.clamp(1, take - 1);
             }
         }
     };
-    let finished = take == pending.len();
+    let finished = take == everything;
     permit.charge(
         &batch_mutations,
         engine
@@ -357,12 +410,55 @@ pub(in crate::engine::attunement) fn execute(
     )
 }
 
-/// One file's answer in a batch: its records and the states either side.
+/// One indivisible part of a batch: a departed file's retirement, or a
+/// pending file's answer.
 struct Group {
+    mutations: Vec<RuntimeMutation>,
+    /// `None` for a retirement.
+    answer: Option<FileAnswer>,
+}
+
+/// The states either side of one file's answer.
+struct FileAnswer {
     previous: Option<FileState>,
     next: FileState,
-    mutations: Vec<RuntimeMutation>,
     rejected: bool,
+}
+
+/// What a Step has gathered so far, for one physical measurement.
+struct Gathered<'a> {
+    states: &'a BTreeMap<String, FileState>,
+    kept: &'a std::collections::BTreeSet<&'a str>,
+    base: &'a [RuntimeMutation],
+    groups: &'a [Group],
+}
+
+/// Physical bytes the store would write for everything gathered so far.
+fn measure_gathered(
+    engine: &RrdEngine,
+    work: &Work<'_>,
+    check: &dyn Fn() -> Result<()>,
+    scope: &ScopeId,
+    gathered: &Gathered<'_>,
+) -> Result<u64> {
+    let summary = summary(gathered.states, gathered.groups, gathered.kept)?;
+    Ok(measure(
+        engine,
+        work,
+        check,
+        scope,
+        Batch {
+            mutations: assemble(gathered.base, gathered.groups),
+            finished: false,
+            summary_sha256: &summary,
+        },
+    )? as u64)
+}
+
+/// JSON bytes a batch may gather at the measured physical ratio: nine tenths
+/// of the physical ceiling.
+fn fitting(used: u64, measured: u64, limit: usize) -> u64 {
+    (u128::from(used) * (limit as u128 * 9 / 10) / u128::from(measured.max(1))) as u64
 }
 
 fn assemble(base: &[RuntimeMutation], groups: &[Group]) -> Vec<RuntimeMutation> {
@@ -383,7 +479,8 @@ fn summary(
     kept: &std::collections::BTreeSet<&str>,
 ) -> Result<String> {
     let mut states = states.clone();
-    for group in groups {
+    // A retirement changes no kept file's state.
+    for group in groups.iter().filter(|group| group.answer.is_some()) {
         for mutation in &group.mutations {
             if let Some(state) = records::state_of(mutation)? {
                 states.insert(state.path.clone(), state);

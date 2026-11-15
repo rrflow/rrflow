@@ -416,6 +416,97 @@ fn a_deletion_larger_than_one_commit_retires_across_steps() {
     assert_eq!(names, BTreeSet::from(["kept".to_owned()]));
 }
 
+/// A replan parses only what changed: an edited file is parsed again, a
+/// deleted file's facts and state are retired, and an unchanged file's state
+/// is not written again.
+#[test]
+fn an_edit_reparses_only_the_edited_file_and_a_deletion_retires_its_facts() {
+    let (installed, engine, session, job) = at_parse_with(policy(64), |root| {
+        std::fs::write(root.join("kept.rs"), b"fn kept() {}\n").unwrap();
+        std::fs::write(root.join("edited.rs"), b"fn before_edit() {}\n").unwrap();
+        std::fs::write(root.join("removed.rs"), b"fn removed() {}\n").unwrap();
+    });
+    let (first, _) = finish_parse(&engine, &session, job, "edit-first");
+    let scope = ScopeId::new(format!("instance:{}", engine.instance_id())).unwrap();
+    let before = engine.storage.runtime().read_stamp(&scope).unwrap();
+
+    std::fs::write(
+        installed.root.path().join("edited.rs"),
+        b"fn after_edit() {}\n",
+    )
+    .unwrap();
+    std::fs::remove_file(installed.root.path().join("removed.rs")).unwrap();
+    let successor = replan_to_parse(&engine, &session, &first, "edit-second");
+    let (second, _) = finish_parse(&engine, &session, successor, "edit-second");
+    let at = second.updated_at_unix_ms + 1;
+
+    let definitions: BTreeSet<String> = symbols(&engine, &session, at)
+        .into_iter()
+        .filter(|(_, role)| role == "definition")
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(
+        definitions,
+        BTreeSet::from(["after_edit".to_owned(), "kept".to_owned()]),
+        "stale facts must be retired"
+    );
+    assert_eq!(
+        parse_states(&engine, &session, at),
+        BTreeSet::from([
+            ("edited.rs".to_owned(), "parsed".to_owned()),
+            ("kept.rs".to_owned(), "parsed".to_owned()),
+        ])
+    );
+
+    // Every live `source-parse` state the second job wrote, from the change feed.
+    let mut written = BTreeSet::new();
+    let mut after_cursor = before.commit_cursor;
+    loop {
+        let page = engine
+            .read_changefeed(
+                &session.session_id,
+                &session.token,
+                &rrd_contract::ReadChangefeed {
+                    scope: scope.as_str().to_owned(),
+                    after_cursor,
+                    limit: rrd_contract::MAX_CHANGEFEED_PAGE,
+                },
+                at,
+                "request-parse-changes",
+                "operation-parse-changes",
+            )
+            .unwrap();
+        for change in &page.changes {
+            after_cursor = after_cursor.max(change.cursor);
+            if let rrd_contract::ChangeMutationSnapshot::Data {
+                mutation:
+                    rrd_contract::TransactionMutation::PutRecord {
+                        reference,
+                        valid_to: None,
+                        properties,
+                        ..
+                    },
+            } = &change.mutation
+            {
+                if reference.kind.as_str() == "source-parse" {
+                    written.insert(format!("{:?}", properties.get("path")));
+                }
+            }
+        }
+        if !page.has_more {
+            break;
+        }
+    }
+    assert_eq!(
+        written,
+        BTreeSet::from([format!(
+            "{:?}",
+            Some(&rrd_contract::QueryValue::String("edited.rs".into()))
+        )]),
+        "only the edited file's state is written again"
+    );
+}
+
 /// Rows and the selected access path of one rrflowQL query.
 fn query(
     engine: &RrdEngine,
