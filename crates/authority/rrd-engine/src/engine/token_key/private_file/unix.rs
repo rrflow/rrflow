@@ -88,6 +88,69 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+pub(super) fn directory_security_sha256(file: &File) -> io::Result<String> {
+    use std::os::fd::AsRawFd;
+    fn acl(file: &File, name: &std::ffi::CStr) -> io::Result<Option<Vec<u8>>> {
+        // SAFETY: fd is live and the first call requests the current length only.
+        let size =
+            unsafe { libc::fgetxattr(file.as_raw_fd(), name.as_ptr(), std::ptr::null_mut(), 0) };
+        if size < 0 {
+            let error = io::Error::last_os_error();
+            if error.raw_os_error() == Some(libc::ENODATA) {
+                return Ok(None);
+            }
+            return Err(error);
+        }
+        let size = usize::try_from(size).map_err(io::Error::other)?;
+        // Linux bounds xattr values to XATTR_SIZE_MAX (64 KiB).
+        if size > 65_536 {
+            return Err(denied("directory ACL exceeds native bound"));
+        }
+        let mut bytes = vec![0u8; size];
+        // SAFETY: bytes owns size writable bytes; the native function reports actual bytes.
+        let actual = unsafe {
+            libc::fgetxattr(
+                file.as_raw_fd(),
+                name.as_ptr(),
+                bytes.as_mut_ptr().cast(),
+                size,
+            )
+        };
+        if actual < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        if usize::try_from(actual).map_err(io::Error::other)? != size {
+            return Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "directory ACL changed while observed",
+            ));
+        }
+        Ok(Some(bytes))
+    }
+    let metadata = file.metadata()?;
+    let access = acl(file, c"system.posix_acl_access")?;
+    let default = acl(file, c"system.posix_acl_default")?;
+    let bytes = serde_json::to_vec(&(
+        "rrflow-linux-directory-security-v1",
+        metadata.uid(),
+        metadata.gid(),
+        metadata.mode(),
+        access,
+        default,
+    ))
+    .map_err(io::Error::other)?;
+    Ok(rrd_core::digest::sha256_hex(&bytes))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub(super) fn directory_security_sha256(_: &File) -> io::Result<String> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "retained directory ACL inspection is not yet supported on this platform",
+    ))
+}
+
 #[cfg(test)]
 pub(super) fn open(path: &Path, create: bool) -> io::Result<File> {
     let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;

@@ -55,6 +55,12 @@ mod platform {
             "native directory adoption unavailable",
         ))
     }
+    pub(super) fn directory_security_sha256(_: &File) -> io::Result<String> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "directory security inspection unavailable",
+        ))
+    }
 }
 
 fn denied(message: &'static str) -> io::Error {
@@ -63,6 +69,24 @@ fn denied(message: &'static str) -> io::Error {
 
 pub(in crate::engine) fn pin_private_directory(path: &AnchoredPath) -> io::Result<AnchoredPath> {
     path.pin_directory_checked(platform::validate_directory)
+}
+
+/// Read security from a retained, no-follow directory handle, without changing it.
+pub(in crate::engine) fn directory_security_sha256(path: &AnchoredPath) -> io::Result<String> {
+    let mut digest = None;
+    path.pin_directory_checked(|file| {
+        let first = platform::directory_security_sha256(file)?;
+        let second = platform::directory_security_sha256(file)?;
+        if first != second {
+            return Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "directory security changed while observed",
+            ));
+        }
+        digest = Some(first);
+        Ok(())
+    })?;
+    digest.ok_or_else(|| io::Error::other("directory security observation missing"))
 }
 
 pub(in crate::engine) fn create_private_directory_anchored(
@@ -330,6 +354,49 @@ mod tests {
             }
         }
         bytes
+    }
+
+    #[cfg(any(windows, target_os = "linux"))]
+    #[test]
+    fn directory_security_digest_is_stable_and_follows_native_permissions() {
+        let fixture = tempfile::tempdir().unwrap();
+        let root = AnchoredPath::open_root(fixture.path()).unwrap();
+        let directory = create_private_directory_anchored(&root.join("private")).unwrap();
+        let first = directory_security_sha256(&root.join("private")).unwrap();
+        assert_eq!(first.len(), 64);
+        assert_eq!(
+            first,
+            directory_security_sha256(&root.join("private")).unwrap()
+        );
+        // Observation must not change what it observes.
+        pin_private_directory(&directory).unwrap();
+        platform::make_directory_permissive_for_test(&fixture.path().join("private"));
+        let loosened = directory_security_sha256(&root.join("private")).unwrap();
+        assert_ne!(
+            loosened, first,
+            "a permission change must change the digest"
+        );
+        platform::restore_private_directory_for_test(&fixture.path().join("private"));
+        let restored = directory_security_sha256(&root.join("private")).unwrap();
+        assert_ne!(restored, loosened);
+        assert_eq!(
+            restored,
+            directory_security_sha256(&root.join("private")).unwrap()
+        );
+        create_private_directory_anchored(&root.join("second")).unwrap();
+        assert_eq!(
+            first,
+            directory_security_sha256(&root.join("second")).unwrap(),
+            "equal native security gives an equal digest, whatever the path"
+        );
+        assert_ne!(
+            first,
+            directory_security_sha256(&root).unwrap(),
+            "the temporary root has different native security from a private directory"
+        );
+        let file = root.join("file");
+        std::fs::write(fixture.path().join("file"), b"x").unwrap();
+        assert!(directory_security_sha256(&file).is_err());
     }
 
     #[cfg(any(unix, windows))]

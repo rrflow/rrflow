@@ -22,15 +22,17 @@ use windows_sys::Win32::Foundation::{
 };
 
 use windows_sys::Win32::Security::Authorization::{
-    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
-    SDDL_REVISION_1, SE_FILE_OBJECT,
+    ConvertSecurityDescriptorToStringSecurityDescriptorW, ConvertSidToStringSidW,
+    ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo, SDDL_REVISION_1,
+    SE_FILE_OBJECT,
 };
 
 use windows_sys::Win32::Security::{
     EqualSid, GetAce, GetLengthSid, GetSecurityDescriptorControl, GetTokenInformation, IsValidAcl,
     IsValidSecurityDescriptor, IsValidSid, IsWellKnownSid, TokenOwner, TokenUser,
     WinLocalSystemSid, ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, DACL_SECURITY_INFORMATION,
-    OWNER_SECURITY_INFORMATION, PSID, SE_DACL_PROTECTED, TOKEN_OWNER, TOKEN_QUERY, TOKEN_USER,
+    GROUP_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION, PSID, SE_DACL_PROTECTED, TOKEN_OWNER,
+    TOKEN_QUERY, TOKEN_USER,
 };
 
 use windows_sys::Win32::Storage::FileSystem::{
@@ -478,6 +480,64 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
         ));
     }
     validate_security(file, true)
+}
+
+/// Hash the owner, group, and DACL returned for this exact handle. SDDL is used only
+/// inside this process; no security descriptor or principal names are logged.
+pub(super) fn directory_security_sha256(file: &File) -> io::Result<String> {
+    let mut owner = null_mut();
+    let mut group = null_mut();
+    let mut dacl: *mut ACL = null_mut();
+    let mut raw = null_mut();
+    // SAFETY: the live directory handle grants READ_CONTROL and each output is writable.
+    let status = unsafe {
+        GetSecurityInfo(
+            file.as_raw_handle(),
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+            &mut owner,
+            &mut group,
+            &mut dacl,
+            null_mut(),
+            &mut raw,
+        )
+    };
+    if status != 0 {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    let security = LocalAllocation(raw);
+    // SAFETY: GetSecurityInfo returned the descriptor and owns the referenced buffers.
+    if unsafe { IsValidSecurityDescriptor(security.0) } == 0 || owner.is_null() {
+        return Err(denied("invalid directory security descriptor"));
+    }
+    let mut text = null_mut();
+    let mut length = 0u32;
+    // SAFETY: descriptor is valid, and the API allocates a NUL-terminated UTF-16 result.
+    if unsafe {
+        ConvertSecurityDescriptorToStringSecurityDescriptorW(
+            security.0,
+            SDDL_REVISION_1,
+            OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+            &mut text,
+            &mut length,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    let encoded = LocalAllocation(text.cast());
+    if text.is_null() || length == 0 || length > 1_048_576 {
+        return Err(denied("directory security descriptor exceeds bound"));
+    }
+    // SAFETY: the API reports the allocated UTF-16 length, retained by encoded.
+    let words = unsafe { std::slice::from_raw_parts(text, length as usize) };
+    let mut bytes = Vec::with_capacity(words.len() * 2);
+    for word in words {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    let digest = rrd_core::digest::sha256_hex(&bytes);
+    drop(encoded);
+    Ok(digest)
 }
 
 #[cfg(test)]

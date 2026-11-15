@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 mod private_file;
 pub(in crate::engine) use private_file::{
-    adopt_private_directory_anchored, create_private_directory_anchored,
+    adopt_private_directory_anchored, create_private_directory_anchored, directory_security_sha256,
     open_private_empty_anchored, pin_private_directory, read_private_anchored,
     write_private_anchored,
 };
