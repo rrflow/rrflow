@@ -274,6 +274,10 @@ Uncommitted F-06 cold-storage hardening on top of a head `main` already has. Its
 | Installed read-back proves coverage, not just existence | **Ported; passes on `main`** | `rrflow-cli/tests/installed_lifecycle/engrams_and_history.rs`: three known transactions, the copy must reach their last cursor, and each acknowledged cursor appears exactly once with its exact mutation, before and after a restart |
 | SDK cold-history conformance in the Rust, Python, Go, Java, .NET and TypeScript clients | **Ported** | The shared corpus gains a `cold_history` domain (`rrd-contract/src/sdk_conformance.rs`, `fixtures/rrd-sdk-conformance-v1.json`); the harness publishes one generation before any client runs; each client reads generation 1 and requires the seeded actor. Unlike the archive, the corpus carries no policy: `main` installs with cold history on by default, so the installation identity is unchanged. Run against a real daemon here for Rust, Python and Go; Java, .NET and the TypeScript run are proven only by the gate |
 
+| The worktree's own 1,276-line journal | **Kept as a record** | `main`'s journal is a 174-line rewrite and 927 of the archive's 1,051 substantive lines are not on it. Preserved unchanged except title, status, coordinate and a provenance note: [f-06-derived-cold-history-worktree-20261107.md](../gate-f/f-06-derived-cold-history-worktree-20261107.md) |
+
+Verdict: every code and test item of this ref is on `main`, the two SDK defects are in the POA&M, and the journal is kept.
+
 Also recorded while verifying this ref, though not from it: the 2026-11-14 nightly failed on Windows creating its disposable account, [POAM-084](../../../poam/rrflow-1.0-alpha/poam-084.md).
 
 ## Kept in the archive deliberately
