@@ -90,6 +90,22 @@ class OfflineLifecyclePolicyTests(unittest.TestCase):
                 self.assertNotIn("private", repr(error))
                 self.assertEqual(completed, [])
 
+    def test_held_output_is_reported_closed_only_after_its_holder_exits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pid_file = Path(directory) / "holder.pid"
+            try:
+                with self.assertRaises(runner.CommandOutputNotClosed) as caught:
+                    runner.run(*held_output_command(pid_file, False, True), check=False, timeout=30)
+                error = caught.exception
+                self.assertTrue(error.stderr_open)
+                # The holder is alive, so a short wait proves nothing.
+                self.assertFalse(error.wait_closed(0.2))
+            finally:
+                end_holder(pid_file)
+            self.assertTrue(error.wait_closed(10))
+        # A record without its capture threads can never claim release.
+        self.assertFalse(runner.CommandOutputNotClosed("other", 1, False, True).wait_closed(0))
+
     @unittest.skipUnless(os.name == "posix", "requires a real POSIX process group")
     def test_successful_group_command_lets_its_descendant_finish(self):
         finish = '(sleep 0.5; echo finished; : > "$1")'

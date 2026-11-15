@@ -28,6 +28,11 @@ from run_offline_lifecycle import (CommandDeadlineExceeded, CommandOutputNotClos
 CASE = NATIVE_CAPACITY_CASE
 POINTS = ("wal_before_write", "segment_before_create", "manifest_before_create", "current_before_create")
 SCRIPT = Path(__file__).resolve()
+# hdiutil create starts a diskimages-helper that leaves the command's process
+# group and inherits its output. After a busy create that helper can outlive
+# hdiutil while it serves the half-made image. This bounds how long a retry
+# waits for it to let go after the owned image is released.
+HELPER_EXIT_SECONDS = 20
 
 
 class NotRun(RuntimeError):
@@ -43,6 +48,8 @@ class NativeCommandFailure(RuntimeError):
         self.stdout_open = stdout_open
         self.stderr_open = stderr_open
         self.timed_out = timed_out
+        # Set when a busy create's output stayed open past the bounded wait.
+        self.holder_outlived_release = False
         self.stdout_head = result.stdout[:8192]
         self.stdout_tail = result.stdout[-8192:]
         self.stderr_head = result.stderr[:8192]
@@ -106,6 +113,7 @@ def retain_native_failure(config, fixture, mode, point, case_index, error):
                        "stdout_head": source.stdout_head, "stdout_tail": source.stdout_tail,
                        "stderr_head": source.stderr_head, "stderr_tail": source.stderr_tail,
                        "stdout_open": source.stdout_open, "stderr_open": source.stderr_open,
+                       "holder_outlived_release": source.holder_outlived_release,
                        "cleanup_state": "unknown"}
             encoded = json.dumps(receipt, ensure_ascii=False).encode("utf-8", errors="replace")
             require(len(encoded) <= 256 * 1024, "capacity diagnostic exceeds output bound")
@@ -203,18 +211,25 @@ def native_command(*arguments, **kwargs):
     return result
 
 
-def is_retryable_darwin_create_failure(error):
-    # Only a command that finished and closed its streams can be retried. A
-    # timed-out or still-open create may leave an escaped process holding the
-    # image; retrying over it could report success while that process lives,
-    # and its diagnostic would never be retained.
+def is_busy_darwin_create(error):
+    # A timed-out create is never retried: its work may still be running. One
+    # whose output is still open is retried only after its holder is seen to
+    # let go; `darwin_template` owns that wait.
     if not (isinstance(error, NativeCommandFailure)
             and sys.platform == "darwin"
             and (error.tool, error.verb) == ("hdiutil", "create")
-            and not (error.timed_out or error.stdout_open or error.stderr_open)):
+            and not error.timed_out):
         return False
     native_output = (error.stderr_tail + "\n" + error.stdout_tail).lower()
     return "resource busy" in native_output
+
+
+def held_output(error):
+    """The open-output record behind a create whose output a process still holds."""
+    if not (error.stdout_open or error.stderr_open):
+        return None
+    cause = error.__cause__
+    return cause if isinstance(cause, CommandOutputNotClosed) else None
 
 
 def associated_loops(image):
@@ -257,18 +272,34 @@ def darwin_template(fixture: Path, size: int) -> Path:
                 "-volname", "RRFlowCapacity", str(template), timeout=120)
             break
         except NativeCommandFailure as error:
-            if not is_retryable_darwin_create_failure(error) or attempt == 4:
+            if not is_busy_darwin_create(error) or attempt == 4:
                 raise
             # A busy create can leave a partial image behind, possibly
             # still attached; the next attempt must start from no image,
             # and only an ordinary file inside the fixture is ever removed.
-            if template.exists():
+            leftover = template.exists()
+            if leftover:
                 require(template.is_file() and not template.is_symlink()
                         and template.resolve().parent == fixture.resolve(),
                         "owned APFS image escaped fixture")
                 detach_owned_image(template)
-                if template.exists():
-                    template.unlink()
+            # Never create over a live holder. A create whose output stayed
+            # open is retried only after the holder is seen to let go; if it
+            # does not, the image stays for inspection and the failure is kept.
+            released_ms = None
+            if error.stdout_open or error.stderr_open:
+                held = held_output(error)
+                began = time.monotonic()
+                if held is None or not held.wait_closed(HELPER_EXIT_SECONDS):
+                    error.holder_outlived_release = True
+                    raise
+                released_ms = round((time.monotonic() - began) * 1000)
+            if template.exists():
+                template.unlink()
+            print(json.dumps({"capacity_create_retry": {
+                "attempt": attempt + 1, "leftover_image": leftover,
+                "held_output": released_ms is not None, "released_ms": released_ms}}),
+                flush=True)
             time.sleep(2 ** attempt)
     return template
 

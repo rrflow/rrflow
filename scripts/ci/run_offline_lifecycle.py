@@ -279,7 +279,7 @@ class CommandOutputNotClosed(RuntimeError):
     a caller that owns that command as evidence, such as an owned-image OS tool.
     """
     def __init__(self, command_category, child_returncode, stdout_open, stderr_open, captured=None,
-                 timed_out=False):
+                 timed_out=False, readers=()):
         self.command_category = command_category if command_category in _CAPTURE_COMMANDS.values() else "other"
         self.child_returncode = (child_returncode if type(child_returncode) is int
                                  and -(2 ** 31) <= child_returncode < 2 ** 31 else None)
@@ -287,7 +287,22 @@ class CommandOutputNotClosed(RuntimeError):
         self.stderr_open = bool(stderr_open)
         self.timed_out = bool(timed_out)
         self.captured = captured
+        self._readers = tuple(readers)
         super().__init__("command output did not close")
+
+    def wait_closed(self, seconds):
+        """Whether every held stream reached end of file within the bound.
+
+        End of file means the last process holding the pipe closed it or
+        exited. Without the capture threads nothing is proven, so the answer
+        is no.
+        """
+        if not self._readers:
+            return False
+        deadline = time.monotonic() + seconds
+        for reader in self._readers:
+            reader.join(max(0.0, deadline - time.monotonic()))
+        return not any(reader.is_alive() for reader in self._readers)
 
 
 class CommandDeadlineExceeded(RuntimeError):
@@ -405,7 +420,8 @@ def run(*arguments: str, **kwargs: object) -> subprocess.CompletedProcess:
         category = _CAPTURE_COMMANDS.get((tool, verb), "other")
         raise CommandOutputNotClosed(category, child.returncode, *open_streams,
                                      captured=result if child.returncode != 0 else None,
-                                     timed_out=error == "command exceeded its deadline")
+                                     timed_out=error == "command exceeded its deadline",
+                                     readers=readers)
     if on_completion is not None:
         on_completion(result)
     if capture_deadline_output and error == "command exceeded its deadline":

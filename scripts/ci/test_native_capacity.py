@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -26,6 +27,11 @@ class NativeCapacityCases(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="rrflow-capacity-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve(strict=True)
+        # The runner's retry lines are CI evidence. Simulated cases must not
+        # print them into a real job's log, where they would be counted.
+        quiet = redirect_stdout(io.StringIO())
+        quiet.__enter__()
+        self.addCleanup(quiet.__exit__, None, None, None)
         self.events = []
         self.generation = 0
         self.config = {"size_mib": 256, "modes": ["fresh", "existing"],
@@ -524,6 +530,77 @@ class NativeCapacityCases(unittest.TestCase):
         self.assertEqual(creates, [str(template)], "one hdiutil create for the whole suite")
         self.assertEqual(attached, [b"pristine template", b"pristine template"],
                          "each case attaches a fresh copy, never the template itself")
+
+    def busy_create_with_held_output(self, holder_lets_go_on_detach):
+        """A busy template create whose escaped helper holds stderr, as on macOS runners."""
+        result = subprocess.CompletedProcess([], 1, "Finishing", "hdiutil: create failed - Resource busy")
+        template = self.root / runner.DARWIN_TEMPLATE
+        released = threading.Event()
+        observed = []
+
+        def native(*args, **kwargs):
+            if args[:2] == ("hdiutil", "create"):
+                observed.append(("create", template.exists(), released.is_set()))
+                if len([entry for entry in observed if entry[0] == "create"]) > 1:
+                    raise runner.NativeCommandFailure(args[0], args[1],
+                                                      subprocess.CompletedProcess([], 1, "", "permanent"))
+                template.write_bytes(b"half-made")
+                reader = threading.Thread(target=released.wait, args=(30,), daemon=True)
+                reader.start()
+                holder = runner.CommandOutputNotClosed("other", 1, False, True, captured=result,
+                                                       readers=[reader])
+                raise runner.NativeCommandFailure(args[0], args[1], result, False, True) from holder
+            return subprocess.CompletedProcess([], 0, "", "")
+
+        def detach(path):
+            observed.append(("detach", Path(path) == template))
+            if holder_lets_go_on_detach:
+                released.set()
+        return template, released, observed, native, detach
+
+    def test_macos_template_retries_a_busy_create_after_its_helper_lets_go(self):
+        template, released, observed, native, detach = self.busy_create_with_held_output(True)
+        with patch.object(runner.sys, "platform", "darwin"), \
+                patch.object(runner, "native_command", side_effect=native), \
+                patch.object(runner, "detach_owned_image", side_effect=detach), \
+                patch.object(runner.time, "sleep") as sleep, redirect_stdout(io.StringIO()) as output:
+            with self.assertRaisesRegex(runner.NativeCommandFailure, "permanent"):
+                with runner.volume(self.root, 256):
+                    self.fail("failed creation must not yield a volume")
+        # The half-made template is released first, the retry waits for the helper,
+        # and the next create starts from no image with no live holder.
+        self.assertEqual(observed[:3], [("create", False, False), ("detach", True), ("create", False, True)])
+        self.assertFalse(template.exists())
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1])
+        retries = [json.loads(line)["capacity_create_retry"] for line in output.getvalue().splitlines()
+                   if line.startswith('{"capacity_create_retry"')]
+        self.assertEqual(len(retries), 1)
+        self.assertEqual((retries[0]["attempt"], retries[0]["leftover_image"], retries[0]["held_output"]),
+                         (1, True, True))
+        self.assertIsInstance(retries[0]["released_ms"], int)
+
+    def test_macos_template_keeps_a_busy_create_whose_helper_never_lets_go(self):
+        template, released, observed, native, detach = self.busy_create_with_held_output(False)
+        diagnostics = self.root / "rrflow-capacity-diagnostics"
+        environment = {"RUNNER_TEMP": str(self.root), "RRFLOW_CAPACITY_DIAGNOSTICS": str(diagnostics)}
+        try:
+            with patch.dict(os.environ, environment), patch.object(runner.sys, "platform", "darwin"), \
+                    patch.object(runner, "native_command", side_effect=native), \
+                    patch.object(runner, "detach_owned_image", side_effect=detach), \
+                    patch.object(runner, "HELPER_EXIT_SECONDS", 0.2), \
+                    patch.object(runner.time, "sleep") as sleep, redirect_stdout(io.StringIO()) as output:
+                with self.assertRaisesRegex(runner.NativeCommandFailure, "Resource busy"):
+                    runner.cases(self.config, self.root)
+        finally:
+            released.set()
+        self.assertEqual([entry[0] for entry in observed].count("create"), 1)
+        sleep.assert_not_called()
+        self.assertNotIn("capacity_create_retry", output.getvalue())
+        receipt = json.loads(next(diagnostics.glob("*.json")).read_text(encoding="utf8"))
+        self.assertTrue(receipt["stderr_open"])
+        self.assertTrue(receipt["holder_outlived_release"])
+        # The template stays for inspection while something may still serve it.
+        self.assertTrue(template.exists())
 
     def test_macos_volume_retries_busy_create_until_success(self):
         result = subprocess.CompletedProcess([], 1, "native detail", "Resource busy")
