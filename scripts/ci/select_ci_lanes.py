@@ -79,6 +79,13 @@ DOCS_PATTERNS = (
 PINNED_BY: dict[str, tuple[str, ...]] = {
     "rrd-contract": ("rrflow-qualification-storage",),
 }
+# Crate -> the workspace binary of another package that its tests execute.
+# `cargo test -p <crate>` builds only that crate's own binaries, so the lane
+# builds these first. The first push that changed rrd-server under the
+# development gate failed for want of one (run 43665714352).
+TEST_BINARIES: dict[str, tuple[str, str]] = {
+    "rrd-server": ("rrflow-cli", "rrd-estate-controller"),
+}
 
 
 def matches(path: str, patterns: tuple[str, ...]) -> bool:
@@ -177,20 +184,25 @@ def select(paths: list[str], *, metadata: dict | None = None, root: Path = ROOT,
                 lanes[lane] = True
             workspace = True
             unknown.append(path)
-    selection, dependents = "", ""
+    selection, dependents, binaries = "", "", ""
     if force_full:
         # The full matrix already covers every light lane.
         lanes = {lane: lane == "full" for lane in LANES}
     elif lanes["engine"]:
         packages |= {pinner for owner in sorted(packages) for pinner in PINNED_BY.get(owner, ())}
         selection = " ".join(f"-p {name}" for name in sorted(packages))
+        binaries = " ".join(
+            f"-p {package} --bin {binary}"
+            for package, binary in sorted({TEST_BINARIES[name] for name in packages if name in TEST_BINARIES})
+        )
         if workspace:
             dependents = "--workspace"
         elif packages:
             graph = workspace_graph(metadata if metadata is not None else cargo_metadata(root))
             closure = with_dependents(packages, graph) - packages
             dependents = " ".join(f"-p {name}" for name in sorted(closure))
-    return {**lanes, "packages": selection, "dependents": dependents, "unknown": sorted(unknown)}
+    return {**lanes, "packages": selection, "dependents": dependents, "binaries": binaries,
+            "unknown": sorted(unknown)}
 
 
 def changed_paths(base: str, head: str, root: Path = ROOT) -> list[str]:
@@ -221,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     lines = [f"{lane}={'true' if result[lane] else 'false'}" for lane in LANES]
     lines.append(f"packages={result['packages']}")
     lines.append(f"dependents={result['dependents']}")
+    lines.append(f"binaries={result['binaries']}")
     for line in lines:
         print(line)
     if result["unknown"]:

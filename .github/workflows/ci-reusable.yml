@@ -45,6 +45,7 @@ jobs:
       sdk: ${{ steps.lanes.outputs.sdk }}
       packages: ${{ steps.lanes.outputs.packages }}
       dependents: ${{ steps.lanes.outputs.dependents }}
+      binaries: ${{ steps.lanes.outputs.binaries }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1039,6 +1040,7 @@ jobs:
       RUSTFLAGS: "-C link-arg=-Wl,--threads=1"
       PACKAGES: ${{ needs.changes.outputs.packages }}
       DEPENDENTS: ${{ needs.changes.outputs.dependents }}
+      BINARIES: ${{ needs.changes.outputs.binaries }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1058,6 +1060,11 @@ jobs:
         run: python3 scripts/ci/check_generated_surfaces.py
       - name: Require a package or dependent selection
         run: test -n "$PACKAGES$DEPENDENTS"
+      # A test that runs another package's binary needs it built first:
+      # `cargo test -p <crate>` builds only that crate's own binaries.
+      - name: Build the binaries the changed crates' tests run
+        if: ${{ env.BINARIES != '' }}
+        run: cargo build $BINARIES --locked
       - name: Test the changed crates
         if: ${{ env.PACKAGES != '' }}
         run: cargo test $PACKAGES --locked --no-fail-fast

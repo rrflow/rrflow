@@ -6,7 +6,10 @@ import tomllib
 import unittest
 from pathlib import Path
 
-from select_ci_lanes import LANES, PINNED_BY, ROOT, select, with_dependents, workspace_graph
+import re
+
+from select_ci_lanes import (LANES, PINNED_BY, ROOT, TEST_BINARIES, select, with_dependents,
+                             workspace_graph)
 from workspace_packages import member_directories
 
 METADATA = {
@@ -93,6 +96,31 @@ class LaneSelectionTests(unittest.TestCase):
         self.assertNotIn("rrflow-qualification-storage", result["dependents"])
         # A crate that pins nothing selects nothing extra.
         self.assertEqual(self.lanes("crates/persistence/rrd-lsm/src/lib.rs")[1], "-p rrd-lsm")
+
+    def test_a_crate_whose_tests_run_a_workspace_binary_has_it_built_first(self):
+        result = select(["crates/transport/rrd-server/src/http/maintenance.rs"],
+                        metadata=METADATA, root=ROOT)
+        self.assertEqual(result["binaries"], "-p rrflow-cli --bin rrd-estate-controller")
+        self.assertEqual(select(["crates/persistence/rrd-lsm/src/lib.rs"], metadata=METADATA,
+                                root=self.root)["binaries"], "")
+
+    def test_every_test_that_runs_a_workspace_binary_is_declared(self):
+        # `workspace_binary("name")` is how a test finds another package's built
+        # binary. Each crate that does so must name it in TEST_BINARIES.
+        used: dict[str, set[str]] = {}
+        for directory, package in member_directories(ROOT).items():
+            for source in (ROOT / directory).rglob("*.rs"):
+                for binary in re.findall(r'workspace_binary\("([^"]+)"\)', source.read_text(encoding="utf-8")):
+                    used.setdefault(package, set()).add(binary)
+        self.assertTrue(used, "no test uses workspace_binary any more; remove TEST_BINARIES")
+        for package, binaries in used.items():
+            with self.subTest(package=package):
+                self.assertIn(package, TEST_BINARIES)
+                self.assertEqual(binaries, {TEST_BINARIES[package][1]})
+        members = set(member_directories(ROOT).values())
+        for package, (owner, _) in TEST_BINARIES.items():
+            self.assertIn(package, used, f"{package} no longer runs a workspace binary")
+            self.assertIn(owner, members)
 
     def test_every_pinning_crate_is_a_workspace_member_that_depends_on_its_owner(self):
         members = {name: directory for directory, name in member_directories(ROOT).items()}

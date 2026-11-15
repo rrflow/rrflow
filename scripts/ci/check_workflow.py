@@ -1063,7 +1063,7 @@ def verify_lane_selection(jobs: dict[str, str], reusable: str) -> None:
         require(changes.count(required) == 1, f"pull-request limits are missing from lane selection: {required.strip()}")
     require(not re.search(r"(?m)^        if:.*\n(?:.*\n){0,3}.*check_pr_governance", changes),
             "pull-request limits cannot be conditional")
-    for name in ("full", "docs", "scripts", "engine", "sdk", "packages", "dependents"):
+    for name in ("full", "docs", "scripts", "engine", "sdk", "packages", "dependents", "binaries"):
         require(f"      {name}: ${{{{ steps.lanes.outputs.{name} }}}}" in changes,
                 f"lane selection must publish the {name} output")
     for job in FULL_LANE_JOBS:
@@ -1079,6 +1079,8 @@ def verify_lane_selection(jobs: dict[str, str], reusable: str) -> None:
     for required in (
         "PACKAGES: ${{ needs.changes.outputs.packages }}",
         "DEPENDENTS: ${{ needs.changes.outputs.dependents }}",
+        "BINARIES: ${{ needs.changes.outputs.binaries }}",
+        "cargo build $BINARIES --locked",
         'test -n "$PACKAGES$DEPENDENTS"',
         "cargo test $PACKAGES --locked --no-fail-fast",
         "cargo clippy $PACKAGES --all-targets --locked -- -D warnings",
@@ -1091,7 +1093,8 @@ def verify_lane_selection(jobs: dict[str, str], reusable: str) -> None:
         "cargo test -p rrd-engine --locked --test workspace_architecture") == 1,
         "repository invariants must run the workspace architecture tests on every light candidate")
     require(fast.count("        if: ${{ env.PACKAGES != '' }}\n") == 2
-            and fast.count("        if: ${{ env.DEPENDENTS != '' }}\n") == 1,
+            and fast.count("        if: ${{ env.DEPENDENTS != '' }}\n") == 1
+            and fast.count("        if: ${{ env.BINARIES != '' }}\n") == 1,
             "engine fast lane must skip package steps for a workspace-only selection and "
             "dependent compilation when nothing depends on the change")
     # Candidates never run the full matrix, so workflow and CI-script edits

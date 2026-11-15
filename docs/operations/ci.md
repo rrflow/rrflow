@@ -160,6 +160,14 @@ records the public catalogue's digest. The cause and the fix are in the
 Any other behaviour of a dependent that a change breaks is found by the
 nightly full matrix, not by the gate.
 
+A test that runs another package's binary needs it built first, because
+`cargo test -p <crate>` builds only that crate's own binaries. `TEST_BINARIES`
+in the same script names them, and `engine-fast` builds them before testing:
+today `rrd-server`'s tests run `rrflow-cli`'s `rrd-estate-controller`. A test
+in `scripts/ci/test_select_ci_lanes.py` fails when a crate calls
+`workspace_binary("…")` without being declared
+([journal](../evidence/change-journals/repository/ci-fast-lane-test-binaries-20261114.md)).
+
 **Qualification matrix (`full`).** The full matrix covers the native installed
 lifecycle on Linux, macOS, Windows and Linux ARM64, crash injection, the
 100-cycle reopen, native capacity, the partitioned engine suites, optional

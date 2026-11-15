@@ -87,6 +87,7 @@ class LanePolicyTests(unittest.TestCase):
             "cargo test $PACKAGES --locked --no-fail-fast",
             "cargo clippy $PACKAGES --all-targets --locked -- -D warnings",
             "cargo check $DEPENDENTS --all-targets --locked",
+            "cargo build $BINARIES --locked",
         ):
             with self.subTest(command=command):
                 self.assertIn(command, self.reusable)
