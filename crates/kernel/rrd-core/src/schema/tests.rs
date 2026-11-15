@@ -272,7 +272,7 @@ fn tag(category: &str, value: &str) -> RuntimeTagRef {
 
 /// Two project kinds and one engine-owned kind, organised into a small tree.
 fn organised() -> RuntimeSchemaRegistry {
-    let mut registry = RuntimeSchemaRegistry::empty(1, "organise the estate");
+    let mut registry = RuntimeSchemaRegistry::empty(1, "organise the engram");
     for name in ["invoice", "customer", "rrflow-seat"] {
         registry.tables.insert(
             kind(name),
@@ -521,7 +521,7 @@ fn organisation_labels_are_bounded_titled_text() {
 #[test]
 fn default_organisation_is_omitted_from_the_persisted_registry() {
     let mut registry = organised();
-    registry.organisation = RuntimeEstateOrganisation::default();
+    registry.organisation = RuntimeEngramOrganisation::default();
     let json = serde_json::to_value(&registry).unwrap();
     assert!(json.get("organisation").is_none());
     let organised = serde_json::to_value(organised()).unwrap();

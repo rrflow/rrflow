@@ -1,5 +1,8 @@
 #![cfg(feature = "endpoint-chat")]
 //! Protocol correctness fixtures, not worker quality or training examples.
+#[path = "support/observed_configuration.rs"]
+mod observed_configuration;
+
 use rrd_contract::{
     EndpointConfiguration, EndpointGenerationSettings, EndpointResponseFormat,
     EndpointTokenParameter,
@@ -14,12 +17,13 @@ fn inputs() -> (EndpointConfiguration, ModelChatRequest, Value) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../transport/rrd-contract/tests/fixtures/endpoint-selection-observed/available");
     let configuration: EndpointConfiguration =
-        serde_json::from_slice(&std::fs::read(root.join("configuration.json")).unwrap()).unwrap();
+        serde_json::from_slice(&observed_configuration::read(&root, "configuration.json")).unwrap();
     let model = configuration.profile.as_ref().unwrap().bindings[0]
         .service_id
         .clone();
     let response =
-        serde_json::from_slice(&std::fs::read(root.join("choice-response.json")).unwrap()).unwrap();
+        serde_json::from_slice(&observed_configuration::read(&root, "choice-response.json"))
+            .unwrap();
     (
         configuration,
         ModelChatRequest {

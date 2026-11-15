@@ -22,7 +22,7 @@ pub struct CapacityProfile {
     pub vcpus: u64,
     pub host_bytes: u64,
     pub engine_bytes: u64,
-    pub estates: u64,
+    pub engrams: u64,
     pub records_min: u64,
     pub edges_min: u64,
     pub vectors_min: u64,
@@ -30,7 +30,7 @@ pub struct CapacityProfile {
     pub logical_source_bytes_min: u64,
     pub clients: Vec<u64>,
     pub rates: Vec<u64>,
-    pub requires_estate_interference: bool,
+    pub requires_engram_interference: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -79,7 +79,7 @@ pub(super) fn validate_capacity_profile(campaign: &StorageCampaign) -> Result<()
         allocation.vcpus.get() == profile.vcpus
             && allocation.host_bytes.get() == profile.host_bytes
             && allocation.engine_bytes.get() == profile.engine_bytes
-            && allocation.estates.get() == profile.estates,
+            && allocation.engrams.get() == profile.engrams,
         "qualification allocation differs from the owning J-04 profile",
     )?;
     require(

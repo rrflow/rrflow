@@ -1,7 +1,7 @@
 //! Durable execution boundary for project-scoped external operator knowledge.
 
 use super::{DurableTraceSpan, TraceIdentity};
-use rrd_contract::InstalledEstateIdentity;
+use rrd_contract::InstalledEngramIdentity;
 use rrd_core::{
     digest, Millis, RuntimeProperties, RuntimeValue, TraceBoundary, TraceDataClass, TraceLink,
     TraceOutcome,
@@ -31,7 +31,7 @@ pub struct TracedOperatorSync {
 #[allow(clippy::too_many_arguments)]
 pub fn execute_traced_operator_sync<E, W>(
     store: &E,
-    installed: &InstalledEstateIdentity,
+    installed: &InstalledEngramIdentity,
     knowledge: &OperatorKnowledgeBinding,
     writer: &mut W,
     work: &OperatorSyncWork,
@@ -204,7 +204,7 @@ where
 #[allow(clippy::too_many_arguments)]
 pub fn execute_traced_operator_search<E, A>(
     store: &E,
-    installed: &InstalledEstateIdentity,
+    installed: &InstalledEngramIdentity,
     knowledge: &OperatorKnowledgeBinding,
     adapter: &mut A,
     request: &OperatorSearchRequest,
@@ -377,7 +377,7 @@ where
 }
 
 fn require_project_binding(
-    installed: &InstalledEstateIdentity,
+    installed: &InstalledEngramIdentity,
     knowledge: &OperatorKnowledgeBinding,
 ) -> Result<(), Box<dyn std::error::Error>> {
     installed.validate()?;

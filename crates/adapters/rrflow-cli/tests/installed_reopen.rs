@@ -34,7 +34,7 @@ const CYCLES: usize = 100;
 const STREAM_LIMIT: usize = 1024 * 1024;
 const CORPUS_SECONDS: u64 = 3600;
 
-struct Estate {
+struct Engram {
     temp: owned_directory::OwnedDirectory,
     binary: PathBuf,
     project: PathBuf,
@@ -43,7 +43,7 @@ struct Estate {
     at: u64,
 }
 
-impl Estate {
+impl Engram {
     fn command(&self) -> Command {
         let mut command = Command::new(&self.binary);
         command
@@ -124,7 +124,7 @@ impl Estate {
         if mode == "existing" {
             std::fs::write(project.join("README.md"), "project-owned\n").unwrap();
         }
-        let mut estate = Self {
+        let mut engram = Self {
             temp: owned_directory::OwnedDirectory::new(temp),
             binary,
             project,
@@ -132,17 +132,17 @@ impl Estate {
             plan: Value::Null,
             at: 0,
         };
-        estate.build = estate.invoke(&["--json", "version"])["build"].clone();
+        engram.build = engram.invoke(&["--json", "version"])["build"].clone();
         let artifact_sha256 = artifact_digest
             .finalize()
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         assert_eq!(
-            estate.build["executable_sha256"], artifact_sha256,
+            engram.build["executable_sha256"], artifact_sha256,
             "reported build does not identify the actual staged bytes"
         );
-        let identity = estate.invoke(&["install", "identity"])["installation_identity"]
+        let identity = engram.invoke(&["install", "identity"])["installation_identity"]
             .as_str()
             .unwrap()
             .to_owned();
@@ -154,31 +154,31 @@ impl Estate {
             "--mode",
             mode,
             "--project",
-            estate.project.to_str().unwrap(),
+            engram.project.to_str().unwrap(),
         ];
         if let Some(configuration) = configuration {
             arguments.extend(["--configuration", configuration.to_str().unwrap()]);
         }
-        let preview = estate.invoke(&arguments);
-        let path = estate.temp.path().join("plan.json");
+        let preview = engram.invoke(&arguments);
+        let path = engram.temp.path().join("plan.json");
         std::fs::write(&path, serde_json::to_vec(&preview).unwrap()).unwrap();
-        let applied = estate.invoke(&[
+        let applied = engram.invoke(&[
             "--json",
             "install",
             "apply",
             "--mode",
             mode,
             "--project",
-            estate.project.to_str().unwrap(),
+            engram.project.to_str().unwrap(),
             "--plan",
             path.to_str().unwrap(),
             "--expect",
             preview["installation"]["plan_sha256"].as_str().unwrap(),
         ]);
         assert_eq!(applied["runtime_cursor"], 2);
-        estate.at = applied["applied_at_unix_ms"].as_u64().unwrap();
-        estate.plan = preview["installation"].clone();
-        estate
+        engram.at = applied["applied_at_unix_ms"].as_u64().unwrap();
+        engram.plan = preview["installation"].clone();
+        engram
     }
 
     fn start(&self, clock: Instant) -> (process::Process, RrdClient, Value) {
@@ -264,7 +264,7 @@ impl Estate {
             // Child termination and stream collection precede retention. Keep
             // the original private bytes, without copying or uploading them.
             eprintln!(
-                "native_startup_failure_estate={}",
+                "native_startup_failure_engram={}",
                 serde_json::json!({"path": self.temp.retain(), "private_state": true})
             );
             panic!("bounded ordinary startup: {error}; {diagnosis}");
@@ -323,10 +323,10 @@ fn kill(mut child: process::Process, clock: Instant) -> Value {
 
 #[test]
 fn installed_redacted_transaction_capture_survives_restart() {
-    let estate = Estate::install("fresh");
+    let engram = Engram::install("fresh");
     let capture = transaction_trace::Capture::new(2).unwrap();
     let clock = Instant::now();
-    let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let credential = RrdEngine::read_installed_api_key(&engram.project).unwrap();
     let begin_options = options("private-redacted-begin");
     let begin_digest = rrd_core::digest::sha256_hex(begin_options.request_id.as_str().as_bytes());
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -335,7 +335,7 @@ fn installed_redacted_transaction_capture_survives_restart() {
         .unwrap();
     let filter = Some("rrd_engine::transaction_diagnostic=debug");
     let (mut first, client, _) =
-        estate.start_for_with_capture(clock, Duration::from_secs(180), filter, Some(&capture));
+        engram.start_for_with_capture(clock, Duration::from_secs(180), filter, Some(&capture));
     let (session, transaction) = runtime.block_on(async {
         let session = client
             .create_session(
@@ -374,7 +374,7 @@ fn installed_redacted_transaction_capture_survives_restart() {
     );
 
     let (second, client, _) =
-        estate.start_for_with_capture(clock, Duration::from_secs(180), filter, Some(&capture));
+        engram.start_for_with_capture(clock, Duration::from_secs(180), filter, Some(&capture));
     let second_pid = second.id();
     let replay = runtime
         .block_on(client.begin_transaction(
@@ -528,11 +528,11 @@ async fn read(
 }
 
 fn run(mode: &str) {
-    let estate = Estate::install(mode);
-    let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let engram = Engram::install(mode);
+    let credential = RrdEngine::read_installed_api_key(&engram.project).unwrap();
     // Freeze every request/effect identity before the first operation.
     let requests = (0..CYCLES)
-        .map(|cycle| request(cycle, estate.at))
+        .map(|cycle| request(cycle, engram.at))
         .collect::<Vec<_>>();
     let mut ledger = AcknowledgementLedger::default();
     for (cycle, request) in requests.iter().enumerate() {
@@ -553,7 +553,7 @@ fn run(mode: &str) {
         .build()
         .unwrap();
     let cleanup = runtime.block_on(async {
-        let (mut child, mut client, initial) = estate.start(clock);
+        let (mut child, mut client, initial) = engram.start(clock);
         let session = client
             .create_session(
                 credential.principal_id.clone(),
@@ -605,11 +605,11 @@ fn run(mode: &str) {
             leases.push(lease);
             let terminated = kill(child, clock);
             assert_eq!(terminated["pid"], previous["pid"]);
-            let (reopened, reconnected, identity) = estate.start(clock);
+            let (reopened, reconnected, identity) = engram.start(clock);
             child = reopened;
             client = reconnected;
             // Read before retry so retry cannot conceal missing persisted effects.
-            let observed = read(&client, &session, estate.at, cycle + 1).await;
+            let observed = read(&client, &session, engram.at, cycle + 1).await;
             for index in 0..=cycle {
                 let started = clock.elapsed().as_nanos() as u64;
                 let replay = client
@@ -629,7 +629,7 @@ fn run(mode: &str) {
                 );
                 record(&mut ledger, index, started, clock, &replay);
             }
-            read(&client, &session, estate.at, cycle + 1).await;
+            read(&client, &session, engram.at, cycle + 1).await;
             ledger.readback.clear();
             for (index, expected_operation) in ledger.expected.iter().take(cycle + 1).enumerate() {
                 let values = expected(index)
@@ -671,14 +671,14 @@ fn run(mode: &str) {
     assert!(report.violations.is_empty(), "{report:?}");
     if mode == "existing" {
         assert_eq!(
-            std::fs::read_to_string(estate.project.join("README.md")).unwrap(),
+            std::fs::read_to_string(engram.project.join("README.md")).unwrap(),
             "project-owned\n"
         );
     }
-    let receipt = serde_json::to_vec(&json!({"instrumentation":"none","mode":mode,"build":estate.build,
+    let receipt = serde_json::to_vec(&json!({"instrumentation":"none","mode":mode,"build":engram.build,
         "native_os":std::env::consts::OS,"native_arch":std::env::consts::ARCH,"forced_reopens":CYCLES,
-        "installation_plan_sha256":estate.plan["plan_sha256"],"expected_sha256":expected_sha256,
-        "profile_id":estate.plan["profile_id"],"deployment":estate.plan["deployment"],"configuration":estate.plan["configuration"],
+        "installation_plan_sha256":engram.plan["plan_sha256"],"expected_sha256":expected_sha256,
+        "profile_id":engram.plan["profile_id"],"deployment":engram.plan["deployment"],"configuration":engram.plan["configuration"],
         "cycles":cycles,"cleanup":cleanup,"ledger":ledger,"report":report})).unwrap();
     assert!(receipt.len() <= 8 * STREAM_LIMIT);
     assert!(!String::from_utf8_lossy(&receipt).contains(credential.credential()));
@@ -695,7 +695,7 @@ fn run(mode: &str) {
         file.sync_all().unwrap();
         println!(
             "installed_reopen_summary={}",
-            json!({"mode":mode,"build":estate.build,"forced_reopens":CYCLES,"report":report})
+            json!({"mode":mode,"build":engram.build,"forced_reopens":CYCLES,"report":report})
         );
     } else {
         println!(

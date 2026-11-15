@@ -2,9 +2,9 @@
 
 package rrd
 
-// OpenAPI SHA-256: 8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae
+// OpenAPI SHA-256: 80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb
 
-const EndpointOpenAPIDocumentSHA256 = "8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae"
+const EndpointOpenAPIDocumentSHA256 = "80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb"
 
 type OperationID string
 
@@ -39,7 +39,7 @@ const (
 	OperationEndpointConfigurationApply   OperationID = "endpoint-configuration-apply"
 	OperationEndpointConfigurationPreview OperationID = "endpoint-configuration-preview"
 	OperationEndpointConfigurationRead    OperationID = "endpoint-configuration-read"
-	OperationEstateRead                   OperationID = "estate-read"
+	OperationEngramRead                   OperationID = "engram-read"
 	OperationFlightLaunch                 OperationID = "flight-launch"
 	OperationFlightList                   OperationID = "flight-list"
 	OperationFlightRead                   OperationID = "flight-read"
@@ -125,7 +125,7 @@ var endpoints = map[OperationID]Endpoint{
 	OperationEndpointConfigurationApply:   {Method: "POST", Path: "/v1/configuration/endpoints/apply", Authentication: "session_bearer", Mutation: true},
 	OperationEndpointConfigurationPreview: {Method: "POST", Path: "/v1/configuration/endpoints/preview", Authentication: "session_bearer", Mutation: false},
 	OperationEndpointConfigurationRead:    {Method: "POST", Path: "/v1/configuration/endpoints/read", Authentication: "session_bearer", Mutation: false},
-	OperationEstateRead:                   {Method: "POST", Path: "/v1/estates/{estate}/read", Authentication: "session_bearer", Mutation: false},
+	OperationEngramRead:                   {Method: "POST", Path: "/v1/engrams/{engram}/read", Authentication: "session_bearer", Mutation: false},
 	OperationFlightLaunch:                 {Method: "POST", Path: "/v1/flights", Authentication: "session_bearer", Mutation: true},
 	OperationFlightList:                   {Method: "POST", Path: "/v1/flights/list", Authentication: "session_bearer", Mutation: false},
 	OperationFlightRead:                   {Method: "POST", Path: "/v1/flights/read", Authentication: "session_bearer", Mutation: false},

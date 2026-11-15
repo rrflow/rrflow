@@ -25,7 +25,7 @@ original values. Traversal `path` entries use the same escaped pair. Series
 result identity is the sample's own `(kind, id)`, not its observation time or
 series ID. Claim results and context use the same opaque SHA-256-based claim
 identity; it is a digest, not a reversible reference or a mathematical proof
-that collisions cannot occur. IDs are scoped to their estate/read stamp.
+that collisions cannot occur. IDs are scoped to their engram/read stamp.
 
 Derived query indexes record result identity version 2. An older index without
 that version is not selected for queries; the authorized `ensure` operation
@@ -36,7 +36,7 @@ contract and query source-kind grammar currently accept; see
 [POAM-005](../../poam/rrflow-1.0-alpha/poam-005.md).
 
 rrflowQL is the relational query surface over rrflowDB records and their
-relationships. A record identity is its table/kind and ID within its estate.
+relationships. A record identity is its table/kind and ID within its engram.
 Graph-shaped views and adjacency access paths are derived from relationships;
 they are not a separate database or an extra record-identity authority.
 Project files and an existing project PostgreSQL database are distinct

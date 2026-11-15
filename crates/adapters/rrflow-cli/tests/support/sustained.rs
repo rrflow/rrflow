@@ -1,6 +1,6 @@
 //! Ordinary installed campaign. Explicit environment admission keeps a long
 //! campaign out of ordinary correctness CI; failure artifacts are never green.
-use super::Estate;
+use super::Engram;
 use rrd_client::RequestOptions;
 use rrd_contract::{CloseSession, CreateSession, ReadStorageDiagnostics, SessionLimits};
 use rrflow_qualification_storage::*;
@@ -50,20 +50,20 @@ fn backup_due(campaign: &StorageCampaign, phase: LoadPhase, sequence: u64) -> bo
 }
 
 fn retain_failed_lifecycle<T>(
-    estate: &super::owned_directory::OwnedDirectory,
+    engram: &super::owned_directory::OwnedDirectory,
     result: DriverResult<T>,
 ) -> DriverResult<T> {
     if result.is_err() {
         eprintln!(
-            "native_lifecycle_failure_estate={}",
-            serde_json::json!({"path": estate.retain(), "private_state": true})
+            "native_lifecycle_failure_engram={}",
+            serde_json::json!({"path": engram.retain(), "private_state": true})
         );
     }
     result
 }
 
 #[test]
-fn lifecycle_failure_retains_its_owned_estate_but_success_cleans_it() {
+fn lifecycle_failure_retains_its_owned_engram_but_success_cleans_it() {
     let parent = tempfile::tempdir().unwrap();
     let success =
         super::owned_directory::OwnedDirectory::new(tempfile::tempdir_in(parent.path()).unwrap());
@@ -111,14 +111,14 @@ fn bounded_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Drive
 }
 
 async fn session(
-    estate: &Estate,
+    engram: &Engram,
     client: rrd_client::RrdClient,
     seed: u64,
     campaign: &StorageCampaign,
     clients: u64,
     ordinal: u64,
 ) -> DriverResult<Workload> {
-    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project)
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project)
         .map_err(|e| e.to_string())?;
     let name = format!("capacity-session-{ordinal}");
     let session = client
@@ -142,7 +142,7 @@ async fn session(
         native_worker: Default::default(),
         client,
         session,
-        valid_at: estate.at,
+        valid_at: engram.at,
         dimensions: campaign
             .allocation
             .vector_dimensions
@@ -174,7 +174,7 @@ async fn session(
             .max(1024)
             .try_into()
             .map_err(|_| "source payload overflow")?,
-        query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+        query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
             .map_err(|e| e.to_string())?,
     })
 }
@@ -182,7 +182,7 @@ async fn session(
 /// Rotate only between bounded segments, after every in-flight request has
 /// joined. Closing the old lease prevents a day of accumulated live sessions.
 async fn rotate_session(
-    estate: &Estate,
+    engram: &Engram,
     work: &mut Workload,
     campaign: &StorageCampaign,
     clients: u64,
@@ -203,7 +203,7 @@ async fn rotate_session(
         .map_err(|e| e.to_string())?;
     *ordinal = ordinal.checked_add(1).ok_or("session ordinal overflow")?;
     *work = session(
-        estate,
+        engram,
         work.client.clone(),
         work.seed,
         campaign,
@@ -354,11 +354,11 @@ struct PointRun<'a> {
 mod campaign;
 #[path = "sustained/capacity_workload.rs"]
 mod capacity_workload;
-#[path = "sustained/estate.rs"]
-mod estate;
+#[path = "sustained/engram.rs"]
+mod engram;
 #[path = "sustained/point_run.rs"]
 mod point_run;
 
 use campaign::*;
-use estate::*;
+use engram::*;
 use point_run::*;

@@ -7,7 +7,7 @@
 
 ## Context
 
-The repository owner described the second brain on 2026-11-11 as "global and user preferences that apply to all projects". In their words, reasoning is "graph reasoning driven with the second brain tuned for global/operato/org preferences depending on their account indie vs enterprise / team rbac based". They define an engram as "one instance per major project", replacing "estate". This record says engram; the documentation-wide rename is tracked as POAM-078 (pull request #357).
+The repository owner described the second brain on 2026-11-11 as "global and user preferences that apply to all projects". In their words, reasoning is "graph reasoning driven with the second brain tuned for global/operato/org preferences depending on their account indie vs enterprise / team rbac based". They define an engram as "one instance per major project", replacing "engram". This record says engram; the documentation-wide rename is tracked as POAM-078 (pull request #357).
 
 At `b2d0d722` none of this has a home.
 
@@ -21,7 +21,7 @@ What already exists and can be built on:
 
 - Bi-temporal claims with supersession in the kernel (`crates/kernel/rrd-core/src/claim.rs`).
 - Principals and roles with inheritance per instance (`crates/security/rrd-security/src/lib.rs`).
-- [ADR-0003](0003-configurable-estate-organisation.md)'s domains inside one engram.
+- [ADR-0003](0003-configurable-engram-organisation.md)'s domains inside one engram.
 
 ## Research basis
 
@@ -107,6 +107,6 @@ Accepted on 2026-11-11 by the owner, who chose option A with an added org engram
 
 - [Instance topology](../architecture/instance-topology.md)
 - [Project links](../reference/data/rrflowdb-capability.md#project-links)
-- [ADR-0003](0003-configurable-estate-organisation.md)
+- [ADR-0003](0003-configurable-engram-organisation.md)
 - [One-engine joins plan](../roadmap/one-engine-joins-engineering-plan.md)
 - [Gate H](../roadmap/rrflow-1.0/gate-h.md)

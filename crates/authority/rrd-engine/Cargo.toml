@@ -28,7 +28,7 @@ full = [
     "dep:base64",
     "dep:rrd-cluster",
     "dep:rrd-contract",
-    "dep:rrd-estate",
+    "dep:rrd-engram",
     "dep:rrd-operator-knowledge",
     "dep:rrd-observation",
     "dep:rrd-query",
@@ -49,7 +49,7 @@ full = [
 [dependencies]
 rrd-attunement = { path = "../../compute/rrd-attunement", optional = true }
 rrd-contract = { path = "../../transport/rrd-contract", optional = true }
-rrd-estate = { path = "../rrd-estate", optional = true }
+rrd-engram = { path = "../rrd-engram", optional = true }
 rrd-security = { path = "../rrd-security", optional = true }
 rrd-core = { path = "../../kernel/rrd-core", optional = true }
 rrd-query = { path = "../../compute/rrd-query", optional = true }

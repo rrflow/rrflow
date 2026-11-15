@@ -103,7 +103,7 @@ fn public_ensure_rebuilds_legacy_identities_without_disabling_uniqueness() {
                 registry: DataSchemaRegistry {
                     revision: 1,
                     migration: "identity index fixture".into(),
-                    organisation: DataEstateOrganisation::default(),
+                    organisation: DataEngramOrganisation::default(),
                     tables: BTreeMap::from([(
                         CanonicalId::new("document").unwrap(),
                         DataTableSchema {
@@ -245,7 +245,7 @@ fn public_engine_owns_every_index_family_and_enforces_unique_commits() {
                 registry: DataSchemaRegistry {
                     revision: 1,
                     migration: "install index foundation fixture".into(),
-                    organisation: DataEstateOrganisation::default(),
+                    organisation: DataEngramOrganisation::default(),
                     tables: BTreeMap::from([
                         (
                             CanonicalId::new("document").unwrap(),

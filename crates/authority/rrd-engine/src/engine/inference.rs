@@ -209,11 +209,11 @@ impl RrdEngine {
         read: ReadStamp,
         cancellation: &rrd_inference::EmbeddingCancellation,
     ) -> Result<GenerateEmbeddingsResult> {
-        // Bind the sealed estate ceiling once, before input preparation. The
+        // Bind the sealed engram ceiling once, before input preparation. The
         // adapter cannot reset it by taking longer to validate or execute.
         let deadline = std::time::Instant::now()
             .checked_add(std::time::Duration::from_millis(
-                self.estate_configuration.reasoning.max_step_elapsed_ms,
+                self.engram_configuration.reasoning.max_step_elapsed_ms,
             ))
             .ok_or(ServiceError::DeadlineExceeded)?;
         let control = rrd_inference::EmbeddingExecutionControl::new(deadline, cancellation.clone());
@@ -229,7 +229,7 @@ impl RrdEngine {
         let scope = self.query_scope(&request.scope)?;
         let deadline = Instant::now()
             .checked_add(Duration::from_millis(
-                self.estate_configuration.reasoning.max_step_elapsed_ms,
+                self.engram_configuration.reasoning.max_step_elapsed_ms,
             ))
             .ok_or(ServiceError::DeadlineExceeded)?
             .min(inherited.deadline());

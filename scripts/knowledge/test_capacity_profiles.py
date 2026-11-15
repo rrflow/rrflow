@@ -14,7 +14,7 @@ class CapacityProfiles(unittest.TestCase):
         desktop, service, fleet, larger = result["profiles"]
         self.assertEqual(desktop["clients"], [1, 4, 8])
         self.assertEqual(service["rates"], [25, 100, 250])
-        self.assertEqual(fleet["records_min"], desktop["records_min"] * fleet["estates"])
+        self.assertEqual(fleet["records_min"], desktop["records_min"] * fleet["engrams"])
         self.assertEqual(larger["engine_bytes"], service["engine_bytes"])
         self.assertEqual(larger["logical_source_bytes_min"], 32 * projection.GIB)
 

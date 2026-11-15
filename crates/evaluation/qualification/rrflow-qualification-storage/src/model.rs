@@ -1,5 +1,5 @@
 use super::{require, Result};
-use rrd_contract::{CapabilityStatus, DiagnosticStorageSnapshot, EstateConfiguration};
+use rrd_contract::{CapabilityStatus, DiagnosticStorageSnapshot, EngramConfiguration};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -119,11 +119,11 @@ pub struct Budgets {
     pub recovery_ms: Limit,
     pub process_bytes: Limit,
     /// Optional shared native pool. Individual ceilings are not reservations;
-    /// the summed per-estate disjoint reservations must fit this aggregate.
+    /// the summed per-engram disjoint reservations must fit this aggregate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregate_process_bytes: Option<Limit>,
     pub host_bytes: Limit,
-    pub estates: Limit,
+    pub engrams: Limit,
     pub disk_bytes: Limit,
     pub temporary_disk_bytes: Limit,
     pub recovery_reserve_bytes: Limit,
@@ -161,7 +161,7 @@ pub struct StorageManifest {
     pub candidate: Candidate,
     pub environment: Environment,
     pub corpus_sha256: Digest,
-    pub installed_configuration: EstateConfiguration,
+    pub installed_configuration: EngramConfiguration,
     pub storage_observation: DiagnosticStorageSnapshot,
     pub budgets: Budgets,
     #[schemars(length(min = 1, max = 256))]

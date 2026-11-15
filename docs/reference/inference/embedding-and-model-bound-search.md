@@ -26,7 +26,7 @@ route authorization, or dispatch path; D-05 and G-01 through G-06 own those
 remaining behaviors.
 
 Executable backend code, sessions, accelerator handles, and credentials remain
-process-local. The registry revision is observable but is not durable estate
+process-local. The registry revision is observable but is not durable engram
 configuration. A restart therefore requires the operator or future installer
 to install the same backend again. Gate D must make configured adapter
 selection and attunement explicit without serializing provider credentials as

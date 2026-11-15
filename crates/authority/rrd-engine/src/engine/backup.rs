@@ -241,7 +241,7 @@ impl RrdEngine {
             // before object verification reopens the root.
             let restored = rrd_store::RrflowKvStore::open_existing_anchored(
                 &target,
-                super::core::installed_storage_options(&self.estate_configuration.storage)?,
+                super::core::installed_storage_options(&self.engram_configuration.storage)?,
             )?;
             if restored.claims().sequence()? != backup.archive.claim_sequence
                 || restored.runtime().cursor()? != backup.archive.runtime_cursor
@@ -255,7 +255,7 @@ impl RrdEngine {
                 &backup_root,
                 &request.backup_sha256,
                 &target,
-                super::core::installed_storage_options(&self.estate_configuration.storage)?,
+                super::core::installed_storage_options(&self.engram_configuration.storage)?,
             )?;
             (backup.archive.clone(), true, true)
         } else {
@@ -264,7 +264,7 @@ impl RrdEngine {
                 &request.backup_sha256,
                 &target,
                 request.restored_at_unix_ms,
-                super::core::installed_storage_options(&self.estate_configuration.storage)?,
+                super::core::installed_storage_options(&self.engram_configuration.storage)?,
             )?;
             (report.inventory, report.reopened, false)
         };
@@ -294,7 +294,7 @@ impl RrdEngine {
 
     /// Where backup catalogues and restore staging roots live.
     ///
-    /// An installed estate keeps them inside its managed persistent container,
+    /// An installed engram keeps them inside its managed persistent container,
     /// `.rrflow/rrd/<kind>/<instance>`, beside `roots/` and never below it:
     /// `roots/` holds only storage roots the locator can select, and install
     /// recovery rejects anything else there. A component or test root opened
@@ -315,27 +315,27 @@ impl RrdEngine {
     }
 
     pub(super) fn backup_root(&self) -> Result<AnchoredPath> {
-        self.operation_root(super::estate_layout::BACKUPS_DIRECTORY_NAME)
+        self.operation_root(super::engram_layout::BACKUPS_DIRECTORY_NAME)
     }
 
     fn restore_root(&self) -> Result<AnchoredPath> {
-        self.operation_root(super::estate_layout::RESTORES_DIRECTORY_NAME)
+        self.operation_root(super::engram_layout::RESTORES_DIRECTORY_NAME)
     }
 }
 
 /// The control-journal families an application-complete backup carries as the
-/// estate's control state: the installed record and install checkpoint, the
+/// engram's control state: the installed record and install checkpoint, the
 /// active configuration, the security policy and audit chain, the attunement
-/// plan and job state, and the estate document.
+/// plan and job state, and the engram document.
 ///
 /// Every value in these families is non-secret: credentials appear only as
 /// digests, and the token key and operator credential are files outside the
 /// store. Transient and operational families stay out: session leases,
-/// subscriptions, backup and restore operation receipts, and estate-recovery
+/// subscriptions, backup and restore operation receipts, and engram-recovery
 /// receipts. The two catalogue families travel in the catalogue manifest.
 pub(in crate::engine) fn installed_control_families(instance: &CanonicalId) -> Vec<String> {
     let mut families = vec![
-        "server/state/estate".to_owned(),
+        "server/state/engram".to_owned(),
         "server/state/install".to_owned(),
         format!("server/state/{instance}/attunement"),
         format!("server/state/{instance}/audit"),

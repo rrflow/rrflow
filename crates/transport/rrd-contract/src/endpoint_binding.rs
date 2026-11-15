@@ -62,7 +62,7 @@ pub enum WorkloadClass {
 pub enum BindingKind {
     /// Same machine as the engine: in process, or a loopback endpoint.
     Local,
-    /// A service on the operator's own estate, reached over the network or a mesh.
+    /// A service on the operator's own engram, reached over the network or a mesh.
     SelfHosted,
     /// A vendor subscription reached through its endpoint.
     Subscription,

@@ -357,8 +357,8 @@ pub(super) fn inventory_larger_than_one_physical_batch_publishes_and_reopens() {
 
 #[test]
 pub(super) fn inventory_output_bound_preserves_runtime_checkpoint_and_head_after_reopen() {
-    let defaults = rrd_contract::EstateConfiguration::default();
-    let input = rrd_contract::EstateConfigurationInput {
+    let defaults = rrd_contract::EngramConfiguration::default();
+    let input = rrd_contract::EngramConfigurationInput {
         format_version: defaults.format_version,
         clock: defaults.clock,
         storage: rrd_contract::StorageLimits {
@@ -505,7 +505,7 @@ pub(super) fn partial_inventory_recovery(edit_source: bool) {
                         attempt: 1,
                         request_sha256: digest::sha256_hex(&serde_json::to_vec(&command).unwrap()),
                     },
-                    RrdOperation::EstateAdmin,
+                    RrdOperation::EngramAdmin,
                     InvocationCredential::Session {
                         session_id: &session.session_id,
                         token: &session.token,

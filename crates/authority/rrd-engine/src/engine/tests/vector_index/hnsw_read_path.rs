@@ -78,7 +78,7 @@ fn ensure_collection(
 
 /// Twelve documents in `documents` and `unrelated` vectors in `archive`, with a payload index on
 /// `bucket`, and no generation yet.
-fn estate(
+fn engram(
     unrelated: usize,
     tier: VectorMemoryTier,
 ) -> (tempfile::TempDir, RrdEngine, SessionLease) {
@@ -183,7 +183,7 @@ fn build(engine: &RrdEngine, lease: &SessionLease, key: &str, filter_properties:
 }
 
 fn fixture(unrelated: usize) -> (tempfile::TempDir, RrdEngine, SessionLease) {
-    let (root, engine, lease) = estate(unrelated, VectorMemoryTier::Cached);
+    let (root, engine, lease) = engram(unrelated, VectorMemoryTier::Cached);
     build(&engine, &lease, "build", &["bucket"]);
     (root, engine, lease)
 }
@@ -300,7 +300,7 @@ fn hit_ids(result: &VectorSearchResult) -> Vec<(String, f64)> {
         .collect()
 }
 
-/// Every approximate search on the changed estate serves HNSW, and returns exactly what exact
+/// Every approximate search on the changed engram serves HNSW, and returns exactly what exact
 /// search and the general planner return on the same data.
 fn assert_agrees_with_exact(engine: &RrdEngine, lease: &SessionLease) {
     let cases = [
@@ -451,7 +451,7 @@ fn hnsw_work_stays_flat_as_unrelated_vectors_grow() {
             "HNSW reranks fewer versions than the collection holds"
         );
         // Every storage path's work, apart from the accumulator proof, whose inclusion paths grow
-        // with the logarithm of the estate's leaves.
+        // with the logarithm of the engram's leaves.
         let paths = approximate
             .read_evidence
             .paths
@@ -571,7 +571,7 @@ fn assert_refused_without_reading(
 #[test]
 fn a_filter_the_generation_does_not_cover_is_refused_without_reading_vectors() {
     // A generation with no filter coverage over more vectors than the budget could read.
-    let (_root, engine, lease) = estate(400, VectorMemoryTier::Cached);
+    let (_root, engine, lease) = engram(400, VectorMemoryTier::Cached);
     build(&engine, &lease, "uncovered", &[]);
     assert_refused_without_reading(
         &engine,
@@ -600,7 +600,7 @@ fn a_filter_the_generation_does_not_cover_is_refused_without_reading_vectors() {
 
 #[test]
 fn no_generation_at_all_is_refused_without_reading_vectors() {
-    let (_root, engine, lease) = estate(400, VectorMemoryTier::Cached);
+    let (_root, engine, lease) = engram(400, VectorMemoryTier::Cached);
     assert_refused_without_reading(&engine, &lease, &search(1, 1, None, APPROXIMATE, 64));
 }
 
@@ -654,7 +654,7 @@ fn activate_turboquant(engine: &RrdEngine, lease: &SessionLease, filter_properti
 #[test]
 fn an_uncovered_filter_on_turboquant_is_refused_without_reading_vectors() {
     // POAM-055's own case: an active TurboQuant generation that cannot cover the filter.
-    let (_root, engine, lease) = estate(400, VectorMemoryTier::Cached);
+    let (_root, engine, lease) = engram(400, VectorMemoryTier::Cached);
     activate_turboquant(&engine, &lease, &[]);
     assert_refused_without_reading(
         &engine,
@@ -666,7 +666,7 @@ fn an_uncovered_filter_on_turboquant_is_refused_without_reading_vectors() {
 /// `mirror` names the same field as `documents` and holds other vectors, all older than a
 /// generation `publish` builds for `documents`, so no overlay can answer for them either.
 fn assert_serves_only_its_own_collection(path: &str, publish: impl Fn(&RrdEngine, &SessionLease)) {
-    let (_root, engine, lease) = estate(4, VectorMemoryTier::Cached);
+    let (_root, engine, lease) = engram(4, VectorMemoryTier::Cached);
     ensure_collection(
         &engine,
         &lease,
@@ -818,7 +818,7 @@ fn a_generation_over_the_cache_bound_still_serves_without_reading_the_corpus() {
 /// addresses that share a field must receive distinct HNSW indexes.
 #[test]
 fn distinct_source_addresses_receive_distinct_hnsw_indexes() {
-    let (_root, engine, lease) = estate(0, VectorMemoryTier::Cached);
+    let (_root, engine, lease) = engram(0, VectorMemoryTier::Cached);
     let addresses = [("a-b", "c"), ("a", "b-c")];
     let mut indexes = Vec::new();
     for (ordinal, (collection, vector_name)) in addresses.into_iter().enumerate() {
@@ -882,7 +882,7 @@ fn distinct_source_addresses_receive_distinct_hnsw_indexes() {
 /// foreign-generation oracle that #304 repairs through the source identity.
 #[test]
 fn an_emptied_hnsw_generation_does_not_answer_for_another_collection() {
-    let (_root, engine, lease) = estate(4, VectorMemoryTier::Cached);
+    let (_root, engine, lease) = engram(4, VectorMemoryTier::Cached);
     ensure_collection(
         &engine,
         &lease,

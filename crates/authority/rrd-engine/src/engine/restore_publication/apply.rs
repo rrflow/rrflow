@@ -223,7 +223,7 @@ impl RrdEngine {
         }
         outputs.push(plan.candidate.physical_sha256.clone());
 
-        // OpenPublishedEstate: the published root opens through the installed
+        // OpenPublishedEngram: the published root opens through the installed
         // engine path, records the receipt, and passes quick verification.
         // The receipt commit below changes the root's bytes, so a resumed run
         // checks the published root by its semantic watermarks and identity.
@@ -283,7 +283,7 @@ impl RrdEngine {
         )?;
         if report.status != InstallationVerificationStatus::Passed {
             return Err(ServiceError::Storage(
-                "published estate failed quick verification".into(),
+                "published engram failed quick verification".into(),
             ));
         }
         let result = build_result(

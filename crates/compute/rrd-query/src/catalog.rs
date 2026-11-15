@@ -271,7 +271,7 @@ impl Catalog {
 
     /// Captures schema history and the explicitly selected source families.
     /// An empty `sources` slice is a schema-only catalogue, not an implicit
-    /// whole-estate scan.
+    /// whole-engram scan.
     pub fn capture_for_sources<E: StorageEngine>(
         engine: &E,
         scope: &ScopeId,

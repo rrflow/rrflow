@@ -134,7 +134,7 @@ impl RrdEngine {
             ));
         }
         let mut project = canonical_project_root(project)?;
-        validate_estate_directories(&project, true)?;
+        validate_engram_directories(&project, true)?;
         let executable_sha256 = sha256_file(executable)?;
         if executable_sha256 != preview.installation.executable_sha256 {
             return Err(ServiceError::ProjectBindingMismatch);
@@ -146,7 +146,7 @@ impl RrdEngine {
         }
 
         let started = Instant::now();
-        let layout = EstateLayout::new(
+        let layout = EngramLayout::new(
             &preview.installation.storage_root_id,
             &preview.installation.initial_principal_id,
         )?;
@@ -179,7 +179,7 @@ impl RrdEngine {
             admission::Admission::Published { intent, result } => {
                 if let Some(intent) = intent {
                     let (_, _, locator_bytes) = read_locator_anchored(&project)?;
-                    validate_recovery_estate(&project, &layout)?;
+                    validate_recovery_engram(&project, &layout)?;
                     observe_install_stage(
                         preview,
                         started,
@@ -215,8 +215,8 @@ impl RrdEngine {
             admission::Admission::New(clock_anchor) => {
                 // Adoption precedes the intent: an interrupted move changes the
                 // listed entries, so the stale plan is refused and re-planned.
-                if let Some(entries) = &preview.installation.adopted_estate_entries {
-                    project.adopt_estate_directory(preview.installation.id.as_str(), entries)?;
+                if let Some(entries) = &preview.installation.adopted_engram_entries {
+                    project.adopt_engram_directory(preview.installation.id.as_str(), entries)?;
                 }
                 let (intent, recovery_state) = load_or_create_intent(
                     &project,
@@ -233,7 +233,7 @@ impl RrdEngine {
                 {
                     return Err(ServiceError::ProjectBindingMismatch);
                 }
-                validate_recovery_estate(&project, &layout)?;
+                validate_recovery_engram(&project, &layout)?;
                 observe_install_stage(
                     preview,
                     started,
@@ -261,13 +261,13 @@ impl RrdEngine {
             .managed_path(InstallationManagedPathKind::OperatorCredential)
             .relative_path
             .clone();
-        create_estate_directories(&mut project)?;
-        validate_recovery_estate(&project, &layout)?;
+        create_engram_directories(&mut project)?;
+        validate_recovery_engram(&project, &layout)?;
         let locator_path = safe_join(&project, LOCATOR_RELATIVE_PATH)?;
         observe_install_stage(
             preview,
             started,
-            InstallApplyStage::EstateDirectoriesReady,
+            InstallApplyStage::EngramDirectoriesReady,
             InstallRecoveryState::OwnedIntent,
             None,
             observer,
@@ -359,7 +359,7 @@ impl RrdEngine {
         let installed_at_unix_ms = intent.clock_anchor().observed_at_unix_ms;
 
         let memory_plan = build_memory_engram_plan(
-            &PersistMemoryEstate {
+            &PersistMemoryEngram {
                 scope: format!("instance:{instance_id}"),
                 seat: preview.installation.initial_seat.clone(),
                 representations: Vec::new(),
@@ -438,7 +438,7 @@ impl RrdEngine {
             &operation_id,
         )?;
         let bootstrap_control_sequence = transitions.len() as u64 + 5;
-        let mut installed = InstalledEstateRecord {
+        let mut installed = InstalledEngramRecord {
             format_version: INSTALLED_RECORD_FORMAT,
             installation: preview.installation.clone(),
             attunement_plan_sha256: preview.attunement.plan_sha256.clone(),

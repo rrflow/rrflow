@@ -1,7 +1,7 @@
 //! Digest-verified local backup catalogue over retained logical archives.
 //!
 //! Every digest here detects changed bytes. None authenticates a producer:
-//! the catalogue shares the estate's filesystem trust domain, so a keyed
+//! the catalogue shares the engram's filesystem trust domain, so a keyed
 //! authenticator would be stored beside the key it protects. Operations that
 //! read a catalogue say "verify", never "authenticate".
 

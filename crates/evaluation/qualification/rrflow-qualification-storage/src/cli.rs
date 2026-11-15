@@ -62,14 +62,14 @@ pub fn run(args: &[String]) -> Result<()> {
         }
         ["campaign", "validate", path] => {
             let campaign: StorageCampaign = decode(&read(Path::new(path))?)?;
-            if campaign.allocation.estates.get()>1 {validate_fleet(&campaign)?;}
+            if campaign.allocation.engrams.get()>1 {validate_fleet(&campaign)?;}
             println!("valid storage campaign: {} purpose={:?}; no workload executed",
                 campaign.sha256()?.as_str(), campaign.purpose);
             Ok(())
         }
         ["campaign", "verify", directory] => {
             let campaign: StorageCampaign = decode(&read(&Path::new(directory).join("campaign.json"))?)?;
-            if campaign.allocation.estates.get()>1 {
+            if campaign.allocation.engrams.get()>1 {
                 let result=verify_fleet(Path::new(directory))?;
                 std::io::stdout().lock().write_all(&pretty(&result)?).map_err(|e|e.to_string())?;
                 require(result.status==CampaignStatus::Completed,"fleet failed; raw evidence retained")?;

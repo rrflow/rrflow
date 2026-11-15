@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixtures = root.join("tests/fixtures/storage");
     let mut source: Value =
         serde_json::from_slice(&std::fs::read(fixtures.join("manifest.json"))?)?;
-    let configuration = rrd_contract::EstateConfiguration::default();
+    let configuration = rrd_contract::EngramConfiguration::default();
     source["candidate"]["configuration_sha256"] = configuration.configuration_sha256.clone().into();
     source["candidate"]["public_catalogue_sha256"] = serde_json::to_value(catalogue_digest()?)?;
     source["installed_configuration"] = serde_json::to_value(configuration)?;

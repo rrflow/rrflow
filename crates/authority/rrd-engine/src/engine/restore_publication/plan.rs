@@ -6,7 +6,7 @@ impl RrdEngine {
     /// Previews the publication of one staged restore. The plan binds the
     /// candidate, the active root it replaces, the backup that produced the
     /// candidate, and read-only evidence of both roots; `apply` refuses any
-    /// drift from it. Planning writes nothing and fails while the estate is
+    /// drift from it. Planning writes nothing and fails while the engram is
     /// being served.
     pub fn plan_restore_publication(
         project: &Path,
@@ -93,7 +93,7 @@ impl RrdEngine {
                     RestorePublicationActionKind::PublishCandidateRoot => {
                         (candidate.evidence.physical_sha256.clone(), 0)
                     }
-                    RestorePublicationActionKind::OpenPublishedEstate => {
+                    RestorePublicationActionKind::OpenPublishedEngram => {
                         (active.installed.record_sha256.clone(), 1_024)
                     }
                 };

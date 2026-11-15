@@ -39,13 +39,13 @@ impl RrdEngine {
             request_id,
             operation_id,
         )?;
-        let caps = &self.estate_configuration.reasoning;
+        let caps = &self.engram_configuration.reasoning;
         if request.limits.max_run_elapsed_ms > caps.max_run_elapsed_ms
             || request.limits.max_steps > caps.max_steps
             || request.limits.max_step_elapsed_ms > caps.max_step_elapsed_ms
         {
             return Err(ServiceError::ConfigurationLimit(
-                "task limits cannot exceed estate caps".into(),
+                "task limits cannot exceed engram caps".into(),
             ));
         }
         let scope = self.query_scope(&request.scope)?;
@@ -55,7 +55,7 @@ impl RrdEngine {
         if let Some(existing) = existing {
             if existing.limits != request.limits
                 || existing.repetition_policy != request.repetition_policy
-                || existing.configuration_sha256 != self.estate_configuration.configuration_sha256
+                || existing.configuration_sha256 != self.engram_configuration.configuration_sha256
             {
                 return Err(ServiceError::IdempotencyConflict);
             }
@@ -67,7 +67,7 @@ impl RrdEngine {
             instance_id: self.instance.clone(),
             scope: request.scope.clone(),
             task_id: request.task_id.clone(),
-            configuration_sha256: self.estate_configuration.configuration_sha256.clone(),
+            configuration_sha256: self.engram_configuration.configuration_sha256.clone(),
             limits: request.limits.clone(),
             started_at_unix_ms: at,
             deadline_unix_ms: at

@@ -325,7 +325,7 @@ RRFlow therefore needs two coordinated representations, not two authorities:
 
 At ingress, RRD validates and continues an incoming W3C context or creates a
 new one. `RrdEngine` binds that context to the authenticated request
-correlation, actor, estate/scope, authorization decision, and `ReadStamp`.
+correlation, actor, engram/scope, authorization decision, and `ReadStamp`.
 Child work keeps the trace identity. Asynchronous work caused by a committed
 event, projection delta, retry, or routine activity records a causal link
 rather than inventing false synchronous parentage.

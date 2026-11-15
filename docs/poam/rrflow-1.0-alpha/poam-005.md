@@ -36,7 +36,7 @@ proves authenticated direct semantic-version selection and exact snapshots witho
 runtime-log reconstruction. Vector search now reads its artifact and quantization catalogues
 at the request stamp; maintenance replay and final closure keep C-04/[POAM-028](poam-028.md)
 open. rrflowQL traversal now reads native temporal adjacency ranges,
-but context graph expansion and memory-estate seat planning still materialize scope
+but context graph expansion and memory-engram seat planning still materialize scope
 snapshots; scalar/unique state, incremental BM25 postings, and exact/approximate vector generations
 still do not form one planner-selected, stamped native access system. Elias-Fano/PFOR
 posting compression, TurboQuant_prod, and LSM-VEC-style disk navigation are evidence-gated

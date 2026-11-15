@@ -151,12 +151,12 @@ fn cancelled_embedding_returns_while_worker_keeps_its_permit() {
 
 fn interrupted_embedding_keeps_its_permit(cancel: bool) {
     let (_root, mut engine) = isolated_engine();
-    let mut configuration = rrd_contract::EstateConfiguration::default();
+    let mut configuration = rrd_contract::EngramConfiguration::default();
     configuration.reasoning.max_step_elapsed_ms = if cancel { 5_000 } else { 250 };
     configuration.configuration_sha256 =
-        rrd_contract::estate_configuration_sha256(&configuration).unwrap();
+        rrd_contract::engram_configuration_sha256(&configuration).unwrap();
     configuration.validate().unwrap();
-    engine.estate_configuration = configuration;
+    engine.engram_configuration = configuration;
     let (entered_tx, entered_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel();
     let inner = rrd_inference::FeatureHashBackend::new(32, 914).unwrap();

@@ -37,7 +37,7 @@ pub(in crate::engine) fn load_parse_inventory(
         checkpoint,
         profile.inventory_policy.limits.output_bytes.min(
             engine
-                .estate_configuration
+                .engram_configuration
                 .storage
                 .transaction_admission_bytes,
         ),
@@ -63,7 +63,7 @@ pub(in crate::engine) fn load_accepted_source(
     max_bytes: u64,
     max_entries: u64,
 ) -> Result<AcceptedInventory> {
-    let mut remaining_keys = engine.estate_configuration.query.max_storage_keys;
+    let mut remaining_keys = engine.engram_configuration.query.max_storage_keys;
     let (head_bytes, head, proposal) = records::load_accepted(
         engine,
         project_id,
@@ -132,11 +132,11 @@ pub(super) fn execute(
     let policy = &profile.inventory_policy;
     let output_limit = policy.limits.output_bytes.min(
         engine
-            .estate_configuration
+            .engram_configuration
             .storage
             .transaction_admission_bytes,
     );
-    let mut remaining_keys = engine.estate_configuration.query.max_storage_keys;
+    let mut remaining_keys = engine.engram_configuration.query.max_storage_keys;
     let (prior_bytes, prior) = records::load_prior(
         engine,
         &work.plan,
@@ -145,7 +145,7 @@ pub(super) fn execute(
         &mut remaining_keys,
     )?;
     let source_scope = SourceScope {
-        estate: work.plan.target.estate_id.as_str().into(),
+        engram: work.plan.target.engram_id.as_str().into(),
         project: work.plan.target.project_id.as_str().into(),
         root: policy.logical_root.as_str().into(),
     };
@@ -175,7 +175,7 @@ pub(super) fn execute(
     permit.charge(
         &commit,
         engine
-            .estate_configuration
+            .engram_configuration
             .storage
             .transaction_admission_bytes,
     )?;

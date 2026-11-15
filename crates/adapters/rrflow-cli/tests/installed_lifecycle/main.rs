@@ -53,6 +53,9 @@ const LOOPBACK_ALLOWANCE_BYTES: &[u8] = include_bytes!(
 #[path = "../support/adaptive_installed.rs"]
 mod adaptive_installed;
 
+#[path = "../support/observed_configuration.rs"]
+mod observed_configuration;
+
 #[path = "../support/process.rs"]
 mod process;
 

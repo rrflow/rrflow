@@ -4,7 +4,7 @@
 //! is installed or served. It is a replaceable projection with no authority;
 //! only the notes section belongs to the owner and is carried forward intact.
 
-use super::estate_layout::EstateFilesystem;
+use super::engram_layout::EngramFilesystem;
 use super::installation::{project_entries, ProjectEntry};
 use super::*;
 use rrd_store::filesystem::{AnchoredPath, OpenOptions};
@@ -37,7 +37,7 @@ impl RrdEngine {
         let locator = Self::read_project_locator(project)?;
         let (profile, _) = DefaultInstallProfile::load(locator.profile_id.as_str())?;
         let root = AnchoredPath::open_root(project).map_err(storage_error)?;
-        let engram = EstateFilesystem::admit(root, false)?;
+        let engram = EngramFilesystem::admit(root, false)?;
         // The installed profile's inventory policy and the project's own Git
         // ignore rules decide what is part of the project, as for installation.
         let entries = project_entries(engram.project(), &profile)?;

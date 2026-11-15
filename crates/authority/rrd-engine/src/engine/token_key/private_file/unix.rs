@@ -82,7 +82,7 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
         || metadata.permissions().mode() & 0o7777 != 0o700
     {
         return Err(denied(
-            "estate directory requires effective-user ownership and mode 0700",
+            "engram directory requires effective-user ownership and mode 0700",
         ));
     }
     Ok(())

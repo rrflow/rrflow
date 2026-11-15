@@ -430,12 +430,12 @@ pub(super) fn installed_binary_replans_and_reads_receipt_after_forced_restart(ex
                 // records are reachable through the public query boundary.
                 #[derive(serde::Serialize)]
                 struct SourceScope<'a> {
-                    estate: &'a str,
+                    engram: &'a str,
                     project: &'a str,
                     root: &'a str,
                 }
                 let scope = SourceScope {
-                    estate: current_plan.target.estate_id.as_str(),
+                    engram: current_plan.target.engram_id.as_str(),
                     project: current_plan.target.project_id.as_str(),
                     root: "project-source",
                 };

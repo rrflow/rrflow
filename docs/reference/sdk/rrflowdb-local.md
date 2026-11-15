@@ -98,7 +98,7 @@ and independently compare the original and copy with `sha256sum` on Linux or
 `shasum -a 256` on macOS. Use the copied binary for each lifecycle command and
 `target/debug/examples/rrflowdb` for the example. A custom `CARGO_TARGET_DIR`
 changes the build output location. These are source-built development artifacts,
-not a signed official release. Installed estates bind the executable digest:
+not a signed official release. Installed engrams bind the executable digest:
 retain the binary used to install them; replacing it is not an automatic upgrade.
 
 Stop the service, run `rrflow verify --project <path> --level quick`, restart
@@ -154,7 +154,7 @@ supports relationship names a document and a task, requires a reason, and
 enforces a unique endpoint pair. Values also have valid-time intervals and
 commit coordinates.
 The diagram describes this application's schema, not additional platform
-project/estate/account authorities.
+project/engram/account authorities.
 
 The parameterized native join is:
 

@@ -21,7 +21,7 @@ relationships, graphs, vectors, memory, reasoning state and evidence under one
 transaction authority. rrflowQL is its relational, SQL-like query and planning
 layer; graph generation and traversal are capabilities over the same data, not
 the definition of the language. A record's logical identity is its table/kind
-and ID within its estate. PostgreSQL and SQLite compatibility are product
+and ID within its engram. PostgreSQL and SQLite compatibility are product
 targets whose exact SQL, client/API and file-format surfaces require separate
 qualification; neither compatibility claim is established today. The
 [database identity and compatibility
@@ -72,7 +72,7 @@ The first product proof is one working project and its authenticated daemon,
 including usable Connectome, configured LFG/SWAG, source-grounded retrieval and
 observable results. After that proof, the target is to manage as many separate
 project instances as the operator's configured resources admit, starting and
-stopping owned instances as needed without losing their durable estates. A
+stopping owned instances as needed without losing their durable engrams. A
 separate optional enterprise control plane is a later cloud/self-hosted
 deployment direction; it is not a prerequisite for the local engine. The owner
 has requested a six-year source-availability direction for that enterprise
@@ -199,9 +199,9 @@ pre-alpha status remain authoritative.
 | Prepare Spark experiments, qualify SWAG candidates and govern RROFLOW improvement | [Learning reference](docs/reference/inference/learning/README.md) |
 | Discover connector requirements and build source-grounded knowledge trees | [Knowledge connectors and Parquet target contract](docs/reference/data/knowledge-connectors.md) |
 | Study analytical database techniques for native rrflowDB | [Native analytical database research](docs/reference/data/duckdb.md) - research input; no DuckDB or ClickHouse runtime is planned |
-| Understand project, estate, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
+| Understand project, engram, RRD instance, environment, deployment, and physical placement | [RRFlow instance topology](docs/architecture/instance-topology.md) |
 | Select and prove deployment form, storage profile, and endpoint presentation independently | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
-| Install, serve, verify, repair, restore, and remove one project estate through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |
+| Install, serve, verify, repair, restore, and remove one project engram through the shipped binary | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) |
 | Deploy one installed RRD instance through Kubernetes without creating another authority | [RRFlow Kubernetes deployment adapter](docs/reference/deployment/kubernetes-operator.md) |
 | Understand the unavailable distributed target and disposition of current cluster code | [RRFlow distributed cluster contract](docs/reference/distributed/cluster-contract.md) |
 | Follow writes, persistence, reads, Arrow/DataFusion, and context end to end | [RRFlow engine data flow](docs/architecture/engine-data-flow.md) |
@@ -222,10 +222,10 @@ definition; this portal does not reproduce those bodies.
 | Invariant | Owning section |
 |---|---|
 | Canonical names for RRFlow, RRD, `RrdEngine`, rrflowDB, rrflowKV, rrflowMX, rrflowQL, Arrow/DataFusion, vectors, inference, RRO, RROFLOW, LFG, SWAG, Governance, workspace, and Connectome | [Canonical component terminology](docs/architecture/system-overview.md#canonical-component-terminology) |
-| One project ↔ one estate/rrflowDB ↔ one RRD instance; an account may own many estates and a workspace groups estates above the engine; deployment form, storage profile, endpoint presentation, security, and physical placement remain distinct | [Locked alpha topology](docs/architecture/instance-topology.md#locked-alpha-topology) and [deployment profiles](docs/reference/deployment/modes.md#independent-profile-coordinates) |
+| One project ↔ one engram/rrflowDB ↔ one RRD instance; an account may own many engrams and a workspace groups engrams above the engine; deployment form, storage profile, endpoint presentation, security, and physical placement remain distinct | [Locked alpha topology](docs/architecture/instance-topology.md#locked-alpha-topology) and [deployment profiles](docs/reference/deployment/modes.md#independent-profile-coordinates) |
 | One semantic, security, transaction, mutation, and context authority | [ADR-0001 decision](docs/decisions/0001-single-engine-authority.md#decision) |
 | Adaptive exploration and model reasoning; closed contracts at durable state, external effect, replay, and evidence boundaries | [ADR-0002 decision](docs/decisions/0002-adaptive-reasoning-governed-effects.md#decision) |
-| Configurable domains, categories and tags inside one estate; scopes applied before candidate generation; optional per-domain isolation; per-domain evidence | [ADR-0003 decision](docs/decisions/0003-configurable-estate-organisation.md#decision) and [estate organisation contract](docs/reference/data/estate-organisation.md) |
+| Configurable domains, categories and tags inside one engram; scopes applied before candidate generation; optional per-domain isolation; per-domain evidence | [ADR-0003 decision](docs/decisions/0003-configurable-engram-organisation.md#decision) and [engram organisation contract](docs/reference/data/engram-organisation.md) |
 | Editor and provider hooks only as alias stubs generated from one RRFlow owner; a hook firing authorizes nothing and proves nothing | [ADR-0004 decision](docs/decisions/0004-host-hooks-as-alias-stubs.md#decision) and [host hook contract](docs/reference/agent-bootstrap.md#host-hooks) |
 | No parallel product line: one current pre-release implementation with requirement-to-code/test traceability before direct convergence | [Pre-release convergence boundary](docs/architecture/system-overview.md#pre-release-convergence-boundary) and [implementation-requirements traceability](docs/roadmap/rrflow-1.0-execution-map.md#implementation-requirements-traceability) |
 | Persistent rrflowDB versus volatile rrflowMX | [Persistence and memory boundary](docs/architecture/system-overview.md#persistence-and-memory-boundary) |
@@ -244,13 +244,13 @@ definition; this portal does not reproduce those bodies.
 
 | Operation or surface | Owning record or gate |
 |---|---|
-| New/existing-project installation, specialization, and attunement | [Provider-neutral agent bootstrap](docs/reference/agent-bootstrap.md#installation-and-attunement) and [roadmap Gate D](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-estate) |
-| Binary acquisition, install plan/apply, serve/readiness, verify, repair, backup/restore, salvage, and uninstall | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) and [roadmap D-01/D-11](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-estate) |
-| Deterministic project-tree snapshot and incremental refresh | [Project-tree inventory flow](docs/architecture/engine-data-flow.md#project-tree-inventory-and-incremental-attunement) and [roadmap D-03/D-04](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-estate) |
+| New/existing-project installation, specialization, and attunement | [Provider-neutral agent bootstrap](docs/reference/agent-bootstrap.md#installation-and-attunement) and [roadmap Gate D](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-engram) |
+| Binary acquisition, install plan/apply, serve/readiness, verify, repair, backup/restore, salvage, and uninstall | [RRFlow installed lifecycle](docs/reference/deployment/installed-lifecycle.md) and [roadmap D-01/D-11](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-engram) |
+| Deterministic project-tree snapshot and incremental refresh | [Project-tree inventory flow](docs/architecture/engine-data-flow.md#project-tree-inventory-and-incremental-attunement) and [roadmap D-03/D-04](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-engram) |
 | Governed in-engine functions and proposed-transaction bindings | [RRFlow governed functions](docs/reference/automation/functions.md) and [roadmap A-07/C/I](docs/roadmap/rrflow-1.0.md#executable-dependency-spine) |
-| Discovered project commands, installed capability bindings, and external activities | [Project command capability contract](docs/reference/automation/project-command-capabilities.md), [roadmap D-06](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-estate), and [roadmap I-03](docs/roadmap/rrflow-1.0.md#gate-i--add-explicit-automation-scaffolding-with-host-hooks-as-alias-stubs) |
+| Discovered project commands, installed capability bindings, and external activities | [Project command capability contract](docs/reference/automation/project-command-capabilities.md), [roadmap D-06](docs/roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-engram), and [roadmap I-03](docs/roadmap/rrflow-1.0.md#gate-i--add-explicit-automation-scaffolding-with-host-hooks-as-alias-stubs) |
 | Durable provider-neutral self and `rrflow://` record resolution | [Seat identity and memory warps](docs/reference/seat-identity.md) |
-| Estate desired/observed state and fenced external effects | [RRFlow estate control](docs/reference/operations/estate-control.md) |
+| Engram desired/observed state and fenced external effects | [RRFlow engram control](docs/reference/operations/engram-control.md) |
 | Embedded, single-node, cluster, rrflowMX, rrflowKV, loopback, and network combinations | [RRFlow deployment profiles](docs/reference/deployment/modes.md) |
 | Kubernetes projection, reconciliation, readiness, deletion, and qualification | [RRFlow Kubernetes deployment adapter](docs/reference/deployment/kubernetes-operator.md) |
 | Distributed consistency, replication, recovery, and qualification | [RRFlow distributed cluster contract](docs/reference/distributed/cluster-contract.md) |
@@ -385,15 +385,15 @@ installation, serve the generated public contract, complete an authenticated
 readiness challenge, and perform mutation-free quick verification. The linked
 [walking-product journal](docs/evidence/change-journals/gate-d/d-01-installed-ui-walking-product.md)
 records the exact limits and evidence. The next bounded prerequisite also now
-establishes one canonical project-local `.rrflow` estate, a portable locator,
+establishes one canonical project-local `.rrflow` engram, a portable locator,
 owner-only credential and storage roots, and one sealed
-`EstateConfiguration`. Installation can accept a bounded TOML input at plan
+`EngramConfiguration`. Installation can accept a bounded TOML input at plan
 time; apply uses only the sealed plan; installed open and server discovery bind
-the same project/estate/instance identity, independent deployment coordinates,
+the same project/engram/instance identity, independent deployment coordinates,
 configuration revision, digest, and reasoning/recall/query ceilings. A real
 process rejects over-ceiling query work as resource exhausted before executing
 it. The linked
-[canonical-estate journal](docs/evidence/change-journals/gate-d/d-01-canonical-estate-layout-and-configuration.md)
+[canonical-engram journal](docs/evidence/change-journals/gate-d/d-01-canonical-estate-layout-and-configuration.md)
 records the exact implementation and tests. A third bounded prerequisite now
 makes that sealed installation the only product startup authority. The same
 plan resumes after deterministic interruptions at each of ten durable-effect
@@ -412,7 +412,7 @@ clock observation, labels it `host_system_time` / `unverified`, seals the first
 observation into recovery and installed records, and applies the strict
 format-2 `clock.maximum_rollback_ms = 0` default during recovery, replay, and
 open. Read-only verification reports current, explicitly tolerated rollback,
-exceeded rollback, or unavailable time without mutating the estate; unsafe
+exceeded rollback, or unavailable time without mutating the engram; unsafe
 open fails closed. The same bounded abrupt-kill/reopen primary-binary test is
 now scheduled on Linux, macOS, and Windows. The linked
 [clock-substrate journal](docs/evidence/change-journals/gate-d/d-01-engine-owned-installation-clock.md)
@@ -431,7 +431,7 @@ publish a staged restore into the storage root's own name with the previous
 root quarantined; its help and parser reject the removed raw-database and
 development commands. Repair, uninstall, durable attunement execution, and
 release service management remain absent. The retained internal server and
-adapter binaries open only an already-installed estate, but they are not a
+adapter binaries open only an already-installed engram, but they are not a
 second supported operator command tree. Native primary-executable lifecycle
 tests now pass on Windows, Linux and macOS; the
 [native lifecycle journal](docs/evidence/change-journals/gate-d/d-01-native-installed-lifecycle.md)
@@ -454,15 +454,15 @@ one repository fallback; the linked record owns the content.
 |---|---|---|
 | Knowledge structure and ownership | [`rrflow://rrflow-instance/data/documentation-index/rrflow-knowledge-map`](rrflow://rrflow-instance/data/documentation-index/rrflow-knowledge-map) | [`docs/README.md`](docs/README.md) |
 | Master system overview | [`rrflow://rrflow-instance/data/architecture/system-overview`](rrflow://rrflow-instance/data/architecture/system-overview) | [`docs/architecture/system-overview.md`](docs/architecture/system-overview.md) |
-| Project, estate, instance, and deployment topology | [`rrflow://rrflow-instance/data/architecture/instance-topology`](rrflow://rrflow-instance/data/architecture/instance-topology) | [`docs/architecture/instance-topology.md`](docs/architecture/instance-topology.md) |
+| Project, engram, instance, and deployment topology | [`rrflow://rrflow-instance/data/architecture/instance-topology`](rrflow://rrflow-instance/data/architecture/instance-topology) | [`docs/architecture/instance-topology.md`](docs/architecture/instance-topology.md) |
 | Deployment profiles and cross-profile conformance | [`rrflow://rrflow-instance/data/reference/deployment/modes`](rrflow://rrflow-instance/data/reference/deployment/modes) | [`docs/reference/deployment/modes.md`](docs/reference/deployment/modes.md) |
 | Installed product lifecycle | [`rrflow://rrflow-instance/data/reference/deployment/installed-lifecycle`](rrflow://rrflow-instance/data/reference/deployment/installed-lifecycle) | [`docs/reference/deployment/installed-lifecycle.md`](docs/reference/deployment/installed-lifecycle.md) |
 | Kubernetes deployment adapter | [`rrflow://rrflow-instance/data/reference/deployment/kubernetes-operator`](rrflow://rrflow-instance/data/reference/deployment/kubernetes-operator) | [`docs/reference/deployment/kubernetes-operator.md`](docs/reference/deployment/kubernetes-operator.md) |
 | Distributed cluster contract | [`rrflow://rrflow-instance/data/reference/distributed/cluster-contract`](rrflow://rrflow-instance/data/reference/distributed/cluster-contract) | [`docs/reference/distributed/cluster-contract.md`](docs/reference/distributed/cluster-contract.md) |
 | Single-engine authority decision | [`rrflow://rrflow-instance/data/decision/0001-single-engine-authority`](rrflow://rrflow-instance/data/decision/0001-single-engine-authority) | [`docs/decisions/0001-single-engine-authority.md`](docs/decisions/0001-single-engine-authority.md) |
 | Adaptive reasoning and governed effects decision | [`rrflow://rrflow-instance/data/decision/0002-adaptive-reasoning-governed-effects`](rrflow://rrflow-instance/data/decision/0002-adaptive-reasoning-governed-effects) | [`docs/decisions/0002-adaptive-reasoning-governed-effects.md`](docs/decisions/0002-adaptive-reasoning-governed-effects.md) |
-| Configurable estate organisation decision | [`rrflow://rrflow-instance/data/decision/0003-configurable-estate-organisation`](rrflow://rrflow-instance/data/decision/0003-configurable-estate-organisation) | [`docs/decisions/0003-configurable-estate-organisation.md`](docs/decisions/0003-configurable-estate-organisation.md) |
-| Estate organisation contract | [`rrflow://rrflow-instance/data/reference/data/estate-organisation`](rrflow://rrflow-instance/data/reference/data/estate-organisation) | [`docs/reference/data/estate-organisation.md`](docs/reference/data/estate-organisation.md) |
+| Configurable engram organisation decision | [`rrflow://rrflow-instance/data/decision/0003-configurable-engram-organisation`](rrflow://rrflow-instance/data/decision/0003-configurable-engram-organisation) | [`docs/decisions/0003-configurable-engram-organisation.md`](docs/decisions/0003-configurable-engram-organisation.md) |
+| Engram organisation contract | [`rrflow://rrflow-instance/data/reference/data/engram-organisation`](rrflow://rrflow-instance/data/reference/data/engram-organisation) | [`docs/reference/data/engram-organisation.md`](docs/reference/data/engram-organisation.md) |
 | Host hooks as alias stubs decision | [`rrflow://rrflow-instance/data/decision/0004-host-hooks-as-alias-stubs`](rrflow://rrflow-instance/data/decision/0004-host-hooks-as-alias-stubs) | [`docs/decisions/0004-host-hooks-as-alias-stubs.md`](docs/decisions/0004-host-hooks-as-alias-stubs.md) |
 | Engine data flow | [`rrflow://rrflow-instance/data/architecture/engine-data-flow`](rrflow://rrflow-instance/data/architecture/engine-data-flow) | [`docs/architecture/engine-data-flow.md`](docs/architecture/engine-data-flow.md) |
 | rrflowKV current physical format | [`rrflow://rrflow-instance/data/reference/storage/rrflowkv-current-format`](rrflow://rrflow-instance/data/reference/storage/rrflowkv-current-format) | [`docs/reference/storage/rrflowkv-current-format.md`](docs/reference/storage/rrflowkv-current-format.md) |

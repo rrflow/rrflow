@@ -5,10 +5,10 @@ use super::*;
 #[test]
 #[ignore = "explicit native capacity-driver smoke; candidate portability job"]
 fn installed_capacity_workload_smoke() {
-    let estate = Estate::install("fresh");
+    let engram = Engram::install("fresh");
     let clock = Instant::now();
-    let (child, client, _) = estate.start_for(clock, Duration::from_secs(300));
-    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let (child, client, _) = engram.start_for(clock, Duration::from_secs(300));
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -38,7 +38,7 @@ fn installed_capacity_workload_smoke() {
             native_worker: Default::default(),
             client,
             session: lease,
-            valid_at: estate.at,
+            valid_at: engram.at,
             dimensions: 16,
             seed: 73,
             records: 8,
@@ -46,7 +46,7 @@ fn installed_capacity_workload_smoke() {
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,
-            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
                 .unwrap(),
         };
         work.initialize().await.unwrap();
@@ -62,7 +62,7 @@ fn installed_capacity_workload_smoke() {
         let winning_key = "seed-00000000000000000007";
         let before = work.verify_joined_search(winning_key, 1, 7, 5.53125).await.unwrap();
         super::super::kill(child, clock);
-        let (mut child, client, _) = estate.start_for(clock, Duration::from_secs(300));
+        let (mut child, client, _) = engram.start_for(clock, Duration::from_secs(300));
         work.client = client;
         let after = work.verify_joined_search(winning_key, 1, 7, 5.53125).await.unwrap();
         assert_eq!(after.known_at_cursor, before.known_at_cursor);
@@ -428,7 +428,7 @@ fn installed_capacity_workload_smoke() {
         assert!(!acknowledged.is_empty());
         assert_eq!(interrupted_events.iter().filter(|event| matches!(event, ProgressEvent::Resource { .. })).count(), 1);
         super::super::kill(child, clock);
-        let (restarted, client, _) = estate.start_for(clock, Duration::from_secs(300));
+        let (restarted, client, _) = engram.start_for(clock, Duration::from_secs(300));
         child = restarted;
         work.client = client;
         assert_eq!(std::fs::read_to_string(interrupted_evidence.join("progress.jsonl")).unwrap(), raw);
@@ -496,7 +496,7 @@ fn installed_capacity_workload_smoke() {
             serde_json::to_string(&selected_evidence).unwrap()
         );
         let killed = super::super::kill(child, clock);
-        let (reopened, client, identity) = estate.start_for(clock, Duration::from_secs(300));
+        let (reopened, client, identity) = engram.start_for(clock, Duration::from_secs(300));
         work.client = client;
         // Exercise the production post-reopen bounded readback before replay.
         let mut reopened_digest =
@@ -547,7 +547,7 @@ fn installed_capacity_workload_smoke() {
         println!(
             "installed_capacity_workload_smoke={}",
             serde_json::json!({
-            "build":estate.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
+            "build":engram.build,"records":8,"edges":24,"vectors":16,"dimensions":16,
             "replayed_transactions":12,"write_transitions":{"insert":3,"update":4,"retire":3,"recreate":2},"backup_sha256":backup.receipt.backup.backup_sha256,
             "management_followup_verified":true,"reader_interference":reader_evidence,"termination":killed,"reopened":identity,
             "interrupted_acknowledged_writes":acknowledged.len(),"interrupted_sample_cancelled":gate.dropped.load(std::sync::atomic::Ordering::SeqCst),

@@ -254,7 +254,7 @@ async fn rust_sdk_passes_shared_real_daemon_conformance() {
     }));
 
     // The quantization lifecycle: build a TurboQuant generation, activate the
-    // generation this build returned (the runners share one estate), and
+    // generation this build returned (the runners share one engram), and
     // require it.
     let quantization = &corpus.vector.quantization;
     let built = client
@@ -392,16 +392,16 @@ async fn rust_sdk_passes_shared_real_daemon_conformance() {
         .backups
         .iter()
         .any(|entry| entry.backup_sha256 == backup.backup.backup_sha256));
-    let estate = client
-        .read_estate(
+    let engram = client
+        .read_engram(
             &session,
-            corpus.identity.estate.clone(),
-            corpus.estate.clone(),
-            read("estate-read"),
+            corpus.identity.engram.clone(),
+            corpus.engram.clone(),
+            read("engram-read"),
         )
         .await
         .unwrap();
-    assert_eq!(estate.revision, corpus.expected.estate_revision);
+    assert_eq!(engram.revision, corpus.expected.engram_revision);
 
     let closed = client
         .close_session(&session, corpus.session.close, mutation("session-close"))

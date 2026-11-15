@@ -38,7 +38,7 @@ pub enum Error {
     /// Propagated from the substrate.
     Substrate(String),
     /// Another handle already holds the database's single writer lock, so
-    /// the estate is open in another process. Carries the lock's display path.
+    /// the engram is open in another process. Carries the lock's display path.
     ActiveWriter(String),
     /// Known admission rejection before this batch's domain publication.
     WriteBatchLimit {

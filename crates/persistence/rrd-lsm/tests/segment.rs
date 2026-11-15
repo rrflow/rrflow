@@ -47,7 +47,7 @@ fn compressible_table() -> Memtable {
     let mutations = (0..128)
         .map(|index| Mutation::Put {
             key: format!("key-{index:04}").into_bytes(),
-            value: format!("estate=rrflow|record={index:04}|")
+            value: format!("engram=rrflow|record={index:04}|")
                 .repeat(16)
                 .into_bytes(),
         })

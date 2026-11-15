@@ -52,7 +52,7 @@ fn schema() -> DataSchemaRegistry {
     DataSchemaRegistry {
         revision: 1,
         migration: "install vector index fixture".into(),
-        organisation: DataEstateOrganisation::default(),
+        organisation: DataEngramOrganisation::default(),
         tables: BTreeMap::from([
             (canonical("document"), table(DataLogicalModel::Document)),
             (canonical("embedding"), table(DataLogicalModel::Vector)),

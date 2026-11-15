@@ -17,7 +17,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateRead,
+            SecurityAction::EngramRead,
             now,
             request_id,
             operation_id,

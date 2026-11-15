@@ -68,15 +68,15 @@ fn inventory(root: &Path) -> BTreeMap<String, (u64, String)> {
     result
 }
 
-fn require_denied(estate: &Estate, serve: bool) -> serde_json::Value {
-    let mut command = estate.command();
+fn require_denied(engram: &Engram, serve: bool) -> serde_json::Value {
+    let mut command = engram.command();
     command
         .args([
             "--json",
             if serve { "serve" } else { "verify" },
             "--project",
         ])
-        .arg(&estate.project);
+        .arg(&engram.project);
     if serve {
         command.args(["--bind", "127.0.0.1:0"]);
     } else {
@@ -107,9 +107,9 @@ fn require_denied(estate: &Estate, serve: bool) -> serde_json::Value {
         "stdout_bytes":output.stdout.len(),"stderr_bytes":output.stderr.len()})
 }
 
-fn target(estate: &Estate, role: &str) -> PathBuf {
-    let locator = rrd_engine::RrdEngine::read_project_locator(&estate.project).unwrap();
-    let root = estate.project.join(locator.storage_root);
+fn target(engram: &Engram, role: &str) -> PathBuf {
+    let locator = rrd_engine::RrdEngine::read_project_locator(&engram.project).unwrap();
+    let root = engram.project.join(locator.storage_root);
     let inspector = rrd_store::RrflowKvInspector::open(&root).unwrap();
     let physical = &inspector.inspection().physical;
     let relative = match role {
@@ -134,19 +134,19 @@ fn target(estate: &Estate, role: &str) -> PathBuf {
     let path = root.join(relative);
     assert!(std::fs::canonicalize(&path)
         .unwrap()
-        .starts_with(std::fs::canonicalize(&estate.project).unwrap()));
+        .starts_with(std::fs::canonicalize(&engram.project).unwrap()));
     assert!(path.is_file() && std::fs::metadata(&path).unwrap().len() > 0);
     path
 }
 
 async fn restore_backup(
-    estate: &Estate,
+    engram: &Engram,
     work: &mut Workload,
     backup: &BackupEvidence,
     originals: &[(Prepared, Digest)],
     clock: Instant,
 ) -> serde_json::Value {
-    let (child, client, _) = estate.start_for(clock, Duration::from_secs(180));
+    let (child, client, _) = engram.start_for(clock, Duration::from_secs(180));
     work.client = client;
     let backup_sha = &backup.receipt.backup.backup_sha256;
     let staged = work
@@ -156,43 +156,43 @@ async fn restore_backup(
             rrd_contract::RestoreInstanceBackup {
                 backup_sha256: backup_sha.clone(),
                 restore_id: rrd_contract::CanonicalId::new("damage-roundtrip").unwrap(),
-                restored_at_unix_ms: estate.at + 3000,
+                restored_at_unix_ms: engram.at + 3000,
             },
             RequestOptions::mutation("damage-restore", "damage-restore", "damage-restore").unwrap(),
         )
         .await
         .unwrap();
     super::super::kill(child, clock);
-    let before = inventory(&estate.project);
+    let before = inventory(&engram.project);
     let arguments = [
         "restore",
         "plan",
         "--project",
-        estate.project.to_str().unwrap(),
+        engram.project.to_str().unwrap(),
         "--restore",
         "damage-roundtrip",
         "--backup",
         backup_sha,
     ];
-    let plan = estate.invoke(&arguments);
+    let plan = engram.invoke(&arguments);
     assert_eq!(
-        estate.invoke(&arguments),
+        engram.invoke(&arguments),
         plan,
         "restore plan must be stable"
     );
     assert_eq!(
-        inventory(&estate.project),
+        inventory(&engram.project),
         before,
         "planning changed project state"
     );
-    let path = estate.temp.path().join("damage-restore-plan.json");
+    let path = engram.temp.path().join("damage-restore-plan.json");
     std::fs::write(&path, serde_json::to_vec(&plan).unwrap()).unwrap();
-    let published = estate.invoke(&[
+    let published = engram.invoke(&[
         "--json",
         "restore",
         "apply",
         "--project",
-        estate.project.to_str().unwrap(),
+        engram.project.to_str().unwrap(),
         "--plan",
         path.to_str().unwrap(),
         "--expect",
@@ -200,14 +200,14 @@ async fn restore_backup(
     ]);
     assert_eq!(published["plan_sha256"], plan["plan_sha256"]);
     assert_eq!(published["runtime_cursor"], staged.inventory.runtime_cursor);
-    let quarantine = estate
+    let quarantine = engram
         .project
         .join(published["quarantine_root"].as_str().unwrap());
     assert!(quarantine.is_dir());
     assert!(std::fs::canonicalize(quarantine)
         .unwrap()
-        .starts_with(std::fs::canonicalize(&estate.project).unwrap()));
-    let (child, client, _) = estate.start_for(clock, Duration::from_secs(180));
+        .starts_with(std::fs::canonicalize(&engram.project).unwrap()));
+    let (child, client, _) = engram.start_for(clock, Duration::from_secs(180));
     work.client = client;
     // Application backups exclude transient sessions and their operation
     // receipts. Restoring one must not resurrect old session authorization.
@@ -227,7 +227,7 @@ async fn restore_backup(
             if error.code == rrd_contract::ErrorCode::NotFound),
         "stale session must receive an API denial"
     );
-    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project).unwrap();
     work.session = work
         .client
         .create_session(
@@ -268,7 +268,7 @@ async fn restore_backup(
     assert!(!receipt.idempotent_replay);
     work.verify(&subsequent).await.unwrap();
     super::super::kill(child, clock);
-    let (child, client, _) = estate.start_for(clock, Duration::from_secs(180));
+    let (child, client, _) = engram.start_for(clock, Duration::from_secs(180));
     work.client = client;
     for (operation, _) in originals.iter().take(work.records as usize) {
         work.verify(operation).await.unwrap();
@@ -300,14 +300,14 @@ fn run(mode: &str) {
     let path = configuration.path().join("configuration.toml");
     let mut policy: toml::Value = toml::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../authority/rrd-engine/assets/install/default-estate-configuration-v3.toml"
+        "/../../authority/rrd-engine/assets/install/default-engram-configuration-v3.toml"
     )))
     .unwrap();
     policy["storage"]["wal_flush_target_bytes"] = toml::Value::Integer(1);
     std::fs::write(&path, toml::to_string(&policy).unwrap()).unwrap();
-    let estate = Estate::install_configured(mode, Some(&path));
+    let engram = Engram::install_configured(mode, Some(&path));
     assert_eq!(
-        estate.plan["configuration"]["storage"]["wal_flush_target_bytes"],
+        engram.plan["configuration"]["storage"]["wal_flush_target_bytes"],
         1
     );
     let clock = Instant::now();
@@ -316,8 +316,8 @@ fn run(mode: &str) {
         .build()
         .unwrap();
     runtime.block_on(async {
-        let (child, client, _) = estate.start_for(clock, Duration::from_secs(180));
-        let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+        let (child, client, _) = engram.start_for(clock, Duration::from_secs(180));
+        let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project).unwrap();
         let session = client
             .create_session(
                 credential.principal_id.clone(),
@@ -338,7 +338,7 @@ fn run(mode: &str) {
             native_worker: Default::default(),
             client,
             session,
-            valid_at: estate.at,
+            valid_at: engram.at,
             dimensions: 16,
             seed: 97,
             records: 4,
@@ -346,7 +346,7 @@ fn run(mode: &str) {
             edges_per_record: 2,
             vectors_per_record: 2,
             payload_bytes: 1024,
-            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
                 .unwrap(),
         };
         work.initialize().await.unwrap();
@@ -378,9 +378,9 @@ fn run(mode: &str) {
         let mut cases = Vec::new();
         for role in ["wal", "segment", "manifest", "current"] {
             for fault in ["missing", "corrupt"] {
-                let before = inventory(&estate.project);
-                let path = target(&estate, role);
-                let saved = estate.temp.path().join(format!("saved-{role}-{fault}"));
+                let before = inventory(&engram.project);
+                let path = target(&engram, role);
+                let saved = engram.temp.path().join(format!("saved-{role}-{fault}"));
                 if fault == "missing" {
                     std::fs::rename(&path, &saved).unwrap();
                 } else {
@@ -399,20 +399,20 @@ fn run(mode: &str) {
                     file.write_all(&byte).unwrap();
                     file.sync_all().unwrap();
                 }
-                let damaged = inventory(&estate.project);
+                let damaged = inventory(&engram.project);
                 assert_ne!(
                     before, damaged,
                     "fixture must change actual authoritative bytes"
                 );
-                let verify = require_denied(&estate, false);
+                let verify = require_denied(&engram, false);
                 assert_eq!(
-                    inventory(&estate.project),
+                    inventory(&engram.project),
                     damaged,
                     "verify changed damage evidence"
                 );
-                let serve = require_denied(&estate, true);
+                let serve = require_denied(&engram, true);
                 assert_eq!(
-                    inventory(&estate.project),
+                    inventory(&engram.project),
                     damaged,
                     "open changed damage evidence"
                 );
@@ -421,8 +421,8 @@ fn run(mode: &str) {
                     std::fs::remove_file(&path).unwrap();
                 }
                 std::fs::rename(&saved, &path).unwrap();
-                assert_eq!(inventory(&estate.project), before, "restored bytes differ");
-                let (reopened, client, _) = estate.start_for(clock, Duration::from_secs(180));
+                assert_eq!(inventory(&engram.project), before, "restored bytes differ");
+                let (reopened, client, _) = engram.start_for(clock, Duration::from_secs(180));
                 work.client = client;
                 for (operation, _) in &originals {
                     work.verify(operation).await.unwrap();
@@ -442,10 +442,10 @@ fn run(mode: &str) {
             }
         }
         assert_eq!(cases.len(), 8);
-        let restored = restore_backup(&estate, &mut work, &backup, &originals, clock).await;
+        let restored = restore_backup(&engram, &mut work, &backup, &originals, clock).await;
         println!(
             "installed_damage_receipt={}",
-            serde_json::json!({"mode":mode,"build":estate.build,
+            serde_json::json!({"mode":mode,"build":engram.build,
             "backup_sha256":backup.receipt.backup.backup_sha256,"cases":cases,
             "restore":restored,"implicit_repair":false,"capacity_qualification":false})
         );

@@ -238,7 +238,7 @@ fn installed_source_binding_preview_apply_restart_revoke_and_replay() {
         .records
         .iter()
         .any(|record| record.operation_id == "apply"
-            && record.action == SecurityAction::EstateAdmin
+            && record.action == SecurityAction::EngramAdmin
             && record.decision == AuditDecision::Allowed));
     let entries = engine.storage.control().journal_since(0, 1024).unwrap();
     let actions: Vec<_> = entries
@@ -349,7 +349,7 @@ fn installed_source_binding_preview_apply_restart_revoke_and_replay() {
             expires_at_unix_ms: u64::MAX,
             disabled: false,
             role_ids: std::collections::BTreeSet::new(),
-            grants: [SecurityAction::SessionCreate, SecurityAction::EstateRead]
+            grants: [SecurityAction::SessionCreate, SecurityAction::EngramRead]
                 .into_iter()
                 .map(|action| ResourceGrant {
                     action,
@@ -431,7 +431,7 @@ fn installed_source_binding_preview_apply_restart_revoke_and_replay() {
 }
 
 #[test]
-fn public_source_preview_uses_host_clock_on_an_installed_estate() {
+fn public_source_preview_uses_host_clock_on_an_installed_engram() {
     use std::time::{SystemTime, UNIX_EPOCH};
     let time = || {
         u64::try_from(

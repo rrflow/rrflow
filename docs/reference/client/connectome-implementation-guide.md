@@ -106,7 +106,7 @@ The UI must retain this generated identity across preview regeneration and
 apply, and generate a new one for another independent project. It belongs to
 the pending preview, not a new client-owned durable lifecycle. Version-2 plans
 also bind the initial root; moving a partially installed project is refused.
-Already installed estates retain their identity through relocation and reopen.
+Already installed engrams retain their identity through relocation and reopen.
 
 Start the installed service in a foreground terminal:
 
@@ -161,7 +161,7 @@ Use these words precisely:
 | Authenticated | Native client created a valid RRD session for the expected instance/principal |
 | Connected | Discovered and authenticated; renderer has only an opaque connection handle |
 | Persisted | A commit receipt was reconciled and a later query at an adequate read coordinate returns the value |
-| Recovered | A different RRFlow process reopened the same installed estate and a fresh authenticated query returned the same value |
+| Recovered | A different RRFlow process reopened the same installed engram and a fresh authenticated query returned the same value |
 
 An HTTP 200, green dot, animation, process ID, open port, generated interface,
 mock response, or screenshot cannot advance these states.

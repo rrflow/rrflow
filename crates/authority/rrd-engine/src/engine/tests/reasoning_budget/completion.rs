@@ -1,4 +1,4 @@
-//! Bookkeeping/freshness tests in isolated engine estates. The supplied output
+//! Bookkeeping/freshness tests in isolated engine engrams. The supplied output
 //! tuple projects retained provider bytes onto a fresh task solely to test the
 //! ledger; it is not evidence of a provider call for that packet, nor learning data.
 use super::*;
@@ -693,7 +693,7 @@ fn public_proposal_requires_initialized_authority_before_any_reservation() {
 
 #[test]
 fn each_required_proposal_permission_is_enforced_before_configuration_or_capacity() {
-    // These are real authorization denials in isolated estates. No transport or
+    // These are real authorization denials in isolated engrams. No transport or
     // fabricated model answer is involved. The secret is an engine-issued token.
     let required = [
         SecurityAction::EndpointPropose,

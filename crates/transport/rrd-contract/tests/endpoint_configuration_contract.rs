@@ -1,9 +1,9 @@
 use rrd_contract::*;
 
-fn identity() -> InstalledEstateIdentity {
-    InstalledEstateIdentity {
+fn identity() -> InstalledEngramIdentity {
+    InstalledEngramIdentity {
         project_id: CanonicalId::new("project").unwrap(),
-        estate_id: CanonicalId::new("estate").unwrap(),
+        engram_id: CanonicalId::new("engram").unwrap(),
         instance_id: CanonicalId::new("instance").unwrap(),
     }
 }
@@ -73,9 +73,9 @@ fn configuration_catalogue_projects_authenticated_read_preview_and_mutation() {
     let catalogue = endpoint_catalogue();
     let openapi = openapi_document().unwrap();
     for (op, mutation, action) in [
-        ("read", false, SecurityAction::EstateRead),
-        ("preview", false, SecurityAction::EstateAdmin),
-        ("apply", true, SecurityAction::EstateAdmin),
+        ("read", false, SecurityAction::EngramRead),
+        ("preview", false, SecurityAction::EngramAdmin),
+        ("apply", true, SecurityAction::EngramAdmin),
     ] {
         let name = format!("endpoint-configuration-{op}");
         let endpoint = catalogue

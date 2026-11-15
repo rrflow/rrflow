@@ -72,7 +72,7 @@ PACKAGE_GATES: dict[str, tuple[str, ...]] = {
         "J-04",
     ),
     "rrd-security": ("A-07", "D-01", "H-04", "H-05", "J-02"),
-    "rrd-estate": ("A-07", "D-01", "D-02", "D-10", "H-05", "J-03"),
+    "rrd-engram": ("A-07", "D-01", "D-02", "D-10", "H-05", "J-03"),
     "rrd-engine": (
         "A-07",
         "C-03",
@@ -390,7 +390,7 @@ FILE_OVERRIDES: dict[str, tuple[str, ...]] = {
         "H-01",
         "H-02",
     ),
-    "crates/authority/rrd-engine/src/engine/memory_estate.rs": (
+    "crates/authority/rrd-engine/src/engine/memory_engram.rs": (
         "C-03",
         "D-01",
         "E-01",
@@ -401,7 +401,7 @@ FILE_OVERRIDES: dict[str, tuple[str, ...]] = {
         "H-05",
         "J-01",
     ),
-    "crates/authority/rrd-engine/src/engine/tests/memory_estate.rs": (
+    "crates/authority/rrd-engine/src/engine/tests/memory_engram.rs": (
         "C-03",
         "D-01",
         "G-02",
@@ -531,7 +531,7 @@ FILE_OVERRIDES: dict[str, tuple[str, ...]] = {
         "J-01",
     ),
     "crates/transport/rrd-contract/src/attunement.rs": ("D-01", "D-02", "D-05"),
-    "crates/transport/rrd-contract/src/memory_estate.rs": (
+    "crates/transport/rrd-contract/src/memory_engram.rs": (
         "C-03",
         "D-01",
         "G-02",
@@ -631,8 +631,8 @@ FILE_OVERRIDES: dict[str, tuple[str, ...]] = {
 
 REMOVE_OR_REWRITE = {
     "crates/kernel/rrd-core/src/claim.rs": "derive any producer attribution from the authenticated principal and same-stamp provider representation; an arbitrary actor string cannot authorize, resolve a seat, or persist routed work",
-    "crates/transport/rrd-contract/src/memory_estate.rs": "rename the ambiguous MemoryEstate contract directly to canonical seat and provider-representation vocabulary while preserving validation, subject-digest redaction, and temporal relation semantics; leave no alias",
-    "crates/authority/rrd-engine/src/engine/memory_estate.rs": "move seat planning and commit into one authenticated engine operation, consume the installed specialization, and replace broad snapshot reconstruction with canonical native graph/index access; leave no old module or type alias",
+    "crates/transport/rrd-contract/src/memory_engram.rs": "rename the ambiguous MemoryEngram contract directly to canonical seat and provider-representation vocabulary while preserving validation, subject-digest redaction, and temporal relation semantics; leave no alias",
+    "crates/authority/rrd-engine/src/engine/memory_engram.rs": "move seat planning and commit into one authenticated engine operation, consume the installed specialization, and replace broad snapshot reconstruction with canonical native graph/index access; leave no old module or type alias",
     "crates/authority/rrd-engine/src/operator.rs": "bind claim attribution to canonical authenticated identity and representation semantics rather than accepting Producer.actor as sufficient identity",
     "crates/adapters/rrflow-cli/src/command.rs": "remove hardcoded Clyffy identity defaults and caller-selected actor attribution; consume the installed specialization and public authenticated engine operations",
     "crates/authority/rrd-engine/src/engine/security_bootstrap.rs": "absorb strict validation, bounded secret input, atomic initial policy/audit, exact replay, and drift denial into the D-01 install authority; remove the static rrflowKV/path/time opener and manifest dialect",
@@ -663,14 +663,14 @@ C04_DIRECT_READ_PATHS = {
     "crates/authority/rrd-engine/src/engine/context.rs",
     "crates/authority/rrd-engine/src/engine/data.rs",
     "crates/authority/rrd-engine/src/engine/inference.rs",
-    "crates/authority/rrd-engine/src/engine/memory_estate.rs",
+    "crates/authority/rrd-engine/src/engine/memory_engram.rs",
     "crates/authority/rrd-engine/src/engine/query.rs",
     "crates/authority/rrd-engine/src/engine/retrieval.rs",
     "crates/authority/rrd-engine/src/engine/retrieval_query.rs",
     "crates/authority/rrd-engine/src/engine/tests/context.rs",
     "crates/authority/rrd-engine/src/engine/tests/data_crud.rs",
     "crates/authority/rrd-engine/src/engine/tests/function.rs",
-    "crates/authority/rrd-engine/src/engine/tests/memory_estate.rs",
+    "crates/authority/rrd-engine/src/engine/tests/memory_engram.rs",
     "crates/authority/rrd-engine/src/engine/tests/native_inference.rs",
     "crates/authority/rrd-engine/src/engine/tests/query_transaction.rs",
     "crates/authority/rrd-engine/src/engine/tests/recovery.rs",
@@ -695,7 +695,7 @@ C04_DIRECT_READ_PATHS = {
     "crates/transport/rrd-contract/src/inference.rs",
     "crates/transport/rrd-contract/src/lib.rs",
     "crates/transport/rrd-contract/src/memory_context.rs",
-    "crates/transport/rrd-contract/src/memory_estate.rs",
+    "crates/transport/rrd-contract/src/memory_engram.rs",
     "crates/transport/rrd-contract/src/router.rs",
     "crates/transport/rrd-contract/tests/public_contract/main.rs",
     "crates/transport/rrd-contract/tests/router_contract.rs",
@@ -1687,7 +1687,7 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
     "docs/reference/inference/README.md": ("KB-05", "KB-08"),
     "docs/reference/inference/embedding-and-model-bound-search.md": ("KB-05",),
     "docs/reference/operations/README.md": ("KB-05", "KB-08"),
-    "docs/reference/operations/estate-control.md": ("KB-05",),
+    "docs/reference/operations/engram-control.md": ("KB-05",),
     "docs/reference/protocol/README.md": ("KB-05", "KB-08"),
     "docs/reference/protocol/postgresql.md": ("H-08", "J-02", "J-03", "J-05"),
     "docs/reference/protocol/public-contract.md": ("KB-05",),
@@ -1709,7 +1709,7 @@ PLANNED_PATHS: dict[str, tuple[str, ...]] = {
     "docs/reference/sdk/typescript.md": ("KB-05",),
     "docs/reference/security/README.md": ("KB-05", "KB-08"),
     "docs/reference/security/authority.md": ("KB-05",),
-    "docs/reference/security/local-estate-authorization.md": ("KB-05",),
+    "docs/reference/security/local-engram-authorization.md": ("KB-05",),
     "docs/reference/storage/logical-archive.md": ("KB-05",),
     "docs/reference/storage/tiered-persistence.md": ("KB-05",),
     "docs/reference/vector/README.md": ("KB-05", "KB-08"),

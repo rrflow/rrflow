@@ -1,13 +1,13 @@
 //! Explicit installed recovery over the native validated prefix. Neither serve
 //! nor verify can invoke this effect. The project locator remains the authority.
-use super::estate_layout::safe_join;
+use super::engram_layout::safe_join;
 use super::installation::{
     engram_configuration_key, json_sha256, read_locator, require_locator_record_match, sha256_file,
-    InstalledEstateRecord, INSTALLED_RECORD_KEY,
+    InstalledEngramRecord, INSTALLED_RECORD_KEY,
 };
 use super::token_key::{read_api_key_document_anchored, read_token_key_anchored};
 use super::*;
-use rrd_contract::EstateConfiguration;
+use rrd_contract::EngramConfiguration;
 use rrd_store::{RrflowKvTailRepair, TailRepairPlan, TailRepairReceipt};
 use serde::de::DeserializeOwned;
 pub(in crate::engine) mod publication;
@@ -17,7 +17,7 @@ pub use publication::RepairPublication;
 #[serde(deny_unknown_fields)]
 pub struct InstalledTailRepairPlan {
     pub format_version: u16,
-    pub target: InstalledEstateIdentity,
+    pub target: InstalledEngramIdentity,
     pub locator_sha256: String,
     pub executable_sha256: String,
     pub configuration_sha256: String,
@@ -46,7 +46,7 @@ impl InstalledTailRepairPlan {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstalledTailRepairReceipt {
     pub plan_sha256: String,
-    pub target: InstalledEstateIdentity,
+    pub target: InstalledEngramIdentity,
     pub runtime_cursor: u64,
     pub claim_sequence: u64,
     pub storage: TailRepairReceipt,
@@ -58,7 +58,7 @@ pub struct InstalledTailRepairReceipt {
 
 struct BoundRepair {
     repair: RrflowKvTailRepair,
-    target: InstalledEstateIdentity,
+    target: InstalledEngramIdentity,
     locator_sha256: String,
     executable_sha256: String,
     configuration_sha256: String,
@@ -66,7 +66,7 @@ struct BoundRepair {
 }
 
 impl RrdEngine {
-    /// Mutation-free preview, requiring a stopped estate and a positively
+    /// Mutation-free preview, requiring a stopped engram and a positively
     /// classified incomplete final frame. Complete corruption is never repairable.
     pub fn plan_installed_tail_repair(
         project: &Path,
@@ -131,10 +131,10 @@ impl BoundRepair {
             &root,
             super::core::installed_storage_options(&locator.storage)?,
         )?;
-        let installed: InstalledEstateRecord = decode(&repair, INSTALLED_RECORD_KEY)?;
+        let installed: InstalledEngramRecord = decode(&repair, INSTALLED_RECORD_KEY)?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
-        let configuration: EstateConfiguration = decode(
+        let configuration: EngramConfiguration = decode(
             &repair,
             &engram_configuration_key(&locator.identity.instance_id),
         )?;

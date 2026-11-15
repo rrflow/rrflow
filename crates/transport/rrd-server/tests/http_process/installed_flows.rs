@@ -421,7 +421,7 @@ pub(super) fn installed_endpoint_configuration_http_flow_survives_restart_and_re
     }
     let reopened = RrdEngine::open_installed(&project, &executable).unwrap();
     assert_eq!(
-        reopened.installed_estate_identity(),
+        reopened.installed_engram_identity(),
         Some(&installation.installation.target)
     );
 }

@@ -37,7 +37,7 @@ effect and the claim, not to the complexity of the reasoning that preceded it.
 
 | Activity | Contract posture |
 |---|---|
-| Read, search, inspect, compare, hypothesize, and select provisional context | Adaptive and incrementally grounded. Record uncertainty and source identity when useful; do not require a complete estate snapshot merely to think or look. |
+| Read, search, inspect, compare, hypothesize, and select provisional context | Adaptive and incrementally grounded. Record uncertainty and source identity when useful; do not require a complete engram snapshot merely to think or look. |
 | Produce a recommendation or draft | Flexible semantic output with provenance appropriate to its use. It remains a proposal and has no mutation authority. |
 | Persist canonical knowledge, activate a projection, or mutate project state | Authenticate, authorize, bind the relevant read/source revision, validate the proposed effect, and commit through `RrdEngine`. |
 | Invoke a process, provider, network service, or other external effect | Use an explicit installed capability, bounded activity plan, and accepted or uncertain-outcome receipt. |

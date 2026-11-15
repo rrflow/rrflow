@@ -79,13 +79,13 @@ impl RrdEngine {
                 outcome_sha256: previous.outcome_sha256,
             });
         }
-        let limits = self.estate_configuration.reasoning.clone();
+        let limits = self.engram_configuration.reasoning.clone();
         let mut budget = existing.unwrap_or(TaskReasoningBudget {
             format_version: 1,
             instance_id: self.instance.clone(),
             scope: input.scope.into(),
             task_id: input.task_id.clone(),
-            configuration_sha256: self.estate_configuration.configuration_sha256.clone(),
+            configuration_sha256: self.engram_configuration.configuration_sha256.clone(),
             deadline_unix_ms: at
                 .checked_add(limits.max_run_elapsed_ms)
                 .ok_or(ServiceError::DeadlineExceeded)?,
@@ -111,7 +111,7 @@ impl RrdEngine {
         }
         let mut stop = if at < budget.last_observed_at_unix_ms {
             Some(ReasoningBudgetStop::ClockRollback)
-        } else if budget.configuration_sha256 != self.estate_configuration.configuration_sha256 {
+        } else if budget.configuration_sha256 != self.engram_configuration.configuration_sha256 {
             Some(ReasoningBudgetStop::ConfigurationChanged)
         } else if input.cancellation.is_cancelled() {
             Some(ReasoningBudgetStop::Cancelled)

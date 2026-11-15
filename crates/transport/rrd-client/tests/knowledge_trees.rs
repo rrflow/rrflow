@@ -1,5 +1,5 @@
 //! Public authenticated knowledge-tree configuration: real HTTP and durable engine.
-//! Uses only this test's temporary installed estate; no external provider is invoked.
+//! Uses only this test's temporary installed engram; no external provider is invoked.
 
 use rrd_client::{ClientConfig, Error, RequestOptions, RrdClient, Session};
 use rrd_contract::{

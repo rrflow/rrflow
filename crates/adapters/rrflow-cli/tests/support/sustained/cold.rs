@@ -3,7 +3,7 @@ use super::*;
 
 #[cfg(not(target_os = "linux"))]
 pub(super) async fn run(
-    _estate: &Estate,
+    _engram: &Engram,
     _child: &mut Option<super::super::process::Process>,
     _work: &mut Workload,
     _campaign: &StorageCampaign,
@@ -16,7 +16,7 @@ pub(super) async fn run(
 
 #[cfg(target_os = "linux")]
 pub(super) async fn run(
-    estate: &Estate,
+    engram: &Engram,
     child: &mut Option<super::super::process::Process>,
     work: &mut Workload,
     campaign: &StorageCampaign,
@@ -28,8 +28,8 @@ pub(super) async fn run(
     let deadline = Instant::now() + Duration::from_millis(campaign.schedule.lifecycle_ms.get());
     super::super::kill(child.take().ok_or("missing cold-start server")?, clock);
     let locator =
-        rrd_engine::RrdEngine::read_project_locator(&estate.project).map_err(|e| e.to_string())?;
-    let project = std::fs::canonicalize(&estate.project).map_err(|e| e.to_string())?;
+        rrd_engine::RrdEngine::read_project_locator(&engram.project).map_err(|e| e.to_string())?;
+    let project = std::fs::canonicalize(&engram.project).map_err(|e| e.to_string())?;
     let path = project.join(locator.storage_root);
     if std::fs::symlink_metadata(&path)
         .map_err(|e| e.to_string())?
@@ -42,7 +42,7 @@ pub(super) async fn run(
     if !root.starts_with(&project) || root == project {
         return Err("cold root escaped its owned installed project".into());
     }
-    let policy = &estate.plan["configuration"]["storage"];
+    let policy = &engram.plan["configuration"]["storage"];
     let limit = |name: &str| {
         policy[name]
             .as_u64()
@@ -59,7 +59,7 @@ pub(super) async fn run(
     )?;
     observed.started_ns = started_ns;
     observed.evicted_ns = ns(clock);
-    let (reopened, client, _) = estate.start_for(clock, lifetime);
+    let (reopened, client, _) = engram.start_for(clock, lifetime);
     *child = Some(reopened);
     work.client = client;
     observed.ready_ns = ns(clock);

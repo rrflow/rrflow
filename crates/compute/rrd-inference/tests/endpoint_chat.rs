@@ -1,5 +1,8 @@
 #![cfg(feature = "endpoint-chat")]
 //! Actual retained HTTP records; denial mutations are in-memory probes only.
+#[path = "support/observed_configuration.rs"]
+mod observed_configuration;
+
 use rrd_contract::{endpoint_profile_sha256, EndpointConfiguration, EndpointSelectionAllowance};
 use rrd_inference::{
     endpoint_chat::{EndpointChatRequest, PreparedEndpointChat},
@@ -12,13 +15,12 @@ use std::{
 };
 
 fn read(name: &str, file: &str) -> Vec<u8> {
-    std::fs::read(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    observed_configuration::read(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../transport/rrd-contract/tests/fixtures/endpoint-selection-observed")
-            .join(name)
-            .join(file),
+            .join(name),
+        file,
     )
-    .unwrap()
 }
 fn inputs(
     name: &str,
@@ -259,11 +261,12 @@ fn native_live_calls_retain_actual_bytes_and_uncertain_failures() {
             continue;
         }
         let configuration =
-            serde_json::from_slice(&std::fs::read(root.join("configuration.json")).unwrap())
+            serde_json::from_slice(&observed_configuration::read(&root, "configuration.json"))
                 .unwrap();
-        let allowance = serde_json::from_slice(
-            &std::fs::read(root.join(format!("{name}-allowance.json"))).unwrap(),
-        )
+        let allowance = serde_json::from_slice(&observed_configuration::read(
+            &root,
+            &format!("{name}-allowance.json"),
+        ))
         .unwrap();
         let request: EndpointChatRequest =
             serde_json::from_slice(&std::fs::read(root.join(name).join("request.json")).unwrap())

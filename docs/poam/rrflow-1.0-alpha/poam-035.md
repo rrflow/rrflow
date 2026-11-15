@@ -193,7 +193,7 @@ The [encoder candidate's native descriptor failure](../../evidence/change-journa
 reached 77,945 acknowledged records before EMFILE at the actual 1,024-descriptor
 soft limit. Read-only installed verification passes, but full corpus readback
 and soak qualification did not complete. Bounded segment-handle ownership is
-required; the retained failed estate and its original identities remain evidence.
+required; the retained failed engram and its original identities remain evidence.
 The [bounded segment-handle repair](../../evidence/change-journals/gate-c/c-07g-bounded-segment-handles.md)
 implements per-database admission, idle eviction and identity-checked reopen.
 The native low-descriptor regression fails on main and passes on the working
@@ -212,7 +212,7 @@ The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-enco
 records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
 CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
 records on the 30-second write deadline. No failed compaction or OOM was
-reported, the private estate was retained, and continuation refused soak.
+reported, the private engram was retained, and continuation refused soak.
 Native profiling on a separate copy led to incremental row-group encoding and
 buffer reuse in PR128. Exact-byte and component checks do not establish repair
 of that installed timeout. Full growth/profile and actual 24-hour acceptance
@@ -239,7 +239,7 @@ It never entered soak. PR123's native crash and 100-reopen jobs passed on all
 three platforms, while an installation-recovery lease conflict failed its
 optional-engine job and final gate. PR126 consolidates the current candidate,
 removes irrelevant per-key compaction shadow scans, explicitly releases the
-installation lease and retains private setup-failure estates. Causal repair
+installation lease and retains private setup-failure engrams. Causal repair
 and acceptance require the final candidate suites and full-corpus rerun;
 existing deadlines and resource limits remain unchanged.
 
@@ -262,7 +262,7 @@ metadata-refill change does not execute on this WAL case.
 
 [PR23 run 40121518000](https://github.com/rrflow/rrflow-development/actions/runs/40121518000)
 filled 242651136 bytes on ext4 and returned `api-Internal`, then exceeded the
-120-second `Estate::invoke` limit. Its stack identifies the `capacity_case`
+120-second `Engram::invoke` limit. Its stack identifies the `capacity_case`
 async closure; the only invocation in that closure is `repair apply`.
 The old log lacks the command label, elapsed phase timings and resource trace
 needed to distinguish replay/hashing/copy/publication costs or a stalled repair.
@@ -525,7 +525,7 @@ Its per-open-instance output cap is not a bound on independent reopen pools,
 other memory families or installed total memory. C-07d/e remain open.
 
 Component success could be mistaken for safe production growth, a true
-disk-full result, power-loss durability or bounded multi-estate operation.
+disk-full result, power-loss durability or bounded multi-engram operation.
 Storage-level success cannot establish native graph/vector scale, complete
 SQL compatibility, model execution or UI/provider conformance.
 
@@ -607,7 +607,7 @@ binds one admitted read-only physical snapshot across archive, object closure,
 catalogue and control reads. Native candidate acceptance remains pending;
 this implementation does not qualify large-corpus backup latency or soak.
 
-The combined two-estate flow exposed concurrent session-state replacement
+The combined two-engram flow exposed concurrent session-state replacement
 between transaction begin/abort and commit. The [session admission correction](../../evidence/change-journals/gate-c/c-07g-session-admission.md)
 extends the existing bounded transaction gate to begin, preview, abort, renewal
 and closure, preserving exact identities and explicit conflicts. Native
@@ -736,7 +736,7 @@ per-open random namespace without overwriting interrupted bytes. An independent
 subprocess regression first reproduced native AlreadyExists, then passed for
 manifest/CURRENT/checkpoint publication after correction. Exact installed and
 three-platform candidate acceptance remain pending.
-The canonical ten-estate J-04 declaration was itself inadmissible: the shared
+The canonical ten-engram J-04 declaration was itself inadmissible: the shared
 8 GiB ceiling was multiplied into an 80 GiB host reservation. The
 [shared fleet budget correction](../../evidence/change-journals/gate-c/c-07g-shared-fleet-budget.md)
 binds an explicit aggregate pool and rejects true summed-reservation overcommit.
@@ -787,7 +787,7 @@ ledger acceptance. Forty evaluation tests and CLI lint pass; the repaired
 quiet/equal/abusive installed campaign remains required.
 
 The [combined native characterization record](../../evidence/change-journals/gate-c/c-07h-native-flow-characterization.md)
-retains completed repaired Windows compaction flow, all three two-estate
+retains completed repaired Windows compaction flow, all three two-engram
 interference trials, and a Linux WSL ext4 cold flow with zero resident pages
 before restart. Fleet and Linux small runs have exact histories and no rejected
 or unresolved work; the Windows 20 rps point exceeds error/latency thresholds.
@@ -1089,7 +1089,7 @@ the actual 24-hour soak remain required before C-07 can close.
 The [integrated native growth record](../../evidence/change-journals/gate-c/c-07g-integrated-native-growth.md)
 retains both failed exact-source comparisons. The 10k corpus fully acknowledged
 and read back, then restart failed with `multiply linked file denied`. The
-failed estate was removed during harness unwinding, preventing file/link-count
+failed engram was removed during harness unwinding, preventing file/link-count
 inspection. Preserve owned failure state and identify that admission before
 repairing its canonical owner; no link guard or capacity threshold is waived.
 
@@ -1163,7 +1163,7 @@ checks, canonical digest ordering, original deadlines and resource limits
 remain. Component overlap/cancellation and real installed mixed-family smoke
 pass. This is a driver scheduling remedy, not a measured engine speedup or
 complete native setup; fresh frozen full-corpus/profile/24-hour evidence remains
-required and earlier failed estates stay retained.
+required and earlier failed engrams stay retained.
 
 The [proof-read trace correction](../../evidence/change-journals/gate-c/c-07g-proof-read-trace-conformance.md)
 records candidate 40265699310 failing an obsolete 16-value trace expectation
@@ -1177,11 +1177,11 @@ The [bounded-window terminal outcome](../../evidence/change-journals/gate-c/c-07
 records frozen 04559542 failing the unchanged two-hour setup deadline after
 100000 acknowledgements and 64724 independent verifications. Complete corpus
 readback and measured/24-hour acceptance remain open. Partial verification
-counts are not a passing capacity result; original failed estates remain retained.
+counts are not a passing capacity result; original failed engrams remain retained.
 
 
 The [point-range indexing package](../../evidence/change-journals/gate-c/c-07g-point-range-index.md)
-records a bounded diagnostic of the failed 100k estate and replaces linear
+records a bounded diagnostic of the failed 100k engram and replaces linear
 immutable point-candidate enumeration with a derived range index at the
 existing database boundary. Independent lifecycle and MVCC oracles exposed
 and corrected live-vector versus manifest-order mismatches. Component work

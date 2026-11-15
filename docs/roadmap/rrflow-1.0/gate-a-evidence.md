@@ -438,9 +438,9 @@ either independently.
   the memory database is rrflowDB itself and that Connectome is the client.
   SWAG replaces the working name Dalal; LFG's Gate G text predates the
   LFG/SWAG split and is revised before Gate G work starts.
-- The topology record defines workspace as a set of estates grouped by an
+- The topology record defines workspace as a set of engrams grouped by an
   account or client above the engine (decided by the repository owner on
-  2026-10-17), states that an account may own many estates, spells the estate
+  2026-10-17), states that an account may own many engrams, spells the engram
   scope as `instance:{instance_id}`, and reconciles the reserved
   namespace/database fields with the schema catalogue. `PLATFORM_TERMS` gives
   workspace the `ClientGrouping` role; the table's replacement stays with

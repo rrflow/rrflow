@@ -12,7 +12,7 @@ priority or closure status.
 A code read at `de435238` on 2026-11-11 found these gaps.
 
 **The configuration cannot change after install.**
-- `EstateConfiguration` is immutable once installed. Its contract says "Mutating it requires a future governed configure-plan/configure-apply operation" (`crates/transport/rrd-contract/src/deployment.rs:643-645`).
+- `EngramConfiguration` is immutable once installed. Its contract says "Mutating it requires a future governed configure-plan/configure-apply operation" (`crates/transport/rrd-contract/src/deployment.rs:643-645`).
 - Only the endpoint profile can be revised (`crates/authority/rrd-engine/src/engine/endpoint_configuration.rs:106`).
 
 **Most parts have no configuration at all.**

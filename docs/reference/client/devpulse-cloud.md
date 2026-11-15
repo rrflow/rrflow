@@ -31,7 +31,7 @@ endpoints, account federation or available service APIs:
 
 | Experience | Planned role | Independent qualification |
 |---|---|---|
-| Local RRFlow and Connectome | Open-source engine with one estate per project, usable without an account. Connectome offers guided operation and learning from visible evidence. | D-01/C-07 and H-06/J installed product and client acceptance. First-party licence texts/notices remain a J-05/POAM-013 release requirement. |
+| Local RRFlow and Connectome | Open-source engine with one engram per project, usable without an account. Connectome offers guided operation and learning from visible evidence. | D-01/C-07 and H-06/J installed product and client acceptance. First-party licence texts/notices remain a J-05/POAM-013 release requirement. |
 | rrflow.ai | The hosted reasoning engine: optional managed access to hosted project engines, explicitly selected synchronization including access from another authorized device, and the evidence views below. | H-07 account, instance, transfer and real-service acceptance; remote access is not proof of two-way synchronization. |
 | rroflow.ai | The intended AI-observability and learning service: inspect authorized provider activity, signals and tags, and optional supervised, unsupervised and recursive learning over authorized datasets, experiments and qualified improvement artifacts. | I-01/I-04 host-event admission, H-05 evidence, G-06/I-03/I-07 learning acceptance and H-07 transfer/account controls. Collection, upload, training and artifact activation are distinct authorized capabilities. This service and collection path are not yet implemented. |
 | shippin.cloud | First hosted destination for local RRFlow bidirectional synchronization and managed project engines/data; also the private development space for toolchains, containers/VMs and UI previews. | H-07a/b/c/d/g identity, engine distribution and real sync acceptance; H-07e/f adds the distinct devspace and file/environment proof. A synchronized database is not a working devspace. |
@@ -60,7 +60,7 @@ or assume a protocol from the product name.
 Delivery order is a working local engine, then opt-in local-to-shippin.cloud
 bidirectional synchronization using Nomen login, then qualification of additional
 custom/self-hosted service profiles through the same configurable boundaries.
-Hosted engines can store and operate project estates on shippin.cloud; local
+Hosted engines can store and operate project engrams on shippin.cloud; local
 replication and remote-only access are separate choices. This priority does not
 remove local-only, cloud-hosted or custom deployment targets, or postpone local
 engine correctness behind cloud work. No account is required for local use.
@@ -72,15 +72,15 @@ service/project bindings. Do not require the user to configure each grant or
 reapprove unchanged authorized operations. Shared login identifies the user;
 remembered sharing choices determine which bindings can activate automatically.
 Nomen identity is distinct from the engine's
-[durable seat identity](../seat-identity.md), estate identity and transaction
+[durable seat identity](../seat-identity.md), engram identity and transaction
 authority. Binding an account must not replace those identities, silently merge
-estates, enable cross-project context sharing or grant training/provisioning
+engrams, enable cross-project context sharing or grant training/provisioning
 permission. Credentials must be validated for their intended service and scope;
 account binding, expiry, rotation and revocation must have explicit outcomes.
 
 Use configured endpoint profiles, trust and credential references rather than
 hardcoded domains in engine or client dispatch. Show the actual service,
-account, destination estate and synchronization state for each operation.
+account, destination engram and synchronization state for each operation.
 Central login never implies access to every product's data. Custom deployments
 must declare their supported identity/trust profile; no managed Nomen service
 may become an undeclared dependency of local or homelab operation. Unknown or
@@ -312,10 +312,10 @@ mock entitlement, UI switch or successful sign-in does not pass these cases.
 flowchart TB
     DP[DevPulse project application] --> Provision[Authorized VM/container provisioning adapter]
     Provision --> LocalRun[Local project runtime and private UI preview]
-    DP --> Local[Local RRFlow estate]
+    DP --> Local[Local RRFlow engram]
     Local --> LocalKV[Local rrflowKV]
-    Local <-. selected native data and durable receipts .-> Cloud[Selected managed RRFlow estate]
-    Local <-. selected native data and durable receipts .-> Lab[Homelab RRFlow estate]
+    Local <-. selected native data and durable receipts .-> Cloud[Selected managed RRFlow engram]
+    Local <-. selected native data and durable receipts .-> Lab[Homelab RRFlow engram]
     DP -. managed account and project provisioning .-> CloudRun[Cloud VM/container devspace]
     DP -. operator-configured identity and provisioning .-> LabRun[Homelab VM/container devspace]
     CloudRun --> Cloud
@@ -331,8 +331,8 @@ Each endpoint authenticates an exact instance. A cloud account, UI or resolver
 cannot become a database authorization or lifecycle authority. Separate local
 and cloud instances do not imply an active-active replica or cross-instance ACID.
 
-DevPulse groups corresponding project checkouts and their estates above the
-engine. Every estate retains its own project, instance, authorization and local
+DevPulse groups corresponding project checkouts and their engrams above the
+engine. Every engram retains its own project, instance, authorization and local
 commit coordinates; a sync binding maps identities between selected peers.
 This is distinct from a read-only cross-project link (H-10) and from replication
 inside one distributed RRD instance. Neither is a shortcut to bidirectional sync.
@@ -387,7 +387,7 @@ the synchronization protocol.
 
 Project requirements/preferences are versioned governed data. The user-facing
 specification may compose these fields, but cannot become a second authority:
-`EstateConfiguration` owns effective engine settings, `EndpointProfile` owns
+`EngramConfiguration` owns effective engine settings, `EndpointProfile` owns
 endpoint bindings, H-10 records own project-link consent, H-07 records own sync
 consent, and DevPulse/provider records own physical provisioning. Each view
 references those identities/revisions and shows proposed versus observed
@@ -399,7 +399,7 @@ versioned representation. These are RRFlow product terms, not a claim of an
 industry standard or a new executable schema. Project-scoped overrides,
 process requirements, testing expectations and model preferences compose
 through the existing configuration owners. A global profile is a reusable
-input above estates; each estate explicitly accepts a revision. Editing the
+input above engrams; each engram explicitly accepts a revision. Editing the
 profile cannot silently change every project's effective configuration.
 
 Show effective values, origins, precedence, conflicts, proposed changes and
@@ -436,7 +436,7 @@ The UI must present separate choices with explicit scope:
 A sharing graph may inform which placements are candidates, but never selects
 placement by itself. Two sharing projects can require separate VMs; two
 nonsharing projects may occupy one explicitly allowed trust-group VM with
-separate containers and independent estate authorization. Containers sharing a
+separate containers and independent engram authorization. Containers sharing a
 guest kernel do not provide the same boundary as separate VMs. Untrusted
 mutually isolated workloads require an approved stronger isolation profile;
 if the provider cannot enforce it, placement fails rather than silently
@@ -540,7 +540,7 @@ they must not execute inside the database process.
 
 ## Service and homelab operation
 
-The hosted service must bind authenticated accounts/projects to exact estates,
+The hosted service must bind authenticated accounts/projects to exact engrams,
 enforce tenant isolation and quotas, expose bounded health/readiness, and prove
 backup/restore, upgrade compatibility, recovery, credential rotation, deletion
 and observability against the shipped server artifact. Provisioning a container

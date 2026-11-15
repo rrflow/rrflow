@@ -17,7 +17,7 @@ A code read at `de435238` on 2026-11-11 found that the MCP context tool's input 
 | `max_items` | 512 | 128 |
 | `max_output_bytes` | 786432 | 524288 |
 
-The ceilings come from `crates/authority/rrd-engine/assets/install/default-estate-configuration-v3.toml:50-52`. The schema is not generated from the operation catalogue.
+The ceilings come from `crates/authority/rrd-engine/assets/install/default-engram-configuration-v3.toml:50-52`. The schema is not generated from the operation catalogue.
 
 ## Impact
 

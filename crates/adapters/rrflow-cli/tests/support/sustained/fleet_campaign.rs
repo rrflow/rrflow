@@ -1,4 +1,4 @@
-//! Bounded coordinator over the existing single-estate campaign implementation.
+//! Bounded coordinator over the existing single-engram campaign implementation.
 use super::super::*;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -12,20 +12,20 @@ pub(super) struct Shared {
     boundaries: Mutex<Vec<FleetBoundary>>,
     origin: Mutex<u64>,
     quiet_turn: AtomicU64,
-    estates: u64,
+    engrams: u64,
 }
 #[derive(Clone)]
 pub(crate) struct Participation {
     shared: Arc<Shared>,
     pub clock: Instant,
-    pub estate: u64,
+    pub engram: u64,
     pub trial: FleetTrial,
     wait: Duration,
 }
 impl Participation {
     pub fn quiet_extra_ms(&self, measured_ms: u64) -> u64 {
         if self.trial == FleetTrial::Quiet {
-            (self.shared.estates - 1) * (measured_ms + 120_000)
+            (self.shared.engrams - 1) * (measured_ms + 120_000)
         } else {
             0
         }
@@ -35,12 +35,12 @@ impl Participation {
         target: u64,
         driver: &mut PointRun<'_>,
         writer: &mut CampaignWriter,
-        lease: (&Estate, &mut u64, &mut Instant),
+        lease: (&Engram, &mut u64, &mut Instant),
     ) -> DriverResult<()> {
-        let (estate, ordinal, opened) = lease;
+        let (engram, ordinal, opened) = lease;
         while self.shared.quiet_turn.load(Ordering::Acquire) < target {
             rotate_session(
-                estate,
+                engram,
                 &mut driver.workload,
                 driver.campaign,
                 driver.point.clients.get(),
@@ -60,20 +60,20 @@ impl Participation {
         self.shared
             .quiet_turn
             .compare_exchange(
-                self.estate,
-                self.estate + 1,
+                self.engram,
+                self.engram + 1,
                 Ordering::AcqRel,
                 Ordering::Acquire,
             )
-            .map_err(|_| "isolated estate completed out of order")?;
-        Ok(self.shared.estates)
+            .map_err(|_| "isolated engram completed out of order")?;
+        Ok(self.shared.engrams)
     }
     /// All engines finish the previous phase before a new phase is admitted.
     /// Session credentials stay in process memory and are never serialized.
     pub async fn boundary(
         &self,
         stage: &str,
-        estate: &Estate,
+        engram: &Engram,
         driver: &mut PointRun<'_>,
         ordinal: &mut u64,
         opened: &mut Instant,
@@ -87,7 +87,7 @@ impl Participation {
             tokio::select! {
                 result=&mut ready => {result.map_err(|_|"fleet phase readiness deadline")?;break;},
                 _=tokio::time::sleep(Duration::from_secs(60)) => {
-                    rotate_session(estate,&mut driver.workload,driver.campaign,driver.point.clients.get(),ordinal,opened).await?;
+                    rotate_session(engram,&mut driver.workload,driver.campaign,driver.point.clients.get(),ordinal,opened).await?;
                 }
             }
         }
@@ -95,7 +95,7 @@ impl Participation {
         self.shared
             .works
             .lock()
-            .map_err(|_| "fleet session registry poisoned")?[self.estate as usize] =
+            .map_err(|_| "fleet session registry poisoned")?[self.engram as usize] =
             Some(driver.workload.clone());
         tokio::time::timeout(self.wait, self.shared.barrier.wait())
             .await
@@ -106,7 +106,7 @@ impl Participation {
                 .works
                 .lock()
                 .map_err(|_| "fleet session registry poisoned")?;
-            works[(self.estate as usize + 1) % works.len()]
+            works[(self.engram as usize + 1) % works.len()]
                 .clone()
                 .ok_or("foreign fleet session missing")?
         };
@@ -141,7 +141,7 @@ impl Participation {
             }
         };
         let boundary = FleetBoundary {
-            estate: self.estate,
+            engram: self.engram,
             stage: evidence_id(stage),
             instance: driver.workload.client.instance_id().to_string(),
             foreign_instance: foreign.client.instance_id().to_string(),
@@ -185,8 +185,8 @@ pub(crate) fn execute(campaign: StorageCampaign, evidence: PathBuf) {
         FleetWriter::create(&evidence, campaign.clone()).expect("bounded fleet manifest admission");
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(campaign.allocation.estates.get() as usize + 2)
-            .max_blocking_threads(campaign.allocation.estates.get() as usize)
+            .worker_threads(campaign.allocation.engrams.get() as usize + 2)
+            .max_blocking_threads(campaign.allocation.engrams.get() as usize)
             .enable_all()
             .build()
             .unwrap()
@@ -226,25 +226,25 @@ async fn run_fleet(
     for point in 0..campaign.points.len() {
         for seed in 0..campaign.seeds.len() {
             for trial in FleetTrial::ALL {
-                let n = campaign.allocation.estates.get() as usize;
+                let n = campaign.allocation.engrams.get() as usize;
                 let shared = Arc::new(Shared {
                     barrier: Barrier::new(n),
                     works: Mutex::new(vec![None; n]),
                     boundaries: Mutex::new(Vec::with_capacity(n * 7)),
                     origin: Mutex::new(0),
                     quiet_turn: AtomicU64::new(0),
-                    estates: n as u64,
+                    engrams: n as u64,
                 });
                 let clock = Instant::now();
                 let mut tasks = JoinSet::new();
-                for estate in 0..n {
-                    let child = fleet_child(campaign, point, seed, trial, estate as u64)?;
-                    let directory = fleet_member_directory(evidence, index, estate as u64);
+                for engram in 0..n {
+                    let child = fleet_child(campaign, point, seed, trial, engram as u64)?;
+                    let directory = fleet_member_directory(evidence, index, engram as u64);
                     let mut child_writer = CampaignWriter::create(&directory, child.clone())?;
                     let participant = Participation {
                         shared: shared.clone(),
                         clock,
-                        estate: estate as u64,
+                        engram: engram as u64,
                         trial,
                         wait: Duration::from_millis(
                             campaign.schedule.setup_ms.get()
@@ -254,7 +254,7 @@ async fn run_fleet(
                     };
                     tasks.spawn(async move {
                         let result =
-                            run_estate(&child, &mut child_writer, Some(&participant)).await;
+                            run_engram(&child, &mut child_writer, Some(&participant)).await;
                         let (status, limitations) = if result.is_ok() {
                             (CampaignStatus::Completed, vec![])
                         } else {
@@ -268,14 +268,14 @@ async fn run_fleet(
                         };
                         let report = child_writer.finish(status, limitations)?;
                         result?;
-                        Ok::<_, String>((estate, digest("rrflow-fleet-child-result-v1", &report)?))
+                        Ok::<_, String>((engram, digest("rrflow-fleet-child-result-v1", &report)?))
                     });
                 }
                 let mut receipts = vec![None; n];
                 let mut failure = None;
                 while let Some(completed) = tasks.join_next().await {
                     match completed {
-                        Ok(Ok((estate, hash))) => receipts[estate] = Some(hash),
+                        Ok(Ok((engram, hash))) => receipts[engram] = Some(hash),
                         Ok(Err(error)) => {
                             failure = Some(error);
                             tasks.abort_all();

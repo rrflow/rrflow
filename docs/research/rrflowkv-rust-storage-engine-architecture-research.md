@@ -258,7 +258,7 @@ The ordered spine remains the source for point, prefix, range, graph adjacency,
 and index-key navigation. Arrow-layout pages are immutable scan projections,
 not a replacement for the ordering structure. This hybrid is where RRFlow can
 differentiate: the same durable table can serve low-latency ordered access and
-columnar analytical projection without exporting the estate to another
+columnar analytical projection without exporting the engram to another
 database.
 
 ### Read path
@@ -373,14 +373,14 @@ and binary/wire contract. It should not accept arbitrary shell, JavaScript,
 SQL, provider prompt text, or dynamically fetched policy code as a trigger.
 CloudEvents provides a useful interoperable event-envelope vocabulary—unique
 identity, source, type, subject, schema and occurrence context—but RRFlow's
-persisted event remains its own typed engine record tied to estate, stamp,
+persisted event remains its own typed engine record tied to engram, stamp,
 authorization, provenance and idempotency coordinates.[^20]
 
 ### Required typed records
 
 | Record | Purpose | Authority |
 |---|---|---|
-| `ConfigurationRevision` | immutable desired state, base revision, schema identity, content digest, estate scope | persisted through `RrdEngine` |
+| `ConfigurationRevision` | immutable desired state, base revision, schema identity, content digest, engram scope | persisted through `RrdEngine` |
 | `ConfigurationProposal` | untrusted requested changes, rationale, evidence links, author/provider identity | cannot mutate |
 | `ConfigurationPlan` | deterministic normalized diff, prerequisites, affected records/files, permissions, budgets, estimates, rollback/removal plan | preview only until exact digest authorization |
 | `ConfigurationDecision` | operator/policy allow or deny bound to proposal/plan/revision digests | required input to apply |

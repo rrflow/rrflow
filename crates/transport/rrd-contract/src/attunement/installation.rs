@@ -52,7 +52,7 @@ pub enum InstallationTargetKind {
 pub enum InstallationActionKind {
     ValidateProject,
     AcquireInstallationLease,
-    CreateEstateDirectories,
+    CreateEngramDirectories,
     MaterializeBootstrap,
     CreateStorageRoot,
     PrepareCredentials,
@@ -96,7 +96,7 @@ impl InstallationPlanAction {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum InstallationManagedPathKind {
-    EstateDirectory,
+    EngramDirectory,
     StorageDirectory,
     StorageRootsDirectory,
     CredentialDirectory,
@@ -164,10 +164,10 @@ pub struct InstallationPlan {
     pub contract_version: u16,
     /// Explicit 256-bit identity input, generated once per independent install.
     pub installation_identity: String,
-    /// Initial canonical project root; not the permanent estate identity.
+    /// Initial canonical project root; not the permanent engram identity.
     pub project_root_sha256: String,
     pub id: CanonicalId,
-    pub target: InstalledEstateIdentity,
+    pub target: InstalledEngramIdentity,
     pub target_kind: InstallationTargetKind,
     pub deployment: DeploymentProfile,
     pub product_version: String,
@@ -176,7 +176,7 @@ pub struct InstallationPlan {
     pub profile_sha256: String,
     pub project_precondition_sha256: String,
     pub storage_root_id: CanonicalId,
-    pub configuration: EstateConfiguration,
+    pub configuration: EngramConfiguration,
     pub bootstrap: InstallationBootstrap,
     pub initial_seat: MemorySeatDefinition,
     pub initial_principal_id: CanonicalId,
@@ -188,17 +188,17 @@ pub struct InstallationPlan {
     pub attunement_plan_sha256: String,
     pub actions: Vec<InstallationPlanAction>,
     /// Present when the project already holds a `.rrflow` folder that is not
-    /// an installed estate. Apply makes that folder private in place and moves
+    /// an installed engram. Apply makes that folder private in place and moves
     /// exactly these top-level entries into `.rrflow/previous/<plan id>/`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub adopted_estate_entries: Option<Vec<String>>,
+    pub adopted_engram_entries: Option<Vec<String>>,
     pub plan_sha256: String,
 }
 
 /// The most entries one adoption moves; a larger leftover tree is refused.
-pub const MAX_ADOPTED_ESTATE_ENTRIES: usize = 256;
+pub const MAX_ADOPTED_ENGRAM_ENTRIES: usize = 256;
 /// The `.rrflow` entry that retains adopted contents; never itself adopted.
-pub const ADOPTED_ESTATE_DIRECTORY: &str = "previous";
+pub const ADOPTED_ENGRAM_DIRECTORY: &str = "previous";
 
 impl InstallationPlan {
     pub fn validate(&self) -> Result<()> {
@@ -243,7 +243,7 @@ impl InstallationPlan {
         )?;
         let expected_paths = [
             (
-                InstallationManagedPathKind::EstateDirectory,
+                InstallationManagedPathKind::EngramDirectory,
                 InstallationRemovalRule::RemoveIfOwnedAndEmpty,
             ),
             (
@@ -375,7 +375,7 @@ impl InstallationPlan {
             InstallationActionKind::ValidateProject,
             InstallationActionKind::AcquireInstallationLease,
             InstallationActionKind::PrepareCredentials,
-            InstallationActionKind::CreateEstateDirectories,
+            InstallationActionKind::CreateEngramDirectories,
             InstallationActionKind::MaterializeBootstrap,
             InstallationActionKind::CreateStorageRoot,
             InstallationActionKind::DeliverCredentials,
@@ -392,8 +392,8 @@ impl InstallationPlan {
                 return invalid("installation actions are missing, duplicated, or out of order");
             }
         }
-        if let Some(entries) = &self.adopted_estate_entries {
-            validate_adopted_estate_entries(entries)?;
+        if let Some(entries) = &self.adopted_engram_entries {
+            validate_adopted_engram_entries(entries)?;
         }
         validate_sha256(&self.plan_sha256, "installation plan_sha256")?;
         if self.plan_sha256 != installation_plan_sha256(self)? {
@@ -416,7 +416,7 @@ impl InstallationPlan {
 
     pub fn managed_path(&self, kind: InstallationManagedPathKind) -> &InstallationManagedPath {
         let index = match kind {
-            InstallationManagedPathKind::EstateDirectory => 0,
+            InstallationManagedPathKind::EngramDirectory => 0,
             InstallationManagedPathKind::StorageDirectory => 1,
             InstallationManagedPathKind::StorageRootsDirectory => 2,
             InstallationManagedPathKind::CredentialDirectory => 3,
@@ -434,7 +434,7 @@ impl InstallationPlan {
     }
 }
 
-/// Canonical initial grant choices for a newly installed estate. The optional
+/// Canonical initial grant choices for a newly installed engram. The optional
 /// source-read action is explicit and never accepts caller-authored grant sets.
 pub fn installation_initial_grants(project_source_read: bool) -> Vec<SecurityAction> {
     SecurityAction::ALL

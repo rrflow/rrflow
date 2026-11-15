@@ -190,7 +190,7 @@ fn configure_assessment_budget_with_repetition(
             &rrd_contract::ConfigureTaskBudget {
                 scope: fixture.selection.scope.clone(),
                 task_id: fixture.selection.task_id.clone(),
-                limits: fixture.engine.estate_configuration.reasoning.clone(),
+                limits: fixture.engine.engram_configuration.reasoning.clone(),
                 repetition_policy: max_equivalent_attempts.map(|max_equivalent_attempts| {
                     rrd_contract::TaskRepetitionPolicy {
                         max_equivalent_attempts,

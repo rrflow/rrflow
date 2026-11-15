@@ -66,7 +66,7 @@ pub(super) fn pre_canonical_startup_authorities_are_absent_from_product_tree() {
         "crates/adapters/rrflow-mcp/src",
         "crates/transport/rrd-server/src",
         "crates/transport/rrd-client/examples",
-        "crates/authority/rrd-estate/src/commands",
+        "crates/authority/rrd-engram/src/commands",
         "crates/operations/rrd-kubernetes/src",
     ] {
         for forbidden in [
@@ -137,17 +137,17 @@ pub(super) fn pre_canonical_startup_authorities_are_absent_from_product_tree() {
         "Kubernetes startup must use one canonical install apply handoff"
     );
 
-    let estate_control = module_source(
+    let engram_control = module_source(
         &metadata.root,
-        "crates/authority/rrd-engine/src/engine/estate_control.rs",
+        "crates/authority/rrd-engine/src/engine/engram_control.rs",
     );
     assert!(
-        !estate_control.contains("RrdEngine::open(")
-            && !estate_control.contains("RrdEngine::open_existing(")
-            && estate_control.contains("RrdEngine::open_installed(")
-            && !estate_control.contains("join(\"backups\")")
-            && !estate_control.contains("join(\"restores\")"),
-        "the estate controller opens a managed instance only as an installed estate and keeps no catalogue or staging lane outside the instance"
+        !engram_control.contains("RrdEngine::open(")
+            && !engram_control.contains("RrdEngine::open_existing(")
+            && engram_control.contains("RrdEngine::open_installed(")
+            && !engram_control.contains("join(\"backups\")")
+            && !engram_control.contains("join(\"restores\")"),
+        "the engram controller opens a managed instance only as an installed engram and keeps no catalogue or staging lane outside the instance"
     );
 }
 

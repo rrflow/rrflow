@@ -77,7 +77,7 @@ pub(super) fn publish(
     engine.authorize(
         work.session,
         work.token,
-        SecurityAction::EstateAdmin,
+        SecurityAction::EngramAdmin,
         elapsed_time(work.now, work.started)?,
         work.context.request_id.as_str(),
         work.context.operation_id.as_str(),

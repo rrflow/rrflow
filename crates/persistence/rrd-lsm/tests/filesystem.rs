@@ -77,18 +77,18 @@ fn source_observation_detects_replacement_with_equal_length_and_mtime() {
 fn native_directory_identity_survives_child_creation_but_detects_replacement() {
     let fixture = tempfile::tempdir().unwrap();
     let anchor = AnchoredPath::open_root(fixture.path()).unwrap();
-    let path = fixture.path().join("estate");
+    let path = fixture.path().join("engram");
     std::fs::create_dir(&path).unwrap();
-    let before = anchor.join("estate").source_observation().unwrap();
+    let before = anchor.join("engram").source_observation().unwrap();
     std::fs::write(path.join("new-child"), b"new").unwrap();
-    let changed = anchor.join("estate").source_observation().unwrap();
+    let changed = anchor.join("engram").source_observation().unwrap();
     assert_eq!(
         before.object_identity_sha256().unwrap(),
         changed.object_identity_sha256().unwrap()
     );
-    std::fs::rename(&path, fixture.path().join("retained-estate")).unwrap();
+    std::fs::rename(&path, fixture.path().join("retained-engram")).unwrap();
     std::fs::create_dir(&path).unwrap();
-    let replacement = anchor.join("estate").source_observation().unwrap();
+    let replacement = anchor.join("engram").source_observation().unwrap();
     assert_ne!(
         before.object_identity_sha256().unwrap(),
         replacement.object_identity_sha256().unwrap()

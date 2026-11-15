@@ -55,7 +55,7 @@ impl InstallationPreview {
 pub struct ProjectLocator {
     pub format_version: u16,
     pub product_version: String,
-    pub identity: InstalledEstateIdentity,
+    pub identity: InstalledEngramIdentity,
     pub storage_root: String,
     pub token_key: String,
     pub operator_credential: String,
@@ -102,7 +102,7 @@ impl ProjectLocator {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct InstalledEstateRecord {
+pub struct InstalledEngramRecord {
     pub format_version: u16,
     pub installation: InstallationPlan,
     pub attunement_plan_sha256: String,
@@ -115,7 +115,7 @@ pub struct InstalledEstateRecord {
     pub record_sha256: String,
 }
 
-impl InstalledEstateRecord {
+impl InstalledEngramRecord {
     pub(in super::super) fn validate(&self) -> Result<()> {
         self.installation
             .validate()

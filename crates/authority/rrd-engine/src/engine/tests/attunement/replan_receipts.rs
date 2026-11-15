@@ -551,7 +551,7 @@ pub(super) fn attunement_receipt_readback_is_principal_scoped_and_authorized() {
         }];
         if read {
             grants.push(ResourceGrant {
-                action: SecurityAction::EstateRead,
+                action: SecurityAction::EngramRead,
                 resource_prefix: resource.clone(),
                 data_policy: None,
             });

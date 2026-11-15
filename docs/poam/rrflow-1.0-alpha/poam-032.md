@@ -75,5 +75,5 @@ The row closes only when, in addition:
   exists, and source-routing candidates return once an engine routing
   projection exists, each as public operations; and
 - the Connectome flight lens consumes the three operations at the generated
-  contract digest against an installed estate, with the retired diagnostics
+  contract digest against an installed engram, with the retired diagnostics
   protocol and private routes removed.

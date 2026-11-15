@@ -30,10 +30,10 @@
 | POAM-014 | Critical | Sequenced | [implementation-requirements traceability](rrflow-1.0-alpha/poam-014.md) |
 | POAM-015 | High | Sequenced | [public-contract discovery consistency](rrflow-1.0-alpha/poam-015.md) |
 | POAM-016 | Critical | Sequenced | [security initialization and effect-complete authorization](rrflow-1.0-alpha/poam-016.md) |
-| POAM-017 | Critical | Sequenced | [estate-administration authority](rrflow-1.0-alpha/poam-017.md) |
-| POAM-018 | High | Closed | [accepted complete estate and backup shapes](rrflow-1.0-alpha/poam-018.md) |
-| POAM-019 | Critical | Sequenced | [native estate records and engine transactions](rrflow-1.0-alpha/poam-019.md) |
-| POAM-020 | Critical | Sequenced | [canonical project, estate, and instance topology](rrflow-1.0-alpha/poam-020.md) |
+| POAM-017 | Critical | Sequenced | [engram-administration authority](rrflow-1.0-alpha/poam-017.md) |
+| POAM-018 | High | Closed | [accepted complete engram and backup shapes](rrflow-1.0-alpha/poam-018.md) |
+| POAM-019 | Critical | Sequenced | [native engram records and engine transactions](rrflow-1.0-alpha/poam-019.md) |
+| POAM-020 | Critical | Sequenced | [canonical project, engram, and instance topology](rrflow-1.0-alpha/poam-020.md) |
 | POAM-021 | Critical | Sequenced | [local process-control authority](rrflow-1.0-alpha/poam-021.md) |
 | POAM-022 | Critical | Sequenced | [deployment facts and profile semantics](rrflow-1.0-alpha/poam-022.md) |
 | POAM-023 | Critical | Sequenced | [distributed-cluster authority](rrflow-1.0-alpha/poam-023.md) |
@@ -44,7 +44,7 @@
 | POAM-028 | High | Open | [vector catalogue history replay and C-04 source closure](rrflow-1.0-alpha/poam-028.md) |
 | POAM-029 | High | Sequenced | [diagnostic snapshot under concurrent audited traffic](rrflow-1.0-alpha/poam-029.md) |
 | POAM-030 | High | Verifying | [bounded audit read across a partial final journal page](rrflow-1.0-alpha/poam-030.md) |
-| POAM-031 | Critical | Closed | [installed-estate backups omit the installed control state](rrflow-1.0-alpha/poam-031.md) |
+| POAM-031 | Critical | Closed | [installed-engram backups omit the installed control state](rrflow-1.0-alpha/poam-031.md) |
 | POAM-032 | High | Open | [prompt flights removed without engine absorption](rrflow-1.0-alpha/poam-032.md) |
 | POAM-033 | High | Open | [rejected native commits retain an unabortable intent](rrflow-1.0-alpha/poam-033.md) |
 | POAM-034 | High | Open | [commit-time schema constraints load the whole scope](rrflow-1.0-alpha/poam-034.md) |
@@ -55,7 +55,7 @@
 | POAM-039 | High | Open | [no versioned handoff or open-question record](rrflow-1.0-alpha/poam-039.md) |
 | POAM-040 | High | Open | [background jobs and memory receipts are not observable](rrflow-1.0-alpha/poam-040.md) |
 | POAM-041 | High | Open | [plan-conformance and change, interrupt and restart evidence stop at installation](rrflow-1.0-alpha/poam-041.md) |
-| POAM-042 | High | Open | [the estate has no configurable organisation layer](rrflow-1.0-alpha/poam-042.md) |
+| POAM-042 | High | Open | [the engram has no configurable organisation layer](rrflow-1.0-alpha/poam-042.md) |
 | POAM-043 | High | Open | [transaction previews rebuild the whole scope and skip object checks](rrflow-1.0-alpha/poam-043.md) |
 | POAM-044 | High | Open | [rrflowQL refusals are unstructured, and queries cannot be checked without running](rrflow-1.0-alpha/poam-044.md) |
 | POAM-045 | High | Verifying | [vector search returns a vector's old version after it moves to another collection](rrflow-1.0-alpha/poam-045.md) |

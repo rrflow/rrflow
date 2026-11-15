@@ -32,7 +32,7 @@ pub trait ClaimSource {
 
     /// Every claim of `subject` across all predicates, ordered by predicate and
     /// newest first within each predicate. A persistent subject lookup costs
-    /// one bounded seek, never an estate-wide scan.
+    /// one bounded seek, never an engram-wide scan.
     fn subject_versions(&self, subject: &Subject) -> Result<Vec<Claim>, Self::Error>;
 
     /// Every claim for each requested subject, aligned with `subjects`.

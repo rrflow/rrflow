@@ -1,4 +1,4 @@
-//! Estate configuration, its input, the follow policy and its digest.
+//! Engram configuration, its input, the follow policy and its digest.
 
 use super::*;
 
@@ -6,7 +6,7 @@ use super::*;
 /// so neither can be forged or silently retained across an edit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct EstateConfigurationInput {
+pub struct EngramConfigurationInput {
     pub format_version: u16,
     pub clock: ClockPolicy,
     pub storage: StorageLimits,
@@ -45,11 +45,11 @@ impl AttunementFollowPolicy {
     }
 }
 
-impl EstateConfigurationInput {
+impl EngramConfigurationInput {
     pub fn validate(&self) -> Result<()> {
-        if self.format_version != ESTATE_CONFIGURATION_FORMAT_VERSION {
+        if self.format_version != ENGRAM_CONFIGURATION_FORMAT_VERSION {
             return invalid(format!(
-                "estate configuration format version must be {ESTATE_CONFIGURATION_FORMAT_VERSION}"
+                "engram configuration format version must be {ENGRAM_CONFIGURATION_FORMAT_VERSION}"
             ));
         }
         self.clock.validate()?;
@@ -69,7 +69,7 @@ impl EstateConfigurationInput {
 /// configure-plan/configure-apply operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct EstateConfiguration {
+pub struct EngramConfiguration {
     pub format_version: u16,
     pub revision: u64,
     pub clock: ClockPolicy,
@@ -82,11 +82,11 @@ pub struct EstateConfiguration {
     pub configuration_sha256: String,
 }
 
-impl EstateConfiguration {
-    pub fn from_input(revision: u64, input: EstateConfigurationInput) -> Result<Self> {
+impl EngramConfiguration {
+    pub fn from_input(revision: u64, input: EngramConfigurationInput) -> Result<Self> {
         input.validate()?;
         if revision == 0 {
-            return invalid("estate configuration revision must be greater than zero");
+            return invalid("engram configuration revision must be greater than zero");
         }
         let mut configuration = Self {
             format_version: input.format_version,
@@ -99,12 +99,12 @@ impl EstateConfiguration {
             attunement_follow: input.attunement_follow,
             configuration_sha256: String::new(),
         };
-        configuration.configuration_sha256 = estate_configuration_sha256(&configuration)?;
+        configuration.configuration_sha256 = engram_configuration_sha256(&configuration)?;
         Ok(configuration)
     }
 
     pub fn validate(&self) -> Result<()> {
-        EstateConfigurationInput {
+        EngramConfigurationInput {
             format_version: self.format_version,
             clock: self.clock.clone(),
             storage: self.storage.clone(),
@@ -115,10 +115,10 @@ impl EstateConfiguration {
         }
         .validate()?;
         if self.revision == 0 {
-            return invalid("estate configuration revision must be greater than zero");
+            return invalid("engram configuration revision must be greater than zero");
         }
-        if self.configuration_sha256 != estate_configuration_sha256(self)? {
-            return invalid("estate configuration digest does not match its content");
+        if self.configuration_sha256 != engram_configuration_sha256(self)? {
+            return invalid("engram configuration digest does not match its content");
         }
         Ok(())
     }
@@ -133,7 +133,7 @@ impl EstateConfiguration {
             policy.validate()?;
         }
         self.attunement_follow = policy;
-        self.configuration_sha256 = estate_configuration_sha256(&self)?;
+        self.configuration_sha256 = engram_configuration_sha256(&self)?;
         self.validate()?;
         Ok(self)
     }
@@ -184,12 +184,12 @@ impl EstateConfiguration {
     }
 }
 
-impl Default for EstateConfiguration {
+impl Default for EngramConfiguration {
     fn default() -> Self {
         Self::from_input(
             1,
-            EstateConfigurationInput {
-                format_version: ESTATE_CONFIGURATION_FORMAT_VERSION,
+            EngramConfigurationInput {
+                format_version: ENGRAM_CONFIGURATION_FORMAT_VERSION,
                 clock: ClockPolicy {
                     maximum_rollback_ms: 0,
                 },
@@ -209,11 +209,11 @@ impl Default for EstateConfiguration {
                 attunement_follow: None,
             },
         )
-        .expect("default estate configuration is valid")
+        .expect("default engram configuration is valid")
     }
 }
 
-pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Result<String> {
+pub fn engram_configuration_sha256(configuration: &EngramConfiguration) -> Result<String> {
     let encoded = serde_json::to_vec(&(
         configuration.format_version,
         configuration.revision,
@@ -227,7 +227,7 @@ pub fn estate_configuration_sha256(configuration: &EstateConfiguration) -> Resul
         crate::ContractError(format!("configuration digest encoding failed: {error}"))
     })?;
     let mut bytes = Vec::with_capacity(40 + encoded.len());
-    bytes.extend_from_slice(b"rrflow-estate-configuration-v3\0");
+    bytes.extend_from_slice(b"rrflow-engram-configuration-v3\0");
     bytes.extend_from_slice(&encoded);
     Ok(sha256_bytes(&bytes))
 }

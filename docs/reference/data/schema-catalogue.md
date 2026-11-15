@@ -13,8 +13,8 @@ table's logical identity or independently publish canonical data.
 
 ## Logical models and table identity
 
-Each registry carries the estate's organisation, owned by the
-[estate organisation contract](estate-organisation.md): every kind and vector
+Each registry carries the engram's organisation, owned by the
+[engram organisation contract](engram-organisation.md): every kind and vector
 collection belongs to exactly one domain, categories hold governed tag
 vocabularies, and kinds may carry tags. An organisation that is all defaults is
 omitted, so it encodes exactly as a registry did before domains existed. H-11a
@@ -110,7 +110,7 @@ Existing route ceilings are already executable in `rrd-contract/src/router.rs`
 (512 KiB request, 128 KiB response, 32 KiB intent and 60,000 ms maximum declared
 execution). These are contract ceilings, not recommended defaults or proof of
 runtime enforcement. Generate their schema projection from that owner and
-intersect installed estate, backend and request limits at admission. Byte
+intersect installed engram, backend and request limits at admission. Byte
 limits apply to encoded UTF-8/decoded resources as appropriate; JSON string
 length alone cannot enforce them.
 
@@ -126,7 +126,7 @@ For every completed family, the owning PR must:
    before unbounded decoding or hashing.
 3. Test golden acceptance and malformed/oversized/unknown-version/unknown-tag
    denial through both the generated surface and semantic validator. Include
-   wrong digest, stale stamp, schema change, cross-estate references, unauthorized
+   wrong digest, stale stamp, schema change, cross-engram references, unauthorized
    fields and required-but-missing data. JSON Schema `format` annotations do not
    establish these properties.
 4. Prove schema-change atomicity, historical reads and cache/prepared-plan

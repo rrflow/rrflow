@@ -157,7 +157,7 @@ mod tests {
     }
 
     #[test]
-    fn disjoint_estate_search_does_not_walk_every_descriptor() {
+    fn disjoint_engram_search_does_not_walk_every_descriptor() {
         let descriptors = (0..1477u32)
             .rev()
             .map(|i| {

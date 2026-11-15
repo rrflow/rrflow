@@ -55,7 +55,7 @@ evidence.
 
 ## Current remediation evidence
 
-Package `D01-02-canonical-estate-layout-and-configuration-v1` removes
+Package `D01-02-canonical-engram-layout-and-configuration-v1` removes
 `DeploymentMode` and its wire field without an alias. `DeploymentProfile` now
 separates deployment form, storage profile, and endpoint presentation;
 `RrdEngine` carries the explicit storage fact; the server derives only endpoint

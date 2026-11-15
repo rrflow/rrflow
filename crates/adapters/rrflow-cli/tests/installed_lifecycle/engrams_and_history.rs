@@ -4,7 +4,7 @@ use super::*;
 
 /// H-07h: an instance started from the project folder records its endpoint,
 /// another process proves it through `ready` without an address, and a second
-/// serve of the same estate fails before binding.
+/// serve of the same engram fails before binding.
 #[test]
 fn a_served_engram_is_found_proved_and_not_served_twice() {
     let root = tempfile::tempdir().unwrap();
@@ -69,7 +69,7 @@ fn a_served_engram_is_found_proved_and_not_served_twice() {
 
     let second = invoke(&["serve", "--project", project_arg, "--bind", "127.0.0.1:0"]);
     capture_output(&second, &mut captured);
-    assert!(!second.status.success(), "a second serve of an open estate");
+    assert!(!second.status.success(), "a second serve of an open engram");
     let refusal = String::from_utf8_lossy(&second.stderr);
     assert!(
         refusal.contains("already open in another process"),
@@ -119,8 +119,8 @@ fn configured_cold_history_publishes_and_reads_after_process_restart() {
     let project = root.path().join("project");
     std::fs::create_dir(&project).unwrap();
     std::fs::write(project.join("README.md"), "cold history project\n").unwrap();
-    let default = rrd_contract::EstateConfiguration::default();
-    let mut input = rrd_contract::EstateConfigurationInput {
+    let default = rrd_contract::EngramConfiguration::default();
+    let mut input = rrd_contract::EngramConfigurationInput {
         format_version: default.format_version,
         clock: default.clock,
         storage: default.storage,

@@ -72,7 +72,7 @@ fn installed_command(
     })
 }
 
-struct Estate {
+struct Engram {
     temp: tempfile::TempDir,
     _volume_project: Option<tempfile::TempDir>,
     working: PathBuf,
@@ -83,7 +83,7 @@ struct Estate {
     build: Value,
 }
 
-impl Estate {
+impl Engram {
     fn command(&self) -> Command {
         let mut command = Command::new(&self.binary);
         command.env_clear().current_dir(&self.working);
@@ -134,21 +134,21 @@ impl Estate {
             .unwrap();
         let volume_project = volume.map(|root| {
             tempfile::Builder::new()
-                .prefix("rrflow-estate-")
+                .prefix("rrflow-engram-")
                 .tempdir_in(root)
                 .unwrap()
         });
-        let estate_root = volume_project
+        let engram_root = volume_project
             .as_ref()
             .map_or(temp.path(), |owner| owner.path());
-        let project = estate_root.join("project");
-        let working = estate_root.join("working");
+        let project = engram_root.join("project");
+        let working = engram_root.join("working");
         std::fs::create_dir(&project).unwrap();
         std::fs::create_dir(&working).unwrap();
         if mode == "existing" {
             std::fs::write(project.join("README.md"), "owned project\n").unwrap();
         }
-        let mut estate = Self {
+        let mut engram = Self {
             temp,
             _volume_project: volume_project,
             working,
@@ -158,14 +158,14 @@ impl Estate {
             at: 0,
             build: Value::Null,
         };
-        estate.build = estate.invoke(&["--json", "version"])["build"].clone();
-        estate.identity = estate.invoke(&["install", "identity"])["installation_identity"]
+        engram.build = engram.invoke(&["--json", "version"])["build"].clone();
+        engram.identity = engram.invoke(&["install", "identity"])["installation_identity"]
             .as_str()
             .unwrap()
             .to_owned();
-        let configuration = estate.temp.path().join("configuration.toml");
+        let configuration = engram.temp.path().join("configuration.toml");
         let mut policy = include_str!(
-            "../../../authority/rrd-engine/assets/install/default-estate-configuration-v3.toml"
+            "../../../authority/rrd-engine/assets/install/default-engram-configuration-v3.toml"
         )
         .to_owned();
         if flush_each {
@@ -175,36 +175,36 @@ impl Estate {
             );
         }
         std::fs::write(&configuration, policy).unwrap();
-        let preview = estate.invoke(&[
+        let preview = engram.invoke(&[
             "install",
             "plan",
             "--identity",
-            &estate.identity,
+            &engram.identity,
             "--mode",
             mode,
             "--project",
-            estate.project.to_str().unwrap(),
+            engram.project.to_str().unwrap(),
             "--configuration",
             configuration.to_str().unwrap(),
         ]);
-        let path = estate.temp.path().join("plan.json");
+        let path = engram.temp.path().join("plan.json");
         std::fs::write(&path, serde_json::to_vec(&preview).unwrap()).unwrap();
-        let applied = estate.invoke(&[
+        let applied = engram.invoke(&[
             "--json",
             "install",
             "apply",
             "--mode",
             mode,
             "--project",
-            estate.project.to_str().unwrap(),
+            engram.project.to_str().unwrap(),
             "--plan",
             path.to_str().unwrap(),
             "--expect",
             preview["installation"]["plan_sha256"].as_str().unwrap(),
         ]);
-        estate.at = applied["applied_at_unix_ms"].as_u64().unwrap();
+        engram.at = applied["applied_at_unix_ms"].as_u64().unwrap();
         assert_eq!(applied["runtime_cursor"], 2);
-        estate
+        engram
     }
 
     fn control(&self, point: &str, id: u16, operation: Option<&str>) -> Value {
@@ -417,8 +417,8 @@ fn run(mode: &str, points: &[&str]) {
 }
 
 fn run_history(mode: &str, points: &[&str], publication: bool) {
-    let estate = Estate::install_at(mode, None, publication);
-    let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let engram = Engram::install_at(mode, None, publication);
+    let credential = RrdEngine::read_installed_api_key(&engram.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -427,7 +427,7 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
     let mut ledger = AcknowledgementLedger::default();
     let clock = Instant::now();
     runtime.block_on(async {
-        let (child, client) = estate.serve(&Value::Null);
+        let (child, client) = engram.serve(&Value::Null);
         let session = client
             .create_session(
                 credential.principal_id.clone(),
@@ -444,7 +444,7 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
             .await
             .unwrap();
         let mut values = BTreeMap::new();
-        let baseline = request("baseline", estate.at);
+        let baseline = request("baseline", engram.at);
         ledger.expected.push(ExpectedOperation {
             logical_id: "baseline".to_owned().try_into().unwrap(),
             request_sha256: digest("c07c.installed.request", &baseline).unwrap(),
@@ -501,7 +501,7 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
             // reaches its WAL. Its prior ACKs must survive, while this new
             // operation must remain absent until the explicit retry.
             let committed_before_pause = !publication && *point != "wal_before_write";
-            let request = request(&name, estate.at);
+            let request = request(&name, engram.at);
             let logical_id = name.clone().try_into().unwrap();
             ledger.expected.push(ExpectedOperation {
                 logical_id,
@@ -509,8 +509,8 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
                 effect_sha256: digest("c07c.installed.effect", &expected(&name)).unwrap(),
                 resolution: ExpectedResolution::Present,
             });
-            let control = estate.control(point, index as u16 + 1, Some(&request.operation_sha256));
-            let (child, client) = estate.serve(&control);
+            let control = engram.control(point, index as u16 + 1, Some(&request.operation_sha256));
+            let (child, client) = engram.serve(&control);
             let lease = client
                 .begin_transaction(
                     &session,
@@ -555,13 +555,13 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
             } else {
                 "recovery_read"
             };
-            let recovery = estate.control(recovery_point, index as u16 + 1, None);
-            hits.push(estate.launch(&recovery).hit_and_kill(recovery));
-            let (child, client) = estate.serve(&Value::Null);
+            let recovery = engram.control(recovery_point, index as u16 + 1, None);
+            hits.push(engram.launch(&recovery).hit_and_kill(recovery));
+            let (child, client) = engram.serve(&Value::Null);
             if committed_before_pause {
                 values.extend(expected(&name));
             }
-            read(&client, &session, estate.at, &values).await;
+            read(&client, &session, engram.at, &values).await;
             let started = clock.elapsed().as_nanos() as u64;
             let prior = client
                 .commit_transaction(
@@ -622,7 +622,7 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
                 });
             }
             values.extend(expected(&name));
-            read(&client, &session, estate.at, &values).await;
+            read(&client, &session, engram.at, &values).await;
             ledger.readback.push(Readback::Present {
                 logical_id: name.try_into().unwrap(),
                 request_sha256: digest("c07c.installed.request", &request).unwrap(),
@@ -641,7 +641,7 @@ fn run_history(mode: &str, points: &[&str], publication: bool) {
     assert_eq!(hits.len(), points.len() * 2);
     assert_eq!(report.unresolved, 0);
     assert!(report.violations.is_empty(), "{report:?}");
-    let receipt = json!({"instrumentation":"crash-test-primary","mode":mode,"build":estate.build,
+    let receipt = json!({"instrumentation":"crash-test-primary","mode":mode,"build":engram.build,
         "native_os":std::env::consts::OS,"publication":publication,"hits":hits,"ledger":ledger,"report":report});
     if publication {
         if let Some(directory) = std::env::var_os("RRFLOW_PUBLICATION_RECEIPT_DIR") {
@@ -710,8 +710,8 @@ fn existing_installed_publication_and_reclamation() {
 
 #[test]
 fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
-    let estate = Estate::install("fresh");
-    let control = estate.control("wal_synced", 42, Some(&"f".repeat(64)));
+    let engram = Engram::install("fresh");
+    let control = engram.control("wal_synced", 42, Some(&"f".repeat(64)));
     let invalid = [
         ("version", json!(2)),
         ("nonce", json!("invalid")),
@@ -724,7 +724,7 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
     for (field, value) in invalid {
         let mut invalid = control.clone();
         invalid[field] = value;
-        let mut child = estate.launch(&invalid);
+        let mut child = engram.launch(&invalid);
         let output = child.child.finish().unwrap();
         assert!(
             !output.status.success(),
@@ -735,8 +735,8 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
             "invalid control reached service or pause"
         );
     }
-    let credential = RrdEngine::read_installed_api_key(&estate.project).unwrap();
-    let (child, client) = estate.serve(&control);
+    let credential = RrdEngine::read_installed_api_key(&engram.project).unwrap();
+    let (child, client) = engram.serve(&control);
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -768,7 +768,7 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
                 )
                 .await
                 .unwrap();
-            let request = request("nonmatching", estate.at);
+            let request = request("nonmatching", engram.at);
             assert_ne!(
                 request.operation_sha256,
                 control["operation_sha256"].as_str().unwrap()
@@ -783,7 +783,7 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
                 .await
                 .unwrap();
             assert_eq!(receipt.last_runtime_cursor, Some(4));
-            read(&client, &session, estate.at, &expected("nonmatching")).await;
+            read(&client, &session, engram.at, &expected("nonmatching")).await;
         });
     assert!(
         matches!(child.lines.try_recv(), Err(mpsc::TryRecvError::Empty)),
@@ -793,6 +793,6 @@ fn diagnostic_controls_reject_invalid_schedules_and_ignore_other_operations() {
     println!(
         "installed_crash_admission_receipt={}",
         json!({"instrumentation":"crash-test-primary",
-        "build":estate.build,"invalid_schedules":7,"nonmatching_commit":true})
+        "build":engram.build,"invalid_schedules":7,"nonmatching_commit":true})
     );
 }

@@ -47,7 +47,7 @@ and retains both declarations. A Git search of both revisions found the two
 constants only at their declarations and found no imports of that module;
 this does not prove that a visible screen uses them. The current pin's native
 `src-tauri/src/rrd/client.rs` does contain an authenticated SDK session and
-query path, while `estate.rs` implements preview and exact-digest installation.
+query path, while `engram.rs` implements preview and exact-digest installation.
 Those source paths are implementation inventory, not a real desktop acceptance
 result. The wider pinned UI integration remains unaudited.
 
@@ -94,7 +94,7 @@ generated from the owning contract, not copied from this prose:
 
 | Group | Required binding |
 |---|---|
-| Identity | Estate, project, plan ID/version/digest, actor and successor lineage; explicit effective configuration and capability revisions. |
+| Identity | Engram, project, plan ID/version/digest, actor and successor lineage; explicit effective configuration and capability revisions. |
 | Evidence | Relevant source identities and content/revision digests, selected retrieval evidence and read stamp, plus exclusions and uncertainty relevant to the effect. |
 | Effect | Capability ID/version, typed parameters, intended resource and effect, required grants, hard budgets, idempotency key, dependencies, and questions that block that effect. |
 | Verification | Observable acceptance predicates, independent checker and permitted evidence source; named inputs and outputs, not a claim that the model complied. |
@@ -138,13 +138,13 @@ operator can inspect why a replan is required; no old receipt is rewritten.
 | Existing source and characterization | Destination and required evidence |
 |---|---|
 | `rrd-engine/assets/install/{default,clyffy}-profile-v3.json`; `installation.rs` proposal validation, profile fallback, sealed preview | Replace fixed default work selection with capability- and project-derived proposals at the existing engine boundary. Preserve no-write preview, exact apply and installed identity. Test multiple different projects/configurations, inactive providers, and unknown capability denial. |
-| `rrd-contract/src/attunement.rs`: `AttunementPhase`, `AttunementPlan`, checkpoint and job validators; `tests/attunement_contract.rs` | Replace the phase-specific planning assumption with versioned capability/effect records and dependency-bound checkpoints. Preserve public operation identities where feasible and document exact contract changes; do not silently reinterpret old digests. The implementation PR must decide and prove what happens to existing pre-release estates and persisted jobs without adding an alternate runtime authority. |
+| `rrd-contract/src/attunement.rs`: `AttunementPhase`, `AttunementPlan`, checkpoint and job validators; `tests/attunement_contract.rs` | Replace the phase-specific planning assumption with versioned capability/effect records and dependency-bound checkpoints. Preserve public operation identities where feasible and document exact contract changes; do not silently reinterpret old digests. The implementation PR must decide and prove what happens to existing pre-release engrams and persisted jobs without adding an alternate runtime authority. |
 | `rrd-engine/src/engine/attunement.rs`: `control_attunement`, `make_attunement_replan`, lease/receipt/replay | Generalize selected execution and successor lineage while retaining authorization rechecks, fencing, idempotency, cancellation and original-principal receipt readback. Test stale workers and post-effect replan, including uncertain external outcomes. |
 | `attunement/inventory.rs`, `inventory/{records,publication,reuse}.rs`, installation inventory; engine `tests/attunement.rs` and `tests/attunement/inventory_delta.rs` | Preserve actual bounded anchored reads, source recheck, incremental reuse, publication groups and committed head. Prove no premature head/receipt on failure and exact state after replay; do not replace with an in-memory index. |
 | Draft PR 241 Parse implementation and `rrd-attunement` | Reconcile its source binding and parser tests into the chosen capability contract. Before activation prove process isolation, memory/time/output enforcement, cancellation/reaping and stale-source publication on each claimed native platform. Its whole-inventory read bound is not 100,000-record evidence. |
 | `rrd-contract::endpoint_catalogue`, `rrd-engine::product_capability_catalogue`, server dispatch, generated SDKs | Use one executable owner for new operations and schema projections. Verify actual HTTP/SDK dispatch and permissions; a catalogue row alone is not execution. |
 | `rrd-query` graph traversal and store transaction paths | Retrieve the same persisted project/source identity through rrflowQL and public readback after reopen. PR 242 merged as `b8e615baab4f7033a3dead4506d7d5d9dc5ce24c` after the original design baseline. Its quoted-identity repair does not by itself prove the complete source-to-query project journey. |
-| Connectome pinned `src/rrflow/attunement.ts`, native `src-tauri/src/rrd/{client,estate}.rs`, `docs/reference/client/connectome.md`, H-06 | Reconcile the static phase/estimate declarations with the engine projection; inspect remaining callers at the implementation revision. Use the existing authenticated SDK session, generated/public operations and readback; UI cannot own plans, source state or claim verified work from health responses. Test the exact pinned desktop. |
+| Connectome pinned `src/rrflow/attunement.ts`, native `src-tauri/src/rrd/{client,engram}.rs`, `docs/reference/client/connectome.md`, H-06 | Reconcile the static phase/estimate declarations with the engine projection; inspect remaining callers at the implementation revision. Use the existing authenticated SDK session, generated/public operations and readback; UI cannot own plans, source state or claim verified work from health responses. Test the exact pinned desktop. |
 
 Before deleting or replacing a path, its implementation PR must complete the
 repository's traceability map, characterize existing persisted formats and
@@ -161,7 +161,7 @@ apply; reconcile an overlap before starting concurrent work.
 
 | Change | Concrete implementation and first-failure oracle |
 |---|---|
-| Plan and effect admission | Characterize the current profile fallback and persisted v2 plan/job/checkpoint fixtures. Extend the existing executable owner with typed capability identities, parameter validation, selected dependencies and plan digest; generate projections. Replace the fixed default in both profiles. Reject unknown effects, duplicate IDs, unresolved dependencies, cycles and altered digests. Show two distinct valid selected plans and an unavailable provider without manufacturing an executor. Exact handling of existing v2 estates must be decided and tested before any removal. |
+| Plan and effect admission | Characterize the current profile fallback and persisted v2 plan/job/checkpoint fixtures. Extend the existing executable owner with typed capability identities, parameter validation, selected dependencies and plan digest; generate projections. Replace the fixed default in both profiles. Reject unknown effects, duplicate IDs, unresolved dependencies, cycles and altered digests. Show two distinct valid selected plans and an unavailable provider without manufacturing an executor. Exact handling of existing v2 engrams must be decided and tested before any removal. |
 | Durable execution and replan | Map plan nodes to the existing engine control, lease and transaction authority. Bind a receipt to plan, actor, operation, input observations and outcome. Preserve stale-worker fencing and historical receipts; reconcile committed effects before successor acceptance. Demonstrate that relevant changes refuse mutation, unrelated changes do not block independent work, and lost acknowledgements do not duplicate effects. |
 | Source to query | Reconcile PR 241 against the resulting plan contract. Use the committed inventory identity and authorized source reader, enforce the parser worker's native resource limits, and publish source spans/relations through the existing transaction. Query the persisted source through rrflowQL after reopen; test changed/deleted files, cancellation, stale input and worker failure. |
 | Developer handoff and UI | Implement handoff, question and receipt operations at the engine catalogue, generate SDK surfaces, and wire the exact pinned Connectome client through those operations. Drive a real permitted change and independent readback/checker through the desktop; show pending and unavailable states honestly. |
@@ -196,7 +196,7 @@ configuration, platform, commands, outcomes, and unavailable features.
 
 1. Preview and explicitly apply the project boundary; verify denied source
    and inactive provider behavior. Restart and authenticate the installed
-   estate. The UI displays identities and actual readiness.
+   engram. The UI displays identities and actual readiness.
 2. Commit a bounded inventory and parse an authorized source. Query the same
    source ID and span through rrflowQL and public engine readback; the UI shows
    the same result and provenance. No fixture-loaded substitute is accepted.
@@ -211,7 +211,7 @@ configuration, platform, commands, outcomes, and unavailable features.
 6. Kill and restart at admission, publication, acknowledgement and replay
    boundaries; test duplicate request, cancellation, expired lease, worker
    death and lost external acknowledgement. Compare exact durable readback.
-7. Exercise two project estates for isolation, selected Windows and Linux
+7. Exercise two project engrams for isolation, selected Windows and Linux
    native builds, and the declared ARM target when a native runner is available.
    Record a missing platform as unqualified. macOS remains required where the
    owning release matrix requires it; this checkpoint does not waive it.

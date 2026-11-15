@@ -16,7 +16,7 @@ owns generic installation and integration rules. The
 owns event, trigger, routine, skill, function, and activity orchestration. The
 [local-process adapter](../deployment/local-process-driver.md) owns host process
 safety. This record owns the narrower boundary that connects those systems for
-project commands. Roadmap [D-03 and D-06](../../roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-estate)
+project commands. Roadmap [D-03 and D-06](../../roadmap/rrflow-1.0.md#gate-d--install-configure-and-attune-one-real-engram)
 own discovery and applied integration; [Gate I](../../roadmap/rrflow-1.0.md#gate-i--add-explicit-automation-scaffolding-with-host-hooks-as-alias-stubs)
 owns durable execution and installation scaffolding.
 
@@ -79,7 +79,7 @@ semantic capability and the committed facts support a binding. For example, a
 generic `verification` routine may require
 `project.verify.typecheck`; it contains no `pnpm`, `npm`, Cargo, Python, Go,
 provider, shell, executable path, or repository-specific command. A TypeScript
-estate could propose one package-script binding while a Rust estate proposes a
+engram could propose one package-script binding while a Rust engram proposes a
 direct Cargo binding. Both remain inactive until policy permits their exact
 closure.
 
@@ -112,7 +112,7 @@ unimplemented TOML or JSON shape already exists.
 
 | Field family | Required semantics |
 |---|---|
-| Identity | Estate, semantic capability ID, immutable revision, activation status, definition digest, and predecessor/retirement coordinates. |
+| Identity | Engram, semantic capability ID, immutable revision, activation status, definition digest, and predecessor/retirement coordinates. |
 | Source evidence | Project-tree snapshot and entry digests, manifest/script/configuration identities, and discovery implementation revision. |
 | Invocation closure | Binding kind; artifact identities and digests; ordered argv or package-script identity; package-manager/runtime/toolchain revisions; lockfile and wrapper digests; and every implicit lifecycle step. |
 | Scope and effects | Logical working directory beneath the installed project root; read roots; declared write roots; output identities; process-tree limit; network policy; and effect class. |
@@ -124,7 +124,7 @@ unimplemented TOML or JSON shape already exists.
 | Provenance | Adapter/platform identity, resolved dependency digests, source and plan coordinates, redaction policy, and retained evidence schema. |
 
 Unknown fields, duplicate IDs, zero/overflowing limits, unverifiable artifacts,
-unavailable enforcement, cross-estate references, stale sources, unbounded
+unavailable enforcement, cross-engram references, stale sources, unbounded
 outputs, undeclared writes, or a mutable/incomplete invocation closure fail
 closed.
 
@@ -200,7 +200,7 @@ automatic retry.
 ## Durable execution and uncertain outcomes
 
 The engine commits an activity plan before dispatch. Its identity is derived
-from the estate, routine run and step or public operation, binding revision,
+from the engram, routine run and step or public operation, binding revision,
 input digest, attempt, and fence. The adapter reports heartbeats only for
 bounded liveness, progress, cancellation delivery, and resource accounting;
 a heartbeat is not a checkpoint or completion record.
@@ -291,7 +291,7 @@ capability implementation:
 | `rrd-contract/src/function.rs` and `rrd-engine/src/engine/automation.rs` | Closed, digest-bound, resource-bounded deterministic JavaScript/WebAssembly functions; authorization; immutable catalogue revisions; transaction-pinned replay; synchronous validation/derived-event behavior. | Not a command binding, activity, routine, or post-commit trigger. Rename `AutomationCatalogue` and `FunctionTrigger*` to their narrow function/transaction-binding terms during A-07/I-01/I-02; extract reusable function execution before decomposing the module. |
 | `rrd-core::RuntimeEvent` | A typed runtime event value committed in the runtime log. | Missing the complete canonical engine-event identity/authorization/provenance envelope; I-01 converges it directly rather than adding another event database. |
 | `rrd-core::RuntimeTraceEvent` and engine trace helpers | Bounded causal trace events, MX/KV parity for current trace bytes, concurrent append, and incomplete-span visibility after reopen. | Traces are evidence, not activity/routine state. Current direct `StorageEngine` trace writes and `Lifecycle`/`Workflow` vocabulary require H-05/I/J convergence through authorized engine operations. |
-| `rrd-estate::LocalProcessDriver` | Useful no-shell argv, path, identity, timeout, cleanup, and effect-gap characterization. | It is an RRD deployment implementation inside the wrong domain, not a generic project-activity adapter. Preserve its safety semantics in `rrflow-local-process`; remove direct storage/private JSON/marker authority as specified by its owner. |
+| `rrd-engram::LocalProcessDriver` | Useful no-shell argv, path, identity, timeout, cleanup, and effect-gap characterization. | It is an RRD deployment implementation inside the wrong domain, not a generic project-activity adapter. Preserve its safety semantics in `rrflow-local-process`; remove direct storage/private JSON/marker authority as specified by its owner. |
 | `rrflow-cli::dev::supervisor` | Development-only process observation and cleanup behavior. | A duplicate supervisor and bootstrap authority scheduled for direct removal; it cannot be generalized into routines. |
 | `rrflow-lab-experiments::run_trial` | A provider-specific controlled-evaluation harness that directly invokes installed provider CLIs and records trial output. | Evaluation evidence only. It is not an installed project capability, public operation, adapter conformance proof, or runtime implementation. |
 

@@ -2,7 +2,7 @@
 //!
 //! These types freeze a deterministic package for later authorized import.
 //! They do not read Markdown, inspect a checkout, open storage, or mutate an
-//! RRFlow estate. KB-03 owns export and KB-06 owns import through `RrdEngine`.
+//! RRFlow engram. KB-03 owns export and KB-06 owns import through `RrdEngine`.
 
 use crate::{invalid, sha256_bytes, validate_sha256, CanonicalId, Result};
 use schemars::JsonSchema;

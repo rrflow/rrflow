@@ -1,6 +1,6 @@
 //! Accounted copy and resumable publication. The damaged input is never edited.
 use super::*;
-use crate::engine::estate_layout::{instance_operation_root, RESTORES_DIRECTORY_NAME};
+use crate::engine::engram_layout::{instance_operation_root, RESTORES_DIRECTORY_NAME};
 use crate::engine::installation::ProjectLocator;
 use crate::engine::restore_publication::PublicationLease;
 use crate::engine::token_key::{

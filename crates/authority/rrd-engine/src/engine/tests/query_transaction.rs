@@ -63,7 +63,7 @@ fn query_transaction_commit_cancel_failure_replay_and_reopen_share_one_authority
         registry: DataSchemaRegistry {
             revision: 1,
             migration: "install query transaction schema".into(),
-            organisation: DataEstateOrganisation::default(),
+            organisation: DataEngramOrganisation::default(),
             tables: BTreeMap::from([(
                 document.kind.clone(),
                 DataTableSchema {

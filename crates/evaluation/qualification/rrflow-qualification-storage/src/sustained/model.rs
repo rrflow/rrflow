@@ -68,7 +68,7 @@ pub struct CapacityAllocation {
     pub vcpus: Limit,
     pub host_bytes: Limit,
     pub engine_bytes: Limit,
-    pub estates: Limit,
+    pub engrams: Limit,
     pub records: Limit,
     pub edges: Limit,
     pub vectors: Limit,
@@ -308,14 +308,14 @@ impl StorageCampaign {
         )?;
         require(
             self.allocation.engine_bytes.get() <= self.allocation.host_bytes.get()
-                && self.allocation.estates.get() == self.storage.budgets.estates.get()
+                && self.allocation.engrams.get() == self.storage.budgets.engrams.get()
                 && self.allocation.engine_bytes.get() == self.storage.budgets.process_bytes.get()
                 && self
                     .storage
                     .budgets
                     .aggregate_process_bytes
                     .is_none_or(|pool| pool == self.allocation.engine_bytes)
-                && (self.allocation.estates.get() == 1
+                && (self.allocation.engrams.get() == 1
                     || self.storage.budgets.aggregate_process_bytes.is_some())
                 && self.allocation.host_bytes.get() == self.storage.budgets.host_bytes.get(),
             "allocation and storage budget identity differ",

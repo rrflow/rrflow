@@ -27,7 +27,7 @@ final class SdkConformanceTest {
             "cancellation",
             "cold_history",
             "crud",
-            "estate",
+            "engram",
             "live_feeds",
             "query",
             "retries",
@@ -190,7 +190,7 @@ final class SdkConformanceTest {
                 options("vector-search", session, false, Map.of(), null));
         assertTrue(containsVector(
                 vectors.path("hits"), expected.path("vector_reference").asString()));
-        // The runners share one estate, so activate the generation this build returned.
+        // The runners share one engram, so activate the generation this build returned.
         JsonNode quantization = vector.path("quantization");
         JsonNode built = api.call(
                 OperationId.VECTOR_QUANTIZATION_BUILD,
@@ -298,16 +298,16 @@ final class SdkConformanceTest {
                 options("backup-list", session, false, Map.of(), null));
         assertTrue(containsBackup(
                 backups.path("backups"), backupSnapshot.path("backup_sha256").asString()));
-        JsonNode estate = api.call(
-                OperationId.ESTATE_READ,
-                corpus.path("estate"),
+        JsonNode engram = api.call(
+                OperationId.ENGRAM_READ,
+                corpus.path("engram"),
                 options(
-                        "estate-read",
+                        "engram-read",
                         session,
                         false,
-                        Map.of("estate", identity.path("estate").asString()),
+                        Map.of("engram", identity.path("engram").asString()),
                         null));
-        assertEquals(expected.path("estate_revision").asInt(), estate.path("revision").asInt());
+        assertEquals(expected.path("engram_revision").asInt(), engram.path("revision").asInt());
         JsonNode closed = api.call(
                 OperationId.SESSION_CLOSE,
                 sessionFixture.path("close"),

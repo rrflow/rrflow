@@ -85,9 +85,9 @@ package. Do not create a second SQL operation registry or call physical storage
 from a wire handler. Native and SQL clients must observe the same committed row,
 schema, index, audit and receipt.
 
-One connection's startup database selects one explicitly installed estate.
+One connection's startup database selects one explicitly installed engram.
 The authenticated user maps to one RRFlow principal and allowed schema/actions.
-No wildcard database creation, cross-estate query, or cloud account requirement
+No wildcard database creation, cross-engram query, or cloud account requirement
 is implied. Installation/configuration owns listener activation and credentials.
 Ordinary SQL statements use the principal's configured authorization; they do
 not require an interactive approval dialog for each query.
@@ -145,11 +145,11 @@ comparison input; RRFlow retains its own storage and native vector execution.
 ## Required semantic work before a compatible listener
 
 **Relational identity and types.** Map a SQL table to one canonical logical
-table ID in the estate catalogue, a row to one stable internal record identity,
+table ID in the engram catalogue, a row to one stable internal record identity,
 and SQL columns to typed canonical values. Tables without a primary key still
 receive internal row identities. A primary key is a constrained logical key,
 not the physical address or authorization scope. SQL schemas are catalogue
-namespaces, not new estates. Persist generated OIDs and schema revisions under
+namespaces, not new engrams. Persist generated OIDs and schema revisions under
 the existing transaction authority; built-in type OIDs use their reference
 identities. No transport-local catalogue can become durable truth.
 
@@ -274,7 +274,7 @@ export method. This plan makes no claim about a vendor acquisition.
 3. Preview schema/type conversions: SQLite affinity, integer booleans, datetime
    strings, rowid/autoincrement, NULL/unique rules, collations, JSON and vectors.
    Lossy/unsupported conversions fail with a report; no silent coercion.
-4. Import into an absent staging estate through typed authorized engine
+4. Import into an absent staging engram through typed authorized engine
    operations. Use bounded, receipt-bound chunks with a resumable import ledger
    and stable source keys. Do not run arbitrary exported SQL or bypass validation.
 5. Compare per-table counts, normalized row digests, constraints, vector
@@ -333,7 +333,7 @@ OIDs, parse-depth attacks, wrong credentials, catalogue leakage, stale plans,
 cross-principal cancellation, malformed COPY, savepoint nesting, aborted
 transactions, deadlocks, constraint races, lost acknowledgements, disk full,
 process kill, reopen, schema changes during queries and all resource limits.
-All supported operations must agree with native APIs over the same estate.
+All supported operations must agree with native APIs over the same engram.
 Generated support reports list every pass/fail/skip with reference identities;
 a required skip blocks qualification.
 

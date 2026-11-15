@@ -40,8 +40,8 @@ RRFlow, LFG and SWAG work "truly as one tuned engine", with Connectome as a true
 | Requirement | Exists | Missing |
 |---|---|---|
 | A living visualizer that is the second brain running, drilled down, zoomed and expanded to a full viewport inside Connectome, on bleeding-edge research | A Sigma graph of stored records with zoom and expand-to-window; a live change stream in the client that no view subscribes to | A graph that updates live, drill-down through levels of detail, a model of reasoning, and the research |
-| The second brain persists while project instances are stopped and started | One project maps to one estate and one instance; nothing sits above them | A long-lived brain service and its contract with project instances |
-| Two projects need not share RBAC, with stronger leakage measures once this is proven | Per-estate sessions and authorization | RBAC across a shared brain, then researched leakage controls |
+| The second brain persists while project instances are stopped and started | One project maps to one engram and one instance; nothing sits above them | A long-lived brain service and its contract with project instances |
+| Two projects need not share RBAC, with stronger leakage measures once this is proven | Per-engram sessions and authorization | RBAC across a shared brain, then researched leakage controls |
 | Requests, chat and "even my rage" interpreted as constructional data | LFG's prompt hook journal; 743 of the owner's real prompts in `eval/inputs/staging` | Interpretation that feeds plans |
 | Thresholds "where honesty trumps moving forward blindly" | A hook passes a frustration reading to the session | Measured thresholds and a required realignment step |
 | A lexicon that grows, from layman words to specific analyses | Nothing | The lexicon, its analyses and its growth |

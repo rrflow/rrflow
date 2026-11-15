@@ -1,8 +1,8 @@
 use super::*;
 fn fixture() -> StorageCampaign {
     let mut campaign = super::super::sustained::tests::fixture().0;
-    campaign.allocation.estates = 2u64.try_into().unwrap();
-    campaign.storage.budgets.estates = campaign.allocation.estates;
+    campaign.allocation.engrams = 2u64.try_into().unwrap();
+    campaign.storage.budgets.engrams = campaign.allocation.engrams;
     campaign.allocation.engine_bytes = campaign.allocation.host_bytes;
     campaign.storage.budgets.process_bytes = campaign.allocation.engine_bytes;
     campaign.storage.budgets.aggregate_process_bytes = Some(campaign.allocation.engine_bytes);
@@ -16,7 +16,7 @@ fn fixture() -> StorageCampaign {
 }
 
 #[test]
-fn canonical_ten_estate_profile_admits_one_shared_pool_and_denies_overcommit() {
+fn canonical_ten_engram_profile_admits_one_shared_pool_and_denies_overcommit() {
     let projection = capacity_profiles().unwrap();
     let profile = projection
         .profiles
@@ -31,14 +31,14 @@ fn canonical_ten_estate_profile_admits_one_shared_pool_and_denies_overcommit() {
         vcpus: profile.vcpus.try_into().unwrap(),
         host_bytes: profile.host_bytes.try_into().unwrap(),
         engine_bytes: profile.engine_bytes.try_into().unwrap(),
-        estates: profile.estates.try_into().unwrap(),
+        engrams: profile.engrams.try_into().unwrap(),
         records: profile.records_min.try_into().unwrap(),
         edges: profile.edges_min.try_into().unwrap(),
         vectors: profile.vectors_min.try_into().unwrap(),
         vector_dimensions: profile.vector_dimensions.try_into().unwrap(),
         logical_source_bytes: profile.logical_source_bytes_min.try_into().unwrap(),
     };
-    campaign.storage.budgets.estates = campaign.allocation.estates;
+    campaign.storage.budgets.engrams = campaign.allocation.engrams;
     campaign.storage.budgets.process_bytes = campaign.allocation.engine_bytes;
     campaign.storage.budgets.aggregate_process_bytes = Some(campaign.allocation.engine_bytes);
     campaign.storage.budgets.host_bytes = campaign.allocation.host_bytes;
@@ -95,8 +95,8 @@ fn children_are_exact_mechanical_corpus_rate_seed_and_aggregate_views() {
     let parent = fixture();
     validate_fleet(&parent).unwrap();
     for trial in FleetTrial::ALL {
-        for estate in 0..2 {
-            let child = fleet_child(&parent, 0, 0, trial, estate).unwrap();
+        for engram in 0..2 {
+            let child = fleet_child(&parent, 0, 0, trial, engram).unwrap();
             assert_eq!(child.allocation.records.get(), 8);
             assert_eq!(child.allocation.edges.get(), 24);
             assert_eq!(child.allocation.vectors.get(), 16);
@@ -107,17 +107,17 @@ fn children_are_exact_mechanical_corpus_rate_seed_and_aggregate_views() {
             assert_eq!(child.points[0].clients.get(), 4);
             assert_eq!(
                 child.points[0].requests_per_second.get(),
-                if trial == FleetTrial::Abusive && estate == 0 {
+                if trial == FleetTrial::Abusive && engram == 0 {
                     20
                 } else {
                     10
                 }
             );
-            assert_eq!(child.seeds, vec![parent.seeds[0] + estate]);
+            assert_eq!(child.seeds, vec![parent.seeds[0] + engram]);
             assert_eq!(child.purpose, CampaignPurpose::Characterization);
             assert_eq!(
-                trial.active(estate),
-                trial != FleetTrial::Quiet || estate == 0
+                trial.active(engram),
+                trial != FleetTrial::Quiet || engram == 0
             );
         }
     }
@@ -195,15 +195,15 @@ fn boundaries_require_distinct_engines_explicit_denial_and_real_reopen() {
     .iter()
     .enumerate()
     {
-        for estate in 0..2 {
+        for engram in 0..2 {
             let mut sample = sample.clone();
-            sample.pid = 1 + estate as u32 + if *stage == "reopened" { 2 } else { 0 };
+            sample.pid = 1 + engram as u32 + if *stage == "reopened" { 2 } else { 0 };
             sample.elapsed_ns = 1 + stage_index as u64;
             boundaries.push(FleetBoundary {
-                estate,
+                engram,
                 stage: stage.to_string().try_into().unwrap(),
-                instance: format!("estate-{estate}"),
-                foreign_instance: format!("estate-{}", (estate + 1) % 2),
+                instance: format!("engram-{engram}"),
+                foreign_instance: format!("engram-{}", (engram + 1) % 2),
                 denial: rrd_contract::ErrorCode::Unauthenticated,
                 sample,
             });
@@ -231,7 +231,7 @@ fn boundaries_require_distinct_engines_explicit_denial_and_real_reopen() {
                 wrong.boundaries.pop();
             }
             1 => wrong.boundaries[1].sample.pid = 1,
-            2 => wrong.boundaries[0].foreign_instance = "estate-0".into(),
+            2 => wrong.boundaries[0].foreign_instance = "engram-0".into(),
             3 => wrong.boundaries[12].sample.pid = 1,
             _ => wrong.boundaries[2].sample.elapsed_ns = 1,
         }

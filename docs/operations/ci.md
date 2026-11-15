@@ -163,7 +163,7 @@ nightly full matrix, not by the gate.
 A test that runs another package's binary needs it built first, because
 `cargo test -p <crate>` builds only that crate's own binaries. `TEST_BINARIES`
 in the same script names them, and `engine-fast` builds them before testing:
-today `rrd-server`'s tests run `rrflow-cli`'s `rrd-estate-controller`. A test
+today `rrd-server`'s tests run `rrflow-cli`'s `rrd-engram-controller`. A test
 in `scripts/ci/test_select_ci_lanes.py` fails when a crate calls
 `workspace_binary("…")` without being declared
 ([journal](../evidence/change-journals/repository/ci-fast-lane-test-binaries-20261114.md)).
@@ -345,11 +345,11 @@ The Linux lifecycle and Windows/macOS portability lanes also build the native
 copies, and run the installed example over authenticated loopback HTTP. The
 runner checks the exact synthetic task and owning relationship at one read
 stamp, changes the task, rejects the old expectation, verifies the stopped
-estate and reads the same state after reopening. It bounds child output and
+engram and reads the same state after reopening. It bounds child output and
 execution, and terminates only its own processes. This is a small fresh-project
 integration corpus, not the complete H-04 SDK matrix or C-07 qualification.
 
-The Linux topology and Windows/macOS estate partitions also require
+The Linux topology and Windows/macOS engram partitions also require
 `projected_lifetime` and `reader::lifetime_tests`: overlapping empty-reader
 admission, mixed generations and terminal source-owner release, with copied
 output surviving database/stream disposal. Weak-owner and registry checks
@@ -439,7 +439,7 @@ no ignored or filtered cases. Fresh/existing receipts bind the actual executable
 build metadata, public-contract and signal digests, installation/restore plans,
 backup, read manifest and asserted durable cursors. Unknown receipt fields are
 rejected. Retained artifacts contain these bounded, non-secret receipts and
-sanitized failure status; raw estates and credential-bearing output are never
+sanitized failure status; raw engrams and credential-bearing output are never
 uploaded. The [D-01 acceptance record](../roadmap/rrflow-1.0/gate-d-evidence.md#d-01-accepted-installed-foundation-2026-10-21)
 binds the first accepted three-platform result to its exact candidate. Later
 changes still require their own candidate CI; this result cannot qualify a
@@ -648,7 +648,7 @@ unchanged.
 ## Presubmit and change-evidence boundary
 
 Repository presubmit is not an RRFlow runtime hook. It cannot create an engine
-event, trigger a persisted routine, resolve a skill, mutate an estate, or claim
+event, trigger a persisted routine, resolve a skill, mutate an engram, or claim
 that an effect completed. Gate I owns those future runtime capabilities.
 
 The portable development control has three layers:
@@ -819,7 +819,7 @@ turn it into performance or competitive evidence.
 The Linux installed lane and Windows/macOS portability lanes run
 `cargo test -p rrd-lsm --lib fault_io --locked -- --nocapture` with a five-minute
 step limit. This C-07b unit corpus wraps native file calls with deterministic
-faults, then reconstructs a temporary estate from an independent stable-byte
+faults, then reconstructs a temporary engram from an independent stable-byte
 and directory-entry model. Logs retain call/case counts and failing ordinals.
 The model has fixed byte/file/event bounds and exercises compound recovery
 failures. It is I/O-model evidence on each host, not native process-death,
@@ -869,8 +869,8 @@ cursors, prior ACK receipts and exact retries reconcile uncertainty without
 double application. Negative controls reject inadmissible schedules and prove
 an unrelated operation cannot trigger the selected boundary.
 
-The two estate histories retain six logical calls and 21 attempts each,
-including five uncertain client results; ten point/recovery hits per estate
+The two engram histories retain six logical calls and 21 attempts each,
+including five uncertain client results; ten point/recovery hits per engram
 bind PID, nonce, point and build identity. The third parent test qualifies
 schedule admission. No parent is ignored. Native stdout/stderr capture is
 bounded to 1 MiB per stream, input to 4 KiB, observed event lines to 64 KiB and
@@ -881,7 +881,7 @@ test step allows 20 minutes and two test threads. Existing ordinary lane
 limits are unchanged. `ci-gate` requires all three diagnostic jobs.
 
 The same required native job now invokes
-`python3 scripts/ci/run_native_capacity.py` for fresh/existing estates at WAL,
+`python3 scripts/ci/run_native_capacity.py` for fresh/existing engrams at WAL,
 segment, manifest and CURRENT-write boundaries. It creates a capped ext4 loop
 image in a private mount namespace, fixed APFS image, or NTFS VHD. The harness
 requires a separately enumerated small volume, an exact owner marker, a private
@@ -904,7 +904,7 @@ retained buffers, real exhaustion, sustained capacity or the 24-hour soak.
 
 The installed domain-crash job also runs the
 [publication and reclamation corpus](../evidence/change-journals/gate-c/c-07c-installed-publication.md)
-separately for fresh/existing estates. It retains two bounded native receipts,
+separately for fresh/existing engrams. It retains two bounded native receipts,
 requires all six maintenance boundaries and their compound manifest-recovery
 kills, and reconciles prior ACKs before retrying each uncertain target. The
 ordinary domain step excludes these cases to avoid duplicate execution. Native

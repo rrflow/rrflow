@@ -366,7 +366,7 @@ fn a_deletion_larger_than_one_commit_retires_across_steps() {
     const ADMISSION: &str = "transaction_admission_bytes = 524288";
     let directory = tempfile::tempdir().unwrap();
     let configuration = directory.path().join("small-admission.toml");
-    let default = include_str!("../../../../assets/install/default-estate-configuration-v3.toml");
+    let default = include_str!("../../../../assets/install/default-engram-configuration-v3.toml");
     let small = default.replace("transaction_admission_bytes = 67108864", ADMISSION);
     assert!(
         small.contains(ADMISSION),
@@ -658,7 +658,7 @@ fn a_followed_project_is_attuned_and_relearned_by_the_engine() {
         &configuration,
         format!(
             "{}\n[attunement_follow]\ninterval_ms = 1000\n",
-            include_str!("../../../../assets/install/default-estate-configuration-v3.toml")
+            include_str!("../../../../assets/install/default-engram-configuration-v3.toml")
         ),
     )
     .unwrap();

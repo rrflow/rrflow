@@ -17,7 +17,7 @@ use rrd_contract::{
     FollowChangefeed, HttpMethod as ContractHttpMethod, ListInstanceBackups, ListKnowledgeTrees,
     ListQueryIndexes, ListVectorCollections, ListVectorQuantizationArtifacts, Liveness,
     OpenSubscription, PollLiveQuery, PreviewTransaction, ReadAudit, ReadChangefeed,
-    ReadDiagnosticSnapshot, ReadEstate, Readiness, RenewSession, ReplaceKnowledgeTrees,
+    ReadDiagnosticSnapshot, ReadEngram, Readiness, RenewSession, ReplaceKnowledgeTrees,
     RequestContext, RequestEnvelope, ResourceId, ResourceKind, ResponseEnvelope, ResponseOutcome,
     RestoreInstanceBackup, RetireVectorQuantizationArtifact, RetrieveVectorPoints,
     ScrollVectorPoints, SearchVectors, ServiceCapabilities, PROTOCOL, PROTOCOL_VERSION,
@@ -56,7 +56,7 @@ mod websocket;
 
 use auth::{authenticated_session, header_values, session_creation_identity, SessionIdentity};
 use capabilities::{
-    capabilities, estate_action, parse_correlation, session_action, session_id, transaction_action,
+    capabilities, engram_action, parse_correlation, session_action, session_id, transaction_action,
     transaction_id, unix_time_ms,
 };
 use envelope::{invocation_completion, required_idempotency};

@@ -2,14 +2,14 @@ use super::*;
 use rrd_contract::{
     ApplyEndpointConfiguration, BindingKind, BindingLimits, CredentialReference, DeclaredFootprint,
     EndpointBinding, EndpointConfiguration, EndpointConfigurationPlan, EndpointLocator,
-    EndpointProfileInput, InstalledEstateIdentity, PreviewEndpointConfiguration, SessionLease,
+    EndpointProfileInput, InstalledEngramIdentity, PreviewEndpointConfiguration, SessionLease,
     WorkloadClass,
 };
 
 fn bind(engine: &mut RrdEngine, project: &str) {
-    engine.installed_estate = Some(InstalledEstateIdentity {
+    engine.installed_engram = Some(InstalledEngramIdentity {
         project_id: CanonicalId::new(project).unwrap(),
-        estate_id: CanonicalId::new("endpoint-estate").unwrap(),
+        engram_id: CanonicalId::new("endpoint-engram").unwrap(),
         instance_id: instance(),
     });
 }
@@ -125,18 +125,23 @@ fn worker_and_observation_settings_share_configuration_approval_and_reopen() {
 
 fn configuration_policy_reopens(include_worker: bool, include_observation: bool) {
     // A configuration proposal derived from actual captured settings; this
-    // fresh test estate does not claim to be the captured production identity.
+    // fresh test engram does not claim to be the captured production identity.
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../transport/rrd-contract/tests/fixtures/endpoint-selection-observed/available");
-    let configuration: EndpointConfiguration =
-        serde_json::from_slice(&std::fs::read(fixture.join("configuration.json")).unwrap())
-            .unwrap();
+    let configuration: EndpointConfiguration = serde_json::from_slice(
+        &super::observed_configuration::read(&fixture, "configuration.json"),
+    )
+    .unwrap();
     let captured = configuration.profile.unwrap();
-    let allowance: rrd_contract::EndpointSelectionAllowance =
-        serde_json::from_slice(&std::fs::read(fixture.join("allowance.json")).unwrap()).unwrap();
-    let request: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(fixture.join("choice-request.json")).unwrap())
-            .unwrap();
+    let allowance: rrd_contract::EndpointSelectionAllowance = serde_json::from_slice(
+        &super::observed_configuration::read(&fixture, "allowance.json"),
+    )
+    .unwrap();
+    let request: serde_json::Value = serde_json::from_slice(&super::observed_configuration::read(
+        &fixture,
+        "choice-request.json",
+    ))
+    .unwrap();
     let controller = captured
         .bindings
         .iter()
@@ -511,7 +516,7 @@ fn endpoint_configuration_read_permission_does_not_allow_preview_or_apply() {
         expires_at_unix_ms: u64::MAX,
         disabled: false,
         role_ids: BTreeSet::new(),
-        grants: [SecurityAction::SessionCreate, SecurityAction::EstateRead]
+        grants: [SecurityAction::SessionCreate, SecurityAction::EngramRead]
             .into_iter()
             .map(|action| ResourceGrant {
                 action,

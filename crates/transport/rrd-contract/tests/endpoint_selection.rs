@@ -1,6 +1,8 @@
 //! These inputs are retained actual endpoint calls and installed configuration.
 //! Denial probes mutate those inputs in memory; they are not training examples,
 //! model-produced results, authorization receipts or quality labels.
+#[path = "support/observed_configuration.rs"]
+mod observed_configuration;
 use rrd_contract::{
     endpoint_profile_sha256, EndpointAbstentionReason, EndpointConfiguration,
     EndpointEffortSupport, EndpointSelectionAllowance, EndpointSelectionChoice,
@@ -15,13 +17,13 @@ fn root(name: &str) -> PathBuf {
         .join(name)
 }
 fn json(name: &str, file: &str) -> Value {
-    serde_json::from_slice(&std::fs::read(root(name).join(file)).unwrap()).unwrap()
+    serde_json::from_slice(&observed_configuration::read(&root(name), file)).unwrap()
 }
 fn observation(name: &str) -> (EndpointConfiguration, EndpointSelectionAllowance, Vec<u8>) {
     (
         serde_json::from_value(json(name, "configuration.json")).unwrap(),
         serde_json::from_value(json(name, "allowance.json")).unwrap(),
-        std::fs::read(root(name).join("choice-content.json")).unwrap(),
+        observed_configuration::read(&root(name), "choice-content.json"),
     )
 }
 fn sha(bytes: &[u8]) -> String {

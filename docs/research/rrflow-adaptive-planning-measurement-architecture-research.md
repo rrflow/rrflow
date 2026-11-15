@@ -47,7 +47,7 @@ consistency checks; it does not establish treatment attachment or independent
 answer correctness.
 
 The bundled default currently sets inventory limits of 100,000 entries,
-30,000 ms, one worker and 32 open files; the default estate configuration
+30,000 ms, one worker and 32 open files; the default engram configuration
 sets a 4 MiB page cache, graph depth 4, 128 recall items, and a 256-step
 reasoning *budget*. These are settings in the profile/configuration assets,
 not proof that the 100,000-entry case passes or that these settings are
@@ -125,7 +125,7 @@ without an explicit qualifier. Report k, filter, source/read stamp and corpus.
 ## Runtime information needed for useful debugging
 
 Extend the existing H-05 signal and executable operation owners, not a new
-parallel catalogue. Each observable attempt should link project/estate,
+parallel catalogue. Each observable attempt should link project/engram,
 correlation/trace ID, actor, plan/effect/attempt ID and effective config
 revision; selected capability and availability; source/read stamp; budget and
 actual units; queue and execution timing; admitted/denied/failed/uncertain
@@ -168,7 +168,7 @@ context tokens automatically reduces total end-to-end cost.
    integrated revision. Do not substitute this research or screening fixture
    for those required results.
 
-The numeric defaults in the current estate/profile are operating settings, not
+The numeric defaults in the current engram/profile are operating settings, not
 scientifically optimal values. Until actual installed runs exist, no measured
 winner, competitive-equivalence claim, optimum cache size, graph depth, token
 saving or alpha readiness can be reported from this document.

@@ -210,7 +210,7 @@ fn assessment_mode_bounds_and_persisted_output_validation_are_strict() {
     .unwrap();
     let output = TaskAssessmentOutput {
         contract_version: 1,
-        scope: "estate:demo".into(),
+        scope: "engram:demo".into(),
         task_id: CanonicalId::new("task-one").unwrap(),
         attempt_id: CorrelationId::new("assessment-one").unwrap(),
         task_sha256: digest('a'),
@@ -299,7 +299,7 @@ fn assessment_mode_bounds_and_persisted_output_validation_are_strict() {
 fn assessment_request_rejects_context_before_engine_dispatch() {
     let request = serde_json::json!({
         "contract_version": 1,
-        "scope": "estate:demo",
+        "scope": "engram:demo",
         "task_id": "task-one",
         "attempt_id": "assessment-one",
         "expected_task_sha256": digest('a'),
@@ -321,7 +321,7 @@ fn assessment_request_rejects_context_before_engine_dispatch() {
             "requirement_id": "requirement"
         },
         "practice_text": "Use only the supplied source",
-        "context": { "scope": "estate:demo" }
+        "context": { "scope": "engram:demo" }
     });
     assert!(serde_json::from_value::<TaskAssessmentRequest>(request).is_err());
 }

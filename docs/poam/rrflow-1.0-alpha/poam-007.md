@@ -15,8 +15,8 @@ graph persists through reopen. The [accepted D-01 foundation](../../roadmap/rrfl
 now persists the initial digest-bound specialization subset: the default template
 is generic and the bundled Clyffy profile requires explicit selection. The full
 attuned specialization manifest and adapter-conformance proof across supported AI
-hosts remain open. The current `MemoryEstate*` names conflate seat identity with
-an estate, the caller manually commits the identity plan, broad
+hosts remain open. The current `MemoryEngram*` names conflate seat identity with
+an engram, the caller manually commits the identity plan, broad
 snapshot reconstruction resolves it, and the authenticated
 session/representation/authorization/routing path is not joined.
 

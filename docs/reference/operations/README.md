@@ -10,4 +10,4 @@ does not create a workflow, storage, transport, or lifecycle authority.
 
 | Subject | Durable warp | Checkout record | State |
 |---|---|---|---|
-| Estate desired/observed control | [`rrflow://rrflow-instance/data/reference/operations/estate-control`](rrflow://rrflow-instance/data/reference/operations/estate-control) | [`estate-control.md`](estate-control.md) | useful reconciliation and recovery foundations exist; direct-store aggregate and controller authorities require convergence |
+| Engram desired/observed control | [`rrflow://rrflow-instance/data/reference/operations/engram-control`](rrflow://rrflow-instance/data/reference/operations/engram-control) | [`engram-control.md`](engram-control.md) | useful reconciliation and recovery foundations exist; direct-store aggregate and controller authorities require convergence |

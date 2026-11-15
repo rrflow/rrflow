@@ -74,7 +74,7 @@ impl<'de> Deserialize<'de> for CanonicalId {
 #[serde(rename_all = "snake_case")]
 pub enum ResourceKind {
     Organization,
-    Estate,
+    Engram,
     Project,
     Instance,
     Tenant,

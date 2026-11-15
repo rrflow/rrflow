@@ -15,7 +15,7 @@
    "crates/adapters/rrflow-edge": 1,
    "crates/adapters/rrflow-mcp": 6,
    "crates/authority/rrd-engine": 63,
-   "crates/authority/rrd-estate": 1,
+   "crates/authority/rrd-engram": 1,
    "crates/evaluation/lab/rrflow-lab-experiments": 8,
    "crates/transport/rrd-server": 3
   },
@@ -38,7 +38,7 @@
   "sha2_crate": {
    "crates/adapters/rrflow-cli": 1,
    "crates/authority/rrd-engine": 1,
-   "crates/authority/rrd-estate": 2,
+   "crates/authority/rrd-engram": 2,
    "crates/authority/rrd-security": 1,
    "crates/evaluation/qualification/rrflow-qualification-storage": 3,
    "crates/evaluation/rrflow-evaluation-core": 1,
@@ -51,7 +51,7 @@
    "crates/adapters/rrflow-edge": 4,
    "crates/adapters/rrflow-mcp": 5,
    "crates/authority/rrd-engine": 2,
-   "crates/authority/rrd-estate": 19,
+   "crates/authority/rrd-engram": 19,
    "crates/compute/rrd-inference": 2,
    "crates/evaluation/lab/rrflow-lab": 2,
    "crates/evaluation/lab/rrflow-lab-benchmarks": 1,

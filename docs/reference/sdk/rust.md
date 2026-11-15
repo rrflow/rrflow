@@ -6,7 +6,7 @@
 
 `rrd-client` is the supported asynchronous Rust client foundation for public
 RRD operations. Its only normal RRFlow dependency is `rrd-contract`; engine,
-storage, query, vector, security, estate, and server crates are confined to
+storage, query, vector, security, engram, and server crates are confined to
 development fixtures. That dependency direction is correct and must remain.
 
 This record does not make the client another engine. Authentication,
@@ -335,7 +335,7 @@ The current corpus overstates several rows:
 
 The harness now materializes one checked inert distribution-anchor fixture,
 canonically plans/applies an empty temporary project, requires the derived
-instance and estate IDs to equal the checked corpus, and opens the installed
+instance and engram IDs to equal the checked corpus, and opens the installed
 engine. It extends that fixture's schema and security state without replacing
 the installed identity, then starts one real daemon for Rust, TypeScript,
 Python, Go, Java, and .NET. This proves that all six checked SDKs execute the

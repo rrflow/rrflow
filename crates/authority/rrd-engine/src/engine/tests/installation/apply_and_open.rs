@@ -30,7 +30,7 @@ pub(super) fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
     let engine = open_at(project.path(), &executable, 1_800_000_000_001).unwrap();
     assert!(engine.security_enforced().unwrap());
     assert_eq!(
-        engine.installed_estate_identity(),
+        engine.installed_engram_identity(),
         Some(&preview.installation.target)
     );
     assert_eq!(
@@ -38,7 +38,7 @@ pub(super) fn exact_apply_reopens_and_quick_verification_changes_no_bytes() {
         Some(&preview.installation.deployment)
     );
     assert_eq!(
-        engine.estate_configuration(),
+        engine.engram_configuration(),
         &preview.installation.configuration
     );
     assert_eq!(

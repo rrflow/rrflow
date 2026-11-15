@@ -27,8 +27,8 @@ pub(super) fn transaction_id(path: &str) -> Option<&str> {
     (!id.is_empty() && !id.contains('/')).then_some(id)
 }
 
-pub(super) fn estate_action<'a>(path: &'a str, action: &str) -> Option<&'a str> {
-    path.strip_prefix("/v1/estates/")?
+pub(super) fn engram_action<'a>(path: &'a str, action: &str) -> Option<&'a str> {
+    path.strip_prefix("/v1/engrams/")?
         .strip_suffix(&format!("/{action}"))
         .filter(|id| !id.is_empty() && !id.contains('/'))
 }
@@ -41,7 +41,7 @@ pub(super) fn capabilities(
     tls_enabled: bool,
     jwt_enabled: bool,
 ) -> ServiceCapabilities {
-    let configuration = engine.estate_configuration();
+    let configuration = engine.engram_configuration();
     let backend = match engine.storage_profile_kind() {
         rrd_contract::StorageProfileKind::RrflowMx => "rrflow_mx",
         rrd_contract::StorageProfileKind::RrflowKv => "rrflow_kv",
@@ -203,12 +203,12 @@ pub(super) fn capabilities(
             ),
         },
         CapabilityDescriptor {
-            name: CanonicalId::new("estate-authority-read").unwrap(),
+            name: CanonicalId::new("engram-authority-read").unwrap(),
             contract_version: 1,
             status: CapabilityStatus::Experimental,
             limits: BTreeMap::new(),
             limitation: Some(
-                "read-only estate snapshots; estate mutations remain unavailable"
+                "read-only engram snapshots; engram mutations remain unavailable"
                     .into(),
             ),
         },
@@ -258,7 +258,7 @@ pub(super) fn capabilities(
         CapabilityDescriptor {
             name: CanonicalId::new("knowledge-tree-catalogue").unwrap(),
             contract_version: rrd_contract::KNOWLEDGE_TREE_CONTRACT_VERSION,
-            status: if engine.installed_estate_identity().is_some() {
+            status: if engine.installed_engram_identity().is_some() {
                 CapabilityStatus::Experimental
             } else {
                 CapabilityStatus::Unavailable
@@ -268,10 +268,10 @@ pub(super) fn capabilities(
                 (CanonicalId::new("max-paths").unwrap(), rrd_contract::MAX_KNOWLEDGE_PATHS as u64),
                 (CanonicalId::new("max-catalogue-bytes").unwrap(), rrd_contract::MAX_KNOWLEDGE_CATALOGUE_BYTES as u64),
             ]),
-            limitation: Some(if engine.installed_estate_identity().is_some() {
+            limitation: Some(if engine.installed_engram_identity().is_some() {
                 "authenticated project-bound catalogue configuration with revision compare-and-swap and idempotent receipts; external bindings do not establish provider execution or synchronization".into()
             } else {
-                "knowledge trees require the identity of an installed project estate".into()
+                "knowledge trees require the identity of an installed project engram".into()
             }),
         },
         CapabilityDescriptor {
@@ -412,7 +412,7 @@ pub(super) fn capabilities(
         implementation: CanonicalId::new("rrflow").unwrap(),
         implementation_version: env!("CARGO_PKG_VERSION").into(),
         deployment,
-        installed_estate: engine.installed_estate_identity().cloned(),
+        installed_engram: engine.installed_engram_identity().cloned(),
         configuration: configuration.clone(),
         instance: ResourceId {
             kind: ResourceKind::Instance,

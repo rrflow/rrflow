@@ -125,17 +125,17 @@ reachability and provider identity cannot substitute for RRD server identity,
 RRFlow credentials, or current policy.
 
 The current closed action enum covers session, query, index, transaction,
-changefeed/subscription, vector collection/point, backup/restore, estate,
+changefeed/subscription, vector collection/point, backup/restore, engram,
 audit, diagnostic, security-administration, and implemented governed-runtime
 operations. This is implementation inventory, not permission for speculative
 features; new install, attunement, routing, event, trigger, routine, skill, and
 adapter actions are introduced only with their typed engine operation and
 denial tests.
 
-The current [local-estate authorization](local-estate-authorization.md) path
+The current [local-engram authorization](local-engram-authorization.md) path
 does not follow this authority. It evaluates a separate file policy and
 permission enum, then opens an engine by caller-supplied path and performs
-estate mutations without a canonical principal grant or invocation. Its useful
+engram mutations without a canonical principal grant or invocation. Its useful
 exact-scope and denial-before-creation properties must be absorbed directly;
 the local file policy receives no permanent or compatibility status.
 
@@ -153,12 +153,12 @@ Kubernetes lifecycle. `rrflow install plan` resolves the complete action and
 `rrflow install apply --plan <file> --expect <sha256>` submits the exact
 reviewed digest to
 `RrdEngine`. The server cannot listen for application traffic until that action
-has committed an installed-estate binding and initial security authority.
+has committed an installed-engram binding and initial security authority.
 
 An existing *application project* can still be a fresh RRFlow installation.
 Cold-start authority is available only while RRFlow can prove, under an
 exclusive create-new installation lease, that the target has no installed
-binding, security authority, or canonical estate state. Once any installed
+binding, security authority, or canonical engram state. Once any installed
 binding exists, absence or corruption of policy never re-enables cold start;
 repair and policy replacement require an authenticated `security_admin`
 operation or an explicit recovery procedure. The cold-start path is local and
@@ -170,7 +170,7 @@ callable.
 The installation action input digest commits to one normalized,
 bounded document containing:
 
-- project, estate, and instance identities plus the selected rrflowMX or
+- project, engram, and instance identities plus the selected rrflowMX or
   rrflowKV storage profile and exact placement descriptor;
 - distribution, template, configuration, specialization, and schema digests;
 - every initial principal, principal kind, role membership, inherited role,
@@ -244,7 +244,7 @@ and recovery, replay, and installed open reject an unavailable observation or
 rollback beyond the installed configuration's explicit bound. This provides a
 relative rollback guard; it is not proof of correct UTC or authenticated
 synchronization.
-The accepted installation transaction atomically commits the installed-estate
+The accepted installation transaction atomically commits the installed-engram
 binding, initial policy/verifier metadata, exact plan/action identity,
 installation checkpoint, security-administration audit, outbox/commit evidence,
 and authoritative cursor. rrflowMX and rrflowKV execute the same semantic
@@ -365,9 +365,9 @@ authority. A denial or pre-execution failure remains an audit-only engine
 transaction.
 
 Current security-state initialization/replacement does publish its state and
-`security_admin` completion audit in one control batch. Estate administration,
+`security_admin` completion audit in one control batch. Engram administration,
 reconciliation, backup reconciliation, retention pruning, and restore recovery
-also emit `estate_admin` phase records. Session-backed embedded work attempted
+also emit `engram_admin` phase records. Session-backed embedded work attempted
 outside an active invocation writes an authorization reservation or terminal
 denial so it cannot disappear entirely. These useful causal safeguards must be
 absorbed into the final semantic transaction; they do not make the ordinary
@@ -418,10 +418,10 @@ The complete review found these direct-convergence requirements:
    attunement, routing, engine-event, trigger, routine, skill, and adapter
    operations. Their vocabulary must expand only with the owning implemented
    public operation, never as speculative permission strings.
-8. `rrd-estate::LocalOperatorPolicy` is a second file-backed identity and
-   permission authority. Estate administration and recovery accept
+8. `rrd-engram::LocalOperatorPolicy` is a second file-backed identity and
+   permission authority. Engram administration and recovery accept
    caller-selected database/policy/key/time coordinates, bypass canonical
-   sessions and `RrdOperation::EstateAdmin`, and collapse narrower permissions
+   sessions and `RrdOperation::EngramAdmin`, and collapse narrower permissions
    into a broad allowed audit label. A-07 must absorb its seven real effect
    distinctions into this authority and delete the parallel types and path.
 

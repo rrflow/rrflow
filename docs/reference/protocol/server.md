@@ -74,7 +74,7 @@ compatibility.
 The accepted bounded D-01 bootstrap is the source-built `rrflow install plan`,
 `rrflow install apply`, `rrflow serve`, authenticated `rrflow ready`, and
 read-only `rrflow verify --level quick` flow. Planning previews and seals the
-canonical estate and configuration; apply consumes those sealed bytes; serve
+canonical engram and configuration; apply consumes those sealed bytes; serve
 opens that installed identity read-only before composing the listener. This is
 pre-release implementation evidence, not complete D-01 or release evidence.
 The internal `rrd-server` process likewise requires an installed project plus
@@ -175,7 +175,7 @@ family groups operations for readers and carries no authorization meaning.
 | Family | Server responsibility | Semantic authority |
 |---|---|---|
 | Inspection | Liveness, readiness, capabilities, endpoint catalogue, OpenAPI, and diagnostics. | `RrdEngine` and public contract projections. |
-| Identity and control | Session create, renew, close, estate read, audit read and export, and endpoint configuration read, preview, and apply. | RRFlow security and `RrdEngine`. |
+| Identity and control | Session create, renew, close, engram read, audit read and export, and endpoint configuration read, preview, and apply. | RRFlow security and `RrdEngine`. |
 | Transactions | Begin, preview, commit, and abort typed mutation work. | `RrdEngine`; rrflowKV owns durable physical commit. |
 | Query and context | rrflowQL reads and Parquet export, live-query poll, index administration, and context assembly. | `RrdEngine`, rrflowQL, and the selected storage profile. |
 | Knowledge | List and compare-and-swap replace the project's knowledge-tree catalogue. | `RrdEngine`; external bindings are stored configuration, not a provider connection. |

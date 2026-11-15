@@ -3,7 +3,7 @@ use rrd_contract::{
     AttunementJob, AttunementJobState, AttunementPhase, AttunementPhaseCheckpoint,
     AttunementPhasePlan, AttunementPlan, AttunementRuntimeCoordinates, AttunementVerification,
     AttunementVerificationCheck, AttunementVerificationStatus, CanonicalId,
-    InstalledEstateIdentity, ATTUNEMENT_CONTRACT_VERSION,
+    InstalledEngramIdentity, ATTUNEMENT_CONTRACT_VERSION,
 };
 
 fn id(value: &str) -> CanonicalId {
@@ -27,9 +27,9 @@ fn plan(selected: &[AttunementPhase]) -> AttunementPlan {
     let mut plan = AttunementPlan {
         contract_version: ATTUNEMENT_CONTRACT_VERSION,
         id: id("adaptive-plan"),
-        target: InstalledEstateIdentity {
+        target: InstalledEngramIdentity {
             project_id: id("project"),
-            estate_id: id("estate"),
+            engram_id: id("engram"),
             instance_id: id("instance"),
         },
         source_sha256: "b".repeat(64),

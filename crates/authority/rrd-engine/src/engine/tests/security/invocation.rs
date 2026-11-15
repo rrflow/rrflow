@@ -536,7 +536,7 @@ pub(super) fn an_audited_read_inside_every_assembly_window_exhausts_the_diagnost
             &lease.session_id,
             &lease.token,
             &rrd_contract::ReadStorageDiagnostics {
-                scope: "instance:another-estate".into()
+                scope: "instance:another-engram".into()
             },
             1_100,
             "storage-wrong-scope",

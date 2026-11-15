@@ -25,6 +25,10 @@ The archived rename attempt was reviewed on 2026-11-14: [the review](../../evide
 
 The 2026-11-14 attempts through the editor were case-insensitive text replacements and corrupted identifiers (`LifecycleState` became `Lifecyclengram`). The rename needs a case-preserving, whole-word map applied by hand, files renamed in the same change as the paths that name them, and recorded captures left untouched.
 
+## Applied
+
+The rename was applied by hand on 2026-11-15 as one change on `main`: [journal](../../evidence/change-journals/repository/engram-rename-applied-20261115.md). It needs a reinstall (no migration). Connectome's rename and client regeneration are still open in its own repository, so this record stays open.
+
 ## Impact
 
 One concept has several names in the public contract and generated SDKs. A reader can't tell which name is canonical, and AI clients learn both.

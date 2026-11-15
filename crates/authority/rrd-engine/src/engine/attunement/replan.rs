@@ -76,7 +76,7 @@ impl RrdEngine {
         let (_, authorization) = self.authorize(
             session,
             token,
-            SecurityAction::EstateRead,
+            SecurityAction::EngramRead,
             now,
             request_id,
             operation_id,
@@ -95,8 +95,8 @@ impl RrdEngine {
             .map(Some)
     }
 
-    pub(in super::super) fn attunement_installed_record(&self) -> Result<InstalledEstateRecord> {
-        let record: InstalledEstateRecord = decode(
+    pub(in super::super) fn attunement_installed_record(&self) -> Result<InstalledEngramRecord> {
+        let record: InstalledEngramRecord = decode(
             &self
                 .storage
                 .control()
@@ -104,7 +104,7 @@ impl RrdEngine {
                 .ok_or_else(|| ServiceError::Storage("installed engram record missing".into()))?,
         )?;
         record.validate()?;
-        if self.installed_estate_identity() != Some(&record.installation.target) {
+        if self.installed_engram_identity() != Some(&record.installation.target) {
             return Err(ServiceError::ProjectBindingMismatch);
         }
         Ok(record)
@@ -218,7 +218,7 @@ impl RrdEngine {
                         .iter()
                         .filter_map(|step| step.parse_policy.as_ref()),
                     &profile,
-                    &self.estate_configuration,
+                    &self.engram_configuration,
                 )?;
                 plan
             }
@@ -260,7 +260,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             now,
             request_id,
             operation_id,
@@ -275,7 +275,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             elapsed_time(now, started)?,
             request_id,
             operation_id,
@@ -300,7 +300,7 @@ impl RrdEngine {
         let (_, auth) = self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             now,
             context.request_id.as_str(),
             context.operation_id.as_str(),
@@ -330,7 +330,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             at,
             context.request_id.as_str(),
             context.operation_id.as_str(),
@@ -367,7 +367,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             at,
             context.request_id.as_str(),
             context.operation_id.as_str(),

@@ -6,8 +6,8 @@
 
 This record defines the local operating-system process boundary. The
 [instance topology](../../architecture/instance-topology.md) owns the project,
-estate, instance, deployment-form, and storage-profile relationships. The
-[estate-control reference](../operations/estate-control.md) owns durable
+engram, instance, deployment-form, and storage-profile relationships. The
+[engram-control reference](../operations/engram-control.md) owns durable
 desired/observed state and external-effect reconciliation. The
 [security authority](../security/authority.md) owns authentication,
 authorization, and audit. The [server reference](../protocol/server.md) owns
@@ -20,7 +20,7 @@ A local process is one deployment effect for the single-node server form. It
 is not rrflowDB, a storage profile, an installer, a project lifecycle, a
 reasoning routine, or canonical evidence that an instance is ready. The target
 implementation belongs in one outward `rrflow-local-process` adapter package,
-created only by its owning implementation gate. `rrd-estate` retains pure
+created only by its owning implementation gate. `rrd-engram` retains pure
 desired/observed and effect-plan validation; it must not import filesystem,
 process, hashing, platform API, or storage implementations.
 
@@ -29,7 +29,7 @@ The dependency direction is:
 ```text
 installed host composition root
        │
-       ├── resolved installed-estate binding
+       ├── resolved installed-engram binding
        ├── RrdEngine ── prepared effect plan / accepted receipt
        └── rrflow-local-process
                   ├── artifact and process identity
@@ -49,7 +49,7 @@ canonical desired/observed state.
 
 Only an explicitly previewed and applied `rrflow install` operation may create
 or change local launch registration. The applied plan resolves artifacts from
-the self-contained RRFlow distribution, commits the installed-estate binding,
+the self-contained RRFlow distribution, commits the installed-engram binding,
 and installs the selected foreground or operating-system service integration.
 Ordinary start never runs `initialize`, creates a manifest, infers an identity
 from a directory, downloads an artifact, finds a sibling checkout, or invokes
@@ -58,7 +58,7 @@ an undeclared generator.
 Cold start cannot depend on the daemon already being available. The installed
 launcher may execute the exact immutable plan authorized during installation,
 but it has no permission to edit semantic state. The child then opens the
-installed binding through `RrdEngine`, verifies project/estate/instance and
+installed binding through `RrdEngine`, verifies project/engram/instance and
 configuration identity, and publishes readiness through the protocol below.
 When the engine is available, any later start, stop, or restart request is an
 authenticated public operation whose intent and prepared external-effect plan
@@ -79,7 +79,7 @@ local-process effect binds all of the following before execution:
 
 | Field family | Required binding |
 |---|---|
-| Authority | instance, estate, project, operation, idempotency identity, lease/fence epoch, issuer, and plan digest |
+| Authority | instance, engram, project, operation, idempotency identity, lease/fence epoch, issuer, and plan digest |
 | Installed artifact | distribution manifest entry, version, platform target, content digest, protected installed location, and executable file identity |
 | Runtime configuration | installed configuration revision/digest, storage profile, deployment form, admitted project root, and non-secret locator references |
 | Invocation | executable operation, ordered typed arguments, working directory, permitted non-secret environment, and inherited-handle policy |
@@ -133,7 +133,7 @@ resolve installed binding and immutable prepared plan
   -> discover PID/start/image identity and keep the child reaped on failure
   -> receive bounded bootstrap-ready candidate
   -> authenticate RRD health/readiness/capabilities over the selected endpoint
-  -> verify challenge + project/estate/instance + configuration/artifact/plan
+  -> verify challenge + project/engram/instance + configuration/artifact/plan
   -> submit effect receipt to RrdEngine
   -> atomically accept observation, audit, outbox, trace links, and cursor
 ```
@@ -143,11 +143,11 @@ file, pipe, or local socket for that signal, it is private, bounded, strict,
 one-use, and bound to the startup challenge and plan digest. File existence or
 listener bind alone is never readiness.
 
-The authenticated readiness result binds the expected project, estate, RRD
+The authenticated readiness result binds the expected project, engram, RRD
 instance, protocol version, capability digest, configuration revision,
 artifact/plan digest, endpoint identity, startup challenge, and observed
 process identity. The probe also proves the selected storage capability: an
-rrflowKV deployment must open its installed durable estate; an rrflowMX
+rrflowKV deployment must open its installed durable engram; an rrflowMX
 deployment must identify itself as volatile and cannot claim reopen or
 durability. A wrong instance, stale plan, incomplete recovery, unexpected
 capability set, early exit, or timeout fails the start and triggers bounded
@@ -180,7 +180,7 @@ that result unambiguous.
 ## State, receipts, and storage profiles
 
 Canonical process intent, prepared plans, observations, and accepted receipts
-are typed estate records related to the installed instance and committed
+are typed engram records related to the installed instance and committed
 through `RrdEngine`. They participate in the same rrflowMX/rrflowKV semantic
 contract as other non-durability-specific state. rrflowKV additionally proves
 prepared-before-effect recovery, lost-ack replay, receipt ingestion, and
@@ -218,12 +218,12 @@ canonical destination.
 
 | Current implementation | Useful behavior to preserve | Conflict to remove directly |
 |---|---|---|
-| `rrd-estate/src/local_process.rs` | typed argv without a shell; strict relative paths; executable hashing; PID/start/image checks; bounded readiness and stop; child cleanup; durable staging pattern; retained data on delete | OS/process/filesystem/hashing dependencies inside the estate domain; arbitrary state root; standalone process JSON; marker existence as truth; digest-to-exec race; plaintext environment; unbounded logs and raw stderr tail |
+| `rrd-engram/src/local_process.rs` | typed argv without a shell; strict relative paths; executable hashing; PID/start/image checks; bounded readiness and stop; child cleanup; durable staging pattern; retained data on delete | OS/process/filesystem/hashing dependencies inside the engram domain; arbitrary state root; standalone process JSON; marker existence as truth; digest-to-exec race; plaintext environment; unbounded logs and raw stderr tail |
 | `LocalDeploymentCatalog` and `rrd-deployment-catalog` | bounded strict decoding, content digest, create-new publication, explicit timeouts, empty preparation arguments, and an installed-only server invocation bound to project and distribution-executable digests | still a second launch/configuration document with absolute paths and generic literals/environment; it has no engine-prepared effect/receipt port, signature/policy/secret-reference contract, or artifact-to-exec race protection |
-| `rrd-engine::reconcile_estate_store` and `rrd-estate-controller` | one-step reconciliation, stable operation replay, and testable effect-gap boundaries | static arbitrary-path store opening, caller-selected clock/worker/catalogue, direct repository mutation, release debug holds, and a second control-plane executable |
+| `rrd-engine::reconcile_engram_store` and `rrd-engram-controller` | one-step reconciliation, stable operation replay, and testable effect-gap boundaries | static arbitrary-path store opening, caller-selected clock/worker/catalogue, direct repository mutation, release debug holds, and a second control-plane executable |
 | removed `rrflow-cli` development supervisor | Its identity-safe stop, bounded log tail, port probing, and child-reaping expectations remain represented by narrower installed-lifecycle or process-driver tests. | `supervisor.json`, duplicated startup implementation, manifest/security creation, and `dev` command success paths are absent; retain no replacement private authority. |
 | `rrd-server` ready/shutdown marker support | installed-only engine open, listener publication after bind, synced bounded files, and graceful drain intent | unauthenticated file-existence readiness/completion, independently supplied marker paths, and no challenge/plan/process binding; the release initializer is now absent |
-| `rrd-server/tests/local_estate_driver.rs` | canonically installs its temporary estate before starting a real child, then covers controller reopen, idempotent same-PID replay, forged-PID denial, graceful-timeout fallback, effect-gap kills, and retained data | rrflowKV-only private controller state, marker authority, debug controller dependence, and no public-operation, authenticated-readiness, resource, distribution, or cross-platform proof |
+| `rrd-server/tests/local_engram_driver.rs` | canonically installs its temporary engram before starting a real child, then covers controller reopen, idempotent same-PID replay, forged-PID denial, graceful-timeout fallback, effect-gap kills, and retained data | rrflowKV-only private controller state, marker authority, debug controller dependence, and no public-operation, authenticated-readiness, resource, distribution, or cross-platform proof |
 
 The superseded flat record cited
 [GitHub Actions run 32667681611](https://github.com/EonsofStupid/rrflow/actions/runs/32667681611)
@@ -237,7 +237,7 @@ source, exact distribution, platform versions, and acceptance corpus.
    process and artifact identities, plan/receipt schemas, causal links, and
    every caller/test/fixture disposition.
 2. Move host implementation into the one outward local-process adapter and
-   make `rrd-estate` pure. Remove the second CLI supervisor, deployment-
+   make `rrd-engram` pure. Remove the second CLI supervisor, deployment-
    catalogue binary, static engine store opener, and controller binary rather
    than wrapping or aliasing them.
 3. D-01 makes the signed, repository-contained distribution plus install
@@ -259,15 +259,15 @@ source, exact distribution, platform versions, and acceptance corpus.
 The current source has focused tests for one hard-link-versus-copy executable
 identity check, one installed-only deployment-catalogue generator, controller
 argument cases, and four real-process/effect-gap cases over a canonically
-preinstalled estate. The shortest replacement checks are:
+preinstalled engram. The shortest replacement checks are:
 
 ```text
-cargo test -p rrd-estate --lib local_process --locked
-cargo test -p rrd-estate --test deployment_catalog --locked
-cargo test -p rrflow-cli --bin rrd-estate-controller --locked
-cargo test -p rrd-server --test local_estate_driver real_rrd_child_survives_controller_reopen_and_stops_without_data_deletion --locked
-cargo test -p rrd-server --test local_estate_driver local_driver_refuses_to_signal_a_reused_or_forged_pid_identity --locked
-cargo test -p rrd-server --test local_estate_driver graceful_timeout_reauthenticates_then_uses_the_bounded_kill_fallback --locked
+cargo test -p rrd-engram --lib local_process --locked
+cargo test -p rrd-engram --test deployment_catalog --locked
+cargo test -p rrflow-cli --bin rrd-engram-controller --locked
+cargo test -p rrd-server --test local_engram_driver real_rrd_child_survives_controller_reopen_and_stops_without_data_deletion --locked
+cargo test -p rrd-server --test local_engram_driver local_driver_refuses_to_signal_a_reused_or_forged_pid_identity --locked
+cargo test -p rrd-server --test local_engram_driver graceful_timeout_reauthenticates_then_uses_the_bounded_kill_fallback --locked
 ```
 
 These tests do not prove the target ownership boundary, engine-prepared
@@ -282,9 +282,9 @@ cannot close the associated POA&M row or a release gate.
 ## Acceptance
 
 The local process adapter is implemented only when a clean offline
-distribution installs one project estate, launches the exact authenticated
+distribution installs one project engram, launches the exact authenticated
 artifact without a shell or parallel initializer, and reaches an authenticated
-RRD readiness receipt for the expected project/estate/instance/configuration;
+RRD readiness receipt for the expected project/engram/instance/configuration;
 the same non-durability-specific effect corpus passes through rrflowMX and
 rrflowKV; rrflowKV converges after every prepared/effect/receipt crash boundary;
 PID reuse, path replacement, image replacement, forged readiness/completion,

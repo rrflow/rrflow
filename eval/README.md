@@ -86,7 +86,7 @@ errors report position/category without echoing rejected contents.
 
 ## Policy observations and bounds
 
-The manifest embeds the existing public `EstateConfiguration` and
+The manifest embeds the existing public `EngramConfiguration` and
 `DiagnosticStorageSnapshot` types. Its six effective settings are mechanical
 projections to their `rrd-lsm` owners: WAL/version soft flush targets, cache
 capacity, maximum I/O request bytes, L0 trigger and compaction output target.
@@ -96,7 +96,7 @@ states that explicitly rather than promising live application or restart.
 
 Laboratory budgets use explicit bytes/counts/milliseconds and are frozen per
 run. Disjoint memory reservations must fit the process cap; process allocation
-times estate count must fit the host cap. Atomic work fits mutable/queue
+times engram count must fit the host cap. Atomic work fits mutable/queue
 reservations; disk retains temporary and recovery reserves; wait and recovery
 deadlines fit the run. Soft flush targets must be below proposed hard ceilings.
 These checks do **not** enforce those ceilings inside the engine; C-07d owns
@@ -286,7 +286,7 @@ delegated cgroup; Windows uses an owned Job Object. The driver verifies live
 native limits and process membership rather than trusting environment labels.
 No privileged host setup is implicit. Qualification requires verified native
 allocation and every frozen acceptance condition. Actual retained physical
-readers and multi-estate orchestration are implemented; their presence does
+readers and multi-engram orchestration are implemented; their presence does
 not qualify a profile. macOS constrained-capacity launch is unavailable.
 Characterization results cannot close the profile or 24-hour requirement.
 Before a qualification enters its soak, `CampaignWriter::admit_soak` checks
@@ -327,16 +327,16 @@ failed runs. An evidence quota failure is a failed operating point, not a
 reason to omit samples or increase the frozen limit mid-run.
 
 Capacity qualification binds the exact current J-04 projection digest, fixed
-CPU/memory/estate allocation, minimum corpus, vector dimensions and declared
+CPU/memory/engram allocation, minimum corpus, vector dimensions and declared
 load coordinates. `campaign profiles` exposes the bundled projection without
 running a workload. `scripts/knowledge/render_capacity_profiles.py` derives it
 from the owning workload table; CI rejects drift. A qualifying operating point
 is not proof of the entire load sweep. Reduced characterization remains
 explicitly unqualified. Fleet manifests derive independent child campaigns
 from the same frozen allocation and corpus; they require four clients per
-estate and an exactly divisible aggregate request rate. Quiet rotates the measured interval through every estate, one at a time,
+engram and an exactly divisible aggregate request rate. Quiet rotates the measured interval through every engram, one at a time,
 while neighbours retain their engines and sampled drain without offered load;
-equal loads every estate; abusive offers estate zero twice its admitted rate.
+equal loads every engram; abusive offers engram zero twice its admitted rate.
 Each trial retains the full warmup/measured/burst/drain/soak durations. All
 members warm up before the quiet trial begins. Phase barriers share one clock
 and wait for every member; joined sessions renew while waiting.
@@ -345,13 +345,13 @@ The aggregate cgroup/Windows Job bounds the harness and every child together
 to `engine_bytes`; the host envelope remains independently observed. Native
 membership is checked before ingestion and at resource sampling/reopen.
 Pre-phase boundaries capture idle overhead, unique instance/PID identities
-and explicit cross-estate session denial. Per-estate child histories retain
+and explicit cross-engram session denial. Per-engram child histories retain
 canonical record/relation/vector verification, lifecycle lanes, final restart
 and readback. The aggregate reducer checks overlapping concurrent phases, non-overlapping
 isolated measured intervals, quiet-neighbour drain, shared allocation, and a
 conservative sum of member RSS peaks. It derives bounded p99 intervals from
 raw measured attempt timings using 4,096 integer bins (at most 1/64 relative
-bin width above 64 ns). Every compliant estate's abusive p99 upper bound must
+bin width above 64 ns). Every compliant engram's abusive p99 upper bound must
 be no greater than twice its own quiet p99 lower bound; ambiguous boundary
 bins fail conservatively. `isolated_latency_passed` reports this separately
 from complete qualification.
@@ -359,11 +359,11 @@ That sum is explicitly not a simultaneous RSS sample.
 
 `storage-fleet-trial-v1.json` and `storage-fleet-result-v1.json` are generated
 projections. `campaign verify` dispatches to the fleet reducer for multiple
-estates and streams each bounded child campaign. Failed/aborted members retain
+engrams and streams each bounded child campaign. Failed/aborted members retain
 raw progress; missing members or trials cannot become completed evidence.
 Root metadata and child evidence quotas are reserved before engine installation.
-The coordinator uses at most twelve worker threads for ten estates. Fleet
-execution is implemented but the complete native ten-estate matrix and 24-hour
+The coordinator uses at most twelve worker threads for ten engrams. Fleet
+execution is implemented but the complete native ten-engram matrix and 24-hour
 trial receipts remain required; no capacity result is claimed here.
 
 Installed read retention has per-open active-view and pinned-byte ceilings.

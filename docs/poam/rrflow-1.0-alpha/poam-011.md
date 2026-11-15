@@ -35,7 +35,7 @@ created and validated a private Windows workspace, but its Windows candidate CI
 rejected the child manifest's ownership or DACL. The
 [staging correction](../../evidence/change-journals/gate-h/h-04-sdk-windows-manifest-ci-correction.md)
 creates an explicitly owned, protected staging file and publishes it after a
-complete write. Corrected candidate 137b90a1 passed the hosted Windows estate
+complete write. Corrected candidate 137b90a1 passed the hosted Windows engram
 job and complete candidate CI; this integration must pass its own exact-head CI.
 The complete Windows six-SDK corpus, separate-principal denial, ARM and macOS qualification
 remain required; local descriptor inspection and a real harness startup do not
@@ -69,7 +69,7 @@ submodule, but source registration does not close the client-conformance gap.
 At RRFlow main `1fd7f163de3448c694e09c916b328540303eab1c`, the pinned
 Connectome revision `c1cbff203ecee89013878609d11aed04e89d0e71` sets fixed
 limits of four desktop-owned engines and eight tracked instances in
-`src-tauri/src/rrd/estate/lifecycle.rs`. This does not implement the owner's
+`src-tauri/src/rrd/engram/lifecycle.rs`. This does not implement the owner's
 later resource-managed multi-project target. H-06/H-07 must replace the fixed
 product-level limits with qualified configurable admission while retaining
 bounded resource use and safe ownership, shutdown and recovery. This finding

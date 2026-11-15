@@ -12,7 +12,7 @@ impl Filler {
             let path = std::fs::canonicalize(path).unwrap();
             assert!(
                 path.starts_with(&volume.root) && path != volume.root,
-                "metadata fill must remain inside the owned estate volume"
+                "metadata fill must remain inside the owned engram volume"
             );
             path
         });
@@ -250,7 +250,7 @@ impl Drop for Filler {
                 }
             }
         }
-        // Exact create_new-owned file only; never recurse or remove estate data.
+        // Exact create_new-owned file only; never recurse or remove engram data.
         if let Err(error) = std::fs::remove_file(&self.path) {
             if !std::thread::panicking() {
                 panic!("owned filler cleanup failed: {error}");

@@ -101,7 +101,7 @@ pub struct DiagnosticSnapshot {
     pub query_indexes: QueryIndexCatalogueSnapshot,
     pub vector_collections: VectorCollectionCatalogueSnapshot,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub estate: Option<EstateSnapshot>,
+    pub engram: Option<EngramSnapshot>,
     pub storage: DiagnosticStorageSnapshot,
     pub changes: ChangefeedPage,
     pub audit: AuditPage,

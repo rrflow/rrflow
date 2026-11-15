@@ -1,5 +1,7 @@
 //! Configuration proposals derived from actual retained settings. Mutated
 //! values are validation probes, not installed observations or training data.
+#[path = "support/observed_configuration.rs"]
+mod observed_configuration;
 use rrd_contract::{
     endpoint_profile_sha256, EndpointConfiguration, EndpointSelectionAllowance,
     EndpointSelectionPolicy,
@@ -47,12 +49,11 @@ fn lfg_policy_requires_explicit_bounded_loopback_and_pinned_inputs() {
 }
 
 fn bytes(file: &str) -> Vec<u8> {
-    std::fs::read(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/endpoint-selection-observed/available")
-            .join(file),
+    observed_configuration::read(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/endpoint-selection-observed/available"),
+        file,
     )
-    .unwrap()
 }
 fn proposed() -> (EndpointConfiguration, EndpointSelectionPolicy) {
     let configuration: EndpointConfiguration =

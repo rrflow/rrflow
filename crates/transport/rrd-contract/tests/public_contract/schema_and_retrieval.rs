@@ -1,4 +1,4 @@
-//! Estate organisation, public schemas, data retirement, retrieval and embeddings.
+//! Engram organisation, public schemas, data retirement, retrieval and embeddings.
 
 use super::*;
 
@@ -8,7 +8,7 @@ pub(super) fn unified_catalogue_is_strict_round_trippable_and_rejects_mode_confu
     let mut registry = DataSchemaRegistry {
         revision: 1,
         migration: "freeze public catalogue".into(),
-        organisation: DataEstateOrganisation {
+        organisation: DataEngramOrganisation {
             domains: BTreeMap::from([(
                 CanonicalId::new("knowledge").unwrap(),
                 DataDomainSchema {
@@ -21,7 +21,7 @@ pub(super) fn unified_catalogue_is_strict_round_trippable_and_rejects_mode_confu
                 document.clone(),
                 CanonicalId::new("knowledge").unwrap(),
             )]),
-            ..DataEstateOrganisation::default()
+            ..DataEngramOrganisation::default()
         },
         tables: BTreeMap::from([
             (
@@ -66,7 +66,7 @@ pub(super) fn organised_schema(organisation: serde_json::Value) -> serde_json::V
         "mutation": "put_schema",
         "registry": {
             "revision": 1,
-            "migration": "organise the estate",
+            "migration": "organise the engram",
             "organisation": organisation,
             "tables": {
                 "invoice": {"model": "document", "mode": "schemaless"},
@@ -83,7 +83,7 @@ pub(super) fn put_schema_error(organisation: serde_json::Value) -> String {
 }
 
 #[test]
-pub(super) fn estate_organisation_is_validated_at_the_public_boundary() {
+pub(super) fn engram_organisation_is_validated_at_the_public_boundary() {
     let billing = serde_json::json!({"billing": {"title": "Billing"}});
     let accepted: TransactionMutation =
         serde_json::from_value(organised_schema(serde_json::json!({
@@ -216,7 +216,7 @@ pub(super) fn public_schema_requires_one_explicit_nonempty_table_map() {
     let registry = DataSchemaRegistry {
         revision: 1,
         migration: "reject inferred public table models".into(),
-        organisation: DataEstateOrganisation::default(),
+        organisation: DataEngramOrganisation::default(),
         tables: BTreeMap::new(),
         records: BTreeMap::from([(document, DataRecordSchema::default())]),
         relations: BTreeMap::new(),

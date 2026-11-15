@@ -88,8 +88,8 @@ impl RrdEngine {
             ));
         }
         let project = canonical_project(project, target_kind)?;
-        let adopted_estate_entries = existing_estate_entries(&project)?;
-        reject_existing_estate(&project, adopted_estate_entries.as_deref())?;
+        let adopted_engram_entries = existing_engram_entries(&project)?;
+        reject_existing_engram(&project, adopted_engram_entries.as_deref())?;
         let (profile, profile_sha256) = DefaultInstallProfile::load(profile_id)?;
         let mut configuration = load_engram_configuration(configuration_path)?;
         if let Some(follow) = options.attunement_follow {
@@ -110,11 +110,11 @@ impl RrdEngine {
         let install_id = canonical_prefixed("install", &identity_seed)?;
         let attunement_id = canonical_prefixed("attune", &identity_seed)?;
         let instance_id = canonical_prefixed("instance", &identity_seed)?;
-        let estate_id = canonical_prefixed("estate", &identity_seed)?;
+        let engram_id = canonical_prefixed("engram", &identity_seed)?;
         let project_id = canonical_prefixed("project", &identity_seed)?;
-        let target = InstalledEstateIdentity {
+        let target = InstalledEngramIdentity {
             project_id,
-            estate_id,
+            engram_id,
             instance_id,
         };
         let (steps, minimum, maximum) = match proposal {
@@ -145,7 +145,7 @@ impl RrdEngine {
         attunement.plan_sha256 = attunement_plan_sha256(&attunement)
             .map_err(|error| ServiceError::Contract(error.to_string()))?;
 
-        let layout = EstateLayout::new(&install_id, &profile.initial_principal_id)?;
+        let layout = EngramLayout::new(&install_id, &profile.initial_principal_id)?;
         let absent = digest::sha256_hex(b"rrflow-install-managed-path-absent-v1");
         let managed_paths = layout.managed_paths(&absent);
         let bootstrap = bootstrap::build(&profile, &layout)?;
@@ -181,7 +181,7 @@ impl RrdEngine {
             attunement_plan_id: attunement.id.clone(),
             attunement_plan_sha256: attunement.plan_sha256.clone(),
             actions,
-            adopted_estate_entries,
+            adopted_engram_entries,
             plan_sha256: zero_digest(),
         };
         installation.plan_sha256 = installation_plan_sha256(&installation)

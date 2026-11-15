@@ -9,7 +9,7 @@ priority or closure status.
 
 ## Observed deficiency
 
-On 2026-11-11, a live probe of a release binary through the public API began two transactions and wrote unrelated rows; the second commit was refused. `prepare_semantic_commit` in `crates/persistence/rrd-store/src/access/semantic_commit.rs` compares one estate-wide cursor with the commit's expected cursor, so any commit between a transaction's snapshot and its commit refuses it. An engine test on two unrelated rows fails with `TransactionSnapshotStale { expected: 3, actual: 4 }`, and a companion test shows that two writers on one row do not lose an update. With 8 concurrent writers the probe recorded 370 commits, 1,056 conflicts and 30.8 commits per second, against 51.3 commits per second for one writer.
+On 2026-11-11, a live probe of a release binary through the public API began two transactions and wrote unrelated rows; the second commit was refused. `prepare_semantic_commit` in `crates/persistence/rrd-store/src/access/semantic_commit.rs` compares one engram-wide cursor with the commit's expected cursor, so any commit between a transaction's snapshot and its commit refuses it. An engine test on two unrelated rows fails with `TransactionSnapshotStale { expected: 3, actual: 4 }`, and a companion test shows that two writers on one row do not lose an update. With 8 concurrent writers the probe recorded 370 commits, 1,056 conflicts and 30.8 commits per second, against 51.3 commits per second for one writer.
 
 ## Impact
 

@@ -25,7 +25,7 @@ rrd-contract = { path = "../rrd-contract" }
 
 [dev-dependencies]
 rrd-engine = { path = "../../authority/rrd-engine" }
-rrd-estate = { path = "../../authority/rrd-estate" }
+rrd-engram = { path = "../../authority/rrd-engram" }
 rrd-security = { path = "../../authority/rrd-security" }
 rrd-server = { path = "../rrd-server" }
 rrd-core = { path = "../../kernel/rrd-core" }

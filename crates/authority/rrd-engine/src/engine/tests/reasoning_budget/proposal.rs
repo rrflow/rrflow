@@ -16,8 +16,10 @@ fn captured(file: &str) -> Vec<u8> {
     let bytes = std::fs::read(root.join(file)).unwrap();
     let hashes: serde_json::Value =
         serde_json::from_slice(&std::fs::read(root.join("files.json")).unwrap()).unwrap();
+    // The recorded bytes must be the recorded observation; what the test then
+    // uses is that observation projected to the current names.
     assert_eq!(digest::sha256_hex(&bytes), hashes[file]);
-    bytes
+    crate::engine::tests::observed_configuration::read(&root, file)
 }
 
 pub(super) fn configured() -> EndpointConfiguration {

@@ -282,7 +282,7 @@ impl RrdEngine {
         let control: Option<Arc<InvocationAdmission>> =
             self.invocation_admission(request_id, operation_id)?;
         self.transaction_gate.acquire(
-            &self.estate_configuration.storage,
+            &self.engram_configuration.storage,
             request,
             control.as_deref(),
         )

@@ -6,7 +6,7 @@
 
 This optional Windows x64 archive packages the primary engine and explicitly
 separate controller trial tools. It is unsigned and unqualified. It does not
-contain model weights, credentials, an estate, a task or a preselected provider.
+contain model weights, credentials, an engram, a task or a preselected provider.
 The [installed lifecycle](installed-lifecycle.md) remains the lifecycle owner;
 the [release gate](../../roadmap/rrflow-1.0/gate-j.md) owns default distribution
 qualification. Neither archive assembly nor a model call closes that gate.

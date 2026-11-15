@@ -62,7 +62,7 @@ fn schema() -> DataSchemaRegistry {
     DataSchemaRegistry {
         revision: 1,
         migration: "install vector read path fixture".into(),
-        organisation: DataEstateOrganisation::default(),
+        organisation: DataEngramOrganisation::default(),
         tables: BTreeMap::from([
             (canonical("document"), table(DataLogicalModel::Document)),
             (canonical("embedding"), table(DataLogicalModel::Vector)),
@@ -145,7 +145,7 @@ fn bucket_filter() -> VectorPayloadFilter {
 }
 
 /// The storage work of a search, apart from the accumulator proof, whose inclusion paths grow with
-/// the logarithm of the estate's leaves.
+/// the logarithm of the engram's leaves.
 type StoragePaths = Vec<(ReadAccessPath, u64, u64, u64, u64)>;
 
 #[derive(Debug, PartialEq)]
@@ -535,7 +535,7 @@ async fn an_hnsw_search_reads_what_it_reranks_and_not_the_corpus() {
     // Eight times the points adds three levels to each inclusion path, and no more.
     assert!(
         large.plain_proof < small.plain_proof * 2,
-        "the proof grows with the logarithm of the estate: {} then {}",
+        "the proof grows with the logarithm of the engram: {} then {}",
         small.plain_proof,
         large.plain_proof
     );

@@ -43,7 +43,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateRead,
+            SecurityAction::EngramRead,
             now,
             request_id,
             operation_id,
@@ -74,7 +74,7 @@ impl RrdEngine {
         let (_, authorization) = self.authorize(
             session,
             token,
-            SecurityAction::EstateRead,
+            SecurityAction::EngramRead,
             now,
             request_id,
             operation_id,
@@ -83,7 +83,7 @@ impl RrdEngine {
             .principal_id
             .ok_or(ServiceError::Unauthenticated)?;
         let identity = self
-            .installed_estate_identity()
+            .installed_engram_identity()
             .ok_or(ServiceError::ProjectBindingMismatch)?;
         let key = attunement_receipt_key(&self.instance, job_id, &principal, idempotency_key)?;
         let Some(bytes) = self.storage.control().get(&key)? else {
@@ -132,7 +132,7 @@ impl RrdEngine {
         id: &CanonicalId,
     ) -> Result<(Vec<u8>, AttunementJob, AttunementPlan)> {
         let identity = self
-            .installed_estate_identity()
+            .installed_engram_identity()
             .ok_or(ServiceError::ProjectBindingMismatch)?;
         let bytes = self
             .storage

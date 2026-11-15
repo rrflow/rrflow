@@ -14,7 +14,7 @@ The owner's words of 2026-11-13: "files that are far too long need to be clearly
 | Engine size | 30 crates, 787 `.rs` files, about 204k lines |
 | Long engine files | 61 non-test files over 1,000 lines and 147 over 500. The largest are `rrd-contract/src/lib.rs` (7,669 lines, 261 public types, an 850-line `endpoint_catalogue()`), `rrd-lsm/src/database.rs` (3,056), `rrd-core/src/runtime.rs` (2,825) and `rrd-lsm/src/segment/mod.rs` (2,802) |
 | Engine lint and layout rules | No `clippy.toml`, `rustfmt.toml`, `deny.toml` or `[workspace.lints]`; `too_many_arguments` allowed 132 times. `workspace_architecture.rs` enforces the package-to-path map, dependency sets for 7 crates, forbidden edges and vocabulary, but nothing on file size, module style, errors or tier order |
-| Engine module, error and naming patterns | Both `mod.rs` and file-named modules, plus 23 `#[path]` attributes. Errors are hand-written in five styles, with about 125 `Result<_, String>` and 109 `Box<dyn Error>` signatures. About 35 SHA-256 validators and 13 hand-written hex encoders sit beside `rrd-core::digest`. "estate" appears 3,100 times and "engram" 115, with miscased renames such as `InstalledengramRecord` |
+| Engine module, error and naming patterns | Both `mod.rs` and file-named modules, plus 23 `#[path]` attributes. Errors are hand-written in five styles, with about 125 `Result<_, String>` and 109 `Box<dyn Error>` signatures. About 35 SHA-256 validators and 13 hand-written hex encoders sit beside `rrd-core::digest`. "engram" appears 3,100 times and "engram" 115, with miscased renames such as `InstalledengramRecord` |
 | Engine layering | Group directories do not match dependency tiers: `transport/` holds both the lowest crate (`rrd-contract`) and the highest (`rrd-server`). `rrd-maintenance` and `rrd-kubernetes` have no consumers |
 | Connectome size | 406 TS/TSX files (67,686 lines) and 41 Rust files (18,064 lines) |
 | Connectome layout | Five organizing schemes at once: layer folders, `screens/{pages,views}`, a half-built `shell/shared/spokes`, the `rrflow/` client, and workspace areas. Modals live in 3 places, stores in 2, components in 3 and connection logic in 4. 45 imports break the written spoke rules |
@@ -35,7 +35,7 @@ The owner's words of 2026-11-13: "files that are far too long need to be clearly
 | R7 | Configuration naming: `Options` for constructor inputs, `Settings` only for S1 settings, `Policy` for rules, `Limits` for caps. One `open(path, Options)` instead of `open_with_*` and `create_with_*` fan-out. More than three optional inputs means an options struct | builder and options patterns of the API guidelines | `too_many_arguments` stops being allowed: its 132 escapes go on the ratchet |
 | R8 | `[workspace.lints]`: `unsafe_code` denied outside named crates, `clippy::undocumented_unsafe_blocks`, `unreachable_pub`, `missing_debug_implementations`; `cargo-deny` for licences and advisories | standard workspace hygiene | CI clippy and `cargo deny check` |
 | R9 | Tests: unit tests in a sibling `tests.rs` (`#[cfg(test)] mod tests;`); integration and public-API tests in `tests/`. `rrd-engine/src/engine/tests/` (42.8k lines inside the crate) moves to `tests/` wherever it uses the public API | Cargo conventions | the shape check |
-| R10 | Names: `rrd-*` internal, `rrflow-*` outward (existing rule). Types carry no crate prefix except the facade (`RrdEngine`, `RrdClient`). The estate-to-engram rename is finished with correct casing, and its shims are removed (POAM-078) | consistent vocabulary | a vocabulary check like the existing retired-name bans |
+| R10 | Names: `rrd-*` internal, `rrflow-*` outward (existing rule). Types carry no crate prefix except the facade (`RrdEngine`, `RrdClient`). The engram-to-engram rename is finished with correct casing, and its shims are removed (POAM-078) | consistent vocabulary | a vocabulary check like the existing retired-name bans |
 | R11 | No unconsumed crates or lab code in production crates: `rrd-maintenance` is removed and `physical_policy_lab.rs` moves to the Lab. `rrd-cluster`, `rrd-kubernetes` and the pgvector adapter are product scope (owner, 2026-11-13). They serve the shippin panel and cloud synchronization, so they move to the cloud tier and gain real consumers and tests (kernel package K15) | one current implementation | the architecture test lists every crate with a consumer or an owner decision |
 
 **Target tiers** (directories follow tiers after the moves):
@@ -45,7 +45,7 @@ The owner's words of 2026-11-13: "files that are far too long need to be clearly
 | 0 | `crates/foundation/` | digest and id primitives (new), `rrd-contract`, `rrd-core` |
 | 1 | `crates/storage/` | `rrd-lsm`, `rrd-store` (rrflowKV and rrflowCLD) |
 | 2 | `crates/compute/` | `rrd-query`, `rrd-vector`, `rrd-inference`, `rrd-attunement` |
-| 3 | `crates/governance/` | `rrd-security`, `rrd-estate` (renamed to engram), `rrd-observation` |
+| 3 | `crates/governance/` | `rrd-security`, `rrd-engram` (renamed to engram), `rrd-observation` |
 | 4 | `crates/authority/` | `rrd-engine` |
 | 5 | `crates/interfaces/` | `rrd-server`, `rrd-client`, `rrflow-cli`, `rrflow-mcp`, `rrflow-edge` |
 | 5 | `crates/cloud/` | `rrd-cluster` (replication and synchronization), `rrd-kubernetes` (operator for the shippin.cloud deployment), the pgvector adapter. Feature-gated and optional: never required for local readiness, and consuming only public engine contracts |
@@ -63,7 +63,7 @@ The owner's words of 2026-11-13: "files that are far too long need to be clearly
    - `backup`
    - `audit`
    - `catalogue` (with `endpoint_catalogue()` split per domain)
-   - `estate_authority`
+   - `engram_authority`
    - `error`
    - `identity`
    - `deployment`

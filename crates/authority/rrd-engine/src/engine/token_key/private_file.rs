@@ -1,4 +1,4 @@
-//! Private leaf-file and estate-directory I/O. Validate each opened object.
+//! Private leaf-file and engram-directory I/O. Validate each opened object.
 //! Ancestor traversal and mount confinement remain the installation boundary's
 //! responsibility; this module does not claim an atomic filesystem snapshot.
 
@@ -212,8 +212,8 @@ mod tests {
 
     #[cfg(any(unix, windows))]
     #[test]
-    fn permissive_estate_directory_cannot_advance_recovery() {
-        use crate::engine::estate_layout::EstateLayout;
+    fn permissive_engram_directory_cannot_advance_recovery() {
+        use crate::engine::engram_layout::EngramLayout;
         use crate::engine::installation::recovery::InstallApplyStage;
         use crate::RrdEngine;
         use rrd_contract::InstallationTargetKind;
@@ -235,7 +235,7 @@ mod tests {
                 &executable,
             )
             .unwrap();
-            let layout = EstateLayout::new(
+            let layout = EngramLayout::new(
                 &preview.installation.storage_root_id,
                 &preview.installation.initial_principal_id,
             )
@@ -247,7 +247,7 @@ mod tests {
                 &preview.installation.plan_sha256,
                 1_800_000_000_000,
                 &executable,
-                InstallApplyStage::EstateDirectoriesReady,
+                InstallApplyStage::EngramDirectoriesReady,
             )
             .unwrap_err();
             assert!(error.to_string().contains("test installation failpoint"));
@@ -264,7 +264,7 @@ mod tests {
                     &executable,
                 )
                 .is_err(),
-                "permissive estate directory must deny recovery: {relative}"
+                "permissive engram directory must deny recovery: {relative}"
             );
             assert_eq!(std::fs::read(&intent_path).unwrap(), intent);
             assert!(!project.path().join(&layout.storage_root).exists());
@@ -283,7 +283,7 @@ mod tests {
             assert_eq!(result.applied_at_unix_ms, 1_800_000_000_000);
             assert!(!intent_path.exists());
 
-            // Permission drift on an installed estate must deny every admission
+            // Permission drift on an installed engram must deny every admission
             // without touching the locator, credential or canonical store bytes.
             let before = test_file_bytes(project.path());
             platform::make_directory_permissive_for_test(&project.path().join(relative));
@@ -344,7 +344,7 @@ mod tests {
             create_private_directory(&path).unwrap_err().kind(),
             io::ErrorKind::AlreadyExists
         );
-        // Creating an estate must not tighten the user's parent directory.
+        // Creating an engram must not tighten the user's parent directory.
         assert!(validate_private_directory(root.path()).is_err());
         let file = root.path().join("file");
         std::fs::write(&file, b"retained").unwrap();

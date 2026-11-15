@@ -29,7 +29,7 @@ fn record(id: &str, body: &str) -> RuntimeMutation {
 #[test]
 fn bounded_history_pages_advance_across_filtered_scopes_without_splitting_entries() {
     let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("estate");
+    let path = root.path().join("engram");
     let store = RrflowKvStore::open(&path).unwrap();
     let first = ScopeId::new("instance:first").unwrap();
     let other = ScopeId::new("instance:other").unwrap();

@@ -383,14 +383,14 @@ fn serve(
     #[cfg(feature = "crash-test")]
     rrd_engine::crash_test::configure_from_stdin(&project.join(&locator.storage_root))?;
     let mut engine = RrdEngine::open_installed(project, &executable)
-        .map_err(|error| estate_open_elsewhere(project, error))?;
+        .map_err(|error| engram_open_elsewhere(project, error))?;
     if let Some(path) = endpoint_credentials {
         engine.install_endpoint_credentials(endpoint_credentials::load(path)?)?;
     }
     // Refreshed while this engine holds the writer lock; the map is a
     // replaceable view, so its outcome is reported and never stops serving.
     let map = project_map_line(project);
-    // Issued while this engine holds the estate's writer lock, so a record
+    // Issued while this engine holds the engram's writer lock, so a record
     // found at publication belongs to a process that no longer runs.
     let publisher = engine.serving_publisher()?;
     let server = RrdHttpServer::bind(engine, bind)?;
@@ -454,19 +454,19 @@ fn serve(
     })
 }
 
-/// Another process holds the estate, so this one fails before binding. Name
+/// Another process holds the engram, so this one fails before binding. Name
 /// the endpoint it recorded, if any; only `rrflow ready` can prove it.
-fn estate_open_elsewhere(project: &Path, error: ServiceError) -> BoxError {
-    if !matches!(error, ServiceError::EstateInUse(_)) {
+fn engram_open_elsewhere(project: &Path, error: ServiceError) -> BoxError {
+    if !matches!(error, ServiceError::EngramInUse(_)) {
         return error.into();
     }
     match RrdEngine::read_serving_record(project) {
         Ok(Some(record)) => format!(
-            "this project's RRFlow estate is already open in another process; its served endpoint is recorded at {}. Run `rrflow ready --project` to prove it.",
+            "this project's RRFlow engram is already open in another process; its served endpoint is recorded at {}. Run `rrflow ready --project` to prove it.",
             record.url
         )
         .into(),
-        _ => "this project's RRFlow estate is already open in another process".into(),
+        _ => "this project's RRFlow engram is already open in another process".into(),
     }
 }
 

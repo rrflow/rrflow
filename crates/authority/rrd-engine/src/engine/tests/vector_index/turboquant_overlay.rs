@@ -286,7 +286,7 @@ fn hit_ids(result: &VectorSearchResult) -> Vec<(String, f64)> {
         .collect()
 }
 
-/// Every approximate search on the changed estate serves TurboQuant and
+/// Every approximate search on the changed engram serves TurboQuant and
 /// returns exactly what exact search returns on the same data.
 fn assert_agrees_with_exact(engine: &RrdEngine, lease: &SessionLease) {
     let cases = [
@@ -427,7 +427,7 @@ fn turboquant_work_stays_flat_as_unrelated_vectors_grow() {
             "TurboQuant reranks fewer versions than the collection holds"
         );
         // Every storage path's work, apart from the accumulator proof, whose
-        // inclusion paths grow with the logarithm of the estate's leaves.
+        // inclusion paths grow with the logarithm of the engram's leaves.
         let paths = approximate
             .read_evidence
             .paths

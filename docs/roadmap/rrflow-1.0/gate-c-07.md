@@ -25,7 +25,7 @@ C-07 and the repository-wide review remain open.
 The [retained descriptor-exhaustion result](../../evidence/change-journals/gate-c/c-07g-native-descriptor-failure.md)
 shows that encoder candidate `9957ed39` reached 77,945 acknowledged records,
 then exhausted native file handles. The installed verifier passes on the
-retained estate; corpus/soak qualification remains failed. Bound segment-handle
+retained engram; corpus/soak qualification remains failed. Bound segment-handle
 ownership at the existing I/O boundary before a new full qualification attempt.
 
 The [integrated native WAL candidate](../../evidence/change-journals/gate-c/c-07-native-wal-candidate.md)
@@ -40,7 +40,7 @@ The [encoder working-set record](../../evidence/change-journals/gate-c/c-07-enco
 records the next exact-source result: PR126's `c31ed202` passed all 23 candidate
 CI checks, but its full Desktop corpus preflight failed at 69,246 acknowledged
 records on the 30-second write deadline. No failed compaction or OOM was
-reported, the private estate was retained, and continuation refused soak.
+reported, the private engram was retained, and continuation refused soak.
 Native profiling on a separate copy led to incremental row-group encoding and
 buffer reuse in PR128. Exact-byte and component checks do not establish repair
 of that installed timeout. Full growth/profile and actual 24-hour acceptance
@@ -68,7 +68,7 @@ open; diagnostic implementation is not a causal repair or native acceptance.
 One installed native engine must preserve every acknowledged authoritative
 commit, publish atomic batches, reject uncertain or corrupt state safely, and
 keep admission, maintenance, recovery and retained buffers within explicit
-limits as the estate grows. The same semantic behavior must hold on a small
+limits as the engram grows. The same semantic behavior must hold on a small
 local allocation and a larger single-node service allocation. This is a
 single-node qualification: distributed consensus, replication, cloud placement
 and fleet management retain their existing gates.
@@ -90,7 +90,7 @@ packages as if their implementation were absent.
 |---|---|---|
 | a/b | Evaluation workload/result/independent ledger; native fault facility and stable/volatile model; repaired WAL/publication fencing. | Preserve these oracles in every repair; do not recreate them. |
 | c | `installed_crash.rs`, `installed_reopen.rs`, response-loss/history support and diagnostic-only native pause protocol. | Join fresh/existing domain/publication/compound-recovery and 100-cycle native results for the final candidate. A different PR's green job cannot be rebound to it. |
-| d | `TransactionGate` count/byte/deadline admission; installed storage configuration; native mutable/retention, maintenance, reclamation, recovery and disk-reserve limits. | Demonstrate aggregate process limits and sustained progress under the declared profiles. Logical reservations alone are not RSS or proof that a large estate progresses. |
+| d | `TransactionGate` count/byte/deadline admission; installed storage configuration; native mutable/retention, maintenance, reclamation, recovery and disk-reserve limits. | Demonstrate aggregate process limits and sustained progress under the declared profiles. Logical reservations alone are not RSS or proof that a large engram progresses. |
 | e | Native source-page and retained-output pools, read-view lifetime registry, projected/interleaved lifetime and native memory fixtures. | Complete the required physical/lifetime/native matrix and retained-owner drain evidence on the final candidate. |
 | f | Owned ext4/APFS/NTFS runner, selected native-error/recovery ledger and damaged-state tests. | PR115 candidate `3c13f455` passed all 24 selected native capacity cases across Linux, macOS and Windows. Bind these exact results to the accepted candidate; full profile/soak qualification remains separate. |
 | g | `installed_reopen.rs::sustained` driver, bounded corpus generator/independent readback, `run_sustained_capacity.py`, frozen profiles and progress/result receipts. | Frozen Desktop candidate `7c329d49` acknowledged all 100000 corpus operations, then hit the unchanged two-hour setup limit at 44556 independent verifications. The [retained outcome](../../evidence/change-journals/gate-c/c-07g-shared-manifest-generation.md#preserved-native-failure) and earlier [terminal outcome](../../evidence/change-journals/gate-c/c-07g-window-native-outcome.md) remain distinct. Final complete readback, profile/repetition and actual 24-hour qualification remain open. |
@@ -353,7 +353,7 @@ by this planning document.
 |---|---|---|
 | **C-07a: measurement and policy contract** | At the existing evaluation/diagnostic boundaries, implement the storage subset of J-04a's versioned workload/result model and map effective installed storage settings to their owning types. Declare durability class, operation identity, limits, profile, required cases and failure provenance. Preserve the existing paired-provider evaluation behavior. | Reject unknown fields, zero/overflow limits, inconsistent budget sums, missing native identity, missing required cases and unsupported capabilities. Golden output and independent acknowledgement-ledger fixtures must distinguish success/rejection/uncertainty. No new runtime policy is accepted by a schema alone. |
 | **C-07b: I/O and publication failure oracle** | Extend the native WAL/filesystem/manifest boundaries with a bounded test I/O fault facility and an independent stable-versus-volatile byte model. Cover append, sync, publication and reclamation; repair demonstrated error-handling defects at those owners. | Enumerate short/zero writes, interruption, failed data/directory sync and rename before/after effect. Sweep every eligible operation occurrence for a bounded history, including failure during recovery. Model loses unsynchronized bytes; assertions cannot read the engine's answer as their expected result. |
-| **C-07c: installed crash and acknowledgement history** | Extend the existing real-primary-executable harness and engine transaction receipts. Add test-only, authenticated/owned synchronization barriers where deterministic process termination is required; production builds must have no remotely activatable fault switch. | External client ledger records sent, acknowledged, rejected and unresolved operations; kill/restart at WAL, visibility, manifest and response boundaries. Every acknowledged operation survives exactly once; unresolved operations resolve consistently; rejected operations have no domain effect. Exercise fresh/existing estates and repeat reopen. |
+| **C-07c: installed crash and acknowledgement history** | Extend the existing real-primary-executable harness and engine transaction receipts. Add test-only, authenticated/owned synchronization barriers where deterministic process termination is required; production builds must have no remotely activatable fault switch. | External client ledger records sent, acknowledged, rejected and unresolved operations; kill/restart at WAL, visibility, manifest and response boundaries. Every acknowledged operation survives exactly once; unresolved operations resolve consistently; rejected operations have no domain effect. Exercise fresh/existing engrams and repeat reopen. |
 | **C-07d: hard resource admission and maintenance progress** | Bind finite byte/count/time/debt limits through engine-owned installed configuration; extend current maintenance policies/counters without another scheduler authority. Expose soft threshold, hard cap and effective restart requirement distinctly. | A batch above a soft threshold may remain atomic only within the hard reservation; exceeding the hard cap writes nothing. Sustained writes, a hot key, oversized values and blocked maintenance cannot grow queues or mutable state without bound. Overload is explicit, cancellation releases reservations, and debt drains after load falls. |
 | **C-07e: snapshot, buffer and reclamation lifetime** | Extend the existing transaction pins, projected read leases, immutable generations, compaction and GC. Account for buffers retained after stream cancellation, clone/drop and database close. | Independent reads stay exact while writes, compaction, checkpoints and GC interleave. Retained raw/decoded buffers remain valid until the last owner drops; afterward pins and unreachable storage become reclaimable within declared bounds. Test mapped and bounded-read modes, raw/LZ4 pages and reader admission limits. |
 | **C-07f: native exhaustion and damage qualification** | Use owned bounded filesystems on disposable native runners; extend installed verify/open/backup/recovery tests with genuine capacity errors and targeted corruption. | The filesystem actually reports capacity/quota failure at WAL, segment and publication phases; no fake StorageFull result substitutes. After capacity is restored, capacity-only faults must recover every acknowledged write and admit valid work. Deliberately missing/corrupt authoritative bytes must instead deny access with intact evidence. Restored/backup readback is exact; no implicit repair. |
@@ -414,7 +414,7 @@ fixtures: pre-WAL, complete append, sync, visibility and persisted receipt
 before response. Each also kills recovery before WAL application. The explicit
 nondefault diagnostic build reuses the owned rendezvous; ordinary binaries
 exclude it. Independent rows, cursors and stable receipts reconcile 21 attempts
-per estate, with negative schedule/operation controls. Native candidate CI is
+per engram, with negative schedule/operation controls. Native candidate CI is
 required for this package. Installed publication/reclamation composition and
 100-cycle operating profiles still remain; neither this bounded history nor
 the component corpus closes C-07c, d-g or POAM-035.
@@ -533,7 +533,7 @@ activated by a public header, prompt or ordinary configuration. Compile it
 out of distribution artifacts and verify that absence. Never label the
 instrumented artifact's evidence as an unmodified release-binary run.
 
-For both fresh/existing estates run each declared boundary, a compound
+For both fresh/existing engrams run each declared boundary, a compound
 kill-during-reopen lane, duplicate retry and at least 100 forced reopen cycles
 per admitted native profile. A naturally racing kill cannot claim it reached
 a particular internal boundary. Capture hit/kill/reap/restart identities and
@@ -627,7 +627,7 @@ are separate evidence classes.
 | Reader/transaction/batch owner interleaves with compaction, GC and close | Same-stamp exact values, no dangling raw or decoded Arrow buffer, no premature file retirement; release ownership on actual drop, not merely response timeout. |
 | Client disconnect, queue timeout, duplicate retry and cancellation | Every accepted attempt has an outcome class; engine effects remain reconcilable; no permit, pinned-byte or transaction-slot leak. Retain POAM-033's rejection regression. |
 | Trace sink slow/full/disconnected | Bounded telemetry memory and loss counters; no secret payloads and no change to commit correctness. |
-| Two independent installed estates under pressure | No cross-estate state/credential leakage; aggregate host allocation enforced by the declared deployment fixture. Separate engines may run concurrently without sharing context. |
+| Two independent installed engrams under pressure | No cross-engram state/credential leakage; aggregate host allocation enforced by the declared deployment fixture. Separate engines may run concurrently without sharing context. |
 
 Minimum native profiles are Linux/ext4, macOS/APFS and Windows/NTFS on the
 actual tested architectures. Record mount/device options and the native flush
@@ -646,7 +646,7 @@ and process-death tests must not be relabeled as those experiments.
 Use existing canonical Rust configuration/diagnostic owners and generate their
 schemas and UI descriptions. These are required policy concepts; the
 implemented native and installed limits above must be matched to their exact
-owners and measured together. Each has explicit units, estate/process scope
+owners and measured together. Each has explicit units, engram/process scope
 and a declared live-change or restart rule; no unlimited sentinel is admissible in
 a qualification manifest.
 
@@ -664,7 +664,7 @@ before measured runs; changing them creates a new reviewed run identity and
 retains the failed result. Do not choose passing thresholds after observing
 the candidate's tail latency or memory peak.
 
-Reuse the **Desktop**, **Single service estate**, **Fleet isolation** and
+Reuse the **Desktop**, **Single service engram**, **Fleet isolation** and
 **Data larger than memory** allocations and thresholds in
 [J-04's workload ladder](gate-j.md#initial-workload-ladder). Do not maintain
 another hardware/SLA table here. They are proposed laboratory targets, not
@@ -769,7 +769,7 @@ Do not fetch or activate providers simply because a prompt mentions them.
 
 ## Dogfooding and competitive evidence
 
-Start C-07 dogfooding with an isolated installed test estate driven by the
+Start C-07 dogfooding with an isolated installed test engram driven by the
 public client and an independent history checker. It may store sanitized
 measurement receipts and serve them after restart; its own claims cannot be
 the sole acceptance oracle. The current Markdown/Git owners remain the
@@ -883,7 +883,7 @@ the actual 24-hour soak remain required before C-07 can close.
 The [integrated native growth record](../../evidence/change-journals/gate-c/c-07g-integrated-native-growth.md)
 retains both failed exact-source comparisons. The 10k corpus fully acknowledged
 and read back, then restart failed with `multiply linked file denied`. The
-failed estate was removed during harness unwinding, preventing file/link-count
+failed engram was removed during harness unwinding, preventing file/link-count
 inspection. Preserve owned failure state and identify that admission before
 repairing its canonical owner; no link guard or capacity threshold is waived.
 

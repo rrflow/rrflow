@@ -26,7 +26,7 @@ security boundary, and mutation authority.
 
 The accepted component names and meanings are:
 
-- **rrflowDB** is one persistent project AI estate;
+- **rrflowDB** is one persistent project AI engram;
 - **rrflowKV** is the WAL/MVCC/LSM physical persistence engine beneath
   rrflowDB;
 - **rrflowMX** is the non-durable process-local implementation of the same

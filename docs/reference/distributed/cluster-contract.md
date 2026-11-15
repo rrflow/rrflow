@@ -5,7 +5,7 @@
 **Owner:** distributed consistency, consensus, placement, replica recovery, and qualification for one installed RRD instance
 
 RRFlow does not become a federation of databases when it is distributed. One
-installed project, one estate/rrflowDB, one RRD instance, one logical
+installed project, one engram/rrflowDB, one RRD instance, one logical
 `RrdEngine`, and one operation catalogue remain the authority. A cluster is
 only a physical execution and fault-tolerance form of that instance.
 
@@ -24,7 +24,7 @@ disposition of current cluster code; it does not complete a roadmap gate.
 The first usable alpha is an authenticated `single_node_server` over rrflowKV.
 It may expose a configured network endpoint carried by a mesh, so laptops,
 phones, Connectome, and other clients do not require a database cluster to use
-the same project estate.
+the same project engram.
 
 `clustered_server` is a target value but is not an active capability, an alpha
 exit requirement, or a supported installation choice. The current roadmap has
@@ -44,7 +44,7 @@ boundary is an injected execution port beneath that authority:
 ```text
 public operation
   -> authenticate instance and principal
-  -> resolve installed project/estate binding
+  -> resolve installed project/engram binding
   -> RrdEngine authorize + capture semantic read stamp
   -> parse/bind/plan and optional bounded compute
   -> RrdEngine compile one effect-complete commit proposal
@@ -65,13 +65,13 @@ transfer a snapshot closure, and report observations. It may not:
 - create a cluster-owned tenant, table, schema, project scope, event family,
   trace lane, job repository, or monolithic topology document;
 - let a supervisor, TLS identity, mesh peer, node config, or filesystem marker
-  manufacture the installed instance/estate binding;
+  manufacture the installed instance/engram binding;
 - let DataFusion, an index builder, or an inference adapter commit state;
 - use rrflowMX as replicated canonical state; or
 - accept an earlier pre-release physical or wire shape through a compatibility
   reader.
 
-Node-local consensus metadata is necessary but is not estate truth. Votes,
+Node-local consensus metadata is necessary but is not engram truth. Votes,
 terms, uncommitted logs, peer progress, transport counters, and snapshot spool
 files live in a bounded node-local domain. Committed records, graph adjacency,
 indexes, reasoning state, audit, outbox, runtime log, and projection deltas live
@@ -85,8 +85,8 @@ define another resource hierarchy.
 
 | Term | Meaning | Required relationship |
 |---|---|---|
-| RRD instance | Stable installed runtime serving one project estate. | Exactly one logical instance is deployed by the cluster. |
-| cluster | Consensus and placement domain for that instance. | Belongs to exactly one instance; never contains several estates. |
+| RRD instance | Stable installed runtime serving one project engram. | Exactly one logical instance is deployed by the cluster. |
+| cluster | Consensus and placement domain for that instance. | Belongs to exactly one instance; never contains several engrams. |
 | node | Authenticated process/host member. | Has one installed node identity, placement attributes, endpoint set, and credential reference. |
 | shard | Routing and consensus partition of instance state. | Belongs to one instance and one current placement epoch. |
 | replica | One shard copy placed on a node. | Has one role and one observed applied state at a time. |
@@ -98,7 +98,7 @@ define another resource hierarchy.
 
 Tenant, namespace, database, and logical-table identifiers are not implicit
 cluster parents. If a later semantic schema introduces them, they remain
-estate data and policy scope. Routing is derived from the installed estate,
+engram data and policy scope. Routing is derived from the installed engram,
 canonical record family, and declared partition key—not from a second cluster
 catalogue.
 
@@ -108,12 +108,12 @@ Installation preview must enumerate the exact nodes, endpoints, placement
 policy, storage roots, credential references, resource limits, and process
 effects without writing or contacting them. Apply commits the cluster
 descriptor and desired placement through `RrdEngine` only after the ordinary
-project/estate/instance binding exists. Startup resolves that descriptor
+project/engram/instance binding exists. Startup resolves that descriptor
 read-only; it never synthesizes a cluster from a config file.
 
 Every node must prove before readiness:
 
-1. its installed instance, estate, cluster, and node identities match;
+1. its installed instance, engram, cluster, and node identities match;
 2. its admitted rrflowKV root belongs to that exact replica and contains the
    one accepted physical format;
 3. its endpoint and workload identity match the installed descriptor;
@@ -133,7 +133,7 @@ The replicated command is an engine-compiled proposal, not arbitrary serialized
 application mutations. Its frozen representation must bind at least:
 
 - protocol and command-format identity;
-- instance, estate, cluster, shard, and placement epoch;
+- instance, engram, cluster, shard, and placement epoch;
 - invocation/idempotency identity and authenticated principal evidence;
 - operation, effect-complete authorization decision, policy revision, and
   resource scope;
@@ -360,7 +360,7 @@ must pass at one revision:
 1. repository and dependency checks prove no cluster store opener, semantic
    repository, raw mutation ingress, old-shape reader, private topology/job
    authority, or alternate trace/event lane remains;
-2. a clean offline install creates one cluster for one installed estate and
+2. a clean offline install creates one cluster for one installed engram and
    every node resolves the same binding, capability digest, and security
    authority;
 3. the complete single-node rrflowKV transaction, temporal graph, scalar,

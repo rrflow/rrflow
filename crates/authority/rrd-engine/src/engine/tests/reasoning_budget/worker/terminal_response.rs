@@ -7,7 +7,7 @@ fn rejected_terminal_response_releases_capacity_but_lost_response_does_not() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let (root, engine, lease, selection) =
             admitted_fixture(&format!("http://{}/v1", listener.local_addr().unwrap()));
-        let identity = engine.installed_estate.clone();
+        let identity = engine.installed_engram.clone();
         let request = selected_request(&engine, &lease, &listener, &selection, 1_000, false);
         let before = budget(&engine, &lease, &request.task_id);
         let result = std::thread::scope(|scope| {
@@ -86,7 +86,7 @@ fn rejected_terminal_response_releases_capacity_but_lost_response_does_not() {
         assert!(attempt.worker_output.is_none() && attempt.outcome_sha256.is_none());
         drop(engine);
         let mut engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
-        engine.installed_estate = identity;
+        engine.installed_engram = identity;
         configure(&mut engine, 8);
         assert_eq!(budget(&engine, &lease, &request.task_id), after);
         assert_eq!(

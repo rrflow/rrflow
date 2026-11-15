@@ -134,7 +134,7 @@ fn state(engine: &RrdEngine) -> ColdState {
 #[test]
 fn prepared_history_replays_after_restart_and_new_writes_then_detects_corruption() {
     let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("estate");
+    let path = root.path().join("engram");
     let engine = open(&path);
     seed(&engine);
     let policy = policy();
@@ -253,7 +253,7 @@ fn prepared_history_replays_after_restart_and_new_writes_then_detects_corruption
 #[test]
 fn changed_policy_replans_pending_work_without_rewinding_committed_cursor() {
     let root = tempfile::tempdir().unwrap();
-    let engine = open(&root.path().join("estate"));
+    let engine = open(&root.path().join("engram"));
     seed(&engine);
     let first = policy();
     assert!(engine.maintain_cold_history_at(&first, 100).unwrap());
@@ -270,7 +270,7 @@ fn changed_policy_replans_pending_work_without_rewinding_committed_cursor() {
 #[test]
 fn changed_catalogue_replans_a_stale_stamp_without_losing_progress() {
     let root = tempfile::tempdir().unwrap();
-    let engine = open(&root.path().join("estate"));
+    let engine = open(&root.path().join("engram"));
     seed(&engine);
     let policy = policy();
     assert!(engine.maintain_cold_history_at(&policy, 100).unwrap());
@@ -308,11 +308,11 @@ fn changed_catalogue_replans_a_stale_stamp_without_losing_progress() {
 #[test]
 fn authenticated_generation_readback_reopens_and_rejects_corruption_and_limits() {
     let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("estate");
+    let path = root.path().join("engram");
     let mut engine = open(&path);
     seed(&engine);
     let policy = policy();
-    engine.estate_configuration.storage.cold_history = Some(policy.clone());
+    engine.engram_configuration.storage.cold_history = Some(policy.clone());
     for _ in 0..64 {
         engine.maintain_storage().unwrap();
         if let Some(bytes) = engine
@@ -330,7 +330,7 @@ fn authenticated_generation_readback_reopens_and_rejects_corruption_and_limits()
     assert_eq!(state(&engine).generation, 1);
     drop(engine);
     let mut engine = open(&path);
-    engine.estate_configuration.storage.cold_history = Some(policy);
+    engine.engram_configuration.storage.cold_history = Some(policy);
     let session = engine
         .create_session(
             &rrd_contract::CreateSession {
@@ -408,10 +408,10 @@ fn publication_waits_for_a_foreground_transaction() {
     // journal. Without the gate, they meet as a physical write conflict
     // that clients see as a retryable runtime conflict at an unchanged cursor.
     let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("estate");
+    let path = root.path().join("engram");
     let mut engine = open(&path);
     seed(&engine);
-    engine.estate_configuration.storage.cold_history = Some(policy());
+    engine.engram_configuration.storage.cold_history = Some(policy());
     let before = engine.storage.control().sequence().unwrap();
     let foreground = engine
         .admit_transaction(&"foreground", "request-foreground", "operation-foreground")
@@ -436,12 +436,12 @@ fn publication_waits_for_a_foreground_transaction() {
 #[test]
 fn maintenance_failure_is_durable_deduplicated_and_cleared_by_progress() {
     let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("estate");
+    let path = root.path().join("engram");
     let mut engine = open(&path);
     seed(&engine);
     let mut too_small = policy();
     too_small.max_input_bytes = 1;
-    engine.estate_configuration.storage.cold_history = Some(too_small.clone());
+    engine.engram_configuration.storage.cold_history = Some(too_small.clone());
     for _ in 0..64 {
         if engine.maintain_storage().is_err() {
             break;
@@ -457,7 +457,7 @@ fn maintenance_failure_is_durable_deduplicated_and_cleared_by_progress() {
     drop(engine);
 
     let mut engine = open(&path);
-    engine.estate_configuration.storage.cold_history = Some(too_small);
+    engine.engram_configuration.storage.cold_history = Some(too_small);
     let session = engine
         .create_session(
             &rrd_contract::CreateSession {
@@ -493,7 +493,7 @@ fn maintenance_failure_is_durable_deduplicated_and_cleared_by_progress() {
         status.failure.unwrap().code,
         ColdHistoryFailureCode::ResourceLimit
     );
-    engine.estate_configuration.storage.cold_history = Some(policy());
+    engine.engram_configuration.storage.cold_history = Some(policy());
     for _ in 0..64 {
         engine.maintain_storage().unwrap();
         if state(&engine).generation == 1 {
@@ -517,11 +517,11 @@ fn maintenance_failure_is_durable_deduplicated_and_cleared_by_progress() {
 #[test]
 fn encoded_output_limit_is_reported_as_a_resource_failure() {
     let root = tempfile::tempdir().unwrap();
-    let mut engine = open(&root.path().join("estate"));
+    let mut engine = open(&root.path().join("engram"));
     seed(&engine);
     let mut limited = policy();
     limited.max_output_bytes = 1;
-    engine.estate_configuration.storage.cold_history = Some(limited);
+    engine.engram_configuration.storage.cold_history = Some(limited);
 
     let error = engine.maintain_cold_history().unwrap_err();
     assert_eq!(error.kind(), ServiceErrorKind::ResourceExhausted);
@@ -680,9 +680,9 @@ fn embedded_maintenance_publishes_cold_history_while_native_debt_remains() {
     use rrd_store::Durability;
 
     let root = tempfile::tempdir().unwrap();
-    let mut engine = open(&root.path().join("estate"));
+    let mut engine = open(&root.path().join("engram"));
     seed(&engine);
-    engine.estate_configuration.storage.cold_history = Some(policy());
+    engine.engram_configuration.storage.cold_history = Some(policy());
     let store = engine.storage.as_rrflow_kv().unwrap();
     let mut ordinal = 0_u64;
     let debt = || {
@@ -743,10 +743,10 @@ fn cold_history_denies_row_or_field_restricted_changefeed_grants() {
     use std::collections::BTreeSet;
 
     let root = tempfile::tempdir().unwrap();
-    let mut engine = open(&root.path().join("estate"));
+    let mut engine = open(&root.path().join("engram"));
     seed(&engine);
     let policy = policy();
-    engine.estate_configuration.storage.cold_history = Some(policy.clone());
+    engine.engram_configuration.storage.cold_history = Some(policy.clone());
     assert!(engine.maintain_cold_history_at(&policy, 100).unwrap());
     assert!(engine.maintain_cold_history_at(&policy, 101).unwrap());
     assert_eq!(state(&engine).generation, 1);
@@ -889,7 +889,7 @@ fn publication_survives_process_termination_at_each_boundary() {
 
     const TEST_NAME: &str =
         "engine::cold_history::tests::publication_survives_process_termination_at_each_boundary";
-    if let Some(path) = std::env::var_os("RRFLOW_COLD_CRASH_ESTATE") {
+    if let Some(path) = std::env::var_os("RRFLOW_COLD_CRASH_ENGRAM") {
         let engine = open(Path::new(&path));
         engine.maintain_cold_history_at(&policy(), 101).unwrap();
         panic!("publication completed without reaching the requested checkpoint");
@@ -902,7 +902,7 @@ fn publication_survives_process_termination_at_each_boundary() {
         "receipt_committed",
     ] {
         let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("estate");
+        let path = root.path().join("engram");
         let marker = root.path().join("checkpoint");
         let engine = open(&path);
         seed(&engine);
@@ -923,7 +923,7 @@ fn publication_survives_process_termination_at_each_boundary() {
                 .arg("--exact")
                 .arg(TEST_NAME)
                 .arg("--nocapture")
-                .env("RRFLOW_COLD_CRASH_ESTATE", &path)
+                .env("RRFLOW_COLD_CRASH_ENGRAM", &path)
                 .env("RRFLOW_COLD_CRASH_CHECKPOINT", checkpoint)
                 .env("RRFLOW_COLD_CRASH_MARKER", &marker)
                 .stdout(Stdio::null())

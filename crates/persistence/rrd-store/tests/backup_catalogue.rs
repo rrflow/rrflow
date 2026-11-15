@@ -13,7 +13,7 @@ use rrd_store::{
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 
-/// The control families a test estate declares as its estate control state.
+/// The control families a test engram declares as its engram control state.
 fn control_families() -> Vec<String> {
     vec![
         "server/state/install".into(),

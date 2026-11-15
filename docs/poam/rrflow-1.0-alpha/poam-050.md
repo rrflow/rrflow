@@ -40,5 +40,5 @@ Roadmap owners: [Gate G](../../roadmap/rrflow-1.0/gate-g.md) and
 
 A public, authorized, paged read returns a task's attempts in order with their
 status and times, at a stated read position and within a stated budget. A test
-through the real engine creates attempts, reopens the estate, and lists the same
+through the real engine creates attempts, reopens the engram, and lists the same
 attempts with no id supplied by the caller. Reading never re-executes an effect.

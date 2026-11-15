@@ -10,9 +10,9 @@ independently.
 
 ## Observed deficiency
 
-Local RRD process control is split between `rrd-estate::LocalProcessDriver`, a standalone
+Local RRD process control is split between `rrd-engram::LocalProcessDriver`, a standalone
 deployment-catalogue generator, static direct-store reconciliation plus
-`rrd-estate-controller`. The second `rrflow-cli` development supervisor and
+`rrd-engram-controller`. The second `rrflow-cli` development supervisor and
 `rrd-server initialize` are removed; generated launch catalogues now have no preparation
 command and start the internal server with an installed project plus explicit distribution
 executable. The remaining controller path still creates private JSON process/catalogue
@@ -41,7 +41,7 @@ Roadmap owners: [Gate A](../../roadmap/rrflow-1.0/gate-a.md),
 
 ## Closure evidence
 
-Make `rrd-estate` pure; implement one outward local-process adapter consuming only immutable
+Make `rrd-engram` pure; implement one outward local-process adapter consuming only immutable
 installed, fenced effect plans; bind artifact digest to the executed image; use
 authenticated challenge-bound readiness/control receipts; commit canonical
 intent/observations/receipts through `RrdEngine`; remove both supervisors,

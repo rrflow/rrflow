@@ -96,7 +96,7 @@ fn restarted_manifest_writer_child() {
 #[cfg(any(unix, windows))]
 fn retained_root_rejects_replaced_manifest_directory() {
     let fixture = tempfile::tempdir().unwrap();
-    let root = fixture.path().join("estate");
+    let root = fixture.path().join("engram");
     let outside = fixture.path().join("outside");
     std::fs::create_dir(&root).unwrap();
     std::fs::create_dir(&outside).unwrap();

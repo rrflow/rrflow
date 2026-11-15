@@ -32,8 +32,8 @@ pull request, CI run, and merge evidence: recorded on the pull request for branc
 
 ## Links
 
-- [ADR-0003 configurable estate organisation](../../../decisions/0003-configurable-estate-organisation.md)
-- [Estate organisation contract](../../../reference/data/estate-organisation.md)
+- [ADR-0003 configurable estate organisation](../../../decisions/0003-configurable-engram-organisation.md)
+- [Estate organisation contract](../../../reference/data/engram-organisation.md)
 - [RRFlow 1.0 alpha objectives](../../../objectives/rrflow-1.0-alpha.md#required-outcomes)
 - [POAM-042](../../../poam/rrflow-1.0-alpha/poam-042.md)
 - [Gate H](../../../roadmap/rrflow-1.0/gate-h.md)

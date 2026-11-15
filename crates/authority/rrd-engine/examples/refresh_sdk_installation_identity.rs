@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("read-only planner mutated the project".into());
     }
     corpus.identity.instance = preview.installation.target.instance_id;
-    corpus.identity.estate = preview.installation.target.estate_id;
+    corpus.identity.engram = preview.installation.target.engram_id;
     let scope = format!("instance:{}", corpus.identity.instance);
     corpus.query.scope.clone_from(&scope);
     corpus.vector.ensure.scope.clone_from(&scope);
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let generated = serde_json::to_value(corpus)?;
         for pointer in [
             "/identity/instance",
-            "/identity/estate",
+            "/identity/engram",
             "/query/scope",
             "/vector/ensure/scope",
             "/vector/search/scope",

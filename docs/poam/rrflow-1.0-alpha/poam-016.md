@@ -15,10 +15,10 @@ exposed a restart limitation on the installed bootstrap principal. The authorize
 security-authority replacement accepts adding `ProjectSourceRead` to that
 principal, but `installation.rs::with_installed_binding` subsequently compares
 its entire grant-action list with immutable `initial_grants` and returns
-`ProjectBindingMismatch` when opening the installed estate. Source edits and
+`ProjectBindingMismatch` when opening the installed engram. Source edits and
 replanning are not the identified cause. The separate explicitly granted
 principal used in the original PR289 worker test was a test workaround for this
-limitation, not the only supported new-estate provisioning route. PR291 adds a
+limitation, not the only supported new-engram provisioning route. PR291 adds a
 [default-off source-read choice to a new installation's sealed initial plan](../../evidence/change-journals/gate-d/d-01-explicit-source-read-install-choice.md)
 and records the controlled installed worker, typed denial, serve/reopen, and
 fresh-auth readback proof. It does not change grants after installation or
@@ -49,7 +49,7 @@ transaction can contain unauthorized graph/index/vector or field effects, an uni
 component fixture can grant loopback application access, and a domain mutation can commit
 without final audit/outbox evidence. Platform or provider credential handling remains
 unqualified even though the removed product bootstrap paths can no longer initialize a
-different estate or grant set.
+different engram or grant set.
 
 ## Owning gates
 

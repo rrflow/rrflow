@@ -261,7 +261,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             [3]
         );
-        // Never in the source, and an estate without moves: unchanged.
+        // Never in the source, and an engram without moves: unchanged.
         let elsewhere = source_history([version(1, "archive", 1, None)], in_source);
         assert!(elsewhere.versions.is_empty());
         assert_eq!(elsewhere.source_cursor, 0);

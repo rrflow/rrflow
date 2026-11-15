@@ -1,4 +1,4 @@
-//! Bounded, read-only observations of the synthetic capacity estate.
+//! Bounded, read-only observations of the synthetic capacity engram.
 use serde_json::{json, Value};
 use std::path::Path;
 

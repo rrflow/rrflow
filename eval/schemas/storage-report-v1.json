@@ -175,7 +175,7 @@
     },
     "PolicyScope": {
       "enum": [
-        "estate_process"
+        "engram_process"
       ],
       "type": "string"
     },

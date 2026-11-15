@@ -51,13 +51,13 @@ fn evicted_sources_remain_readable_through_compaction_gc_and_database_drop() {
 /// Native regression: old PageSource ownership exhausts this child at <384
 /// segments. Keep RLIMIT changes isolated from the test runner and other tests.
 #[test]
-fn segment_estate_exceeds_native_descriptor_ceiling_and_reopens() {
+fn segment_engram_exceeds_native_descriptor_ceiling_and_reopens() {
     #[cfg(unix)]
     if std::env::var_os("RRFLOW_SEGMENT_DESCRIPTOR_CHILD").is_none() {
         let result = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "segment_estate_exceeds_native_descriptor_ceiling_and_reopens",
+                "segment_engram_exceeds_native_descriptor_ceiling_and_reopens",
                 "--nocapture",
             ])
             .env("RRFLOW_SEGMENT_DESCRIPTOR_CHILD", "1")
@@ -85,7 +85,7 @@ fn segment_estate_exceeds_native_descriptor_ceiling_and_reopens() {
         assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limit) }, 0);
     }
     let directory = tempfile::tempdir().unwrap();
-    let root = directory.path().join("estate");
+    let root = directory.path().join("engram");
     let mut options = DatabaseOptions::default();
     options.segment_io.mode = SegmentIoMode::Bounded;
     options.segment_io.allow_fallback = false;

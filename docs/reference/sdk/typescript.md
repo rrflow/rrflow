@@ -107,7 +107,7 @@ The audited projection contains:
 
 That audit describes an earlier projection. The current generated OpenAPI
 SHA-256 is `60d01903f277eede2c2a585d20477e213a64af19471a902df87fcfb24f89b99e`.
-SHA-256 is `8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae`.
+SHA-256 is `80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb`.
 
 The generated `rrd-openapi.ts` is a compile-time projection of roughly 1.6
 MiB. Its `paths`, `components`, and `operations` types are valuable compile-time
@@ -331,7 +331,7 @@ The current evidence is bounded:
 The live script exercises only capability retry/version rejection, catalogue
 count, one authentication denial, session create/renew/close, vector
 ensure/search, transaction begin/preview/abort/commit, one query, changefeed
-read/follow/local abort, backup create/list, and estate read. Its shared domain
+read/follow/local abort, backup create/list, and engram read. Its shared domain
 labels overstate CRUD, backup/restore, vectors, live delivery, typed errors,
 retry/failure gaps, cancellation, and version/package coverage exactly as
 catalogued in the [Rust reference](rust.md#conformance-that-actually-counts).

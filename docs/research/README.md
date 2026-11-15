@@ -61,10 +61,10 @@ listed were the latest stable ones on 2026-10-24.
 
 ## Cross-system lifecycle research
 
-- [`rrflow-canonical-estate-configuration-and-runtime-controls.md`](rrflow-canonical-estate-configuration-and-runtime-controls.md)
+- [`rrflow-canonical-engram-configuration-and-runtime-controls.md`](rrflow-canonical-engram-configuration-and-runtime-controls.md)
   maps primary-source configuration, canonicalization, filesystem creation,
   Arrow/DataFusion, OpenTelemetry, OpenAPI, and release-trust guidance to the
-  project-local estate, runtime ceilings, generated discovery, and staged
+  project-local engram, runtime ceilings, generated discovery, and staged
   rollout. It distinguishes the implemented D-01 slice from later legacy
   convergence, governed reconfiguration, reasoning, Connectome, and release
   qualification.
@@ -92,8 +92,8 @@ listed were the latest stable ones on 2026-10-24.
 - [Second-brain visualizer evidence review](second-brain-visualizer-architecture-research.md): rendering, drill-down, live change, second-mind cognition, reasoning traces and memory isolation.
 
 The pinned SurrealDB reference explicitly rejects its namespace → database →
-table/record hierarchy as RRFlow authority. `estate` is an RRFlow-owned term;
-the accepted project ↔ estate ↔ instance topology remains defined only by the
+table/record hierarchy as RRFlow authority. `engram` is an RRFlow-owned term;
+the accepted project ↔ engram ↔ instance topology remains defined only by the
 [RRFlow topology owner](../architecture/instance-topology.md).
 
 ## RRFlow vocabulary reference
@@ -114,9 +114,9 @@ their authority into this index:
 - [`rrflow-system-convergence-architecture-research.md`](rrflow-system-convergence-architecture-research.md)
   (active primary-source basis for the 1.0 execution map)
 - [`rrd-data-services-architecture-research.md`](../history/rrd-data-services-architecture-research.md) (historical)
-- [`estate-control.md`](../reference/operations/estate-control.md)
+- [`engram-control.md`](../reference/operations/engram-control.md)
   (active implementation reference)
-- [`local-estate-authorization.md`](../reference/security/local-estate-authorization.md)
+- [`local-engram-authorization.md`](../reference/security/local-engram-authorization.md)
   (active supporting security reference)
 - [`instance-topology.md`](../architecture/instance-topology.md)
   (active accepted RRFlow architecture; research records cannot redefine it)

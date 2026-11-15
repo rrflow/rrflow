@@ -51,7 +51,7 @@ pub(super) fn attunement_evidence(
         &plan.target.project_id,
         limits.output_bytes.min(
             engine
-                .estate_configuration
+                .engram_configuration
                 .storage
                 .transaction_admission_bytes,
         ),

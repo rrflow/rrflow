@@ -144,9 +144,9 @@ ledger; current findings are in the linked package evidence.
 
 | Reference capability | RRFlow requirement and existing owner | Proof needed before claiming the capability |
 |---|---|---|
-| [Pinecone integrated embedding](https://docs.pinecone.io/guides/search/integrated-embedding) and [namespace isolation](https://docs.pinecone.io/guides/index-data/implement-multitenancy) | D-01/D-05 automatically bind each project estate and admitted embedding space; D-06 optionally reads a Pinecone namespace. | Real source text produces model-bound vectors; edits/deletes invalidate them; filtered queries cannot cross project grants. A vector dimension or manually seeded vector does not prove semantic indexing. |
+| [Pinecone integrated embedding](https://docs.pinecone.io/guides/search/integrated-embedding) and [namespace isolation](https://docs.pinecone.io/guides/index-data/implement-multitenancy) | D-01/D-05 automatically bind each project engram and admitted embedding space; D-06 optionally reads a Pinecone namespace. | Real source text produces model-bound vectors; edits/deletes invalidate them; filtered queries cannot cross project grants. A vector dimension or manually seeded vector does not prove semantic indexing. |
 | [SurrealDB relations](https://surrealdb.com/docs/reference/query-language/statements/relate), [indexes](https://surrealdb.com/docs/reference/query-language/statements/define/indexes) and [transactions](https://surrealdb.com/docs/reference/query-language/language-primitives/transactions) | C/E/H preserve one transaction for canonical facts, relations and index deltas; rrflowQL combines authorized evidence. | Record/edge/vector updates are atomically visible, exact traversal and current-source retrieval survive crash/reopen, and failed mutations publish no partial semantic state. PostgreSQL compatibility has its separate H-08 proof. |
-| [Qdrant hybrid queries](https://qdrant.tech/documentation/search/hybrid-queries/) and [multitenancy](https://qdrant.tech/documentation/manage-data/multitenancy/) | E-03/E-04/E-05/H-01 supply lexical/vector retrieval, eligible filtering, exact reranking and tenant-aware execution. | Compare each path and fusion at matched quality and budgets; qualify filtered recall, deletion freshness, index update/rebuild and resource cost. External Qdrant partitioning does not replace RRFlow's project estate/authorization design. |
+| [Qdrant hybrid queries](https://qdrant.tech/documentation/search/hybrid-queries/) and [multitenancy](https://qdrant.tech/documentation/manage-data/multitenancy/) | E-03/E-04/E-05/H-01 supply lexical/vector retrieval, eligible filtering, exact reranking and tenant-aware execution. | Compare each path and fusion at matched quality and budgets; qualify filtered recall, deletion freshness, index update/rebuild and resource cost. External Qdrant partitioning does not replace RRFlow's project engram/authorization design. |
 | [Apache Parquet](https://parquet.apache.org/docs/overview/) | D-06/F typed interchange through a locked bundled Rust codec; H-06 operator controls. | Decode actual exports and compare typed authorized values after restart. Independently qualify import and bounded streaming; a linked codec alone proves neither. |
 
 For scale comparisons, freeze product versions, source/model/corpus, filters,
@@ -186,21 +186,21 @@ flowchart LR
 ```
 
 This is the target interaction graph, not a claim that every arrow is live.
-The [topology](instance-topology.md) keeps one project/estate/instance identity.
-Scale a service fleet by placing independently authorized estates on more
-capacity first. A control plane may place, authenticate and monitor estates;
+The [topology](instance-topology.md) keeps one project/engram/instance identity.
+Scale a service fleet by placing independently authorized engrams on more
+capacity first. A control plane may place, authenticate and monitor engrams;
 it does not become their transaction authority. Private project VMs and
 containers remain outside the database process.
 
-A large estate first gets measured vertical headroom, native indexes, bounded
-streaming and admission control. Intra-estate replication/sharding follows the
+A large engram first gets measured vertical headroom, native indexes, bounded
+streaming and admission control. Intra-engram replication/sharding follows the
 [distributed contract](../reference/distributed/cluster-contract.md), with
 quorum, membership, fencing, placement and recovery qualification. Client
 sync is not consensus replication. No cluster or HA claim follows from
 running several single-node binaries.
 
 Qdrant documents a useful small/large-tenant placement tradeoff, but its
-shared-collection model is not RRFlow's estate topology. Use noisy-neighbor
+shared-collection model is not RRFlow's engram topology. Use noisy-neighbor
 and movement tests as reference behavior; do not import its collection or
 shard authority. [Qdrant multitenancy](https://qdrant.tech/documentation/manage-data/multitenancy/)
 supports that comparison, not an RRFlow performance claim.
@@ -213,10 +213,10 @@ interactive recall, model work, ingestion/index maintenance and transfer.
 Reserve operational capacity for cancellation/readiness/recovery; a full model
 queue must not prevent observing or stopping the engine.
 
-The budget is hierarchical: host/service allocation, estate, request, stage
+The budget is hierarchical: host/service allocation, engram, request, stage
 and backend. A child may reduce a budget, never expand it. Queue waiting counts
 against the request deadline. Measure queue wait, actual execution, lock wait,
-model time and durable commit independently. Schedule fairly across estates
+model time and durable commit independently. Schedule fairly across engrams
 and requests; do not confuse DataFusion operator fairness with tenant fairness.
 
 For model adapters, take an immutable descriptor/handle under a short registry
@@ -308,7 +308,7 @@ Arrow batches. Preserve an exact unoptimized oracle for every access path;
 measure ANN recall, filter selectivity and freshness rather than treating ANN
 results as exact.
 
-Planning a DataFusion scan should build a plan, not read the whole estate.
+Planning a DataFusion scan should build a plan, not read the whole engram.
 Execute through a bounded stream; declare each pushed predicate exact,
 inexact or unsupported and retain residual filters as needed. Enforce input,
 output, staging, pinned-page, decoding and spill reservations as well as
@@ -449,7 +449,7 @@ rename RRFlow's frozen signal authority or enable prompt-content collection.
 The capacity ladder and workload/evidence field specification live in
 [Gate J](../roadmap/rrflow-1.0/gate-j.md#capacity-and-optimization-qualification).
 Targets there are proposed engineering acceptance values, not published
-capabilities. Revisit placement after measuring idle per-estate overhead and
+capabilities. Revisit placement after measuring idle per-engram overhead and
 noisy neighbors; revisit backend workers after cancellation and queue evidence;
 revisit cache/index choices only at matched quality; revisit distributed
 operation only after the single-node limit is measured and its consistency

@@ -28,49 +28,49 @@ pub(super) fn public_replan_operations_have_exact_authentication_and_mutation_bo
             "attunement-pause",
             "/v1/attunement/pause",
             true,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-recover-expired",
             "/v1/attunement/recover-expired",
             true,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-resume",
             "/v1/attunement/resume",
             true,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-start",
             "/v1/attunement/start",
             true,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-step",
             "/v1/attunement/step",
             true,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-replan-preview",
             "/v1/attunement/replan/preview",
             false,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-replan-accept",
             "/v1/attunement/replan/accept",
             true,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ),
         (
             "attunement-replan-receipt-read",
             "/v1/attunement/replan/receipt/read",
             false,
-            SecurityAction::EstateRead,
+            SecurityAction::EngramRead,
         ),
     ] {
         let endpoint = catalogue
@@ -108,7 +108,7 @@ pub(super) fn attunement_status_is_an_authenticated_read_operation() {
     assert!(!endpoint.mutation);
     assert_eq!(
         endpoint.action.fixed_action(),
-        Some(SecurityAction::EstateRead)
+        Some(SecurityAction::EngramRead)
     );
     assert_eq!(endpoint.request_type, "ReadAttunement");
     assert_eq!(endpoint.response_type, "AttunementReadResult");
@@ -126,7 +126,7 @@ pub(super) fn attunement_cancel_is_an_authenticated_mutation_operation() {
     assert!(endpoint.mutation);
     assert_eq!(
         endpoint.action.fixed_action(),
-        Some(SecurityAction::EstateAdmin)
+        Some(SecurityAction::EngramAdmin)
     );
     assert_eq!(endpoint.request_type, "CancelAttunement");
     assert_eq!(endpoint.response_type, "AttunementCancelResult");
@@ -171,10 +171,10 @@ pub(super) fn digest(value: u64) -> String {
     format!("{value:064x}")
 }
 
-pub(super) fn target() -> InstalledEstateIdentity {
-    InstalledEstateIdentity {
+pub(super) fn target() -> InstalledEngramIdentity {
+    InstalledEngramIdentity {
         project_id: canonical_id("rrflow"),
-        estate_id: canonical_id("developer-estate"),
+        engram_id: canonical_id("developer-engram"),
         instance_id: canonical_id("rrflow-dev"),
     }
 }

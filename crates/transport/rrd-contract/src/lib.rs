@@ -48,7 +48,7 @@ mod inference;
 mod knowledge;
 mod knowledge_tree;
 mod memory_context;
-mod memory_estate;
+mod memory_engram;
 mod model_manifest;
 mod operation_reference;
 mod platform;
@@ -69,7 +69,7 @@ pub use attunement::{
     attunement_replan_preview_sha256, attunement_replan_seed, attunement_verification_sha256,
     default_source_parse_policy, derive_attunement_phases, derive_attunement_plan,
     installation_initial_grants, installation_plan_sha256, installation_result_sha256,
-    validate_adopted_estate_entries, AcceptAttunementReplan, AttunementCancelResult,
+    validate_adopted_engram_entries, AcceptAttunementReplan, AttunementCancelResult,
     AttunementCapability, AttunementControlResponse, AttunementEvidence, AttunementFailure,
     AttunementJob, AttunementJobPage, AttunementJobState, AttunementJobSummary, AttunementLease,
     AttunementPhase, AttunementPhaseCheckpoint, AttunementPhasePlan, AttunementPlan,
@@ -85,10 +85,10 @@ pub use attunement::{
     InstallationTargetKind, ListAttunementJobs, PauseAttunement, PreviewAttunementReplan,
     ReadAttunement, ReadAttunementReceipt, RecoverExpiredAttunement, ResumeAttunement,
     ResumeAttunementWithLease, SourceParseBinding, SourceParsePolicy, StartAttunement,
-    StepAttunement, ADOPTED_ESTATE_DIRECTORY, ATTUNEMENT_CAPABILITIES, ATTUNEMENT_CONTRACT_VERSION,
+    StepAttunement, ADOPTED_ENGRAM_DIRECTORY, ATTUNEMENT_CAPABILITIES, ATTUNEMENT_CONTRACT_VERSION,
     ATTUNEMENT_EVIDENCE_FORMAT_VERSION, INSTALLATION_BOOTSTRAP_VERSION, INSTALLATION_LEASE_PATH,
     INSTALLATION_LEASE_PRECONDITION, INSTALLATION_PLAN_CONTRACT_VERSION,
-    INSTALL_ATTUNEMENT_CONTRACT_VERSION, MAX_ADOPTED_ESTATE_ENTRIES,
+    INSTALL_ATTUNEMENT_CONTRACT_VERSION, MAX_ADOPTED_ENGRAM_ENTRIES,
     MAX_ATTUNEMENT_CANCEL_REASON_BYTES, MAX_ATTUNEMENT_DESCRIPTION_BYTES,
     MAX_ATTUNEMENT_EVIDENCE_LANGUAGES, MAX_ATTUNEMENT_FAILURE_BYTES, MAX_ATTUNEMENT_JOB_PAGE,
     MAX_ATTUNEMENT_JOB_PAGE_BYTES, MAX_ATTUNEMENT_PHASES, MAX_ATTUNEMENT_VERIFICATION_CHECKS,
@@ -103,11 +103,11 @@ pub use cold_history::{
     ColdHistoryReadResult, ReadColdHistory,
 };
 pub use deployment::{
-    estate_configuration_sha256, AttunementFollowPolicy, ClockPolicy, ColdHistoryCompression,
+    engram_configuration_sha256, AttunementFollowPolicy, ClockPolicy, ColdHistoryCompression,
     ColdHistoryPolicy, DeploymentForm, DeploymentProfile, EndpointPresentation,
-    EstateConfiguration, EstateConfigurationInput, InstalledEstateIdentity, ReasoningLimits,
+    EngramConfiguration, EngramConfigurationInput, InstalledEngramIdentity, ReasoningLimits,
     RecallLimits, StorageLimits, StorageProfileKind, DEPLOYMENT_PROFILE_CONTRACT_VERSION,
-    ESTATE_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS,
+    ENGRAM_CONFIGURATION_FORMAT_VERSION, MAX_CLOCK_ROLLBACK_MS, MAX_REASONING_RUN_ELAPSED_MS,
     MAX_REASONING_STEPS, MAX_REASONING_STEP_ELAPSED_MS,
 };
 pub use diagnostic::{
@@ -195,8 +195,8 @@ pub use memory_context::{
     ContextPlanStageStatus, ContextReadStamp, MAX_CONTEXT_GRAPH_DEPTH, MAX_CONTEXT_ITEMS,
     MAX_CONTEXT_OUTPUT_BYTES, MAX_CONTEXT_QUERY_BYTES, MAX_CONTEXT_SEEDS, MAX_CONTEXT_STORAGE_KEYS,
 };
-pub use memory_estate::{
-    MemoryEstatePlan, MemorySeatDefinition, MemoryWarp, PersistMemoryEstate,
+pub use memory_engram::{
+    MemoryEngramPlan, MemorySeatDefinition, MemoryWarp, PersistMemoryEngram,
     ProviderRepresentation, ProviderRepresentationDefinition, ResolveMemoryWarp,
     ResolveSeatIdentity, ResolvedMemoryWarp, SeatIdentity, MAX_PROVIDER_REPRESENTATIONS,
     MEMORY_PROVIDER_IDENTITY_KIND, MEMORY_REPRESENTS_KIND, MEMORY_SEAT_KIND,
@@ -287,9 +287,9 @@ mod changefeed;
 mod commit;
 mod conformance;
 mod data;
+mod engram_authority;
 mod envelope;
 mod error;
-mod estate_authority;
 mod health;
 mod identity;
 mod openapi;
@@ -310,9 +310,9 @@ pub use changefeed::*;
 pub use commit::*;
 pub use conformance::*;
 pub use data::*;
+pub use engram_authority::*;
 pub use envelope::*;
 pub use error::*;
-pub use estate_authority::*;
 pub use health::*;
 pub use identity::*;
 pub use openapi::*;

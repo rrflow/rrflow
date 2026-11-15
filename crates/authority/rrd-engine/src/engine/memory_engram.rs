@@ -1,7 +1,7 @@
 use super::*;
 use rrd_contract::{
-    AssembleContext, ContextReadStamp, DataEstateOrganisation, DataPropertySchema,
-    MemoryEstatePlan, MemoryWarp, PersistMemoryEstate, ProviderRepresentation, ResolveMemoryWarp,
+    AssembleContext, ContextReadStamp, DataEngramOrganisation, DataPropertySchema,
+    MemoryEngramPlan, MemoryWarp, PersistMemoryEngram, ProviderRepresentation, ResolveMemoryWarp,
     ResolveSeatIdentity, ResolvedMemoryWarp, SeatIdentity, MEMORY_PROVIDER_IDENTITY_KIND,
     MEMORY_REPRESENTS_KIND, MEMORY_SEAT_KIND,
 };
@@ -16,11 +16,11 @@ impl RrdEngine {
         &self,
         session_id: &CorrelationId,
         token: &CorrelationId,
-        request: &PersistMemoryEstate,
+        request: &PersistMemoryEngram,
         now: u64,
         request_id: &str,
         operation_id: &str,
-    ) -> Result<MemoryEstatePlan> {
+    ) -> Result<MemoryEngramPlan> {
         self.authorize(
             session_id,
             token,
@@ -216,9 +216,9 @@ impl RrdEngine {
 /// Pure canonical memory-engram planner used by both authenticated previews
 /// and the cold-start transaction. It performs no authentication or I/O.
 pub(crate) fn build_memory_engram_plan(
-    request: &PersistMemoryEstate,
+    request: &PersistMemoryEngram,
     current: Option<DataSchemaRegistry>,
-) -> Result<MemoryEstatePlan> {
+) -> Result<MemoryEngramPlan> {
     request
         .validate()
         .map_err(|error| ServiceError::Contract(error.to_string()))?;
@@ -282,7 +282,7 @@ pub(crate) fn build_memory_engram_plan(
             properties: BTreeMap::new(),
         });
     }
-    let plan = MemoryEstatePlan {
+    let plan = MemoryEngramPlan {
         operation_sha256: transaction_operation_sha256(&mutations),
         mutations,
     };
@@ -294,8 +294,8 @@ pub(crate) fn build_memory_engram_plan(
 fn memory_engram_schema(current: Option<DataSchemaRegistry>) -> Result<(DataSchemaRegistry, bool)> {
     let mut registry = current.unwrap_or_else(|| DataSchemaRegistry {
         revision: 0,
-        migration: "memory estate bootstrap".into(),
-        organisation: DataEstateOrganisation::default(),
+        migration: "memory engram bootstrap".into(),
+        organisation: DataEngramOrganisation::default(),
         tables: BTreeMap::new(),
         records: BTreeMap::new(),
         relations: BTreeMap::new(),

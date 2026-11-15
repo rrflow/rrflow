@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "crates/transport/rrd-contract",
     "crates/transport/rrd-client",
-    "crates/authority/rrd-estate",
+    "crates/authority/rrd-engram",
     "crates/authority/rrd-security",
     "crates/authority/rrd-engine",
     "crates/transport/rrd-server",

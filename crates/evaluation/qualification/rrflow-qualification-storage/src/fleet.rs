@@ -1,4 +1,4 @@
-//! Independent-estate interference over the canonical storage campaign oracle.
+//! Independent-engram interference over the canonical storage campaign oracle.
 //! Child campaigns are mechanical views; only the aggregate can qualify a fleet.
 use super::sustained::{encode_bounded, read_bounded, write_new};
 use super::*;
@@ -28,8 +28,8 @@ impl FleetTrial {
             Self::Abusive => "abusive",
         }
     }
-    pub fn active(self, estate: u64) -> bool {
-        self != Self::Quiet || estate == 0
+    pub fn active(self, engram: u64) -> bool {
+        self != Self::Quiet || engram == 0
     }
 }
 
@@ -39,34 +39,34 @@ pub fn fleet_child(
     point: usize,
     seed: usize,
     trial: FleetTrial,
-    estate: u64,
+    engram: u64,
 ) -> Result<StorageCampaign> {
     validate_fleet(campaign)?;
     require(
         point < campaign.points.len()
             && seed < campaign.seeds.len()
-            && estate < campaign.allocation.estates.get(),
+            && engram < campaign.allocation.engrams.get(),
         "fleet child coordinate outside manifest",
     )?;
-    let estates = campaign.allocation.estates.get();
+    let engrams = campaign.allocation.engrams.get();
     let mut child = campaign.clone();
     child.purpose = CampaignPurpose::Characterization;
-    child.allocation.estates = 1u64.try_into()?;
-    child.storage.budgets.estates = 1u64.try_into()?;
-    child.allocation.records = (campaign.allocation.records.get() / estates).try_into()?;
-    child.allocation.edges = (campaign.allocation.edges.get() / estates).try_into()?;
-    child.allocation.vectors = (campaign.allocation.vectors.get() / estates).try_into()?;
+    child.allocation.engrams = 1u64.try_into()?;
+    child.storage.budgets.engrams = 1u64.try_into()?;
+    child.allocation.records = (campaign.allocation.records.get() / engrams).try_into()?;
+    child.allocation.edges = (campaign.allocation.edges.get() / engrams).try_into()?;
+    child.allocation.vectors = (campaign.allocation.vectors.get() / engrams).try_into()?;
     child.allocation.logical_source_bytes = campaign
         .allocation
         .logical_source_bytes
         .get()
-        .div_ceil(estates)
+        .div_ceil(engrams)
         .max(1)
         .try_into()?;
     let mut operating = campaign.points[point].clone();
-    operating.clients = (operating.clients.get() / estates).try_into()?;
-    operating.requests_per_second = ((operating.requests_per_second.get() / estates)
-        * if trial == FleetTrial::Abusive && estate == 0 {
+    operating.clients = (operating.clients.get() / engrams).try_into()?;
+    operating.requests_per_second = ((operating.requests_per_second.get() / engrams)
+        * if trial == FleetTrial::Abusive && engram == 0 {
             2
         } else {
             1
@@ -74,11 +74,11 @@ pub fn fleet_child(
     .try_into()?;
     child.points = vec![operating];
     child.seeds = vec![campaign.seeds[seed]
-        .checked_add(estate)
+        .checked_add(engram)
         .filter(|n| *n <= MAX_EXACT_INTEGER)
         .ok_or("fleet seed overflow")?];
     // Reserve a root manifest/result and per-trial metadata outside all children.
-    let children = campaign.points.len() as u64 * campaign.seeds.len() as u64 * 3 * estates;
+    let children = campaign.points.len() as u64 * campaign.seeds.len() as u64 * 3 * engrams;
     let root_reserve = MAX_DOCUMENT_BYTES
         .checked_mul(2 + campaign.points.len() as u64 * campaign.seeds.len() as u64 * 3)
         .and_then(|n| n.checked_add(MAX_LAUNCH_RECEIPT_BYTES))
@@ -101,16 +101,16 @@ pub fn fleet_child(
 
 pub fn validate_fleet(campaign: &StorageCampaign) -> Result<()> {
     campaign.validate()?;
-    let n = campaign.allocation.estates.get();
+    let n = campaign.allocation.engrams.get();
     require(
         (2..=10).contains(&n) && campaign.points.len() * campaign.seeds.len() <= 32,
-        "fleet requires 2..10 estates and at most 32 point/seed coordinates",
+        "fleet requires 2..10 engrams and at most 32 point/seed coordinates",
     )?;
     require(
         campaign.allocation.records.get().is_multiple_of(n)
             && campaign.allocation.edges.get().is_multiple_of(n)
             && campaign.allocation.vectors.get().is_multiple_of(n),
-        "fleet corpus must divide exactly into independent estates",
+        "fleet corpus must divide exactly into independent engrams",
     )?;
     for point in &campaign.points {
         require(
@@ -118,7 +118,7 @@ pub fn validate_fleet(campaign: &StorageCampaign) -> Result<()> {
                 && point.clients.get() / n == 4
                 && point.requests_per_second.get().is_multiple_of(n)
                 && point.requests_per_second.get() / n <= 500_000,
-            "fleet requires four clients per estate and an exactly divisible admitted rate",
+            "fleet requires four clients per engram and an exactly divisible admitted rate",
         )?;
     }
     campaign
@@ -130,7 +130,7 @@ pub fn validate_fleet(campaign: &StorageCampaign) -> Result<()> {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FleetBoundary {
-    pub estate: u64,
+    pub engram: u64,
     /// Warmup/measured/burst/drain/soak/loaded/reopened; fixed coordinator stages.
     pub stage: Id,
     #[schemars(length(min = 1, max = 256))]
@@ -151,13 +151,13 @@ pub struct FleetTrialResult {
     pub seed: usize,
     pub trial: FleetTrial,
     pub status: CampaignStatus,
-    /// One digest per independently verified child result, in estate order.
+    /// One digest per independently verified child result, in engram order.
     #[schemars(length(max = 10))]
     pub child_results: Vec<Digest>,
     /// Bounded pre-phase and post-reopen kernel/authorization observations.
     #[schemars(length(max = 70))]
     pub boundaries: Vec<FleetBoundary>,
-    /// Conservative sum of per-estate peaks, not a simultaneous RSS sample.
+    /// Conservative sum of per-engram peaks, not a simultaneous RSS sample.
     pub sum_member_peak_resident_bytes: u64,
     #[schemars(length(max = 10))]
     pub measured_latency: Vec<FleetLatencyBand>,
@@ -176,12 +176,12 @@ pub struct FleetResult {
     pub qualification_passed: bool,
 }
 
-pub fn fleet_member_directory(root: &Path, trial: u64, estate: u64) -> PathBuf {
-    root.join(format!("trial-{trial:04}-estate-{estate:02}"))
+pub fn fleet_member_directory(root: &Path, trial: u64, engram: u64) -> PathBuf {
+    root.join(format!("trial-{trial:04}-engram-{engram:02}"))
 }
 
 fn check_boundaries(campaign: &StorageCampaign, trial: &FleetTrialResult) -> Result<()> {
-    let n = campaign.allocation.estates.get() as usize;
+    let n = campaign.allocation.engrams.get() as usize;
     let stages = [
         "warmup", "measured", "burst", "drain", "soak", "loaded", "reopened",
     ];
@@ -207,7 +207,7 @@ fn check_boundaries(campaign: &StorageCampaign, trial: &FleetTrialResult) -> Res
         let mut instances = BTreeSet::new();
         let mut seen = BTreeSet::new();
         for row in &rows {
-            let i = row.estate as usize;
+            let i = row.engram as usize;
             require(
                 i < n
                     && seen.insert(i)
@@ -254,7 +254,7 @@ fn check_boundaries(campaign: &StorageCampaign, trial: &FleetTrialResult) -> Res
             } else {
                 require(
                     identities[i] == row.instance,
-                    "fleet estate identity changed",
+                    "fleet engram identity changed",
                 )?;
             }
             require(
@@ -268,11 +268,11 @@ fn check_boundaries(campaign: &StorageCampaign, trial: &FleetTrialResult) -> Res
             )?;
             let next = rows
                 .iter()
-                .find(|r| r.estate == (row.estate + 1) % n as u64)
+                .find(|r| r.engram == (row.engram + 1) % n as u64)
                 .ok_or("foreign member missing")?;
             require(
                 row.foreign_instance == next.instance && row.instance != row.foreign_instance,
-                "foreign denial did not bind the next independent estate",
+                "foreign denial did not bind the next independent engram",
             )?;
             if campaign.purpose == CampaignPurpose::Qualification {
                 let receipt = row
@@ -325,8 +325,8 @@ pub fn assess_fleet_trial(
     require(trial.index == expected_index, "fleet trial order differs")?;
     require(
         trial.boundaries.len() <= 70
-            && trial.child_results.len() <= campaign.allocation.estates.get() as usize
-            && trial.measured_latency.len() <= campaign.allocation.estates.get() as usize,
+            && trial.child_results.len() <= campaign.allocation.engrams.get() as usize
+            && trial.measured_latency.len() <= campaign.allocation.engrams.get() as usize,
         "fleet trial metadata exceeds bound",
     )?;
     if trial.status != CampaignStatus::Completed {
@@ -335,7 +335,7 @@ pub fn assess_fleet_trial(
     }
     check_boundaries(campaign, trial)?;
     require(
-        trial.child_results.len() == campaign.allocation.estates.get() as usize,
+        trial.child_results.len() == campaign.allocation.engrams.get() as usize,
         "fleet child coverage incomplete",
     )?;
     let mut peak = 0u64;
@@ -343,9 +343,9 @@ pub fn assess_fleet_trial(
     let mut measured_latency = Vec::new();
     let mut isolated_intervals = Vec::new();
     let mut overlap = std::collections::BTreeMap::<LoadPhase, (u64, u64)>::new();
-    for estate in 0..campaign.allocation.estates.get() {
-        let child = fleet_child(campaign, trial.point, trial.seed, trial.trial, estate)?;
-        let directory = fleet_member_directory(root, trial.index, estate);
+    for engram in 0..campaign.allocation.engrams.get() {
+        let child = fleet_child(campaign, trial.point, trial.seed, trial.trial, engram)?;
+        let directory = fleet_member_directory(root, trial.index, engram);
         let actual: StorageCampaign = decode(&read_bounded(
             &directory.join("campaign.json"),
             MAX_DOCUMENT_BYTES,
@@ -359,18 +359,18 @@ pub fn assess_fleet_trial(
             result.status == CampaignStatus::Completed
                 && result.limitations.is_empty()
                 && digest("rrflow-fleet-child-result-v1", &result)?
-                    == trial.child_results[estate as usize],
+                    == trial.child_results[engram as usize],
             "fleet child failed or result changed",
         )?;
         let loaded = trial
             .boundaries
             .iter()
-            .find(|b| b.estate == estate && b.stage.as_str() == "loaded")
+            .find(|b| b.engram == engram && b.stage.as_str() == "loaded")
             .ok_or("loaded boundary missing")?;
         let before = trial
             .boundaries
             .iter()
-            .find(|b| b.estate == estate && b.stage.as_str() == "warmup")
+            .find(|b| b.engram == engram && b.stage.as_str() == "warmup")
             .ok_or("warmup boundary missing")?;
         let mut histogram = super::latency::Histogram::new();
         for index in 0..result.segments {
@@ -407,7 +407,7 @@ pub fn assess_fleet_trial(
         }
         let band = histogram.percentile(99)?;
         measured_latency.push(FleetLatencyBand {
-            estate,
+            engram,
             samples: band.samples,
             p99_lower_ns: band.lower_ns,
             p99_upper_ns: band.upper_ns,
@@ -417,10 +417,10 @@ pub fn assess_fleet_trial(
                 .operating_points
                 .iter()
                 .find(|r| r.phase == LoadPhase::Measured)
-                .ok_or("quiet estate measured baseline missing")?;
+                .ok_or("quiet engram measured baseline missing")?;
             isolated_intervals.push((row.started_ns, row.finished_ns));
         }
-        if trial.trial.active(estate) {
+        if trial.trial.active(engram) {
             for row in &result.operating_points {
                 overlap
                     .entry(row.phase)
@@ -441,7 +441,7 @@ pub fn assess_fleet_trial(
                     .unwrap_or(0),
             )
             .ok_or("fleet peak sum overflow")?;
-        if trial.trial.active(estate) {
+        if trial.trial.active(engram) {
             qualifies &= super::sustained::satisfies_operating_requirements(&child, &result)?;
         } else {
             require(
@@ -504,13 +504,13 @@ pub fn assess_fleet_trial(
     }
     if trial.trial == FleetTrial::Quiet {
         require(
-            isolated_intervals.len() == campaign.allocation.estates.get() as usize,
+            isolated_intervals.len() == campaign.allocation.engrams.get() as usize,
             "quiet isolated baseline coverage missing",
         )?;
         for pair in isolated_intervals.windows(2) {
             require(
                 pair[0].1 <= pair[1].0,
-                "quiet baselines overlap or are not in estate order",
+                "quiet baselines overlap or are not in engram order",
             )?;
         }
     }
@@ -534,8 +534,8 @@ impl FleetWriter {
         for point in 0..campaign.points.len() {
             for seed in 0..campaign.seeds.len() {
                 for trial in FleetTrial::ALL {
-                    for estate in 0..campaign.allocation.estates.get() {
-                        fleet_child(&campaign, point, seed, trial, estate)?;
+                    for engram in 0..campaign.allocation.engrams.get() {
+                        fleet_child(&campaign, point, seed, trial, engram)?;
                     }
                 }
             }
@@ -635,7 +635,7 @@ fn verify_fleet_parts(
                     .as_ref()
                     .ok_or("quiet baseline missing before abusive trial")?,
                 &trial.measured_latency,
-                campaign.allocation.estates.get(),
+                campaign.allocation.engrams.get(),
             )?;
         }
         passed &= trial.qualification_passed;

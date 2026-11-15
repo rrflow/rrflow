@@ -93,7 +93,7 @@ start_rrflow() {
   install -m 755 "$RRFLOW_BIN" "$work/bin/rrflow"
   local rrflow=$work/bin/rrflow
   identity=$("$rrflow" install identity --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["installation_identity"])')
-  configuration=$(python3 "$here/rrflow_settings.py" "$manifest" "$system"     "$repository/crates/authority/rrd-engine/assets/install/default-estate-configuration-v3.toml" "$work/estate.toml")
+  configuration=$(python3 "$here/rrflow_settings.py" "$manifest" "$system"     "$repository/crates/authority/rrd-engine/assets/install/default-engram-configuration-v3.toml" "$work/engram.toml")
   "$rrflow" install plan --project "$work/project" --identity "$identity" --mode fresh     ${configuration:+--configuration "$configuration"} --json > "$work/plan.json"
   digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["installation"]["plan_sha256"])' "$work/plan.json")
   "$rrflow" install apply --project "$work/project" --mode fresh --plan "$work/plan.json" --expect "$digest" > /dev/null

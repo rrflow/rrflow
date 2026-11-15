@@ -415,7 +415,7 @@ impl RrdEngine {
     /// identity history; it fixes the commit cursor and how many edges and
     /// events that commit wrote. The second read, at the same stamp, names each
     /// edge by its deterministic identity and each event by its log cursor, so
-    /// the cost is the flight's own size and never the estate's.
+    /// the cost is the flight's own size and never the engram's.
     fn read_flight_versions(
         &self,
         read: &ReadStamp,

@@ -223,7 +223,7 @@ impl<'a> RuntimeRepository<'a> {
     /// except the records of `excluded` kinds, plus the listed identities.
     /// A caller that answered some kinds from commit-maintained indexes at
     /// this stamp reads only the identities those indexes selected, and the
-    /// rest of the estate at the same stamp, so one answer never mixes two
+    /// rest of the engram at the same stamp, so one answer never mixes two
     /// states. Every version read is authenticated as in [`Self::data_snapshot`].
     pub fn data_snapshot_at(
         &self,

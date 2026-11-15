@@ -143,7 +143,7 @@ fn worker_observation_exports_original_configuration_and_reopens_without_complet
     assert_eq!(budget(&engine, &lease, &request.task_id), worker_budget);
     drop(engine);
     let mut engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
-    engine.installed_estate = Some(configuration.identity);
+    engine.installed_engram = Some(configuration.identity);
     configure(&mut engine, 8);
     let readback = engine
         .read_observation_delivery_at(

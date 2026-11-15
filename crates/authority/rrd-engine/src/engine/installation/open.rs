@@ -18,7 +18,7 @@ impl RrdEngine {
     }
 
     pub(in super::super) fn open_installed_anchored(
-        project: &EstateFilesystem,
+        project: &EngramFilesystem,
         executable: &Path,
         clock: &dyn ClockSource,
     ) -> Result<Self> {
@@ -49,7 +49,7 @@ impl RrdEngine {
             .control()
             .get(INSTALLED_RECORD_KEY)?
             .ok_or_else(|| ServiceError::Storage("installed engram record is missing".into()))?;
-        let installed: InstalledEstateRecord = decode_json(&bytes, "installed engram record")?;
+        let installed: InstalledEngramRecord = decode_json(&bytes, "installed engram record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
         bootstrap::verify(&project, &installed.installation)?;
@@ -64,7 +64,7 @@ impl RrdEngine {
             .control()
             .get(&engram_configuration_key(&locator.identity.instance_id))?
             .ok_or_else(|| ServiceError::Storage("engram configuration is missing".into()))?;
-        let configuration: EstateConfiguration =
+        let configuration: EngramConfiguration =
             decode_json(&configuration_bytes, "engram configuration")?;
         configuration
             .validate()
@@ -87,14 +87,14 @@ impl RrdEngine {
             ));
         }
         engine.installed_project_root = Some(project.project().clone());
-        engine.installed_estate_root = Some(project.clone());
+        engine.installed_engram_root = Some(project.clone());
         Ok(engine)
     }
 
     /// The installed operator credential, read when needed and never kept.
     pub(in crate::engine) fn installed_operator_key(&self) -> Result<ApiKeyDocument> {
         let project = self
-            .installed_estate_root
+            .installed_engram_root
             .as_ref()
             .ok_or(ServiceError::ProjectBindingMismatch)?;
         let (project, locator, _) = read_locator_anchored(project)?;
@@ -154,7 +154,7 @@ impl RrdEngine {
     }
 
     pub(in super::super) fn inspect_installed_anchored(
-        project: &EstateFilesystem,
+        project: &EngramFilesystem,
         executable: &Path,
         clock: &dyn ClockSource,
         boundary: &'static str,
@@ -196,7 +196,7 @@ impl RrdEngine {
     }
 
     pub(super) fn with_installed_binding<T>(
-        project: &EstateFilesystem,
+        project: &EngramFilesystem,
         executable: &Path,
         clock: &dyn ClockSource,
         boundary: &'static str,
@@ -222,19 +222,19 @@ impl RrdEngine {
             &storage_root,
             super::super::core::installed_storage_options(&locator.storage)?,
         )?;
-        let installed: InstalledEstateRecord =
+        let installed: InstalledEngramRecord =
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed engram record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
         bootstrap::verify(&project, &installed.installation)?;
-        let layout = EstateLayout::new(
+        let layout = EngramLayout::new(
             &installed.installation.storage_root_id,
             &installed.installation.initial_principal_id,
         )?;
         if installed.installation.bootstrap != bootstrap::build(&profile, &layout)? {
             return Err(ServiceError::ProjectBindingMismatch);
         }
-        let configuration: EstateConfiguration = decode_control(
+        let configuration: EngramConfiguration = decode_control(
             &inspector,
             &engram_configuration_key(&locator.identity.instance_id),
             "engram configuration",

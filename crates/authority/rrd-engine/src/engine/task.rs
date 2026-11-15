@@ -6,7 +6,7 @@
 //! from the task to the flight in the flight's own commit, so rrflowQL walks a
 //! task to its flights and each flight to the records its context used.
 //! Every task read names the row by identity, so it costs the task's own
-//! versions and never the estate's. A task orchestrates nothing.
+//! versions and never the engram's. A task orchestrates nothing.
 
 use super::flight::{public_read_stamp, read_budget};
 use super::*;

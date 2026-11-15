@@ -48,7 +48,7 @@ fn immutable_point_reads_materialize_only_the_winning_version() {
         ] {
             for tombstone in [false, true] {
                 let temp = tempfile::tempdir().unwrap();
-                let root = temp.path().join("estate");
+                let root = temp.path().join("engram");
                 let options = DatabaseOptions {
                     page_cache_bytes: 0,
                     segment_compression: compression,
@@ -146,7 +146,7 @@ fn batched_selection_preserves_segment_locality_with_a_small_cache() {
 
 fn check_batch_locality(disjoint: bool) {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join("estate");
+    let root = temp.path().join("engram");
     let options = DatabaseOptions {
         page_cache_bytes: if disjoint { 256 } else { 1024 },
         page_cache_policy: rrd_lsm::PageCachePolicy::ExactLru,

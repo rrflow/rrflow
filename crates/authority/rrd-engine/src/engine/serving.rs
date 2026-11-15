@@ -1,11 +1,11 @@
-//! The served endpoint record: where a serving installed estate listens.
+//! The served endpoint record: where a serving installed engram listens.
 //!
 //! `rrflow serve` publishes it once its listener is bound, so another local
 //! process can find an instance started from the project folder. It is an
 //! endpoint candidate, never readiness: a caller proves it with the
 //! authenticated readiness challenge.
 
-use super::estate_layout::{safe_join, EstateFilesystem, ESTATE_DIRECTORY};
+use super::engram_layout::{safe_join, EngramFilesystem, ENGRAM_DIRECTORY};
 use super::installation::{
     publish_new_file, read_locator, read_locator_anchored, read_regular_bounded,
 };
@@ -62,13 +62,13 @@ impl ServingRecord {
     }
 }
 
-/// Publishes this process's endpoint for an open installed estate. Only an
-/// open installed engine issues one, and that engine holds the estate's single
+/// Publishes this process's endpoint for an open installed engram. Only an
+/// open installed engine issues one, and that engine holds the engram's single
 /// writer lock, so a record found at publication was left by a process that no
 /// longer runs.
 #[derive(Debug)]
 pub struct ServingPublisher {
-    project: EstateFilesystem,
+    project: EngramFilesystem,
     instance_id: CanonicalId,
     product_version: String,
 }
@@ -84,9 +84,9 @@ pub struct ServingRegistration {
 impl RrdEngine {
     pub fn serving_publisher(&self) -> Result<ServingPublisher> {
         let root = self.installed_project_root.clone().ok_or_else(|| {
-            ServiceError::Contract("only an installed estate records a served endpoint".into())
+            ServiceError::Contract("only an installed engram records a served endpoint".into())
         })?;
-        let (project, locator, _) = read_locator_anchored(&EstateFilesystem::admit(root, false)?)?;
+        let (project, locator, _) = read_locator_anchored(&EngramFilesystem::admit(root, false)?)?;
         if &locator.identity.instance_id != self.instance_id() {
             return Err(ServiceError::ProjectBindingMismatch);
         }
@@ -130,7 +130,7 @@ impl ServingPublisher {
         let path = safe_join(&self.project, SERVING_RECORD_RELATIVE_PATH)?;
         let temporary = safe_join(
             &self.project,
-            &format!("{ESTATE_DIRECTORY}/.serving.pending"),
+            &format!("{ENGRAM_DIRECTORY}/.serving.pending"),
         )?;
         remove_stale(&temporary)?;
         remove_stale(&path)?;
@@ -162,7 +162,7 @@ impl ServingRegistration {
     }
 }
 
-/// Removes a record left by a process that no longer holds the estate. Only a
+/// Removes a record left by a process that no longer holds the engram. Only a
 /// bounded regular file is removed; anything else is refused, not replaced.
 fn remove_stale(path: &AnchoredPath) -> Result<()> {
     match path.metadata() {
@@ -178,7 +178,7 @@ fn remove_stale(path: &AnchoredPath) -> Result<()> {
 fn read_record_file(path: &AnchoredPath) -> Result<Vec<u8>> {
     read_regular_bounded(path, MAX_SERVING_RECORD_BYTES).map_err(|error| match error {
         ServiceError::ProjectBindingMismatch => {
-            record_error("is not a bounded regular file; remove it to serve this estate")
+            record_error("is not a bounded regular file; remove it to serve this engram")
         }
         other => other,
     })

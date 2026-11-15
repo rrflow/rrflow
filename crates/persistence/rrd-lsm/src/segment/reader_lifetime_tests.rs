@@ -7,7 +7,7 @@ use crate::{
 #[test]
 fn read_view_shares_manifest_generation_and_survives_publication() {
     let directory = tempfile::tempdir().unwrap();
-    let mut database = Database::create(&directory.path().join("estate")).unwrap();
+    let mut database = Database::create(&directory.path().join("engram")).unwrap();
     database
         .write_owned(
             WriteBatch::new(vec![Mutation::Put {
@@ -76,7 +76,7 @@ fn read_view_shares_manifest_generation_and_survives_publication() {
 #[test]
 fn shared_manifest_admission_retains_content_checks_and_releases_denials() {
     let directory = tempfile::tempdir().unwrap();
-    let database = Database::create(&directory.path().join("estate")).unwrap();
+    let database = Database::create(&directory.path().join("engram")).unwrap();
     let manifest = Arc::new(database.manifest().clone());
     let registry = Arc::new(Mutex::new(ActiveReadViews::default()));
     let budget = ProjectedReadBudget::default();

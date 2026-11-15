@@ -5,7 +5,7 @@
 //! complete identity history of every relation those ranges name. Temporal
 //! state is reduced once per supplied version, not replayed at each depth. Physical
 //! work therefore follows the visited neighbourhood and its histories, never
-//! the estate's relation or record families. Rows come from one replay over
+//! the engram's relation or record families. Rows come from one replay over
 //! the authenticated subset with the same temporal semantics as a replay of
 //! the complete families.
 

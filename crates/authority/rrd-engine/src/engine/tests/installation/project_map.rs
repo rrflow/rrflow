@@ -70,7 +70,7 @@ pub(super) fn the_project_map_describes_the_project_and_keeps_the_owners_notes()
 
 #[test]
 pub(super) fn an_installed_project_that_holds_its_map_still_reopens_replays_and_recovers() {
-    use crate::engine::estate_layout::{validate_recovery_estate, EstateFilesystem, EstateLayout};
+    use crate::engine::engram_layout::{validate_recovery_engram, EngramFilesystem, EngramLayout};
 
     let (project, preview) = install_demo_project();
     let executable = test_executable();
@@ -88,13 +88,13 @@ pub(super) fn an_installed_project_that_holds_its_map_still_reopens_replays_and_
     // A refresh interrupted before its rename leaves the pending file behind.
     std::fs::write(project.path().join(".rrflow/.project-map.pending"), b"x").unwrap();
 
-    let layout = EstateLayout::new(
+    let layout = EngramLayout::new(
         &preview.installation.storage_root_id,
         &preview.installation.initial_principal_id,
     )
     .unwrap();
-    validate_recovery_estate(
-        &EstateFilesystem::admit(
+    validate_recovery_engram(
+        &EngramFilesystem::admit(
             rrd_store::filesystem::AnchoredPath::open_root(project.path()).unwrap(),
             false,
         )

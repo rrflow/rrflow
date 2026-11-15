@@ -1,4 +1,4 @@
-//! Run against an installed local estate: rrflowdb PROJECT ADDRESS COMMAND.
+//! Run against an installed local engram: rrflowdb PROJECT ADDRESS COMMAND.
 //! Bootstrap only reads the installed locator and credential; all data operations
 //! use the public HTTP client. No cloud connection is made by this example.
 #[path = "support/rrflowdb.rs"]

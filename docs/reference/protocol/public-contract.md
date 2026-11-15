@@ -56,7 +56,7 @@ defines the common maintenance flow.
 ## Installed job discovery
 
 `attunement-job-list` (`POST /v1/attunement/jobs/list`) requires an authenticated
-session and the existing instance `estate_read` grant. `ListAttunementJobs`
+session and the existing instance `engram_read` grant. `ListAttunementJobs`
 accepts a page limit from 1 through 64 and an optional `after_job_id`. An absent
 cursor discovers the installed initial job; subsequent pages follow committed
 successor links. Clients use returned identities, never derive job IDs or read
@@ -84,7 +84,7 @@ version, which remains frozen at `1.0.0` by the
 
 The deterministic OpenAPI projection is currently bound to SHA-256
 `60d01903f277eede2c2a585d20477e213a64af19471a902df87fcfb24f89b99e`.
-`8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae`.
+`80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb`.
 Changing its bytes requires an explicit protocol/schema review and regeneration
 of every checked-in SDK surface; `scripts/ci/check_generated_surfaces.py`
 verifies the SDK projections, the signal reference, and this citation against
@@ -146,10 +146,10 @@ its `deployment_mode` field and its mixed `rrflow_mx`, `embedded`,
 `local_daemon`, `edge`, `remote`, and `distributed` values. The current
 `DeploymentProfile` instead binds `contract_version`, `deployment_form`,
 `storage_profile`, and `endpoint_presentation`. `ServiceCapabilities` also
-projects the optional installed project/estate/instance identity and complete
-effective `EstateConfiguration` revision/digest.
+projects the optional installed project/engram/instance identity and complete
+effective `EngramConfiguration` revision/digest.
 
-The sole accepted estate-configuration input is format `2`. It adds the closed
+The sole accepted engram-configuration input is format `2`. It adds the closed
 `clock.maximum_rollback_ms` policy to reasoning, recall, and query ceilings.
 The engine assigns revision and the v2 domain-separated digest; the strict
 default is zero and the compiled maximum is one hour. This field governs
@@ -197,7 +197,7 @@ The boundary is intentionally explicit:
 | MCP, CLI, Connectome, and model adapters | May consume public contracts but cannot infer engine state or implement missing semantics. | H-04 through H-07 and the relevant D/G/I gates. |
 
 The crate also exports attunement, router, reasoning-tree, knowledge-package,
-function, inference, diagnostic, context, memory-estate, and other typed
+function, inference, diagnostic, context, memory-engram, and other typed
 contracts that are not all present in the current endpoint catalogue. Their
 existence freezes a bounded representation only. Availability must be obtained
 from executable capability and operation catalogues and proved by the owning
@@ -215,7 +215,7 @@ prove that engine by itself:
 | rrflowQL query | Query text, typed parameters, read coordinates, plan evidence, rows, and scan/memory/spill/time/output budgets have public forms. | Accepted C-04 evidence proves bounded authenticated direct reads at one `ReadStamp`. F-01 through F-05 still must prove bounded streaming Arrow/DataFusion execution and remove eager `Vec<QueryRow>` materialization. |
 | Graph, BM25, vector, and retrieval | Typed graph mutations, scalar/BM25 catalogue kinds, named dense/sparse/multi-dense vectors, HNSW index configuration, explicit scalar/product/binary/TurboQuant lifecycle operations, filters, exact/approximate search, recursive retrieval, and RRF evidence can be represented. | E-01 through E-05 and F-03 must prove transactional native access paths, exact fallbacks, deterministic fusion, recall, update/delete, and reopen behavior. |
 | Context and reasoning | Bounded context packets, reasoning trees, route requests/decisions, and B-03 model-manifest pre-load admission have provider-neutral contracts. | G/H must prove executable routing, persisted CAS tree execution, engine-selected fast or analytical paths, authorized same-stamp context, feedback, and replay. |
-| Installation and knowledge | Provider-neutral installation/attunement jobs and content-addressed knowledge packages have contracts. The bounded D-01 slices prove deterministic plan/apply, one canonical project-local estate, sealed format-2 configuration, portable locator, installed close/open, capability discovery, real-process ceiling denial, and engine-owned unverified clock anchoring with rollback diagnosis/enforcement. | D-01 still owns trusted-time/platform qualification, native pathname/ACL qualification, remaining lifecycle operations, and release-contained install/start/verify assets; later D and KB-06 through KB-08 own complete attunement, project inventory, authorized import, readback, and warp resolution. |
+| Installation and knowledge | Provider-neutral installation/attunement jobs and content-addressed knowledge packages have contracts. The bounded D-01 slices prove deterministic plan/apply, one canonical project-local engram, sealed format-2 configuration, portable locator, installed close/open, capability discovery, real-process ceiling denial, and engine-owned unverified clock anchoring with rollback diagnosis/enforcement. | D-01 still owns trusted-time/platform qualification, native pathname/ACL qualification, remaining lifecycle operations, and release-contained install/start/verify assets; later D and KB-06 through KB-08 own complete attunement, project inventory, authorized import, readback, and warp resolution. |
 | Delivery and clients | Changefeeds, durable subscriptions, endpoint discovery, OpenAPI, the B-04 closed multiplexed WebSocket protocol, its Rust client/server implementation, B-05 GraphQL-to-bound-query lowering, and SDK corpus types exist. | H-03/H-04 and J must prove commit-impact delivery, operation execution/cancellation, public GraphQL carriage, cross-surface equivalence, correlated traces, and a clean self-contained deployment. |
 
 Passing a row's serialization test cannot satisfy the behavioral proof in the
@@ -243,13 +243,13 @@ are recorded in the [POA&M](../../poam/rrflow-1.0-alpha.md) for traceable direct
 convergence through their owning H/J and specific remediation packages. A-07
 remains the accepted discovery baseline; these conflicts remain separate
 tracked convergence work and are deliberately not silently repaired by this
-D-01 estate/configuration slice.
+D-01 engram/configuration slice.
 
 ## Current evidence
 
 | Evidence | What it establishes | What it does not establish |
 |---|---|---|
-| `cargo test -p rrd-contract --test deployment_configuration_contract --locked` | Strict project/estate/instance identity, valid deployment combinations, format-2 clock/AI workload ceilings, configuration digest binding, a valid zero-as-strict clock policy, and rejection of unknown/old shapes or invalid workload bounds. | Installation, runtime enforcement, clock synchronization/correction, reasoning execution, or profile equivalence. |
+| `cargo test -p rrd-contract --test deployment_configuration_contract --locked` | Strict project/engram/instance identity, valid deployment combinations, format-2 clock/AI workload ceilings, configuration digest binding, a valid zero-as-strict clock policy, and rejection of unknown/old shapes or invalid workload bounds. | Installation, runtime enforcement, clock synchronization/correction, reasoning execution, or profile equivalence. |
 | `cargo test -p rrd-contract --test public_contract --locked` | Strict selected wire shapes, bounds, 42-operation catalogue, one generic WebSocket descriptor, OpenAPI digest, deployment/SDK corpus validation, and selected cross-language digest vectors. | Server dispatch, storage semantics, DataFusion streaming, native indexes, reasoning execution, or all-language SDK conformance. |
 | `cargo test -p rrd-contract --test signal_catalogue_projection --locked` | Exact kernel-to-OpenAPI catalogue/fingerprint equality, 4/9/22 closure, and a discovery-only field boundary. | Signal emission, level activation, propagation, export, diagnostic parity, overhead, or engine behavior. |
 | `cargo test -p rrd-contract --test websocket_contract --locked` | The B-04 golden frame contract, sender directions, sequence and connection integrity, exact correlations/resume coordinates, negotiated/hard resource limits, and malformed/unknown representation rejection. | H-04 operation execution, generated-language carriage, or release qualification. |

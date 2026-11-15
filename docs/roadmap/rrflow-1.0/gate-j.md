@@ -21,7 +21,7 @@ decision. A force push or history rewrite is never a release mechanism.
 |---|---|---|---|---|
 | [ ] | J-01 | Remove every superseded pre-release entrypoint, format/catalogue reader, missing-field fallback, backend selector, migration executor, editor or provider hook that is not a generated alias stub, duplicate source of truth, transitional alias, and stale generated artifact. | workspace | Strict warning/dependency/terminology searches, negative format fixtures, and all-target builds prove only the accepted RRFlow 1.0 surfaces remain and superseded RRFlow state fails closed. |
 | [ ] | J-02 | Run unit, property, fuzz corpus, differential, recorded-seed state-machine, bounded concurrency-schedule, Miri/supported-sanitizer, crash/reopen, storage-full, security denial, resource-budget, exporter-failure, adapter, release/diagnostic-parity, and real-process suites. | workspace | Release evidence records exact build identity, commands/tool versions/targets, seeds and fault schedules, passed/failed/skipped counts, declared tool limitations, post-reopen verification, and retained failure artifacts. |
-| [ ] | J-03 | Assemble complete manifest-verified native release-candidate bundles from tracked inputs; use only each bundle's primary `rrflow`/`rrflow.exe` to install and attune an empty fixture and this existing repository; then restart, verify, and repeat representative fast/heavy queries. | release harness | On native Linux, Windows, and macOS qualification runners, with outbound network denied, sibling repositories absent, and no compiler or external database/query/vector service, both estates reach authenticated readiness and verify with stable digests; unchanged rerun is incremental; the repair and restore rehearsal passes; and no checkout helper or manual database repair is needed. This qualifies contents and behavior before J-05 signs the reproducible default distribution. |
+| [ ] | J-03 | Assemble complete manifest-verified native release-candidate bundles from tracked inputs; use only each bundle's primary `rrflow`/`rrflow.exe` to install and attune an empty fixture and this existing repository; then restart, verify, and repeat representative fast/heavy queries. | release harness | On native Linux, Windows, and macOS qualification runners, with outbound network denied, sibling repositories absent, and no compiler or external database/query/vector service, both engrams reach authenticated readiness and verify with stable digests; unchanged rerun is incremental; the repair and restore rehearsal passes; and no checkout helper or manual database repair is needed. This qualifies contents and behavior before J-05 signs the reproducible default distribution. |
 | [ ] | J-04 | Publish fixed-hardware rrflowKV, graph, BM25, exact/HNSW, DataFusion, context, LFG, end-to-end, and clean-rollout benchmarks against pinned declared baselines. | evaluation harness | Revision-bound raw histograms name the exact client/server/engine/stage timing boundary and retain failed samples; evidence records build identity, hardware/toolchain/filesystem/device/clock provenance, configuration, corpus/seed, offered-load model, warmup, cache state, concurrency, p50/p95/p99/p99.9, success/error separation, long-duration RSS/CPU/I/O/queue saturation, logical/apparent/allocated bytes, mixed-family interference, recall/quality metrics, and a SurrealDB/Qdrant deployment matrix with artifact and installed bytes, commands, elapsed time, services, ports, configuration, secrets, readiness, and persistent readback. Closed-loop tests correct coordinated omission. No ease or superiority claim is allowed until like-for-like correctness/quality evidence passes. |
 | [ ] | J-05 | Produce reproducible signed default distributions whose one primary operator executable is `rrflow` on Linux/macOS and `rrflow.exe` on Windows, containing or manifest-binding every default engine capability, SDK, schema/golden, project/attunement template, configuration/profile, required local inference asset, SBOM/licence, artifact verifier, backup/restore tool, and runbook. Publish archive/executable checksums, a complete RRFlow byte manifest, build provenance/SBOM attestations, and the native platform signature required by the supported target, including Authenticode for Windows. | release tooling | After artifact acquisition, a clean native supported machine with no compiler, source checkout, sibling repository, repository-local cache, package registry, external database/query/vector service, or outbound network uses only the primary executable to run version, install plan/apply, serve, authenticated ready, commit/query/context, close/reopen, quick/full verify, repair rehearsal, backup/restore, and ownership-safe uninstall; every installed byte and runtime dependency resolves from the signed manifest. |
 
@@ -116,10 +116,10 @@ host total; it cannot disappear from the budget.
 
 | Profile | Fixed allocation and corpus | Load sweep and purpose |
 |---|---|---|
-| Desktop | 4 vCPU, 8 GiB host RAM; engine RSS ceiling 2 GiB; one estate with 100,000 records, 500,000 edges, 100,000 dense 384-dimensional vectors | 1/4/8 concurrent clients; offered 5/25/50 requests/s; establish local operation, incremental ingestion and bounded interference with model work |
-| Single service estate | 8 vCPU, 32 GiB host RAM; engine RSS ceiling 8 GiB; 1,000,000 records, 5,000,000 edges, 1,000,000 dense 768-dimensional vectors | 8/32/64 clients; offered 25/100/250 requests/s; find the sustainable rate and overload knee without silently reducing quality |
-| Fleet isolation | 16 vCPU, 32 GiB host RAM; 8 GiB aggregate engine RSS ceiling; ten desktop-sized estates, aggregate corpus ten times the desktop row | 4 clients per estate; measure quiet, equal-load and one abusive estate at 2x its admitted rate; capture idle per-estate overhead and placement limits |
-| Data larger than memory | Same single-estate allocation; at least 32 GiB measured logical source data and 2,000,000 dense 1536-dimensional vectors; source bytes, on-disk bytes and index bytes reported independently | Repeat selective and broad queries, ingestion, compaction, backup and cancellation under the 8 GiB engine ceiling; this is a streaming/denial/resource test, not a promise that every ANN configuration fits |
+| Desktop | 4 vCPU, 8 GiB host RAM; engine RSS ceiling 2 GiB; one engram with 100,000 records, 500,000 edges, 100,000 dense 384-dimensional vectors | 1/4/8 concurrent clients; offered 5/25/50 requests/s; establish local operation, incremental ingestion and bounded interference with model work |
+| Single service engram | 8 vCPU, 32 GiB host RAM; engine RSS ceiling 8 GiB; 1,000,000 records, 5,000,000 edges, 1,000,000 dense 768-dimensional vectors | 8/32/64 clients; offered 25/100/250 requests/s; find the sustainable rate and overload knee without silently reducing quality |
+| Fleet isolation | 16 vCPU, 32 GiB host RAM; 8 GiB aggregate engine RSS ceiling; ten desktop-sized engrams, aggregate corpus ten times the desktop row | 4 clients per engram; measure quiet, equal-load and one abusive engram at 2x its admitted rate; capture idle per-engram overhead and placement limits |
+| Data larger than memory | Same single-engram allocation; at least 32 GiB measured logical source data and 2,000,000 dense 1536-dimensional vectors; source bytes, on-disk bytes and index bytes reported independently | Repeat selective and broad queries, ingestion, compaction, backup and cancellation under the 8 GiB engine ceiling; this is a streaming/denial/resource test, not a promise that every ANN configuration fits |
 
 These are explicit laboratory resource limits. Record actual CPU model/count,
 OS/target, memory limiter, storage/device, filesystem, available disk and model
@@ -137,7 +137,7 @@ test cannot qualify model quality or end-to-end reasoning latency.
 
 ### Proposed pass/fail thresholds
 
-At desktop 25 requests/s and single-estate 100 requests/s, propose point-read
+At desktop 25 requests/s and single-engram 100 requests/s, propose point-read
 p95 <= 50 ms, durable-commit p95 <= 100 ms, and bounded recall/context p95 <=
 250 ms, all client end-to-end on loopback, with corresponding p99 ceilings
 of 200/500/1000 ms. Use 1 KiB point/write payloads, top-k 20, at most two graph
@@ -148,7 +148,7 @@ tested rate that satisfies every quality, resource and latency condition.
 At declared nominal load, unexpected terminal errors must be <= 0.1%;
 intentional denial/fault cases are separate and never discarded from raw
 evidence. Exact operations require zero oracle mismatches, lost acknowledged
-writes, partial atomic groups, cross-estate disclosures and accepted stale
+writes, partial atomic groups, cross-engram disclosures and accepted stale
 fences. Approximate search proposes recall@20 >= 0.95 against exact search on
 the same authorized filtered corpus; record the actual recall curve and filter
 cost. Full reasoning reports correctness, supported citations, abstention and
@@ -157,8 +157,8 @@ frozen before the run, not replaced by valid-JSON percentage.
 
 Under a 2x nominal-load burst, require bounded queues/memory, explicit overload
 outcomes, no safety violation and return to nominal latency/backlog within
-60 seconds after load falls. In the fleet case, the abusive estate must not
-drive compliant estates above 2x their isolated p99; report admission and
+60 seconds after load falls. In the fleet case, the abusive engram must not
+drive compliant engrams above 2x their isolated p99; report admission and
 placement costs. This ratio is a proposed isolation threshold, not a feature
 claim. Cancellation tests prove permits and bytes are reclaimed after actual
 termination; a response timeout alone is insufficient.

@@ -58,12 +58,12 @@ pub(super) fn contract_fixture() -> ContractFixture {
                 storage_profile: StorageProfileKind::RrflowKv,
                 endpoint_presentation: EndpointPresentation::InProcess,
             },
-            installed_estate: Some(InstalledEstateIdentity {
+            installed_engram: Some(InstalledEngramIdentity {
                 project_id: CanonicalId::new("alpha-project").unwrap(),
-                estate_id: CanonicalId::new("alpha-estate").unwrap(),
+                engram_id: CanonicalId::new("alpha-engram").unwrap(),
                 instance_id: CanonicalId::new("project-alpha").unwrap(),
             }),
-            configuration: EstateConfiguration::default(),
+            configuration: EngramConfiguration::default(),
             instance: ResourceId::new(ResourceKind::Instance, "project-alpha").unwrap(),
             capabilities: vec![
                 CapabilityDescriptor {
@@ -176,7 +176,7 @@ pub(super) fn contract_fixture() -> ContractFixture {
             resource: ResourcePath {
                 segments: vec![
                     ResourceId::new(ResourceKind::Organization, "local").unwrap(),
-                    ResourceId::new(ResourceKind::Estate, "developer").unwrap(),
+                    ResourceId::new(ResourceKind::Engram, "developer").unwrap(),
                     ResourceId::new(ResourceKind::Project, "alpha").unwrap(),
                     ResourceId::new(ResourceKind::Instance, "project-alpha").unwrap(),
                 ],

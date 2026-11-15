@@ -129,7 +129,7 @@ fn installed_sustained_capacity() {
         PathBuf::from(std::env::var_os("RRFLOW_SUSTAINED_EVIDENCE").expect("new evidence path"));
     let campaign: StorageCampaign = bounded_json(&campaign_path).unwrap();
     campaign.validate().unwrap();
-    if campaign.allocation.estates.get() > 1 {
+    if campaign.allocation.engrams.get() > 1 {
         return fleet::execute(campaign, evidence);
     }
     let mut writer = CampaignWriter::create(&evidence, campaign.clone()).unwrap();
@@ -180,7 +180,7 @@ pub(super) fn smoke_campaign() -> StorageCampaign {
     )))
     .unwrap();
     storage.evidence_class = EvidenceClass::NativeCapacity;
-    storage.budgets.estates = 1u64.try_into().unwrap();
+    storage.budgets.engrams = 1u64.try_into().unwrap();
     let limit = |value: u64| value.try_into().unwrap();
     StorageCampaign {
         format_version: 1,
@@ -190,7 +190,7 @@ pub(super) fn smoke_campaign() -> StorageCampaign {
             vcpus: limit(1),
             host_bytes: storage.budgets.host_bytes,
             engine_bytes: storage.budgets.process_bytes,
-            estates: storage.budgets.estates,
+            engrams: storage.budgets.engrams,
             records: limit(8),
             edges: limit(24),
             vectors: limit(16),
@@ -260,10 +260,10 @@ fn backup_is_due_only_for_the_selected_lane_and_first_measured_mixed_write() {
 #[test]
 #[ignore = "explicit installed trace correlation; not capacity qualification"]
 fn installed_sampler_trace_matches_server_and_store() {
-    let estate = Estate::install("fresh");
+    let engram = Engram::install("fresh");
     let clock = Instant::now();
-    let (mut child, client, _) = estate.start_for_with_trace(clock, Duration::from_secs(300), true);
-    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let (mut child, client, _) = engram.start_for_with_trace(clock, Duration::from_secs(300), true);
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -293,7 +293,7 @@ fn installed_sampler_trace_matches_server_and_store() {
             native_worker: Default::default(),
             client,
             session: lease,
-            valid_at: estate.at,
+            valid_at: engram.at,
             dimensions: 16,
             seed: 73,
             records: 8,
@@ -301,7 +301,7 @@ fn installed_sampler_trace_matches_server_and_store() {
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,
-            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
                 .unwrap(),
         };
         work.initialize().await.unwrap();
@@ -323,7 +323,7 @@ fn installed_sampler_trace_matches_server_and_store() {
     let output = child.finish().expect("reap owned traced server");
     check_sample_trace(&output.stderr, &request_id, credential.credential());
     let (mut restarted, client, _) =
-        estate.start_for_with_trace(clock, Duration::from_secs(300), true);
+        engram.start_for_with_trace(clock, Duration::from_secs(300), true);
     work.client = client;
     let second_id = runtime.block_on(async {
         let after = work
@@ -391,10 +391,10 @@ pub(super) fn check_sample_trace(bytes: &[u8], request_id: &str, credential: &st
 fn installed_sampler_trace_during_write_load() {
     const RECORDS: u64 = 4_000;
     const PERIOD: u64 = 125;
-    let estate = Estate::install("fresh");
+    let engram = Engram::install("fresh");
     let clock = Instant::now();
-    let (mut child, client, _) = estate.start_for_with_trace(clock, Duration::from_secs(600), true);
-    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let (mut child, client, _) = engram.start_for_with_trace(clock, Duration::from_secs(600), true);
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -420,7 +420,7 @@ fn installed_sampler_trace_during_write_load() {
             native_worker: Default::default(),
             client,
             session,
-            valid_at: estate.at,
+            valid_at: engram.at,
             dimensions: 16,
             seed: 73,
             records: RECORDS,
@@ -428,7 +428,7 @@ fn installed_sampler_trace_during_write_load() {
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,
-            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
                 .unwrap(),
         };
         work.initialize().await.unwrap();
@@ -523,7 +523,7 @@ fn installed_sampler_trace_during_write_load() {
         overlapping > 0,
         "no client-observed diagnostic/write overlap"
     );
-    let (mut restarted, client, _) = estate.start_for(clock, Duration::from_secs(300));
+    let (mut restarted, client, _) = engram.start_for(clock, Duration::from_secs(300));
     work.client = client;
     runtime.block_on(async {
         for ordinal in [0, 1_333, 2_666, RECORDS - 1] {
@@ -547,10 +547,10 @@ fn installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect() {
         RequestOptions::new(id, id, Some(id), Some(u64::MAX)).unwrap()
     }
 
-    let estate = Estate::install("fresh");
+    let engram = Engram::install("fresh");
     let clock = Instant::now();
-    let (child, client, _) = estate.start_for(clock, Duration::from_secs(300));
-    let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project).unwrap();
+    let (child, client, _) = engram.start_for(clock, Duration::from_secs(300));
+    let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project).unwrap();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -575,7 +575,7 @@ fn installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect() {
             native_worker: Default::default(),
             client,
             session,
-            valid_at: estate.at,
+            valid_at: engram.at,
             dimensions: 16,
             seed: 73,
             records: 8,
@@ -583,7 +583,7 @@ fn installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect() {
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,
-            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
                 .unwrap(),
         };
         work.initialize().await.unwrap();
@@ -726,7 +726,7 @@ fn installed_disjoint_writes_from_one_stamp_conflict_without_partial_effect() {
         assert!(!fresh.idempotent_replay);
         work.verify(&second).await.unwrap();
         super::super::kill(child, clock);
-        let (reopened, client, _) = estate.start_for(clock, Duration::from_secs(300));
+        let (reopened, client, _) = engram.start_for(clock, Duration::from_secs(300));
         work.client = client;
         work.verify(&first).await.unwrap();
         work.verify(&second).await.unwrap();

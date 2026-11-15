@@ -1,10 +1,10 @@
 # rrflowDB capability record
 
-**Status:** active target contract; the estate, temporal graph, claims, adjacency index, native traversal, prompt flights, and task records exist, while prompt graph families, the memory contract gap, and project links are planned
+**Status:** active target contract; the engram, temporal graph, claims, adjacency index, native traversal, prompt flights, and task records exist, while prompt graph families, the memory contract gap, and project links are planned
 **Coordinate:** `rrflow://rrflow-instance/data/reference/data/rrflowdb-capability`
-**Owner:** the planned AI memory capabilities of rrflowDB as the per-project estate: prompt graph families, the memory model, and opt-in links between projects; PostgreSQL compatibility is owned by the [PostgreSQL contract](../protocol/postgresql.md)
+**Owner:** the planned AI memory capabilities of rrflowDB as the per-project engram: prompt graph families, the memory model, and opt-in links between projects; PostgreSQL compatibility is owned by the [PostgreSQL contract](../protocol/postgresql.md)
 
-rrflowDB is the per-project AI estate: one project's governed knowledge,
+rrflowDB is the per-project AI engram: one project's governed knowledge,
 memory, temporal graph, reasoning state, evidence, vectors, and index
 definitions, composed by `RrdEngine` and made durable by rrflowKV
 ([system overview](../../architecture/system-overview.md#canonical-component-terminology),
@@ -22,12 +22,12 @@ semantics, and qualification, and H-08 owns its packages.
 
 | Date | Decision | Effect here |
 |---|---|---|
-| 2026-10-17 | One project ↔ one estate (rrflowDB) ↔ one RRD instance; an account owns many estates; a workspace groups estates above the engine. | Every capability below is per project. Nothing merges two estates. |
-| 2026-10-18 | "The pure Rust Postgres DB for AI" is rrflowDB with a Postgres-wire SQL face: one adapter over the same estate, not a second database and not Postgres as persistence. | Owned by the [PostgreSQL compatibility contract](../protocol/postgresql.md) and H-08; see [SQL access](#sql-access). |
+| 2026-10-17 | One project ↔ one engram (rrflowDB) ↔ one RRD instance; an account owns many engrams; a workspace groups engrams above the engine. | Every capability below is per project. Nothing merges two engrams. |
+| 2026-10-18 | "The pure Rust Postgres DB for AI" is rrflowDB with a Postgres-wire SQL face: one adapter over the same engram, not a second database and not Postgres as persistence. | Owned by the [PostgreSQL compatibility contract](../protocol/postgresql.md) and H-08; see [SQL access](#sql-access). |
 | 2026-10-19 | Knowledge and memory are the same graph family. | [Memory model](#memory-model). |
 | 2026-10-19 | The graphs a prompt forms are configurable so they can be tested and experimented with. | [Prompt graph families](#prompt-graph-families). |
 | 2026-10-19 | Relationships between projects are opt-in links: each project stays its own rrflowDB, a link is explicitly allowed, queries may follow it read-only, and every use is audited. | [Project links](#project-links). |
-| 2026-10-27 | Domains inside a project estate are configurable, with a default each project tunes, kind grouping, categories and tags, optional isolation, and per-domain drill-down. | Owned by the [estate organisation contract](estate-organisation.md) and H-11; prompt graph family definitions and their kinds belong to domains like any other kind. |
+| 2026-10-27 | Domains inside a project engram are configurable, with a default each project tunes, kind grouping, categories and tags, optional isolation, and per-domain drill-down. | Owned by the [engram organisation contract](engram-organisation.md) and H-11; prompt graph family definitions and their kinds belong to domains like any other kind. |
 
 ## What "Postgres-like" means, and what it does not
 
@@ -47,12 +47,12 @@ model. It is one Rust engine with one mutation authority
 | Full-text search | BM25 with highlights | Implemented over artifacts; incremental postings are E-03 |
 | SQL over the wire | The rrflowDB PostgreSQL core profile | Planned, H-08 ([PostgreSQL contract](../protocol/postgresql.md)) |
 | Roles and grants | `RrdEngine` sessions, policies, and audited authorization | Implemented |
-| Extensions, PL/pgSQL, server-side triggers, logical replication | Not offered. Triggers, routines, and functions are explicit engine capabilities (Gate I); sync is per estate | Out of scope |
+| Extensions, PL/pgSQL, server-side triggers, logical replication | Not offered. Triggers, routines, and functions are explicit engine capabilities (Gate I); sync is per engram | Out of scope |
 
 ## Memory model
 
-Knowledge and memory are one family: memory is what the estate knows,
-with the time it became valid and the time the estate learned it. There is no
+Knowledge and memory are one family: memory is what the engram knows,
+with the time it became valid and the time the engram learned it. There is no
 separate memory store
 ([system overview](../../architecture/system-overview.md#canonical-component-terminology)).
 
@@ -103,7 +103,7 @@ the Notion RRO and LFG records). Knowledge includes memory.
   schema revision in `RrdEngine`; a bundled release is not the only source of
   configurable families. Unknown producer effects remain unavailable until an
   executable capability is registered and admitted.
-- **Activation** lives in the estate configuration revision (the
+- **Activation** lives in the engram configuration revision (the
   UI-managed revision of build-order step 2). It selects which families a
   flight forms, per project, with no hardcoded list: the default set is the
   bundled initial revision.
@@ -139,20 +139,20 @@ SQL only through the relational and function surface that contract admits.
 Each project keeps its own rrflowDB, instance, credentials, and authority. A
 link lets one project read another, never write it.
 
-- **A link is two governed records**: an offer in the source estate naming
-  the target estate's instance and estate identities, the families and kinds
+- **A link is two governed records**: an offer in the source engram naming
+  the target engram's instance and engram identities, the families and kinds
   it exposes, direction (read-only), expiry, and approver; and an acceptance
-  in the target estate. Either side revokes by retiring its record.
+  in the target engram. Either side revokes by retiring its record.
 - **Following a link is a federated read** at the workspace layer
   ([instance topology](../../architecture/instance-topology.md)): two stamped
-  reads, one per estate, each authorized by its own engine. The result
-  carries both read stamps and both evidence sets. There is no cross-estate
+  reads, one per engram, each authorized by its own engine. The result
+  carries both read stamps and both evidence sets. There is no cross-engram
   transaction and no shared cursor.
 - **Cross-project edges are foreign references**: a record in the source
-  estate naming a target estate and a record identity there. Resolving it
+  engram naming a target engram and a record identity there. Resolving it
   requires an active link; without one it resolves to "unavailable", never to
   a guess.
-- **Every use is audited** in both estates.
+- **Every use is audited** in both engrams.
 - **Placement is independent.** Linked projects may share a Shippin.cloud
   group or run in separate VMs; links travel over H-07 endpoint resolution.
 
@@ -160,7 +160,7 @@ link lets one project read another, never write it.
 
 | Fact | Evidence |
 |---|---|
-| One estate per project, rrflowKV storage, one authority | [instance topology](../../architecture/instance-topology.md), ADR-0001 |
+| One engram per project, rrflowKV storage, one authority | [instance topology](../../architecture/instance-topology.md), ADR-0001 |
 | Typed temporal relations with both adjacency directions written atomically | C-03; [multi-model contract](multi-model-object-contract.md) |
 | rrflowQL traversal reads native adjacency ranges and matches an independent full-replay oracle | Implemented: E-01a, pull request #21 |
 | Claims are bi-temporal with tier, promotion, confidence, and supersession in the kernel | `rrd-core/src/claim.rs`; `ClaimChangeSnapshot` exposes them on reads |

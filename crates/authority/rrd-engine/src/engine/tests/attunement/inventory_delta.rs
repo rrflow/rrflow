@@ -144,7 +144,7 @@ fn interrupted_refresh_does_not_expose_partial_facts_as_completed_snapshot() {
                         attempt: 1,
                         request_sha256: digest::sha256_hex(&serde_json::to_vec(&command).unwrap()),
                     },
-                    RrdOperation::EstateAdmin,
+                    RrdOperation::EngramAdmin,
                     InvocationCredential::Session {
                         session_id: &session.session_id,
                         token: &session.token,

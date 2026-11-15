@@ -922,7 +922,7 @@ fn replan_receipt_is_not_visible_to_another_authorized_principal() {
             expires_at_unix_ms: u64::MAX,
             disabled: false,
             role_ids: Default::default(),
-            grants: [SecurityAction::SessionCreate, SecurityAction::EstateRead]
+            grants: [SecurityAction::SessionCreate, SecurityAction::EngramRead]
                 .into_iter()
                 .map(|action| ResourceGrant {
                     action,

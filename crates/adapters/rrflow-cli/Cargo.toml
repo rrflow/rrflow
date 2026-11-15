@@ -33,7 +33,7 @@ tempfile = "3"
 rrd-core = { path = "../../kernel/rrd-core" }
 rrd-store = { path = "../../persistence/rrd-store" }
 rrd-security = { path = "../../authority/rrd-security" }
-rrd-estate = { path = "../../authority/rrd-estate" }
+rrd-engram = { path = "../../authority/rrd-engram" }
 
 [build-dependencies]
 serde = { workspace = true }

@@ -1,4 +1,4 @@
-//! The default install profile, attunement proposals and engram and estate configuration loading.
+//! The default install profile, attunement proposals and engram and engram configuration loading.
 
 use super::*;
 
@@ -195,7 +195,7 @@ pub(super) fn planned_attunement_steps(
 pub(in super::super) fn validate_parse_policy_limits(
     steps: &[DefaultAttunementPhase],
     profile: &DefaultInstallProfile,
-    configuration: &rrd_contract::EstateConfiguration,
+    configuration: &rrd_contract::EngramConfiguration,
 ) -> Result<()> {
     validate_parse_policies(
         steps.iter().filter_map(|step| step.parse_policy.as_ref()),
@@ -208,7 +208,7 @@ pub(in super::super) fn validate_parse_policy_limits(
 pub(in super::super) fn validate_parse_policies<'a>(
     policies: impl Iterator<Item = &'a rrd_contract::SourceParsePolicy>,
     profile: &DefaultInstallProfile,
-    configuration: &rrd_contract::EstateConfiguration,
+    configuration: &rrd_contract::EngramConfiguration,
 ) -> Result<()> {
     let inventory = &profile.inventory_policy.limits;
     for policy in policies {
@@ -259,7 +259,7 @@ impl DefaultInstallProfile {
         if self.format_version != INSTALL_PROFILE_FORMAT
             || !matches!(self.id.as_str(), "default" | "clyffy")
             || self.template_asset != "templates/generic-project-v1.md"
-            || self.configuration_asset != "default-estate-configuration-v3.toml"
+            || self.configuration_asset != "default-engram-configuration-v3.toml"
             || self.initial_grant_policy.as_str() != "local-owner-all-actions"
             || !(32..=4_096).contains(&self.credential_bytes)
             || self.estimated_min_duration_ms > self.estimated_max_duration_ms
@@ -334,7 +334,7 @@ impl DefaultInstallProfile {
 /// Loads the bundled default or one explicitly selected, bounded operator
 /// configuration. Planning is the only lifecycle stage that reads this file;
 /// apply consumes the effective configuration sealed into the plan.
-pub fn load_engram_configuration(path: Option<&Path>) -> Result<EstateConfiguration> {
+pub fn load_engram_configuration(path: Option<&Path>) -> Result<EngramConfiguration> {
     let bytes = match path {
         None => DEFAULT_CONFIGURATION_BYTES.to_vec(),
         Some(path) => read_regular_bounded(
@@ -342,11 +342,11 @@ pub fn load_engram_configuration(path: Option<&Path>) -> Result<EstateConfigurat
             MAX_CONFIGURATION_BYTES,
         )?,
     };
-    let input: EstateConfigurationInput = toml::from_str(
+    let input: EngramConfigurationInput = toml::from_str(
         std::str::from_utf8(&bytes).map_err(|error| ServiceError::Contract(error.to_string()))?,
     )
     .map_err(|error| ServiceError::Contract(error.to_string()))?;
-    let configuration = EstateConfiguration::from_input(1, input)
+    let configuration = EngramConfiguration::from_input(1, input)
         .map_err(|error| ServiceError::Contract(error.to_string()))?;
     super::super::core::installed_storage_options(&configuration.storage)?;
     Ok(configuration)
@@ -363,10 +363,4 @@ pub struct NestedRepositoryDiscovery {
     pub recommended_layout: &'static str,
     pub selection_available: bool,
     pub candidates: Vec<String>,
-}
-
-/// Retained source-level name for existing engine callers; the engram-facing
-/// installer and the established configuration contract share one loader.
-pub fn load_estate_configuration(path: Option<&Path>) -> Result<EstateConfiguration> {
-    load_engram_configuration(path)
 }

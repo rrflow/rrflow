@@ -5,7 +5,7 @@
   "stage": "pilot",
   "catalog": {
     "path": "eval/lab/tasks/rrflow-package-planning.json",
-    "sha256": "4a7f0827e8d3cb1ba8cb09d85308afb1dcbbd7e7242473e248b598f74733ea91"
+    "sha256": "9d786aa840c8398ae35e1873f01ccc3dedaa1fa0d47471215c4258ae03c77702"
   },
   "tasks": {"select": "seeded", "count": 5, "seed": 20261103},
   "arms": ["no-repository", "model-alone", "rrflow-harness-import"],

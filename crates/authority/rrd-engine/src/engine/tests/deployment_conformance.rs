@@ -3,7 +3,7 @@ use crate::ServiceErrorKind;
 use std::collections::BTreeMap;
 
 use rrd_contract::{
-    CommitTransaction, DataEstateOrganisation, DataLogicalModel, DataPropertySchema,
+    CommitTransaction, DataEngramOrganisation, DataLogicalModel, DataPropertySchema,
     DataRecordSchema, DataReference, DataSchemaMode, DataSchemaRegistry, DataTableSchema,
     DataValueType, DeploymentConformanceCorpus, ExecuteQuery, QueryBudget, QueryValue,
 };
@@ -49,7 +49,7 @@ fn run_corpus(engine: &RrdEngine, suffix: &str) -> Vec<CanonicalId> {
         registry: DataSchemaRegistry {
             revision: 1,
             migration: "install deployment conformance corpus".into(),
-            organisation: DataEstateOrganisation::default(),
+            organisation: DataEngramOrganisation::default(),
             tables: BTreeMap::from([(
                 table.clone(),
                 DataTableSchema {
@@ -202,7 +202,7 @@ fn configured_query_ceiling_rejects_excess_work_as_resource_exhaustion() {
         )
         .unwrap();
     let budget = QueryBudget {
-        max_rows: engine.estate_configuration().query.max_rows + 1,
+        max_rows: engine.engram_configuration().query.max_rows + 1,
         ..QueryBudget::default()
     };
     let error = engine

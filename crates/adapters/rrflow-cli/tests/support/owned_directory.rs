@@ -1,4 +1,4 @@
-//! Keep an already-owned failed estate without copying or selecting new paths.
+//! Keep an already-owned failed engram without copying or selecting new paths.
 use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},

@@ -18,10 +18,10 @@ fn stopped(
     // direct budget admission/completion probes.
     let (root, mut engine, lease, request) = admitted_fixture("http://127.0.0.1:1/v1");
     configure(&mut engine, steps);
-    engine.estate_configuration.reasoning.max_run_elapsed_ms = 2_000;
-    engine.estate_configuration.reasoning.max_step_elapsed_ms = 1_000;
-    engine.estate_configuration.configuration_sha256 =
-        rrd_contract::estate_configuration_sha256(&engine.estate_configuration).unwrap();
+    engine.engram_configuration.reasoning.max_run_elapsed_ms = 2_000;
+    engine.engram_configuration.reasoning.max_step_elapsed_ms = 1_000;
+    engine.engram_configuration.configuration_sha256 =
+        rrd_contract::engram_configuration_sha256(&engine.engram_configuration).unwrap();
     let cancellation = EmbeddingCancellation::default();
     let context = context(&lease);
     let reservation = engine
@@ -111,8 +111,8 @@ fn resume(
 fn resume_preserves_effort_and_attempts_and_allows_only_a_new_admitted_step() {
     for cancelled in [false, true] {
         let (root, engine, lease, request) = stopped(8, cancelled, false);
-        let identity = engine.installed_estate.clone();
-        let configuration = engine.estate_configuration.clone();
+        let identity = engine.installed_engram.clone();
+        let configuration = engine.engram_configuration.clone();
         let mut expected = budget(&engine, &lease, &request.task_id);
         assert_eq!(
             expected.stopped,
@@ -150,8 +150,8 @@ fn resume_preserves_effort_and_attempts_and_allows_only_a_new_admitted_step() {
         ));
         drop(engine);
         let mut engine = RrdEngine::open_existing(root.path(), instance(), TOKEN_KEY).unwrap();
-        engine.installed_estate = identity;
-        engine.estate_configuration = configuration;
+        engine.installed_engram = identity;
+        engine.engram_configuration = configuration;
         assert_eq!(budget(&engine, &lease, &request.task_id), expected);
         assert_eq!(
             engine

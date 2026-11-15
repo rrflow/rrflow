@@ -84,7 +84,7 @@ on this date) changes some rows; they say so.
 | Area | Today | Evidence | Status | Decision |
 |---|---|---|---|---|
 | Project engram | Installation writes one per project. | `engine/installation.rs:1195` | Runs | |
-| Engram planning and warp APIs | Called only from tests. | `engine/memory_engram.rs:13`; `engine/memory_estate.rs:14,45,106` | Unwired | |
+| Engram planning and warp APIs | Called only from tests. | `engine/memory_engram.rs:13`; `engine/memory_engram.rs:14,45,106` | Unwired | |
 | Personal and org engrams, project links, preference order run → project → user → org → core | Not built. | `docs/decisions/0005-second-brain-personal-and-org-engrams.md:16-18,53-55,73-78` | Docs only | |
 | Active instances in Connectome | A project selector and a "Manage project engines" modal (status, serve, stop, up to four). | `connectome/src/components/ActionBar/projects.tsx:222` | Runs | |
 | Second-brain view | None. | — | Docs only | |
@@ -130,7 +130,7 @@ Engine and repository:
 |---|---|---|---|
 | About 378k lines of Rust in 30 crates, 151k of it in test paths; `rrd-engine` is 103k, of which 51k is tests. Only one binary ships, `rrflow`. | `scripts/build_rrflow.py:110,165` | Size | |
 | `rrd-maintenance` has no dependents; `rrd-cluster` (15k) is reachable only behind a feature no shipped binary enables; `pgvector_postgres.rs` and `fastembed_local.rs` compile only under `--all-features`. | `docs/poam/rrflow-1.0-alpha/poam-008.md:28`; `rrd-engine/Cargo.toml:16` | Unwired | |
-| The Lab is seven crates (13k lines) plus Python and shell; the agent-provider runner is written twice; `eval/lab/retrieval_signal.py` has its own BM25 and report builder; `eval/lab/rrflow_settings.py` rewrites estate TOML with regexes; install and serve are driven by hand in four places; about twelve benchmark runners live in crate `examples/`. | `lab-experiments/src/main.rs:87-101`; `lab-evals/src/provider.rs:14,284`; `run-real-project-workbench.ps1:569-631` | Duplicate | |
+| The Lab is seven crates (13k lines) plus Python and shell; the agent-provider runner is written twice; `eval/lab/retrieval_signal.py` has its own BM25 and report builder; `eval/lab/rrflow_settings.py` rewrites engram TOML with regexes; install and serve are driven by hand in four places; about twelve benchmark runners live in crate `examples/`. | `lab-experiments/src/main.rs:87-101`; `lab-evals/src/provider.rs:14,284`; `run-real-project-workbench.ps1:569-631` | Duplicate | |
 | One contract source but seven SDK and signal generators; `sha256_hex` re-implemented about twelve times beside `rrd-core/src/digest.rs:57`; workspace member lists maintained by hand in six places. | `scripts/ci/check_generated_surfaces.py:497-611`; `scripts/ci/workspace_packages.py` | Duplicate | |
 | The legacy JSON vector segment is still a runtime artifact; the dissolved `rrflow-eval` crate is still documented in `eval/README.md` and nine other records. | `rrd-vector/src/compact.rs:3`; `runtime.rs:21,97` | Superseded | |
 | Planning is spread thin: Gate D has five planning records, "one engine" has three, the Lab has four owners, alpha status spans six records, and 937 of 1,184 Markdown files are change journals. | `docs/roadmap/README.md:51-54,78-79` | Competing owners | |

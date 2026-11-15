@@ -81,7 +81,7 @@ pub(super) fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan
         profile_sha256: digest(41),
         project_precondition_sha256: digest(42),
         storage_root_id: canonical_id("install-01"),
-        configuration: EstateConfiguration::default(),
+        configuration: EngramConfiguration::default(),
         bootstrap: bootstrap(),
         initial_seat: MemorySeatDefinition {
             id: canonical_id("rrflow-local-seat"),
@@ -102,7 +102,7 @@ pub(super) fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan
         ],
         managed_paths: vec![
             InstallationManagedPath {
-                kind: InstallationManagedPathKind::EstateDirectory,
+                kind: InstallationManagedPathKind::EngramDirectory,
                 relative_path: ".rrflow".into(),
                 precondition_sha256: digest(43),
                 removal_rule: InstallationRemovalRule::RemoveIfOwnedAndEmpty,
@@ -204,7 +204,7 @@ pub(super) fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan
                 estimated_write_bytes: 65_536,
             },
             InstallationPlanAction {
-                kind: InstallationActionKind::CreateEstateDirectories,
+                kind: InstallationActionKind::CreateEngramDirectories,
                 disposition: InstallationActionDisposition::Create,
                 input_sha256: digest(4),
                 estimated_write_bytes: 0,
@@ -246,7 +246,7 @@ pub(super) fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan
                 estimated_write_bytes: 256,
             },
         ],
-        adopted_estate_entries: None,
+        adopted_engram_entries: None,
         plan_sha256: digest(0),
     };
     plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();

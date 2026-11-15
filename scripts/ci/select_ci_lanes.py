@@ -84,7 +84,7 @@ PINNED_BY: dict[str, tuple[str, ...]] = {
 # builds these first. The first push that changed rrd-server under the
 # development gate failed for want of one (run 43665714352).
 TEST_BINARIES: dict[str, tuple[str, str]] = {
-    "rrd-server": ("rrflow-cli", "rrd-estate-controller"),
+    "rrd-server": ("rrflow-cli", "rrd-engram-controller"),
 }
 
 

@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae
+// OpenAPI SHA-256: 80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb
 export interface paths {
     "/v1/attunement/cancel": {
         parameters: {
@@ -11,7 +11,7 @@ export interface paths {
         put?: never;
         /**
          * Request cancellation of an installed attunement job
-         * @description Requires EstateAdmin, the exact job revision and plan digest, and an idempotency key. Returns the durable cancel_requested transition or its original receipt on replay. Cancellation is not proof that a worker or external resource has terminated.
+         * @description Requires EngramAdmin, the exact job revision and plan digest, and an idempotency key. Returns the durable cancel_requested transition or its original receipt on replay. Cancellation is not proof that a worker or external resource has terminated.
          */
         post: operations["attunement-cancel"];
         delete?: never;
@@ -31,7 +31,7 @@ export interface paths {
         put?: never;
         /**
          * Discover installed attunement jobs
-         * @description Requires EstateRead. Follows the installed initial job and committed successor links within the requested page bound. Returns stored identities and state at an unchanged control sequence; each later page is a new read. Does not inspect current source, start work, or accept a plan.
+         * @description Requires EngramRead. Follows the installed initial job and committed successor links within the requested page bound. Returns stored identities and state at an unchanged control sequence; each later page is a new read. Does not inspect current source, start work, or accept a plan.
          */
         post: operations["attunement-job-list"];
         delete?: never;
@@ -51,7 +51,7 @@ export interface paths {
         put?: never;
         /**
          * Pause an attunement
-         * @description Requires EstateAdmin, the current revision and worker lease generation, and idempotency. Records a paused job without asserting external resource termination.
+         * @description Requires EngramAdmin, the current revision and worker lease generation, and idempotency. Records a paused job without asserting external resource termination.
          */
         post: operations["attunement-pause"];
         delete?: never;
@@ -71,7 +71,7 @@ export interface paths {
         put?: never;
         /**
          * Read an installed attunement job and its plan
-         * @description Returns the engine's stored attunement plan and status for a known job, authorized by EstateRead. This read does not inspect the current project source and reports source verification as not checked. It does not start, resume, or replan the job.
+         * @description Returns the engine's stored attunement plan and status for a known job, authorized by EngramRead. This read does not inspect the current project source and reports source verification as not checked. It does not start, resume, or replan the job.
          */
         post: operations["attunement-read"];
         delete?: never;
@@ -91,7 +91,7 @@ export interface paths {
         put?: never;
         /**
          * Read an installed attunement control receipt
-         * @description Reads the original committed outcome for the authenticated principal, job, and idempotency key under EstateRead. Returns the stored plan and status or an absent receipt without replaying a mutation. This read does not verify the current project source.
+         * @description Reads the original committed outcome for the authenticated principal, job, and idempotency key under EngramRead. Returns the stored plan and status or an absent receipt without replaying a mutation. This read does not verify the current project source.
          */
         post: operations["attunement-receipt-read"];
         delete?: never;
@@ -111,7 +111,7 @@ export interface paths {
         put?: never;
         /**
          * Recover an expired attunement lease
-         * @description Requires EstateAdmin, the exact revision, an expired lease and idempotency. Records a paused job; the caller must explicitly resume.
+         * @description Requires EngramAdmin, the exact revision, an expired lease and idempotency. Records a paused job; the caller must explicitly resume.
          */
         post: operations["attunement-recover-expired"];
         delete?: never;
@@ -131,7 +131,7 @@ export interface paths {
         put?: never;
         /**
          * Accept an observed source replan
-         * @description Requires EstateAdmin, exact proposal identity and idempotency. Fences the predecessor and records a successor and receipt atomically. Source observation is not an atomic filesystem snapshot.
+         * @description Requires EngramAdmin, exact proposal identity and idempotency. Fences the predecessor and records a successor and receipt atomically. Source observation is not an atomic filesystem snapshot.
          */
         post: operations["attunement-replan-accept"];
         delete?: never;
@@ -151,7 +151,7 @@ export interface paths {
         put?: never;
         /**
          * Preview an attunement replan
-         * @description Requires EstateAdmin and the exact predecessor revision. Observes source without accepting a plan; it is not an atomic filesystem snapshot.
+         * @description Requires EngramAdmin and the exact predecessor revision. Observes source without accepting a plan; it is not an atomic filesystem snapshot.
          */
         post: operations["attunement-replan-preview"];
         delete?: never;
@@ -171,7 +171,7 @@ export interface paths {
         put?: never;
         /**
          * Read an attunement replan receipt
-         * @description Requires EstateRead and reads the authenticated principal's receipt without replaying acceptance or verifying current source.
+         * @description Requires EngramRead and reads the authenticated principal's receipt without replaying acceptance or verifying current source.
          */
         post: operations["attunement-replan-receipt-read"];
         delete?: never;
@@ -191,7 +191,7 @@ export interface paths {
         put?: never;
         /**
          * Resume an attunement
-         * @description Requires EstateAdmin, the exact plan, checkpoint, revision and next phase, plus idempotency. The engine checks observed source before claiming a new lease.
+         * @description Requires EngramAdmin, the exact plan, checkpoint, revision and next phase, plus idempotency. The engine checks observed source before claiming a new lease.
          */
         post: operations["attunement-resume"];
         delete?: never;
@@ -211,7 +211,7 @@ export interface paths {
         put?: never;
         /**
          * Start an attunement
-         * @description Requires EstateAdmin, an exact plan and revision, and idempotency. The engine checks observed source before the transition.
+         * @description Requires EngramAdmin, an exact plan and revision, and idempotency. The engine checks observed source before the transition.
          */
         post: operations["attunement-start"];
         delete?: never;
@@ -231,7 +231,7 @@ export interface paths {
         put?: never;
         /**
          * Advance an attunement
-         * @description Requires EstateAdmin, exact revision and lease generation, and idempotency. The engine checks observed source before advancing.
+         * @description Requires EngramAdmin, exact revision and lease generation, and idempotency. The engine checks observed source before advancing.
          */
         post: operations["attunement-step"];
         delete?: never;
@@ -329,7 +329,7 @@ export interface paths {
         };
         /**
          * Read the service capabilities of this instance
-         * @description Returns the protocol and implementation versions, deployment profile, installed estate identity when present, active estate configuration, instance id, capability descriptors with status, limits, and limitations, and the product capability catalogue. Descriptors are computed when the server binds and reflect whether security, mTLS, and JWT are configured. No credentials are required.
+         * @description Returns the protocol and implementation versions, deployment profile, installed engram identity when present, active engram configuration, instance id, capability descriptors with status, limits, and limitations, and the product capability catalogue. Descriptors are computed when the server binds and reflect whether security, mTLS, and JWT are configured. No credentials are required.
          */
         get: operations["capabilities-read"];
         put?: never;
@@ -431,7 +431,7 @@ export interface paths {
         put?: never;
         /**
          * Read the active endpoint configuration
-         * @description Returns the project endpoint configuration: installed estate identity, revision, current endpoint profile, and the digest of the last applied plan. Revision 0 with no profile means never configured; revocation keeps a nonzero revision with no profile. Requires an installed project identity.
+         * @description Returns the project endpoint configuration: installed engram identity, revision, current endpoint profile, and the digest of the last applied plan. Revision 0 with no profile means never configured; revocation keeps a nonzero revision with no profile. Requires an installed project identity.
          */
         post: operations["endpoint-configuration-read"];
         delete?: never;
@@ -491,7 +491,7 @@ export interface paths {
         put?: never;
         /**
          * Read a consistent cross-model diagnostic snapshot
-         * @description Assembles schema, models, graph and graph difference, retention, vector artifacts, indexes, collections, estate, changefeed, audit, and readiness under one verified read stamp, retrying up to 3 times before returning conflict. scope must equal instance:{id}; change_limit is 1..=4096 and audit_limit 1..=1024. Refused when the runtime head exceeds runtime_max_scanned_changes (max 1000000).
+         * @description Assembles schema, models, graph and graph difference, retention, vector artifacts, indexes, collections, engram, changefeed, audit, and readiness under one verified read stamp, retrying up to 3 times before returning conflict. scope must equal instance:{id}; change_limit is 1..=4096 and audit_limit 1..=1024. Refused when the runtime head exceeds runtime_max_scanned_changes (max 1000000).
          */
         post: operations["diagnostics-read"];
         delete?: never;
@@ -560,7 +560,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/estates/{estate}/read": {
+    "/v1/engrams/{engram}/read": {
         parameters: {
             query?: never;
             header?: never;
@@ -570,10 +570,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Read the snapshot of one estate
-         * @description Returns the estate snapshot named by the {estate} path segment: revision, activity policy, authority resources and receipts, instances with desired, observed, and activity state, and operations. The request resource must carry the same estate id. Returns not_found when no estate authority exists.
+         * Read the snapshot of one engram
+         * @description Returns the engram snapshot named by the {engram} path segment: revision, activity policy, authority resources and receipts, instances with desired, observed, and activity state, and operations. The request resource must carry the same engram id. Returns not_found when no engram authority exists.
          */
-        post: operations["estate-read"];
+        post: operations["engram-read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -591,7 +591,7 @@ export interface paths {
         put?: never;
         /**
          * Record a prompt flight without running a provider
-         * @description Commits a prompt flight at one read stamp: record, stage events, a use edge per canonical record in pruned context, and a task edge when task_id names an open task. Only the observe provider exists, so the flight ends prepared and no provider runs. The same session and idempotency key replay the stored flight; a changed payload conflicts. Context bounds above estate recall limits are refused.
+         * @description Commits a prompt flight at one read stamp: record, stage events, a use edge per canonical record in pruned context, and a task edge when task_id names an open task. Only the observe provider exists, so the flight ends prepared and no provider runs. The same session and idempotency key replay the stored flight; a changed payload conflicts. Context bounds above engram recall limits are refused.
          */
         post: operations["flight-launch"];
         delete?: never;
@@ -691,7 +691,7 @@ export interface paths {
         put?: never;
         /**
          * Read a project's knowledge-tree catalogue
-         * @description Returns the knowledge-tree catalogue for project_id and scope, with its revision, trees, paths and bindings; a catalogue never written is returned empty at revision 0. project_id must match the installed estate's project and scope must be instance:{id}. No vector-store provider is contacted.
+         * @description Returns the knowledge-tree catalogue for project_id and scope, with its revision, trees, paths and bindings; a catalogue never written is returned empty at revision 0. project_id must match the installed engram's project and scope must be instance:{id}. No vector-store provider is contacted.
          */
         post: operations["knowledge-tree-list"];
         delete?: never;
@@ -791,7 +791,7 @@ export interface paths {
         put?: never;
         /**
          * Run a bounded rrflowQL query at one read stamp
-         * @description Parses and runs one rrflowQL query (at most 64 KiB and 128 null, boolean, integer, unsigned or string parameters) on scope instance:{id} at one captured read stamp, returning rows with the canonical query, plan and read evidence. The budget caps storage keys, rows, output, batch rows, memory, spill and elapsed time within estate limits. A principal data policy adds row filters and limits fields.
+         * @description Parses and runs one rrflowQL query (at most 64 KiB and 128 null, boolean, integer, unsigned or string parameters) on scope instance:{id} at one captured read stamp, returning rows with the canonical query, plan and read evidence. The budget caps storage keys, rows, output, batch rows, memory, spill and elapsed time within engram limits. A principal data policy adds row filters and limits fields.
          */
         post: operations["query-execute"];
         delete?: never;
@@ -1151,7 +1151,7 @@ export interface paths {
         put?: never;
         /**
          * Configure the reasoning budget of an open task
-         * @description Creates the durable reasoning budget of an open task from max_run_elapsed_ms, max_steps, and max_step_elapsed_ms, with an optional cap on equivalent attempts. Limits above the estate caps are refused. The run deadline starts when the budget is created. Repeating the same limits returns the existing budget; different limits, or a changed estate configuration, conflict.
+         * @description Creates the durable reasoning budget of an open task from max_run_elapsed_ms, max_steps, and max_step_elapsed_ms, with an optional cap on equivalent attempts. Limits above the engram caps are refused. The run deadline starts when the budget is created. Repeating the same limits returns the existing budget; different limits, or a changed engram configuration, conflict.
          */
         post: operations["task-budget-configure"];
         delete?: never;
@@ -1191,7 +1191,7 @@ export interface paths {
         put?: never;
         /**
          * Resume safely stopped work under its original task budget
-         * @description Requires the exact current expected_budget_sha256 and ReasoningWrite authorization. Resumes cancelled, attempt_failed or repeated_work budgets only with no active or uncertain execution, an open task, unchanged estate configuration and remaining original time and steps. Preserves spent effort, deadline, repetition counts and attempt history; dispatches nothing. An equivalent request stops again before reservation. Old attempts remain non-replayable. Stale requests conflict; after a lost reply read the budget before any further action.
+         * @description Requires the exact current expected_budget_sha256 and ReasoningWrite authorization. Resumes cancelled, attempt_failed or repeated_work budgets only with no active or uncertain execution, an open task, unchanged engram configuration and remaining original time and steps. Preserves spent effort, deadline, repetition counts and attempt history; dispatches nothing. An equivalent request stops again before reservation. Old attempts remain non-replayable. Stale requests conflict; after a lost reply read the budget before any further action.
          */
         post: operations["task-budget-resume"];
         delete?: never;
@@ -1833,7 +1833,7 @@ export interface components {
                                  */
                                 id: string;
                                 /** @enum {string} */
-                                kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                             }[];
                         };
                     };
@@ -3437,7 +3437,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -3784,7 +3784,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -3880,7 +3880,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -4008,7 +4008,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -4100,7 +4100,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -4445,7 +4445,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -4533,7 +4533,7 @@ export interface operations {
                                          *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                          *     labels are separate data and may use arbitrary Unicode.
                                          */
-                                        estate_id: string;
+                                        engram_id: string;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -4769,7 +4769,7 @@ export interface operations {
                                          *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                          *     labels are separate data and may use arbitrary Unicode.
                                          */
-                                        estate_id: string;
+                                        engram_id: string;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -4975,7 +4975,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -5065,7 +5065,7 @@ export interface operations {
                                              *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                              *     labels are separate data and may use arbitrary Unicode.
                                              */
-                                            estate_id: string;
+                                            engram_id: string;
                                             /**
                                              * @description A canonical public identifier component.
                                              *
@@ -5311,7 +5311,7 @@ export interface operations {
                                              *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                              *     labels are separate data and may use arbitrary Unicode.
                                              */
-                                            estate_id: string;
+                                            engram_id: string;
                                             /**
                                              * @description A canonical public identifier component.
                                              *
@@ -5525,7 +5525,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -5950,7 +5950,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -5997,7 +5997,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -6085,7 +6085,7 @@ export interface operations {
                                          *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                          *     labels are separate data and may use arbitrary Unicode.
                                          */
-                                        estate_id: string;
+                                        engram_id: string;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -6426,7 +6426,7 @@ export interface operations {
                                          *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                          *     labels are separate data and may use arbitrary Unicode.
                                          */
-                                        estate_id: string;
+                                        engram_id: string;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -6737,7 +6737,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -6859,7 +6859,7 @@ export interface operations {
                                          *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                          *     labels are separate data and may use arbitrary Unicode.
                                          */
-                                        estate_id: string;
+                                        engram_id: string;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -7024,7 +7024,7 @@ export interface operations {
                                          *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                          *     labels are separate data and may use arbitrary Unicode.
                                          */
-                                        estate_id: string;
+                                        engram_id: string;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -7125,7 +7125,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -7214,7 +7214,7 @@ export interface operations {
                                              *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                              *     labels are separate data and may use arbitrary Unicode.
                                              */
-                                            estate_id: string;
+                                            engram_id: string;
                                             /**
                                              * @description A canonical public identifier component.
                                              *
@@ -7337,7 +7337,7 @@ export interface operations {
                                                  *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                                  *     labels are separate data and may use arbitrary Unicode.
                                                  */
-                                                estate_id: string;
+                                                engram_id: string;
                                                 /**
                                                  * @description A canonical public identifier component.
                                                  *
@@ -7444,7 +7444,7 @@ export interface operations {
                                                  *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                                  *     labels are separate data and may use arbitrary Unicode.
                                                  */
-                                                estate_id: string;
+                                                engram_id: string;
                                                 /**
                                                  * @description A canonical public identifier component.
                                                  *
@@ -7788,7 +7788,7 @@ export interface operations {
                                              *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                              *     labels are separate data and may use arbitrary Unicode.
                                              */
-                                            estate_id: string;
+                                            engram_id: string;
                                             /**
                                              * @description A canonical public identifier component.
                                              *
@@ -7911,7 +7911,7 @@ export interface operations {
                                                  *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                                  *     labels are separate data and may use arbitrary Unicode.
                                                  */
-                                                estate_id: string;
+                                                engram_id: string;
                                                 /**
                                                  * @description A canonical public identifier component.
                                                  *
@@ -8018,7 +8018,7 @@ export interface operations {
                                                  *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                                  *     labels are separate data and may use arbitrary Unicode.
                                                  */
-                                                estate_id: string;
+                                                engram_id: string;
                                                 /**
                                                  * @description A canonical public identifier component.
                                                  *
@@ -8341,7 +8341,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -8691,7 +8691,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -9040,7 +9040,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -9379,7 +9379,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -9518,7 +9518,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -9539,7 +9539,7 @@ export interface operations {
                                 chain_head_sha256?: string | null;
                                 records: {
                                     /** @enum {string} */
-                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                     /** Format: uint64 */
                                     at_unix_ms: number;
                                     /**
@@ -9579,7 +9579,7 @@ export interface operations {
                                              */
                                             id: string;
                                             /** @enum {string} */
-                                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                         }[];
                                     };
                                     response_sha256: string;
@@ -9629,7 +9629,7 @@ export interface operations {
                                 chain_head_sha256?: string | null;
                                 records: {
                                     /** @enum {string} */
-                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                     /** Format: uint64 */
                                     at_unix_ms: number;
                                     /**
@@ -9669,7 +9669,7 @@ export interface operations {
                                              */
                                             id: string;
                                             /** @enum {string} */
-                                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                         }[];
                                     };
                                     response_sha256: string;
@@ -9748,7 +9748,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -9975,7 +9975,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -10440,14 +10440,14 @@ export interface operations {
                                  * @description Stable project-local identity. Organization is deliberately absent: a
                                  *     local installation must not fabricate a tenant merely to address itself.
                                  */
-                                installed_estate?: {
+                                installed_engram?: {
                                     /**
                                      * @description A canonical public identifier component.
                                      *
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -10472,7 +10472,7 @@ export interface operations {
                                      */
                                     id: string;
                                     /** @enum {string} */
-                                    kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                    kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                 };
                                 product_capabilities: {
                                     capabilities: {
@@ -10783,14 +10783,14 @@ export interface operations {
                                  * @description Stable project-local identity. Organization is deliberately absent: a
                                  *     local installation must not fabricate a tenant merely to address itself.
                                  */
-                                installed_estate?: {
+                                installed_engram?: {
                                     /**
                                      * @description A canonical public identifier component.
                                      *
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -10815,7 +10815,7 @@ export interface operations {
                                      */
                                     id: string;
                                     /** @enum {string} */
-                                    kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                    kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                 };
                                 product_capabilities: {
                                     capabilities: {
@@ -10910,7 +10910,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -13030,7 +13030,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -15137,7 +15137,7 @@ export interface operations {
                                  *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                  *     labels are separate data and may use arbitrary Unicode.
                                  */
-                                estate_id: string;
+                                engram_id: string;
                                 /**
                                  * @description A canonical public identifier component.
                                  *
@@ -15543,7 +15543,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -15573,7 +15573,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -16009,7 +16009,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -16823,7 +16823,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -16858,7 +16858,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -17296,7 +17296,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -17745,7 +17745,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -17775,7 +17775,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -18211,7 +18211,7 @@ export interface operations {
                                      *     IDs are lowercase ASCII and intentionally URL/path safe. Human-facing
                                      *     labels are separate data and may use arbitrary Unicode.
                                      */
-                                    estate_id: string;
+                                    engram_id: string;
                                     /**
                                      * @description A canonical public identifier component.
                                      *
@@ -18700,7 +18700,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -19161,7 +19161,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -19700,7 +19700,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -19728,7 +19728,7 @@ export interface operations {
                                     chain_head_sha256?: string | null;
                                     records: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** Format: uint64 */
                                         at_unix_ms: number;
                                         /**
@@ -19768,7 +19768,7 @@ export interface operations {
                                                  */
                                                 id: string;
                                                 /** @enum {string} */
-                                                kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                                kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                             }[];
                                         };
                                         response_sha256: string;
@@ -20780,7 +20780,7 @@ export interface operations {
                                         proof_nodes: number;
                                     };
                                 };
-                                estate?: {
+                                engram?: {
                                     activity_policy: {
                                         /** Format: uint64 */
                                         idle_after_ms: number;
@@ -21683,7 +21683,7 @@ export interface operations {
                                      */
                                     id: string;
                                     /** @enum {string} */
-                                    kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                    kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                 };
                                 models: {
                                     models: {
@@ -22463,7 +22463,7 @@ export interface operations {
                                     chain_head_sha256?: string | null;
                                     records: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** Format: uint64 */
                                         at_unix_ms: number;
                                         /**
@@ -22503,7 +22503,7 @@ export interface operations {
                                                  */
                                                 id: string;
                                                 /** @enum {string} */
-                                                kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                                kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                             }[];
                                         };
                                         response_sha256: string;
@@ -23515,7 +23515,7 @@ export interface operations {
                                         proof_nodes: number;
                                     };
                                 };
-                                estate?: {
+                                engram?: {
                                     activity_policy: {
                                         /** Format: uint64 */
                                         idle_after_ms: number;
@@ -24418,7 +24418,7 @@ export interface operations {
                                      */
                                     id: string;
                                     /** @enum {string} */
-                                    kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                                    kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                                 };
                                 models: {
                                     models: {
@@ -25270,7 +25270,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -25412,7 +25412,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -26008,7 +26008,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -26181,13 +26181,15 @@ export interface operations {
             };
         };
     };
-    "estate-read": {
+    "engram-read": {
         parameters: {
             query?: never;
             header: {
                 "X-RRD-Session": string;
             };
-            path?: never;
+            path: {
+                engram: string;
+            };
             cookie?: never;
         };
         requestBody: {
@@ -26218,7 +26220,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -26791,7 +26793,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -27407,7 +27409,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -27938,7 +27940,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -28853,7 +28855,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -29510,7 +29512,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -29998,7 +30000,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -30281,7 +30283,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -30527,7 +30529,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -30866,7 +30868,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -31381,7 +31383,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -31861,7 +31863,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -32295,7 +32297,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -32720,7 +32722,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -33231,7 +33233,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -33392,7 +33394,7 @@ export interface operations {
                                 endpoints: {
                                     action: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** @constant */
                                         source: "fixed";
                                     };
@@ -33443,7 +33445,7 @@ export interface operations {
                                     /** @enum {string} */
                                     authentication: "public" | "api_key" | "session_bearer";
                                     /** @enum {string} */
-                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                     description: string;
                                     /**
                                      * @description The reference group an operation belongs to.
@@ -33497,7 +33499,7 @@ export interface operations {
                                 endpoints: {
                                     action: {
                                         /** @enum {string} */
-                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                        action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                         /** @constant */
                                         source: "fixed";
                                     };
@@ -33548,7 +33550,7 @@ export interface operations {
                                     /** @enum {string} */
                                     authentication: "public" | "api_key" | "session_bearer";
                                     /** @enum {string} */
-                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "estate_read" | "estate_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
+                                    connect_action: "service_inspect" | "unknown_request" | "session_create" | "session_renew" | "session_close" | "query_execute" | "query_live_poll" | "query_index_ensure" | "query_index_list" | "transaction_begin" | "transaction_preview" | "transaction_commit" | "transaction_abort" | "changefeed_read" | "changefeed_follow" | "web_socket_connect" | "subscription_open" | "subscription_connect" | "subscription_ack" | "subscription_close" | "vector_collection_ensure" | "vector_collection_list" | "vector_collection_delete" | "vector_payload_index_ensure" | "vector_payload_index_list" | "vector_payload_index_delete" | "vector_point_retrieve" | "vector_point_scroll" | "vector_search" | "embedding_model_list" | "embedding_generate" | "embedding_search" | "backup_create" | "backup_list" | "restore_create" | "engram_read" | "engram_admin" | "audit_read" | "audit_export" | "function_catalogue_read" | "function_catalogue_write" | "function_execute" | "diagnostics_read" | "flight_launch" | "flight_read" | "task_write" | "task_read" | "security_admin" | "memory_context_read" | "reasoning_read" | "reasoning_write" | "endpoint_propose" | "worker_execute" | "project_source_read" | "observation_prepare" | "observation_deliver" | "observation_read" | "knowledge_tree_read" | "knowledge_tree_write";
                                     description: string;
                                     /**
                                      * @description The reference group an operation belongs to.
@@ -33716,7 +33718,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -33870,7 +33872,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -34000,7 +34002,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -34197,7 +34199,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -36353,7 +36355,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -36629,7 +36631,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -36796,7 +36798,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -37096,7 +37098,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -37634,7 +37636,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -38180,7 +38182,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -39250,7 +39252,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -39499,7 +39501,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -39753,7 +39755,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -40003,7 +40005,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -40259,7 +40261,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -40492,7 +40494,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -40936,7 +40938,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -41344,7 +41346,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -41679,7 +41681,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -42072,7 +42074,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -42496,7 +42498,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -42640,7 +42642,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -43722,7 +43724,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -44816,7 +44818,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -48931,7 +48933,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -49177,7 +49179,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -49483,7 +49485,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -49899,7 +49901,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -50197,7 +50199,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -50513,7 +50515,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -51451,7 +51453,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -52042,7 +52044,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -52335,7 +52337,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -52731,7 +52733,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -52998,7 +53000,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };
@@ -53646,7 +53648,7 @@ export interface operations {
                              */
                             id: string;
                             /** @enum {string} */
-                            kind: "organization" | "estate" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
+                            kind: "organization" | "engram" | "project" | "instance" | "tenant" | "namespace" | "database" | "table" | "collection" | "record" | "point" | "relation" | "alias" | "cluster" | "node" | "shard" | "replica" | "segment" | "transaction" | "snapshot" | "backup" | "operation";
                         }[];
                     };
                 };

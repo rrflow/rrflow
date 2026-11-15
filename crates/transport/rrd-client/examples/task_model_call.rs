@@ -1,4 +1,4 @@
-//! One explicitly selected installed-estate model operation through the Rust SDK.
+//! One explicitly selected installed-engram model operation through the Rust SDK.
 //! Locator/credential bootstrap follows rrflowdb; all operations use public HTTP.
 use rrd_client::{
     operations::{TaskEndpointPropose, TaskWorkerExecute},

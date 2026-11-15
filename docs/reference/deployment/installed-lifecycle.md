@@ -1,12 +1,12 @@
 # RRFlow installed lifecycle
 
-**Status:** active target contract; canonical local-estate startup and retry slice implemented, operation and release qualification remain open
+**Status:** active target contract; canonical local-engram startup and retry slice implemented, operation and release qualification remain open
 **Coordinate:** `rrflow://rrflow-instance/data/reference/deployment/installed-lifecycle`
 **Owner:** default-distribution acquisition, project installation, readiness, verification, repair, restore, salvage, and removal semantics
 **Reviewed:** 2026-09-15
 
 This record defines the stable target behavior of an installed RRFlow 1.0
-estate. The [alpha objective](../../objectives/rrflow-1.0-alpha.md) owns the
+engram. The [alpha objective](../../objectives/rrflow-1.0-alpha.md) owns the
 measurable result, the [roadmap](../../roadmap/rrflow-1.0.md) owns completion
 order, and the [execution portal](../../roadmap/rrflow-1.0-execution-map.md)
 routes to the active exact-path record, generated inventory, and linked
@@ -41,7 +41,7 @@ Do not conflate these boundaries:
    schemas, templates, default profiles, and required runtime/model assets.
    It never creates project state.
 2. **Project installation** runs `rrflow install` against an explicit project
-   root and creates exactly one estate plus its initial authenticated RRD
+   root and creates exactly one engram plus its initial authenticated RRD
    instance. It never downloads a missing prerequisite.
 
 Every installed byte is either immutable distribution content, a previewed
@@ -86,8 +86,8 @@ alternate supported lifecycle.
 ## Installed state and ownership
 
 The project locator is `.rrflow/config.toml`. It contains only bounded,
-non-secret coordinates needed to locate and authenticate the installed estate:
-format and product identity; project, estate, and instance IDs;
+non-secret coordinates needed to locate and authenticate the installed engram:
+format and product identity; project, engram, and instance IDs;
 project-relative rrflowDB, token-key, and operator-credential locations; and
 the plan, profile, executable, installed-record, and active-configuration
 digests. Canonical mutable state never lives in this file. In particular, it
@@ -103,7 +103,7 @@ Publication fsyncs the candidate, then durably replaces the single locator
 file with a platform-specific atomic file-replacement primitive and fsyncs the
 parent where supported. Cross-device or otherwise non-atomic publication
 fails before mutation. The engine-persisted installed record owns project,
-estate, instance, storage-root, profile, specialization, bundle, schema,
+engram, instance, storage-root, profile, specialization, bundle, schema,
 policy, and plan identities. The locator and record must agree before open;
 neither is synthesized on startup.
 
@@ -148,12 +148,12 @@ RETAINED -> APPLYING
 `QUARANTINED` is fail-closed and cannot serve or accept normal mutations.
 `RETAINED` has no active service, credential, provider binding, or project-file
 integration. Its locator permits only authenticated status, verify, backup,
-restore, and an exact reinstallation plan over the retained estate. Because
+restore, and an exact reinstallation plan over the retained engram. Because
 the alpha has no purge operation, uninstall never claims that retained bytes
 are `ABSENT`.
 
 Attunement's own seven-state job machine remains nested beneath the installed
-estate and does not redefine these states. Events and traces observe committed
+engram and does not redefine these states. Events and traces observe committed
 state; they never manufacture a transition.
 
 ## Read-only nested repository discovery
@@ -178,7 +178,7 @@ returns `installation_identity`, generated from the OS entropy source, and
 writes no project or engine state. Retain that input across previews of this
 installation; obtain a new value for each independent project. The identity
 is not a credential and must not be reused to claim that two independent
-estates are one. A UI can allocate it once when beginning installation and
+engrams are one. A UI can allocate it once when beginning installation and
 retain it with its pending preview, requiring no extra user entry.
 
 `rrflow install plan` is pure. It may read project metadata and bundle content,
@@ -188,7 +188,7 @@ adapter. The plan is canonical serialized data whose SHA-256 covers:
 
 - binary/bundle, template, specialization, attunement-profile, schema, runtime,
   model, and configuration identities;
-- stable project/estate/instance identity, fresh/existing mode, and the exact
+- stable project/engram/instance identity, fresh/existing mode, and the exact
   project-inventory precondition digest without embedding an absolute host
   path;
 - the full effective revisioned configuration, not an opaque or caller-supplied
@@ -212,7 +212,7 @@ scope; the grant covers the installed instance, not only a later selected file.
 The alternative is the unchanged default grant list. Apply accepts only those
 two canonical lists and still requires the exact preview digest. This choice
 does not enable source or context export, make a path eligible, select a
-provider, or change any existing estate. An older executable rejects the new
+provider, or change any existing engram. An older executable rejects the new
 option as unsupported.
 
 `rrflow install attunement-schema` emits the machine-readable shape of an
@@ -271,7 +271,7 @@ generate a handoff, invoke a model, or establish indexing completion.
 
 Installation-plan contract version 4 seals the explicit identity input and
 `project_root_sha256`, a digest of the initial canonical root. Identical project
-content does not allocate an estate identity. New apply and interrupted recovery
+content does not allocate an engram identity. New apply and interrupted recovery
 must match that root before effects. Once the installed locator and record are
 published, relocation, reopen and exact completed replay retain the persisted
 identity; the live path is not its permanent identity. Prior version-1/2/3 plans
@@ -280,9 +280,9 @@ are rejected. Attunement plans, jobs and commands use their independent version
 state and commands are rejected. Installation results retain version 1. Installation previews now carry an
 explicit preview-format version 1 and reject unversioned or unknown preview
 formats. Product version remains `1.0.0`. No migration for earlier attunement
-state or preview files is provided. This is not a binary-upgrade or estate-
+state or preview files is provided. This is not a binary-upgrade or engram-
 migration facility: retain the executable that created an existing pre-alpha
-estate until its qualified upgrade path exists.
+engram until its qualified upgrade path exists.
 `rrflow --json version` advertises `installation_plan_contract_version` so
 clients can check the installation boundary without treating the frozen
 product version as a capability signal.
@@ -340,7 +340,7 @@ binds native qualification and foundation acceptance to exact candidate evidence
    `.rrflow-install.lock` file without following an unreviewed link or mount
    change; retains that handle through final acknowledgement;
 3. prepares the accepted clock anchor and secrets once in the private intent;
-4. creates the private estate directories and publishes exact bundled instructions;
+4. creates the private engram directories and publishes exact bundled instructions;
 5. creates the plan-addressed rrflowKV root and delivers the prepared credentials;
 6. commits the installed binding, initial seat, security authority, checkpoint,
    audit, configuration and pending attunement plan/job through `RrdEngine`;
@@ -348,7 +348,7 @@ binds native qualification and foundation acceptance to exact candidate evidence
 8. acknowledges the exact intent without treating file presence as job completion.
 
 Every crash boundary resumes the same plan or fails closed. It cannot create a
-second credential, policy, estate, instance, audit outcome, or project edit.
+second credential, policy, engram, instance, audit outcome, or project edit.
 No listener becomes ready before authentication policy and the installed
 binding are committed.
 
@@ -379,13 +379,13 @@ full resource accounting and installed Inventory restart evidence remain D-03 wo
 
 ## Current pre-release slice and rollout
 
-Packages `D01-02-canonical-estate-layout-and-configuration-v1`,
+Packages `D01-02-canonical-engram-layout-and-configuration-v1`,
 `D01-04-precanonical-authority-convergence-and-install-recovery-v5`, and
 `D01-05-engine-owned-installation-clock-v1` implement the current concrete
 startup slice without claiming the complete target above:
 
-- `rrd-contract` owns `InstalledEstateIdentity`, three independent deployment
-  coordinates, and a strict self-digesting format-3 `EstateConfiguration`,
+- `rrd-contract` owns `InstalledEngramIdentity`, three independent deployment
+  coordinates, and a strict self-digesting format-3 `EngramConfiguration`,
   including `clock.maximum_rollback_ms` with a zero default and required native
   storage limits;
 - the bundled default configuration or one explicit regular, non-symlinked
@@ -440,7 +440,7 @@ startup slice without claiming the complete target above:
 
 Installation can seal reasoning ceilings from `install plan --configuration
 <toml>`. Copy the complete bundled
-[`default-estate-configuration-v3.toml`](../../../crates/authority/rrd-engine/assets/install/default-estate-configuration-v3.toml)
+[`default-engram-configuration-v3.toml`](../../../crates/authority/rrd-engine/assets/install/default-engram-configuration-v3.toml)
 as the input and edit its existing `[reasoning]` table, for example:
 
 ```toml
@@ -627,14 +627,14 @@ silently defaulted. Product version remains 1.0.0.
 
 A new install adopts a leftover `.rrflow` folder in place (owner decision,
 2026-10-31). The plan lists the folder's top-level entries in
-`adopted_estate_entries`; plans without a leftover folder keep their existing
+`adopted_engram_entries`; plans without a leftover folder keep their existing
 digest. Apply refuses the plan if those entries changed, makes the folder
 private (owner-only DACL on Windows, mode 0700 elsewhere) only when the current
 user owns it and it is a real folder, then moves each listed entry, including a
 pre-canonical `instance.toml`, into `.rrflow/previous/<plan id>/`. Nothing is
 deleted or merged, and moved entries keep their own permissions. An interrupted
 adoption changes the listed entries, so the stale plan is refused and a fresh
-plan adopts what remains. A project with a locator is an installed estate and
+plan adopts what remains. A project with a locator is an installed engram and
 is never adopted.
 The tracked development manifest has been deleted because no source path reads
 it. The clock substrate proves only relative rollback against a sealed anchor:
@@ -646,7 +646,7 @@ in the linked matrix. Configuration plan/apply, attunement phase execution, full
 verify/repair/restore/uninstall, service integration, release assembly, and
 clean-machine qualification remain separate packages. The staged rationale and
 exit proofs are in the
-[canonical estate/configuration research](../../research/rrflow-canonical-estate-configuration-and-runtime-controls.md#rollout-sequence).
+[canonical engram/configuration research](../../research/rrflow-canonical-engram-configuration-and-runtime-controls.md#rollout-sequence).
 
 ## Native secret leaf-file boundary
 
@@ -701,7 +701,7 @@ or serve. Install recovery admits both files below `.rrflow`. The map is not
 yet a recall record and Connectome does not show it; kernel package K5 owns
 making it a projection of the Inventory records.
 
-### Private estate-directory admission
+### Private engram-directory admission
 
 The four engine-owned boundaries `.rrflow`, `.rrflow/rrd`,
 `.rrflow/rrd/roots` and `.rrflow/credentials` are created with private native
@@ -718,13 +718,13 @@ only during new or interrupted apply. A changed mode, unsupported ACL or
 non-directory object is refused without permission repair; project-owned
 parents are never tightened. Creation does not replace an existing object.
 
-These checks extend the private-object boundary. Existing pre-alpha estates
+These checks extend the private-object boundary. Existing pre-alpha engrams
 with incompatible directory permissions
 are refused rather than silently upgraded.
 
 ### Retained filesystem authority
 
-Installation retains the admitted project directory and each private estate
+Installation retains the admitted project directory and each private engram
 boundary. Store, manifest, WAL, segment, object, backup, archive and restore
 operations carry directory capabilities through their existing owners.
 Diagnostic path strings cannot be used as capability inputs. Each relative
@@ -771,7 +771,7 @@ the primary process. An optional outward process adapter may supervise it, but
 cannot initialize state or define readiness.
 
 `rrflow ready` succeeds only when an authenticated challenge proves the exact
-installed project/estate/instance, binary/bundle digest, policy revision,
+installed project/engram/instance, binary/bundle digest, policy revision,
 storage profile, commit/read stamp, and required subsystem status. For alpha,
 the readiness proof includes a bounded engine operation and persistence health.
 A PID, port, TCP handshake, marker, JSON file, source path, or compile result is
@@ -779,18 +779,18 @@ not readiness.
 
 ### Served endpoint record
 
-A served estate records where it listens, so that another local process can
+A served engram records where it listens, so that another local process can
 find an instance started from the project folder. Connectome and
 `rrflow ready` use it. The record is an endpoint candidate under
 [H-07](../../roadmap/rrflow-1.0/gate-h.md#h-07-devpulse-managed-cloud-and-homelab-packages),
 never readiness.
 
 - **Publication.** After the server binds, `RrdEngine` writes
-  `.rrflow/serving.json` in the private estate directory. It holds the record
+  `.rrflow/serving.json` in the private engram directory. It holds the record
   format, instance ID, loopback URL, serving process ID and product version,
   and no credential. The engine writes it beside its final name and moves it
   into place without replacing an object it did not remove.
-- **A record found at start is stale.** The serving process holds the estate's
+- **A record found at start is stale.** The serving process holds the engram's
   single writer lock, so a record that exists when it publishes was left by a
   process that no longer runs. The engine removes it first.
 - **Removal.** A clean shutdown removes the record if it is still the one this
@@ -802,8 +802,8 @@ never readiness.
   The challenge sends the installed credential, so a record that names a
   non-loopback address, another instance, an unknown field or a non-regular
   object is refused before any connection.
-- **A second serve.** While another process holds the estate open,
-  `rrflow serve` fails before binding. It says the estate is already open and
+- **A second serve.** While another process holds the engram open,
+  `rrflow serve` fails before binding. It says the engram is already open and
   names the recorded URL when one exists.
 - **The locator is unchanged.** `.rrflow/config.toml` still contains no
   endpoint.
@@ -901,11 +901,11 @@ separates implementation and compilation from native qualification results.
 
 Backup creation is an authenticated engine operation at one snapshot boundary.
 The application-complete form includes logical semantic commits, catalogues,
-immutable objects, the estate's control state, configuration/schema
+immutable objects, the engram's control state, configuration/schema
 identities, projection source coordinates, and the receipts needed to prove
 completeness. Backup verification is read-only and verifies the digests of the
 whole catalogue closure. A digest detects changed bytes; it does not
-authenticate a producer, because the catalogue shares the estate's filesystem
+authenticate a producer, because the catalogue shares the engram's filesystem
 trust domain and a keyed authenticator would sit beside the key it protects.
 Verification creates nothing: object stores and restored roots are opened as
 existing, and a catalogue file that is absent while retained artifacts exist
@@ -921,17 +921,17 @@ and the archive records them:
 | Family | Content |
 |---|---|
 | `server/state/install` | installed record and install checkpoint |
-| `server/state/<instance>/configuration` | active estate configuration |
+| `server/state/<instance>/configuration` | active engram configuration |
 | `server/state/<instance>/security` | security policy (principals, roles, bindings, issuers; credentials as digests) |
 | `server/state/<instance>/audit`, `server/state/<instance>/audit-head` | the hash-chained audit records and their durable head |
 | `server/state/<instance>/attunement` | attunement plan and job state |
-| `server/state/estate` | estate documents |
+| `server/state/engram` | engram documents |
 
 Every value in these families is non-secret. The token key (`RRD.TOKEN`) and
 the operator credential are files outside the store and are never part of a
 backup; a restored root has no token key until publication supplies one. Not
 carried: session leases, subscriptions, backup and restore operation receipts,
-and estate-recovery receipts, which are transient or belong to the instance
+and engram-recovery receipts, which are transient or belong to the instance
 that performed the operation. The two catalogue families travel in the
 catalogue manifest. A backup whose scope would overlap the catalogue families,
 or whose families overlap each other, is refused before any artifact is
@@ -956,7 +956,7 @@ provenance, and restore verification checks that the restored journal carries
 every archived entry contiguously and in order with the same key, before-state,
 value, time, actor, action, and request identities.
 
-On an installed estate the backup catalogue lives at
+On an installed engram the backup catalogue lives at
 `.rrflow/rrd/backups/<instance-id>/` and restore staging roots at
 `.rrflow/rrd/restores/<instance-id>/<restore-id>/`, both inside the managed
 persistent container beside `roots/` and never below it: `roots/` holds only
@@ -964,7 +964,7 @@ storage roots the locator can select, and install recovery rejects any other
 entry there. Both directories are created on first use, not by installation,
 and uninstall retains them with the rrflowDB data. A component or test root
 opened outside an installation keeps its sibling `rrd-service/<instance>` tree;
-that tree is not an installed-estate location.
+that tree is not an installed-engram location.
 
 Restore never overlays the live data root. It writes an absent staging root,
 validates format and application identity before replay, restores canonical
@@ -980,7 +980,7 @@ replaces, the backup that produced the candidate, and read-only evidence of
 both roots (physical digest, runtime manifest, runtime cursor, claim sequence,
 control sequence); the candidate's installed record must equal the active
 record and its configuration must match the locator, and the plan refuses a
-served estate because the read-only inspector cannot take its shared lock under
+served engram because the read-only inspector cannot take its shared lock under
 a running writer. `rrflow restore apply --plan <file> --expect <sha256>`
 executes only that plan: it holds an exclusive publication lease for the
 instance, re-verifies both roots and the candidate's backup closure, carries the
@@ -1002,7 +1002,7 @@ replacement for that case is D-11 work.
 Uninstall uses plan/apply and owns only RRFlow-installed integration. It
 retains rrflowDB data and backups, stops RRFlow-owned services through
 authenticated receipts, revokes active bindings, removes only unchanged
-managed files/regions, and durably marks the estate `RETAINED`. The bounded
+managed files/regions, and durably marks the engram `RETAINED`. The bounded
 retention locator remains so status, verification, backup/restore, or an exact
 reinstallation can find the bytes without treating them as active. Project
 source, application databases, provider state, mesh state, generator output,
@@ -1073,41 +1073,41 @@ supported target:
   internal/adapter artifacts rather than additional operator lifecycle roots.
 - `RrflowKvStore` has explicit `create_new` and `open_existing` constructors
   beside the retained create-or-open `open`. Every restore path, including the
-  local estate authority's, checks a restored target with `open_existing`, so
+  local engram authority's, checks a restored target with `open_existing`, so
   an empty or foreign target fails closed; `open` remains for component roots
   and tests that do not claim installation. Inspection is separate and
   read-only.
 - `rrflow-cli::dev::supervisor`, its private files, the standalone security
   initializer, `rrd-server initialize`, and create-on-start product paths are
   absent after the D-01 replacement tests passed.
-- the estate controller's backup, prune, and restore paths resolve a managed
-  instance as the installed project `instances/<instance>` under the estate
+- the engram controller's backup, prune, and restore paths resolve a managed
+  instance as the installed project `instances/<instance>` under the engram
   state root: they read its locator, require the controller's
   `--distribution-executable` to be the installed distribution, and act on the
   instance's own `.rrflow/rrd/backups/<id>` catalogue and
   `.rrflow/rrd/restores/<id>/` staging roots — the catalogue the served engine
   lists, and the staging roots `restore plan|apply` publishes from.
   The backup driver opens the instance through `open_installed` with its real
-  token key; a project that is not an installed estate, a pre-canonical
+  token key; a project that is not an installed engram, a pre-canonical
   `.rrflow/rrd` component store, or a different distribution is refused
   permanently without creating anything. The former `<state-root>/backups` and
   `<state-root>/restores` lane is gone. A retention decision applies only when
-  the estate's recovery points are exactly the instance's catalogue; a
+  the engram's recovery points are exactly the instance's catalogue; a
   catalogue that also holds backups created through the served engine's
-  `backup-create` is refused until the estate can register them (open D-11
+  `backup-create` is refused until the engram can register them (open D-11
   work).
 - the engine's `backup-create`, `backup-list`, and `restore-create` operations
-  on an installed estate (opened through `open_installed` by `serve`) write to
+  on an installed engram (opened through `open_installed` by `serve`) write to
   `.rrflow/rrd/backups/<instance-id>/` and `.rrflow/rrd/restores/<instance-id>/`.
   Before that correction they wrote below `roots/`, where install recovery
   rejects any entry but the storage root. Restore stages; publication is the
   offline `restore plan|apply` described above. A restore into an already
   staged target is recovered by opening it as an existing store and verifying
   it, never by creating a database there.
-- a backup of an installed estate carries the installed control state as the
+- a backup of an installed engram carries the installed control state as the
   control-journal archive above, and `rrflow restore plan|apply` publishes a
   staged restore into the storage root's own name with the previous root
-  quarantined, so a restored estate opens through `open_installed` and reaches
+  quarantined, so a restored engram opens through `open_installed` and reaches
   authenticated readiness ([POAM-031](../../poam/rrflow-1.0-alpha/poam-031.md),
   closed). Still D-11 work: locator replacement for a candidate whose
   configuration revision differs from the active locator, and the remaining

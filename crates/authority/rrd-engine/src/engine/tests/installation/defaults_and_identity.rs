@@ -7,7 +7,7 @@ use super::*;
 #[test]
 pub(super) fn every_default_page_cache_is_the_one_search_was_measured_with() {
     const MEASURED: u64 = 64 * 1024 * 1024;
-    let bundled = crate::load_estate_configuration(None).unwrap();
+    let bundled = crate::load_engram_configuration(None).unwrap();
     assert_eq!(
         bundled.storage.page_cache_bytes, MEASURED,
         "the bundled configuration"
@@ -31,7 +31,7 @@ pub(super) fn every_default_page_cache_is_the_one_search_was_measured_with() {
 
 #[test]
 pub(super) fn a_configuration_still_chooses_its_own_page_cache() {
-    let mut storage = crate::load_estate_configuration(None).unwrap().storage;
+    let mut storage = crate::load_engram_configuration(None).unwrap().storage;
     for chosen in [0, 1024 * 1024, 1024 * 1024 * 1024] {
         storage.page_cache_bytes = chosen;
         let installed = crate::engine::core::installed_storage_options(&storage).unwrap();
@@ -137,7 +137,7 @@ pub(super) fn independent_installations_do_not_reuse_content_identity() {
         );
         assert_ne!(
             first_plan.installation.target, second_plan.installation.target,
-            "distinct projects with identical content must not share an estate identity"
+            "distinct projects with identical content must not share an engram identity"
         );
         let before = inventory(second.path());
         assert!(matches!(
@@ -168,7 +168,7 @@ pub(super) fn independent_installations_do_not_reuse_content_identity() {
             .unwrap();
             let reopened = open_at(project, &executable, 1_800_000_000_001).unwrap();
             assert_eq!(
-                reopened.installed_estate_identity(),
+                reopened.installed_engram_identity(),
                 Some(&preview.installation.target)
             );
         }
@@ -361,11 +361,11 @@ pub(super) fn configuration_input_rejects_unknown_oversized_and_symbolic_sources
         "format_version = 1\nunknown_authority = true\n",
     )
     .unwrap();
-    assert!(crate::load_estate_configuration(Some(invalid.path())).is_err());
+    assert!(crate::load_engram_configuration(Some(invalid.path())).is_err());
 
     let oversized = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(oversized.path(), vec![b' '; 64 * 1024 + 1]).unwrap();
-    assert!(crate::load_estate_configuration(Some(oversized.path())).is_err());
+    assert!(crate::load_engram_configuration(Some(oversized.path())).is_err());
 
     #[cfg(unix)]
     {
@@ -376,6 +376,6 @@ pub(super) fn configuration_input_rejects_unknown_oversized_and_symbolic_sources
         let symbolic = directory.path().join("selected.toml");
         std::fs::write(&target, "format_version = 1\n").unwrap();
         symlink(target, &symbolic).unwrap();
-        assert!(crate::load_estate_configuration(Some(&symbolic)).is_err());
+        assert!(crate::load_engram_configuration(Some(&symbolic)).is_err());
     }
 }

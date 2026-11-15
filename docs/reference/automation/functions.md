@@ -86,7 +86,7 @@ schema, limit, capability, runtime-profile, and ordering field.
 
 An accepted definition binds at least:
 
-- estate, function identity, immutable revision, predecessor, definition
+- engram, function identity, immutable revision, predecessor, definition
   digest, activation/retirement state, and catalogue membership;
 - implementation kind, exact built-in registry entry or artifact identity,
   content digest, media type, byte length, runtime profile, ABI, and engine
@@ -102,7 +102,7 @@ An accepted definition binds at least:
 
 Unknown fields, duplicate identities, missing artifacts, digest drift,
 unsupported runtime profiles, zero or overflowing limits, schema mismatch,
-unavailable enforcement, mutable native code, or cross-estate references fail
+unavailable enforcement, mutable native code, or cross-engram references fail
 closed. Advertised catalogue and artifact maxima must fit the actual physical
 transaction and record limits; a public limit that storage cannot represent is
 a contract defect.
@@ -308,7 +308,7 @@ not grants. Principal policy, binding policy, event schema policy, field/record
 policy, and transaction effect authorization are evaluated at the operation's
 captured coordinate.
 
-A function invocation receipt binds at least the estate/instance, invocation,
+A function invocation receipt binds at least the engram/instance, invocation,
 request, operation, correlation, principal and representation, authorization
 digest, read stamp, catalogue revision/digest, definition revision/digest,
 artifact and runtime profile/build, input/output schema and digests, status,

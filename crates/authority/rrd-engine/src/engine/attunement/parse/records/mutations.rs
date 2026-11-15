@@ -237,7 +237,7 @@ pub(in super::super) fn ensure_indexes(
         &engine.storage,
         scope,
         &sources,
-        RuntimeReadBudget::new(engine.estate_configuration.query.max_storage_keys)?,
+        RuntimeReadBudget::new(engine.engram_configuration.query.max_storage_keys)?,
     )
     .map_err(|error| ServiceError::Query(error.to_string()))?;
     for definition in missing {

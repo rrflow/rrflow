@@ -693,7 +693,7 @@ impl SystemAdapter for RrflowAdapter {
     }
 
     fn teardown(&self) -> Result<()> {
-        // RRFlow retains history by design and the lab uses a fresh estate per run,
+        // RRFlow retains history by design and the lab uses a fresh engram per run,
         // so there is nothing to remove here.
         Ok(())
     }

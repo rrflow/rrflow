@@ -21,7 +21,7 @@ impl RrdEngine {
         let (_, auth) = self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             now,
             context.request_id.as_str(),
             context.operation_id.as_str(),
@@ -49,7 +49,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             admitted_at,
             context.request_id.as_str(),
             context.operation_id.as_str(),
@@ -266,7 +266,7 @@ impl RrdEngine {
         self.authorize(
             session,
             token,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
             authorization_at,
             context.request_id.as_str(),
             context.operation_id.as_str(),
@@ -329,7 +329,7 @@ impl RrdEngine {
         next: &mut AttunementJob,
         at: u64,
     ) -> Result<()> {
-        let configuration: EstateConfiguration = decode(
+        let configuration: EngramConfiguration = decode(
             &self
                 .storage
                 .control()
@@ -337,7 +337,7 @@ impl RrdEngine {
                 .ok_or_else(|| ServiceError::Storage("installed configuration missing".into()))?,
         )?;
         configuration.validate().map_err(contract)?;
-        if configuration != self.estate_configuration {
+        if configuration != self.engram_configuration {
             return Err(ServiceError::ProjectBindingMismatch);
         }
         let read = self

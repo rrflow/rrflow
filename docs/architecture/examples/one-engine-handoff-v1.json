@@ -38,7 +38,7 @@
       "kind": "engine_mutation",
       "intent": "Create source-linked records from the authorized example snapshot",
       "capability": "example-capability",
-      "scope": "example project estate",
+      "scope": "example project engram",
       "resources": [{"kind": "engine_record", "selector": "exact", "locator": "rrflow://example/records/source-a"}],
       "source_dependencies": ["source-a"],
       "question_dependencies": [],

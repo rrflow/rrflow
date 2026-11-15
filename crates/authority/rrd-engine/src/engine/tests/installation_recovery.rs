@@ -1,6 +1,6 @@
 use super::*;
 use crate::engine::clock::FixedClock;
-use crate::engine::estate_layout::EstateLayout;
+use crate::engine::engram_layout::EngramLayout;
 use crate::engine::installation::recovery::InstallApplyStage;
 use crate::engine::token_key::{read_api_key_document, read_token_key};
 use crate::InstallationPreview;
@@ -35,8 +35,8 @@ fn plan(project: &Path, executable: &Path) -> InstallationPreview {
     .unwrap()
 }
 
-fn layout(preview: &InstallationPreview) -> EstateLayout {
-    EstateLayout::new(
+fn layout(preview: &InstallationPreview) -> EngramLayout {
+    EngramLayout::new(
         &preview.installation.storage_root_id,
         &preview.installation.initial_principal_id,
     )
@@ -183,7 +183,7 @@ fn interrupted_installation_cannot_resume_at_a_different_root() {
 fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority() {
     let stages = [
         InstallApplyStage::IntentPublished,
-        InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::EngramDirectoriesReady,
         InstallApplyStage::BootstrapStaged,
         InstallApplyStage::BootstrapReady,
         InstallApplyStage::StorageReady,
@@ -198,8 +198,8 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
         let project = project_fixture();
         let executable = test_executable();
         let preview = plan(project.path(), &executable);
-        let estate = layout(&preview);
-        let intent_path = project.path().join(&estate.install_intent);
+        let engram = layout(&preview);
+        let intent_path = project.path().join(&engram.install_intent);
 
         let error = RrdEngine::apply_installation_with_failure(
             project.path(),
@@ -241,14 +241,14 @@ fn interrupted_apply_recovers_at_every_durable_stage_without_duplicate_authority
             )
         );
         assert!(!intent_path.exists());
-        assert!(!project.path().join(&estate.locator_pending).exists());
+        assert!(!project.path().join(&engram.locator_pending).exists());
 
         let (materialized_token, materialized_credential) =
             materialized_secret_evidence(project.path(), &preview);
         assert_eq!(materialized_token, token_sha256);
         assert_eq!(materialized_credential, credential_sha256);
         assert_eq!(count_named_files(project.path(), "RRD.TOKEN"), 1);
-        let credential_name = Path::new(&estate.operator_credential)
+        let credential_name = Path::new(&engram.operator_credential)
             .file_name()
             .unwrap()
             .to_str()
@@ -398,7 +398,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
     let executable = distribution.path().join("rrflow-test-binary");
     std::fs::write(&executable, b"distribution-v1").unwrap();
     let preview = plan(project.path(), &executable);
-    let estate = layout(&preview);
+    let engram = layout(&preview);
 
     RrdEngine::apply_installation_with_failure(
         project.path(),
@@ -450,7 +450,7 @@ fn owned_intent_rejects_project_and_executable_drift_without_writes() {
     .is_err());
     assert_eq!(file_inventory(project.path()), before_project_rejection);
     assert!(!project.path().join(".rrflow").exists());
-    assert!(project.path().join(&estate.install_intent).is_file());
+    assert!(project.path().join(&engram.install_intent).is_file());
 
     std::fs::write(project.path().join("README.md"), "walking product\n").unwrap();
     let recovered = RrdEngine::apply_installation_at(
@@ -716,7 +716,7 @@ fn symbolic_intent_collision_is_preserved_and_rejected() {
 fn anchored_installation_preserves_outside_state_at_durable_boundaries() {
     for stage in [
         InstallApplyStage::IntentPublished,
-        InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::EngramDirectoriesReady,
         InstallApplyStage::BootstrapStaged,
         InstallApplyStage::BootstrapReady,
         InstallApplyStage::LocatorPublished,

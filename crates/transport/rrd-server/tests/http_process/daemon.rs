@@ -123,7 +123,7 @@ pub(super) fn standalone_daemon_process_passes_the_shared_corpus_and_exclusively
         "loopback_http_websocket"
     );
     assert_eq!(
-        payload(&capabilities)["installed_estate"]["instance_id"],
+        payload(&capabilities)["installed_engram"]["instance_id"],
         instance.as_str()
     );
 

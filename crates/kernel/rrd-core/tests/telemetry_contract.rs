@@ -252,7 +252,7 @@ fn catalogue_contains_no_effect_or_content_authority() {
         "actor_id",
         "authorization",
         "credential",
-        "estate_id",
+        "engram_id",
         "model_output",
         "project_id",
         "prompt",

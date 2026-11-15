@@ -89,9 +89,9 @@ class WorkflowPolicy(unittest.TestCase):
     def test_windows_uses_native_python_command(self):
         jobs = job_blocks(REUSABLE.read_text(encoding="utf-8"))
         expected = 'if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; python_command=python; fi'
-        self.assertIn(expected, jobs["estate-portability"])
+        self.assertIn(expected, jobs["engram-portability"])
         altered = dict(jobs)
-        altered["estate-portability"] = altered["estate-portability"].replace(
+        altered["engram-portability"] = altered["engram-portability"].replace(
             "python_command=python; fi", "python_command=python3; fi", 1)
         with self.assertRaises(PolicyError):
             verify_standalone_rrflowdb(altered)
@@ -100,14 +100,14 @@ class WorkflowPolicy(unittest.TestCase):
         jobs = job_blocks(REUSABLE.read_text(encoding="utf-8"))
         verify_standalone_rrflowdb(jobs)
         for job, marker in (("topology-smoke", "scripts/ci/run_rrflowdb_standalone.py"),
-                            ("estate-portability", "scripts/ci/run_rrflowdb_standalone.py"),
+                            ("engram-portability", "scripts/ci/run_rrflowdb_standalone.py"),
                             ("verify", "scripts/ci/test_rrflowdb_standalone.py")):
             altered = dict(jobs)
             altered[job] = altered[job].replace(marker, "missing", 1)
             with self.subTest(job=job), self.assertRaises(PolicyError):
                 verify_standalone_rrflowdb(altered)
         altered = dict(jobs)
-        altered["estate-portability"] = altered["estate-portability"].replace(
+        altered["engram-portability"] = altered["engram-portability"].replace(
             "      - name: Build and exercise the standalone rrflowDB example\n",
             "      - name: Build and exercise the standalone rrflowDB example\n        if: false\n", 1)
         with self.assertRaises(PolicyError):

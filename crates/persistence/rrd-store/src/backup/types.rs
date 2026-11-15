@@ -3,7 +3,7 @@
 use super::*;
 
 /// Version 2 adds the control-journal archive: an application-complete backup
-/// carries the estate's control state (installed record, configuration,
+/// carries the engram's control state (installed record, configuration,
 /// security policy and audit chain, attunement) as replayable journal entries.
 /// A version 1 catalogue is refused rather than read as complete.
 pub const BACKUP_CATALOGUE_VERSION: u16 = 2;
@@ -86,7 +86,7 @@ pub struct BackupEntry {
     pub claims: BackupCoverage,
     pub typed_runtime: BackupCoverage,
     pub catalogues: BackupCoverage,
-    /// The estate's control state outside the catalogues: installed record and
+    /// The engram's control state outside the catalogues: installed record and
     /// checkpoint, active configuration, security policy and audit chain, and
     /// attunement plan and job state, carried as replayable journal entries.
     pub installed_control: BackupCoverage,

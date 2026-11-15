@@ -51,7 +51,7 @@ already has this scan and the fix does not worsen it. The scan bound is now
 
 `audit-read`, `audit-export`, and `diagnostics-read` reject valid bounded
 reads for as long as the journal's length leaves the limit-th record in a
-partial final page. On the Connectome fixture estate, a 64-record audit page
+partial final page. On the Connectome fixture engram, a 64-record audit page
 failed on every run; Connectome now requests one-record pages. Audit lineage
 stays intact, but audit evidence is unavailable at those page sizes.
 

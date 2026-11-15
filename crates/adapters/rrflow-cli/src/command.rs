@@ -57,7 +57,7 @@ pub enum Command {
         #[arg(long = "test-distribution-executable", hide = true)]
         test_distribution_executable: Option<std::path::PathBuf>,
     },
-    /// Authenticate against a running estate and return UI discovery documents.
+    /// Authenticate against a running engram and return UI discovery documents.
     Ready {
         #[arg(long, default_value = ".")]
         project: std::path::PathBuf,
@@ -66,7 +66,7 @@ pub enum Command {
         #[arg(long)]
         address: Option<std::net::SocketAddr>,
     },
-    /// Perform bounded, read-only verification of an installed estate.
+    /// Perform bounded, read-only verification of an installed engram.
     Verify {
         #[arg(long, default_value = ".")]
         project: std::path::PathBuf,
@@ -81,7 +81,7 @@ pub enum Command {
         #[command(subcommand)]
         action: RepairAction,
     },
-    /// Preview or apply the publication of a verified restore while the estate is stopped.
+    /// Preview or apply the publication of a verified restore while the engram is stopped.
     Restore {
         #[command(subcommand)]
         action: RestoreAction,
@@ -90,7 +90,7 @@ pub enum Command {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum RepairAction {
-    /// Inspect the installed estate and emit an exact plan without changing bytes.
+    /// Inspect the installed engram and emit an exact plan without changing bytes.
     Plan {
         #[arg(long, default_value = ".")]
         project: std::path::PathBuf,
@@ -164,13 +164,13 @@ pub enum InstallAction {
         identity: String,
         #[arg(long, default_value = "default")]
         profile: String,
-        /// Operator-authored estate ceilings sealed into the installation plan.
+        /// Operator-authored engram ceilings sealed into the installation plan.
         #[arg(long)]
         configuration: Option<std::path::PathBuf>,
         /// Bounded JSON proposal for recognized attunement effects.
         #[arg(long)]
         attunement_proposal: Option<std::path::PathBuf>,
-        /// Explicitly include the instance-scoped ProjectSourceRead grant in a new estate.
+        /// Explicitly include the instance-scoped ProjectSourceRead grant in a new engram.
         #[arg(long, default_value_t = false)]
         allow_project_source_read: bool,
         /// Seal a policy under which `serve` keeps the project attuned: every

@@ -1,4 +1,4 @@
-use rrd_contract::{CanonicalId, InstalledEstateIdentity};
+use rrd_contract::{CanonicalId, InstalledEngramIdentity};
 use rrd_core::{
     digest, EmbeddingProvenance, ProjectionStamp, ProjectionState, RuntimeCommit,
     RuntimeLogicalModel, RuntimeMutation, RuntimeProperties, RuntimeRecord, RuntimeRecordSchema,
@@ -121,15 +121,15 @@ fn canonical(value: &str) -> CanonicalId {
     CanonicalId::new(value).unwrap()
 }
 
-fn installed_identity() -> InstalledEstateIdentity {
-    InstalledEstateIdentity {
+fn installed_identity() -> InstalledEngramIdentity {
+    InstalledEngramIdentity {
         project_id: canonical("operator-trace-project"),
-        estate_id: canonical("operator-trace-estate"),
+        engram_id: canonical("operator-trace-engram"),
         instance_id: canonical("operator-trace-instance"),
     }
 }
 
-fn knowledge(installed: &InstalledEstateIdentity) -> OperatorKnowledgeBinding {
+fn knowledge(installed: &InstalledEngramIdentity) -> OperatorKnowledgeBinding {
     OperatorKnowledgeBinding {
         contract_version: OPERATOR_KNOWLEDGE_CONTRACT_VERSION,
         adapter: "pgvector".into(),
@@ -273,7 +273,7 @@ fn traces<E: StorageEngine>(store: &E) -> Vec<TraceView> {
 
 fn exercise<E: StorageEngine>(
     store: &E,
-    installed: &InstalledEstateIdentity,
+    installed: &InstalledEngramIdentity,
 ) -> (rrd_engine::TracedOperatorSearch, Vec<TraceView>) {
     let candidates = fixture(store);
     let knowledge = knowledge(installed);

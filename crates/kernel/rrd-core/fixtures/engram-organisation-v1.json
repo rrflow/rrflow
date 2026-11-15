@@ -1,0 +1,71 @@
+{
+  "comment": "H-11a organised registry; changes require an explicit wire-version decision",
+  "commit_digest": "eb78d8a3c340d7fae365ba7948d4693a5addc0a450f54dcb2b59f416c5c90044",
+  "registry": {
+    "events": {},
+    "migration": "organise billing",
+    "organisation": {
+      "categories": {
+        "lifecycle": {
+          "cardinality": "single",
+          "open": false,
+          "tags": {
+            "active": {
+              "title": "Active"
+            }
+          },
+          "targets": "kinds_and_records",
+          "title": "Lifecycle"
+        }
+      },
+      "collection_domains": {
+        "invoice-text": "invoices"
+      },
+      "domains": {
+        "billing": {
+          "description": "Invoices, payments and customers",
+          "title": "Billing"
+        },
+        "invoices": {
+          "parent": "billing",
+          "title": "Invoices"
+        }
+      },
+      "kind_domains": {
+        "customer": "billing",
+        "invoice": "invoices"
+      },
+      "kind_tags": {
+        "invoice": [
+          {
+            "category": "lifecycle",
+            "tag": "active"
+          }
+        ]
+      }
+    },
+    "records": {},
+    "relations": {},
+    "revision": 2,
+    "tables": {
+      "customer": {
+        "allow_additional_properties": false,
+        "mode": "schemaless",
+        "model": "document",
+        "properties": {}
+      },
+      "invoice": {
+        "allow_additional_properties": false,
+        "mode": "schemaless",
+        "model": "document",
+        "properties": {}
+      },
+      "rrflow-seat": {
+        "allow_additional_properties": false,
+        "mode": "schemaless",
+        "model": "document",
+        "properties": {}
+      }
+    }
+  }
+}

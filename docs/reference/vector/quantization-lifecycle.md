@@ -166,7 +166,7 @@ The codec encodes each vector on its own with the configuration's seed and
 fixed codebook, so the generation is byte for byte the one a full build makes
 from the same versions. Source-version reads and newly encoded versions follow
 the change; the stamp's accumulator proof grows with the logarithm of the
-estate's leaves. The build still copies retained codes and serializes a complete
+engram's leaves. The build still copies retained codes and serializes a complete
 generation, so its total work can grow with the base. Total memory and latency
 are not qualified here. The result reports the base generation and the versions
 the build encoded.

@@ -114,7 +114,7 @@ The current `endpoints_gen.go` contains:
 
 That audit describes an earlier projection. The current generated OpenAPI
 SHA-256 is `60d01903f277eede2c2a585d20477e213a64af19471a902df87fcfb24f89b99e`.
-SHA-256 is `8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae`.
+SHA-256 is `80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb`.
 
 It does not generate request/result/error types, path-parameter sets, security
 actions, exact success statuses, media types, causal identity rules,
@@ -372,7 +372,7 @@ Current evidence is deliberately bounded:
 The live conformance command exercises capability retry/version rejection,
 catalogue count, one authentication denial, session create/renew/close, vector
 ensure/search, transaction begin/preview/abort/commit, one query, changefeed
-read/follow/local cancellation, backup create/list, and estate read. Its
+read/follow/local cancellation, backup create/list, and engram read. Its
 labels overstate CRUD, backup/restore, vector, live delivery, typed-error,
 retry/failure, cancellation, and version/module coverage as catalogued in the
 [Rust reference](rust.md#conformance-that-actually-counts).

@@ -59,7 +59,7 @@ pub struct AttunementJobSummary {
 pub struct AttunementJobPage {
     #[schemars(schema_with = "attunement_version_schema")]
     pub contract_version: u16,
-    pub target: InstalledEstateIdentity,
+    pub target: InstalledEngramIdentity,
     /// The control sequence was unchanged throughout this page's collection.
     /// Later pages are new reads, not one retained cross-page snapshot.
     pub control_sequence: u64,

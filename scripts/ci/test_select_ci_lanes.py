@@ -100,7 +100,7 @@ class LaneSelectionTests(unittest.TestCase):
     def test_a_crate_whose_tests_run_a_workspace_binary_has_it_built_first(self):
         result = select(["crates/transport/rrd-server/src/http/maintenance.rs"],
                         metadata=METADATA, root=ROOT)
-        self.assertEqual(result["binaries"], "-p rrflow-cli --bin rrd-estate-controller")
+        self.assertEqual(result["binaries"], "-p rrflow-cli --bin rrd-engram-controller")
         self.assertEqual(select(["crates/persistence/rrd-lsm/src/lib.rs"], metadata=METADATA,
                                 root=self.root)["binaries"], "")
 

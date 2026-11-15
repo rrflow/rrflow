@@ -30,12 +30,12 @@ D-05 uses F-01/F-02/F-04 when a phase actually consumes analytical streaming;
 F-03 owns mixed graph/lexical/vector analytical operators and F-05 cache reuse.
 Native source commits and exact native queries retain their existing engine
 path. Do not postpone all source ingestion behind unrelated analytical cache
-optimization, or call eager whole-estate materialization the finished streaming
+optimization, or call eager whole-engram materialization the finished streaming
 implementation. Each consuming package names its missing provider/operator
 prerequisite and measured allocation/batch-lifetime oracle.
 
 ## Exit condition
 
 Gate F exits only when DataFusion consumes streamed authoritative access paths
-instead of hiding an eager whole-estate materialization, and F-06's Parquet
+instead of hiding an eager whole-engram materialization, and F-06's Parquet
 cold-storage publication, query and recovery cases pass.

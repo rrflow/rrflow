@@ -813,7 +813,7 @@
         "denial": {
           "$ref": "#/$defs/ErrorCode"
         },
-        "estate": {
+        "engram": {
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -837,7 +837,7 @@
         }
       },
       "required": [
-        "estate",
+        "engram",
         "stage",
         "instance",
         "foreign_instance",
@@ -849,7 +849,7 @@
     "FleetLatencyBand": {
       "additionalProperties": false,
       "properties": {
-        "estate": {
+        "engram": {
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -871,7 +871,7 @@
         }
       },
       "required": [
-        "estate",
+        "engram",
         "samples",
         "p99_lower_ns",
         "p99_upper_ns"
@@ -1098,7 +1098,7 @@
       "$ref": "#/$defs/Digest"
     },
     "child_results": {
-      "description": "One digest per independently verified child result, in estate order.",
+      "description": "One digest per independently verified child result, in engram order.",
       "items": {
         "$ref": "#/$defs/Digest"
       },
@@ -1140,7 +1140,7 @@
       "$ref": "#/$defs/CampaignStatus"
     },
     "sum_member_peak_resident_bytes": {
-      "description": "Conservative sum of per-estate peaks, not a simultaneous RSS sample.",
+      "description": "Conservative sum of per-engram peaks, not a simultaneous RSS sample.",
       "format": "uint64",
       "minimum": 0,
       "type": "integer"

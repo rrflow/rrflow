@@ -94,7 +94,7 @@ fn public_engine_reads_updates_event_corrections_and_retirements_at_one_stamp() 
             registry: DataSchemaRegistry {
                 revision: 1,
                 migration: "install CRUD fixture".into(),
-                organisation: DataEstateOrganisation::default(),
+                organisation: DataEngramOrganisation::default(),
                 tables: BTreeMap::from([
                     (
                         document.kind.clone(),

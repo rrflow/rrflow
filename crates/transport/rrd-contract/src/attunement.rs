@@ -6,7 +6,7 @@
 
 use crate::{
     invalid, sha256_bytes, validate_sha256, CanonicalId, CorrelationId, DeploymentProfile,
-    EstateConfiguration, InstalledEstateIdentity, MemorySeatDefinition, Result, SecurityAction,
+    EngramConfiguration, InstalledEngramIdentity, MemorySeatDefinition, Result, SecurityAction,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

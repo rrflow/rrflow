@@ -48,7 +48,7 @@ fn recorded_url(project: &Path) -> String {
 }
 
 #[test]
-fn a_served_estate_records_its_endpoint_and_withdraws_it() {
+fn a_served_engram_records_its_endpoint_and_withdraws_it() {
     let (project, executable) = installed_project();
     assert_eq!(
         RrdEngine::read_serving_record(project.path()).unwrap(),
@@ -184,14 +184,14 @@ fn a_record_naming_another_address_instance_or_shape_is_refused() {
 }
 
 #[test]
-fn opening_an_estate_another_engine_holds_is_refused_as_in_use() {
+fn opening_an_engram_another_engine_holds_is_refused_as_in_use() {
     let (project, executable) = installed_project();
     let engine = open(project.path(), &executable).unwrap();
 
     let Err(error) = open(project.path(), &executable) else {
-        panic!("a second engine opened an estate another engine holds");
+        panic!("a second engine opened an engram another engine holds");
     };
-    assert!(matches!(error, ServiceError::EstateInUse(_)), "{error:?}");
+    assert!(matches!(error, ServiceError::EngramInUse(_)), "{error:?}");
     assert_eq!(
         error.kind(),
         crate::engine::ServiceErrorKind::FailedPrecondition

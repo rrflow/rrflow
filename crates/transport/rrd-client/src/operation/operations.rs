@@ -1,4 +1,4 @@
-//! Backup, estate, audit and diagnostic operations.
+//! Backup, engram, audit and diagnostic operations.
 
 use super::*;
 
@@ -47,16 +47,16 @@ impl RrdClient {
         .await
     }
 
-    pub async fn read_estate(
+    pub async fn read_engram(
         &self,
         session: &Session,
-        estate: CanonicalId,
-        request: ReadEstate,
+        engram: CanonicalId,
+        request: ReadEngram,
         options: RequestOptions,
-    ) -> Result<EstateSnapshot> {
+    ) -> Result<EngramSnapshot> {
         let resource = ResourcePath {
             segments: vec![
-                ResourceId::new(ResourceKind::Estate, estate.as_str().to_owned())
+                ResourceId::new(ResourceKind::Engram, engram.as_str().to_owned())
                     .map_err(contract)?,
                 ResourceId::new(ResourceKind::Instance, self.instance.as_str().to_owned())
                     .map_err(contract)?,
@@ -64,7 +64,7 @@ impl RrdClient {
         };
         self.session_call_resource(
             Method::POST,
-            &format!("/v1/estates/{estate}/read"),
+            &format!("/v1/engrams/{engram}/read"),
             session,
             resource,
             request,

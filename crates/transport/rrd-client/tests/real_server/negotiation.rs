@@ -1203,7 +1203,7 @@ pub(super) async fn rust_client_negotiates_authenticates_queries_and_reads_audit
             OpenTask {
                 scope: scope.clone(),
                 title: "Alpha recall".into(),
-                goal: "Answer Alpha from the estate.".into(),
+                goal: "Answer Alpha from the engram.".into(),
             },
             RequestOptions::mutation("request-task-open", "operation-task-open", "task-key")
                 .unwrap(),

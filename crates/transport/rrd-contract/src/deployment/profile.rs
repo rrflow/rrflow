@@ -1,9 +1,9 @@
-//! Installed estate identity, deployment profile, reasoning and recall limits and clock policy.
+//! Installed engram identity, deployment profile, reasoning and recall limits and clock policy.
 
 use super::*;
 
 pub const DEPLOYMENT_PROFILE_CONTRACT_VERSION: u16 = 1;
-pub const ESTATE_CONFIGURATION_FORMAT_VERSION: u16 = 3;
+pub const ENGRAM_CONFIGURATION_FORMAT_VERSION: u16 = 3;
 pub const MAX_CLOCK_ROLLBACK_MS: u64 = 3_600_000;
 pub const MAX_REASONING_RUN_ELAPSED_MS: u64 = 3_600_000;
 pub const MAX_REASONING_STEPS: u64 = 10_000;
@@ -13,30 +13,30 @@ pub const MAX_REASONING_STEP_ELAPSED_MS: u64 = 300_000;
 /// local installation must not fabricate a tenant merely to address itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct InstalledEstateIdentity {
+pub struct InstalledEngramIdentity {
     pub project_id: CanonicalId,
-    pub estate_id: CanonicalId,
+    pub engram_id: CanonicalId,
     pub instance_id: CanonicalId,
 }
 
-impl InstalledEstateIdentity {
+impl InstalledEngramIdentity {
     pub fn validate(&self) -> Result<()> {
-        if self.project_id == self.estate_id
+        if self.project_id == self.engram_id
             || self.project_id == self.instance_id
-            || self.estate_id == self.instance_id
+            || self.engram_id == self.instance_id
         {
-            return invalid("installed project, estate, and instance ids must be distinct");
+            return invalid("installed project, engram, and instance ids must be distinct");
         }
         Ok(())
     }
 }
 
-impl fmt::Display for InstalledEstateIdentity {
+impl fmt::Display for InstalledEngramIdentity {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
             "{}/{}/{}",
-            self.project_id, self.estate_id, self.instance_id
+            self.project_id, self.engram_id, self.instance_id
         )
     }
 }

@@ -126,7 +126,7 @@ New external research was not required because this package makes no new
 architecture or implementation choice. It reconciles supporting prose with the
 roadmap, accepted Gate C evidence, generated contract, and the preceding fully
 researched D01-02 package. That package's
-[research synthesis](../../../research/rrflow-canonical-estate-configuration-and-runtime-controls.md)
+[research synthesis](../../../research/rrflow-canonical-engram-configuration-and-runtime-controls.md)
 remains the primary-source decision record; this journal does not duplicate it.
 
 Runtime trace, resource evidence, and debugging instrumentation are not

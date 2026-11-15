@@ -474,7 +474,7 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
         || information.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
     {
         return Err(denied(
-            "estate directory must be a native non-reparse directory",
+            "engram directory must be a native non-reparse directory",
         ));
     }
     validate_security(file, true)

@@ -57,7 +57,7 @@ impl<'a> RouterModelArtifacts<'a> {
 /// Opaque proof that declarations and all supplied artifact bytes matched.
 ///
 /// This is load admission only. It neither authorizes a route request nor
-/// grants a model permission to dispatch work, read an estate, or mutate it.
+/// grants a model permission to dispatch work, read an engram, or mutate it.
 #[derive(Debug, Clone, Copy)]
 pub struct VerifiedRouterModelAdmission<'a> {
     manifest: &'a RouterModelManifest,

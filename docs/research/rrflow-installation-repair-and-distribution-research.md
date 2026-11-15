@@ -7,7 +7,7 @@
 
 This record answers one bounded question: what lifecycle must RRFlow expose so
 an acquired release artifact can create, operate, verify, recover, repair, and
-remove one project-bound estate without a source checkout or a second engine
+remove one project-bound engram without a source checkout or a second engine
 authority? The accepted RRFlow target is defined by the
 [installed lifecycle](../reference/deployment/installed-lifecycle.md); delivery
 order and completion remain owned by the
@@ -81,7 +81,7 @@ Rust's file-lock API provides a non-blocking shared-lock attempt that reports
 `WouldBlock` when an incompatible lock is held. RRFlow therefore reuses the
 manifest lock as an exclusive-writer/shared-offline-inspector boundary. The
 inspector opens the already-present lock file and never manufactures one, so a
-missing estate remains missing and a live writer is not mistaken for an
+missing engram remains missing and a live writer is not mistaken for an
 offline verification target. Source:
 [Rust `File::try_lock_shared`](https://doc.rust-lang.org/std/fs/struct.File.html#method.try_lock_shared).
 
@@ -173,7 +173,7 @@ and [SQLite recovery](https://www.sqlite.org/cli.html#recover_data_from_a_corrup
 
 RRFlow adaptation: `rrflow verify` never changes bytes. `rrflow salvage` may
 emit a non-authoritative export with omissions and uncertainty recorded, but
-cannot publish it as the installed estate. Only a separately authorized
+cannot publish it as the installed engram. Only a separately authorized
 restore/import into an absent target may promote verified recovered state.
 
 ### Repair must be bounded and explicit
@@ -203,7 +203,7 @@ target unless an explicit force option is used. Sources:
 and [Qdrant migration and recovery options](https://qdrant.tech/documentation/migration-recovery-options/).
 
 RRFlow adaptation: restore creates an absent target or an explicitly named
-quarantine replacement; it never overlays the live estate. Canonical semantic
+quarantine replacement; it never overlays the live engram. Canonical semantic
 state and authenticated backup inventory are restored first. Rebuildable
 graph, BM25, vector, and analytical projections are accepted only when their
 source cursor, schema, algorithm, and artifact digests match; otherwise they
@@ -243,10 +243,10 @@ these substitutes for runtime qualification.
 
 1. Binary acquisition and per-project installation are distinct. Acquisition
    yields a verified offline-complete bundle; `rrflow install` creates one
-   project estate from only that bundle.
+   project engram from only that bundle.
 2. The alpha's default operator surface is one executable. Companion
    first-party processes are not default readiness prerequisites.
-3. Normal open never creates an estate. Only an exact `install apply` action
+3. Normal open never creates an engram. Only an exact `install apply` action
    may execute cold start.
 4. Plan generation is pure. Every mutating install, repair, restore, and
    uninstall operation consumes a reviewed content digest and records an

@@ -2,7 +2,7 @@ use rrd_lsm::{Database, DatabaseOptions, Error, ReadOnlyDatabase};
 #[test]
 fn zero_source_page_budget_rejects_before_any_store_creation_or_open() {
     let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().join("estate");
+    let root = dir.path().join("engram");
     let options = DatabaseOptions {
         source_page_bytes: 0,
         ..Default::default()
@@ -37,7 +37,7 @@ fn source_page_maintenance_denial_preserves_acknowledged_data_and_reopen_identit
         Durability, Mutation, SegmentCompressionPolicy, SegmentIoMode, SegmentIoPolicy, WriteBatch,
     };
     let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().join("estate");
+    let root = dir.path().join("engram");
     let options = DatabaseOptions {
         source_page_bytes: 128,
         page_cache_bytes: 0,

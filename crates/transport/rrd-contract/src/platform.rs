@@ -17,7 +17,7 @@ pub enum PlatformTermRole {
     WorkloadIdentity,
     InstanceAttribute,
     DeploymentAuthority,
-    /// A grouping of estates kept by an account or client above the engine;
+    /// A grouping of engrams kept by an account or client above the engine;
     /// never an engine scope or resource.
     ClientGrouping,
     LogicalResource,
@@ -44,9 +44,9 @@ pub const PLATFORM_TERMS: [PlatformTermDefinition; 25] = [
         Some(ResourceKind::Organization),
     ),
     term(
-        "estate",
+        "engram",
         PlatformTermRole::ControlResource,
-        Some(ResourceKind::Estate),
+        Some(ResourceKind::Engram),
     ),
     term(
         "project",

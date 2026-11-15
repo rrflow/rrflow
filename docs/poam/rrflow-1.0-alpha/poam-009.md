@@ -85,7 +85,7 @@ requirements; prior installed HTTP evidence does not imply UI completion.
 The [installed worker trial](../../evidence/change-journals/gate-g/task-worker-installed-live.md)
 now proves an actual configured selection and worker draft on the exact clean
 `c75c1896` binary, including missing credentials, restart/readback and replay
-denial. The first model-choice failure and its uncertain estate remain retained.
+denial. The first model-choice failure and its uncertain engram remain retained.
 This is one-candidate task-text evidence; model quality, full UI/project effects,
 RROFLOW and reviewed learning remain open. Composed CI and protected landing
 are still required. Earlier entries below retain their source-specific limits.
@@ -139,7 +139,7 @@ uncertainty reconciliation or routing qualification. Candidate CI/landing remain
 PR206's installed development trial at
 `d365d02891350590aa4495b46fc665ef313aec24` reached the new authenticated endpoint
 proposal operation but returned uncertain transport failure. Reopening the same
-estate retained charged effort and `execution_may_continue: true`; it did not
+engram retained charged effort and `execution_may_continue: true`; it did not
 produce a successful proposal. The
 [installed recovery journal](../../evidence/change-journals/gate-g/controller-task-proposal-installed-recovery.md)
 records actual readback. Durable uncertain capacity has no public reconciliation

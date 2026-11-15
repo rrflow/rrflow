@@ -1,4 +1,4 @@
-//! Atomic data transactions over HTTP and the authenticated estate read.
+//! Atomic data transactions over HTTP and the authenticated engram read.
 
 use super::*;
 
@@ -848,23 +848,23 @@ pub(super) fn data_transaction_atomically_commits_every_public_model_and_replays
 }
 
 #[test]
-pub(super) fn authenticated_estate_read_returns_the_public_snapshot_only() {
+pub(super) fn authenticated_engram_read_returns_the_public_snapshot_only() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path().join("instance");
     {
         let engine = RrflowKvStore::open(&root).unwrap();
         let repository =
-            rrd_estate::EstateRepository::new(&engine, CanonicalId::new("estate-a").unwrap());
+            rrd_engram::EngramRepository::new(&engine, CanonicalId::new("engram-a").unwrap());
         repository
-            .create(&estate_context(10, "create-estate"))
+            .create(&engram_context(10, "create-engram"))
             .unwrap();
         repository
-            .set_desired(&rrd_estate::SetDesired {
-                context: estate_context(20, "deploy-project-a"),
+            .set_desired(&rrd_engram::SetDesired {
+                context: engram_context(20, "deploy-project-a"),
                 instance_id: CanonicalId::new("project-a").unwrap(),
                 idempotency_key: "deploy-project-a".into(),
-                target: rrd_estate::DesiredTarget {
-                    phase: rrd_estate::DesiredPhase::Running,
+                target: rrd_engram::DesiredTarget {
+                    phase: rrd_engram::DesiredPhase::Running,
                     deployment_ref: CanonicalId::new("local-rrd").unwrap(),
                     version: "1.0.0".into(),
                     configuration_sha256: "a".repeat(64),
@@ -881,7 +881,7 @@ pub(super) fn authenticated_estate_read_returns_the_public_snapshot_only() {
                 "max_open_transactions": 2,
             }
         }),
-        Some("estate-session"),
+        Some("engram-session"),
         None,
     );
     let (status, created) = post(&server, "/v1/sessions", &create, None);
@@ -891,21 +891,21 @@ pub(super) fn authenticated_estate_read_returns_the_public_snapshot_only() {
 
     let mut read = envelope(json!({}), None, None);
     read["resource"]["segments"] = json!([
-        {"kind": "estate", "id": "estate-a"},
+        {"kind": "engram", "id": "engram-a"},
         {"kind": "instance", "id": "socket-test"}
     ]);
-    let (status, denied) = post(&server, "/v1/estates/estate-a/read", &read, None);
+    let (status, denied) = post(&server, "/v1/engrams/engram-a/read", &read, None);
     assert_eq!(status, 401);
     assert_eq!(denied["outcome"]["error"]["code"], "unauthenticated");
 
     let (status, response) = post(
         &server,
-        "/v1/estates/estate-a/read",
+        "/v1/engrams/engram-a/read",
         &read,
         Some((session_id, token)),
     );
     assert_eq!(status, 200, "{response}");
-    assert_eq!(payload(&response)["id"], "estate-a");
+    assert_eq!(payload(&response)["id"], "engram-a");
     assert_eq!(payload(&response)["revision"], 2);
     assert_eq!(payload(&response)["instances"][0]["id"], "project-a");
     assert_eq!(payload(&response)["operations"][0]["state"], "pending");
@@ -914,7 +914,7 @@ pub(super) fn authenticated_estate_read_returns_the_public_snapshot_only() {
 
     let (status, mismatch) = post(
         &server,
-        "/v1/estates/other-estate/read",
+        "/v1/engrams/other-engram/read",
         &read,
         Some((session_id, token)),
     );

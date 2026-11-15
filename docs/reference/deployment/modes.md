@@ -10,7 +10,7 @@ different transaction coordinator, graph engine, vector database, query
 planner, reasoning authority, or persistence product.
 
 The [instance-topology architecture](../../architecture/instance-topology.md)
-owns project, estate, instance, environment, and physical-placement identity.
+owns project, engram, instance, environment, and physical-placement identity.
 The [engine data-flow architecture](../../architecture/engine-data-flow.md)
 owns the common write, read, Arrow/DataFusion, reasoning, and recall paths. The
 [distributed cluster contract](../distributed/cluster-contract.md) owns the
@@ -42,7 +42,7 @@ capabilities—not deployment modes.
 Artifact packaging is also separate. The current `rrflow-edge` mmap artifact,
 browser bundles, mobile packages, SDKs, Connectome, and model packages are
 clients or derived artifacts. None is a fourth deployment form and none owns
-canonical estate state.
+canonical engram state.
 
 ## Valid combinations and alpha posture
 
@@ -72,7 +72,7 @@ stamps, evidence, and commit semantics.
 ## Installation and runtime discovery
 
 Gate D-01 selects the complete profile during preview/apply and commits it in
-the installed project-estate-instance binding. Startup resolves that binding
+the installed project-engram-instance binding. Startup resolves that binding
 read-only. The current canonical install profile selects
 `single_node_server` + `rrflow_kv` + `loopback_http_websocket`; engine
 constructors expose only the storage profile they actually own. An embedded or
@@ -93,7 +93,7 @@ In particular:
 The public capability descriptor now reports these facts independently:
 
 ```text
-installed instance/project/estate identity
+installed instance/project/engram identity
 deployment form
 storage profile
 active endpoint presentations
@@ -117,7 +117,7 @@ non-durability-specific result:
 ```text
 configured endpoint or in-process call
   -> authenticate instance and principal
-  -> resolve installed project/estate binding
+  -> resolve installed project/engram binding
   -> RrdEngine authorize + capture stamp
   -> engine-selected native fast path or stamped rrflowQL plan
      -> rrflowMX or rrflowKV transaction/access primitives
@@ -164,7 +164,7 @@ tests.
 ### Deployment-form differential
 
 Execute the same public semantic operations through an embedded composition
-and a real standalone single-node process. Compare instance/estate identity,
+and a real standalone single-node process. Compare instance/engram identity,
 authorization, result, stamp, digest, cancellation, limits, and traces. The
 standalone process must use the implemented bounded D-01 install boundary and
 must prove authenticated readiness and bounded shutdown; a raw root, marker
@@ -201,14 +201,14 @@ its qualification corpus remains far below the preceding acceptance boundary.
 
 | Current implementation | Characterized behavior worth retaining | Required direct convergence |
 |---|---|---|
-| `DeploymentProfile`, `InstalledEstateIdentity`, and `ServiceCapabilities::{deployment,installed_estate,configuration}` | Strict independent axes, identity/configuration validation, generated OpenAPI/TypeScript projection, and rejection of the removed scalar now pass. A-07 is accepted. | Retain this as the sole contract while H-04/J qualify every generated client and deployment form against release-equivalent installed processes. |
+| `DeploymentProfile`, `InstalledEngramIdentity`, and `ServiceCapabilities::{deployment,installed_engram,configuration}` | Strict independent axes, identity/configuration validation, generated OpenAPI/TypeScript projection, and rejection of the removed scalar now pass. A-07 is accepted. | Retain this as the sole contract while H-04/J qualify every generated client and deployment form against release-equivalent installed processes. |
 | `RrdEngine::storage_profile_kind` and `open_installed` | MX and KV constructors report only the explicit storage axis and never infer process form from root presence. Installed open binds identity/configuration and verifies project-relative locator plus distribution executable; outward composition owns form and endpoint. Pre-canonical manifest/private-binding product openers are absent. | Keep raw construction confined to explicit component tests and complete the full storage/deployment semantic differential without making it a product startup mode. |
 | `rrd-server::http::capabilities` | Reports single-node form, engine-selected storage, endpoint presentation from the bound address, installed identity when present, and effective ceilings. TLS no longer selects a database mode. | Qualify configured network listeners and every active presentation; do not count a raw-root standalone fixture as the installed product proof. |
 | `rrd-deployment-conformance-v1.json` and contract validation | Strictly validates a versioned fixture with unique non-empty document IDs, bounds, and expected output membership. | Replace the overclaimed shared-deployment meaning with the layered semantic, form, transport, durability, and artifact corpora above. |
 | engine deployment tests | Exercise one schema plus two records on rrflowMX and rrflowKV, run one exact-ID rrflowQL query through the current DataFusion executor, reject a durability operation on rrflowMX, deny a second rrflowKV writer, and reopen at cursor three. | Retain this as a seed characterization only. It does not prove streaming/pushdown, native graph/index/vector access, complete semantic parity, failure atomicity, reasoning, or resource bounds. |
 | Rust client loopback and mutual-TLS tests | Exercise real sockets and verify selected TLS identity behavior without using TLS to choose the database or deployment profile. Installed-identity fixtures use plan/apply; unrelated transport component fixtures construct their engine explicitly. | Run the complete cross-surface corpus against a release-equivalent installed process. |
-| installed SDK conformance daemon | Canonically installs an empty temporary project from a checked inert distribution anchor, extends its schema/security through the installed engine, requires the derived instance/estate identities to match the shared corpus, and drives Rust, TypeScript, Python, Go, Java, and .NET against one real daemon. | The shared corpus remains narrow and does not prove the full layered semantic, deployment, transport, durability, failure, or resource matrices. |
-| standalone server-process and process-driver tests | The internal server process now requires project plus distribution executable and opens only installed state; process-driver fixtures preinstall the estate and retain real child, writer, stop, and fault behavior. | Replace marker/private controller authority and qualify authenticated launch/readiness, resources, distribution identity, and cross-platform behavior before counting it as deployment proof. |
+| installed SDK conformance daemon | Canonically installs an empty temporary project from a checked inert distribution anchor, extends its schema/security through the installed engine, requires the derived instance/engram identities to match the shared corpus, and drives Rust, TypeScript, Python, Go, Java, and .NET against one real daemon. | The shared corpus remains narrow and does not prove the full layered semantic, deployment, transport, durability, failure, or resource matrices. |
+| standalone server-process and process-driver tests | The internal server process now requires project plus distribution executable and opens only installed state; process-driver fixtures preinstall the engram and retain real child, writer, stop, and fault behavior. | Replace marker/private controller authority and qualify authenticated launch/readiness, resources, distribution identity, and cross-platform behavior before counting it as deployment proof. |
 | `rrflow-edge` offline test | Builds, mmap-opens, and queries a deterministic feature-hash artifact from the two fixture documents. | Keep it as derived-artifact evidence. It parses the fixture as untyped JSON and does not enter `RrdEngine`, rrflowQL, transactions, graph/index semantics, or the shared storage profile. |
 
 The control journal and global runtime cursor are not two ordering authorities.

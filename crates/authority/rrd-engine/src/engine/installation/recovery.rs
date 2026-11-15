@@ -1,5 +1,5 @@
 use super::*;
-use crate::engine::estate_layout::{install_intent_path, EstateFilesystem, EstateLayout};
+use crate::engine::engram_layout::{install_intent_path, EngramFilesystem, EngramLayout};
 use crate::engine::token_key::{
     decode_api_key_document, encode_api_key_document, generate_api_key_document,
     generate_token_key, write_private_anchored, ApiKeyDocument, TOKEN_KEY_BYTES,
@@ -13,7 +13,7 @@ const MAX_INSTALL_INTENT_BYTES: u64 = 32 * 1024;
 pub(in crate::engine) enum InstallApplyStage {
     LeaseAcquired,
     IntentPublished,
-    EstateDirectoriesReady,
+    EngramDirectoriesReady,
     BootstrapStaged,
     BootstrapReady,
     StorageReady,
@@ -29,7 +29,7 @@ impl InstallApplyStage {
         match self {
             Self::LeaseAcquired => "lease_acquired",
             Self::IntentPublished => "intent_published",
-            Self::EstateDirectoriesReady => "estate_directories_ready",
+            Self::EngramDirectoriesReady => "engram_directories_ready",
             Self::BootstrapStaged => "bootstrap_staged",
             Self::BootstrapReady => "bootstrap_ready",
             Self::StorageReady => "storage_ready",
@@ -74,7 +74,7 @@ pub(super) struct InstallIntent {
     stage: InstallApplyStage,
     plan_sha256: String,
     target_kind: InstallationTargetKind,
-    target: InstalledEstateIdentity,
+    target: InstalledEngramIdentity,
     project_precondition_sha256: String,
     profile_id: CanonicalId,
     profile_sha256: String,
@@ -231,8 +231,8 @@ impl InstallIntent {
 }
 
 pub(super) fn load_or_create_intent(
-    project: &EstateFilesystem,
-    layout: &EstateLayout,
+    project: &EngramFilesystem,
+    layout: &EngramLayout,
     preview: &InstallationPreview,
     clock_anchor: &ClockObservation,
     executable_sha256: &str,
@@ -259,8 +259,8 @@ pub(super) fn load_or_create_intent(
 }
 
 pub(super) fn read_existing_intent(
-    project: &EstateFilesystem,
-    layout: &EstateLayout,
+    project: &EngramFilesystem,
+    layout: &EngramLayout,
     preview: &InstallationPreview,
     executable_sha256: &str,
 ) -> Result<Option<InstallIntent>> {
@@ -303,8 +303,8 @@ pub(super) fn materialize_secret(
 }
 
 pub(super) fn acknowledge_intent(
-    project: &EstateFilesystem,
-    layout: &EstateLayout,
+    project: &EngramFilesystem,
+    layout: &EngramLayout,
     expected: &InstallIntent,
 ) -> Result<()> {
     let path = install_intent_path(project, layout)?;

@@ -263,7 +263,7 @@ fn published(engine: &RrdEngine, generation: u64) -> rrd_vector::TurboQuantSegme
 }
 
 /// What a full build makes now, under `generation`'s configuration and
-/// generation number, from every version of `documents.body` in the estate.
+/// generation number, from every version of `documents.body` in the engram.
 /// Returns it with the identity and cursor of each version it encodes.
 fn full_build(
     engine: &RrdEngine,
@@ -556,7 +556,7 @@ fn an_extended_build_reads_and_encodes_only_the_change() {
         );
         assert_eq!(full.base_generation, None);
         // Every storage path's work, apart from the accumulator proof, whose
-        // inclusion paths grow with the logarithm of the estate's leaves.
+        // inclusion paths grow with the logarithm of the engram's leaves.
         let paths = extended
             .read_evidence
             .paths

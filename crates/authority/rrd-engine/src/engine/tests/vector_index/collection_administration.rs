@@ -80,7 +80,7 @@ pub(super) fn collection_filtered_hnsw_overlays_retirement_and_protects_payload_
                 registry: DataSchemaRegistry {
                     revision: 1,
                     migration: "install filtered HNSW schema".into(),
-                    organisation: DataEstateOrganisation::default(),
+                    organisation: DataEngramOrganisation::default(),
                     tables: BTreeMap::from([
                         (
                             CanonicalId::new("embedding").unwrap(),
@@ -404,7 +404,7 @@ pub(super) fn collection_point_and_payload_index_administration_is_atomic_and_re
                 registry: DataSchemaRegistry {
                     revision: 1,
                     migration: "install multimodal point schema".into(),
-                    organisation: DataEstateOrganisation::default(),
+                    organisation: DataEngramOrganisation::default(),
                     tables: BTreeMap::from([
                         (
                             CanonicalId::new("embedding").unwrap(),

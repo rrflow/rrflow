@@ -1,4 +1,4 @@
-//! Estate organisation: domains, categories, tags and their validation.
+//! Engram organisation: domains, categories, tags and their validation.
 
 use super::*;
 
@@ -16,7 +16,7 @@ pub const MAX_TAGS_PER_KIND: usize = 64;
 pub const MAX_ORGANISATION_TITLE_BYTES: usize = 128;
 pub const MAX_ORGANISATION_DESCRIPTION_BYTES: usize = 1_024;
 
-/// One configurable part of an estate's catalogue, such as a service, package
+/// One configurable part of an engram's catalogue, such as a service, package
 /// or subject area. Isolation arrives with its enforcement in H-11d.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeDomainSchema {
@@ -81,11 +81,11 @@ pub struct RuntimeTagRef {
     pub tag: RuntimeType,
 }
 
-/// Domains, categories and memberships of one estate catalogue. A kind or
+/// Domains, categories and memberships of one engram catalogue. A kind or
 /// collection without an entry belongs to its default domain, so a registry
 /// written before organisation existed keeps its meaning and its digest.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuntimeEstateOrganisation {
+pub struct RuntimeEngramOrganisation {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub domains: BTreeMap<RuntimeType, RuntimeDomainSchema>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -98,7 +98,7 @@ pub struct RuntimeEstateOrganisation {
     pub kind_tags: BTreeMap<RuntimeType, BTreeSet<RuntimeTagRef>>,
 }
 
-impl RuntimeEstateOrganisation {
+impl RuntimeEngramOrganisation {
     pub fn is_default(&self) -> bool {
         self.domains.is_empty()
             && self.categories.is_empty()
@@ -132,7 +132,7 @@ impl RuntimeEstateOrganisation {
     ) -> Result<()> {
         if self.domains.len() + 2 > MAX_DOMAINS {
             return invalid(format!(
-                "an estate may declare at most {} domains besides default and rrflow",
+                "an engram may declare at most {} domains besides default and rrflow",
                 MAX_DOMAINS - 2
             ));
         }
@@ -166,7 +166,7 @@ impl RuntimeEstateOrganisation {
         }
         if self.categories.len() > MAX_CATEGORIES {
             return invalid(format!(
-                "an estate may declare at most {MAX_CATEGORIES} categories"
+                "an engram may declare at most {MAX_CATEGORIES} categories"
             ));
         }
         for (id, category) in &self.categories {

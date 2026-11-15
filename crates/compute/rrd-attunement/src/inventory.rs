@@ -14,7 +14,7 @@ const FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceScope {
-    pub estate: String,
+    pub engram: String,
     pub project: String,
     /// Logical coordinate, never a host-absolute path.
     pub root: String,
@@ -328,7 +328,7 @@ impl<'a> Builder<'a> {
         limits: Limits,
         prior: Option<&'a Proposal>,
     ) -> Result<Self> {
-        if [&scope.estate, &scope.project, &scope.root]
+        if [&scope.engram, &scope.project, &scope.root]
             .iter()
             .any(|s| !identifier(s))
         {

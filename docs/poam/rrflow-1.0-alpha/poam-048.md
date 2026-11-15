@@ -13,7 +13,7 @@ independently.
 Observed while authoring [POAM-045](poam-045.md) (pull request #211), on the
 E-04 stack at E-04d `f34451ee`, with POAM-045's fix applied:
 
-- **The repro.** Use the estate of
+- **The repro.** Use the engram of
   `engine::tests::vector_index::collection_moves`:
   - `a` moves from `documents` to `archive`, and `c` to `mirror`;
   - `b` moves to `archive` from valid time 50;
@@ -77,7 +77,7 @@ the move the store records as a removal delta. At an exit:
 That window is never empty, so no format changes. The view's source cursor
 covers every version ever in the collection and every exit, held or dropped.
 Every build takes it, so a generation's coverage never moves backward, even
-when the newest version it held moves out. An estate without moves builds the
+when the newest version it held moves out. An engram without moves builds the
 same bytes.
 
 A graph cannot remove a node. So when the view no longer holds a version the

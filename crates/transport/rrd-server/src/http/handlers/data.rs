@@ -55,49 +55,49 @@ impl AppState {
         )
     }
 
-    pub(in crate::http) fn read_estate(
+    pub(in crate::http) fn read_engram(
         &self,
         headers: &HeaderMap,
         body: &[u8],
         path: &str,
         now: u64,
     ) -> HttpResponse {
-        let estate = estate_action(path, "read").expect("route checked");
-        self.with_authenticated_envelope::<ReadEstate, _, _>(
+        let engram = engram_action(path, "read").expect("route checked");
+        self.with_authenticated_envelope::<ReadEngram, _, _>(
             headers,
             body,
             now,
-            RrdOperation::EstateRead,
+            RrdOperation::EngramRead,
             None,
             |envelope, session, token| {
-                let estate = CanonicalId::new(estate).map_err(|error| {
+                let engram = CanonicalId::new(engram).map_err(|error| {
                     ApiError::new(ErrorCode::InvalidArgument, error.to_string(), false)
                 })?;
-                let resource_estate = envelope
+                let resource_engram = envelope
                     .resource
                     .segments
                     .iter()
-                    .find(|segment| segment.kind == ResourceKind::Estate)
+                    .find(|segment| segment.kind == ResourceKind::Engram)
                     .map(|segment| &segment.id);
-                if resource_estate != Some(&estate) {
+                if resource_engram != Some(&engram) {
                     return Err(ApiError::new(
                         ErrorCode::FailedPrecondition,
-                        "request resource does not target the path estate",
+                        "request resource does not target the path engram",
                         false,
                     ));
                 }
                 self.service
-                    .read_estate(
+                    .read_engram(
                         session,
                         token,
-                        estate,
+                        engram,
                         now,
                         envelope.context.request_id.as_str(),
                         envelope.context.operation_id.as_str(),
                     )
                     .map_err(api_error)?
                     .ok_or_else(|| {
-                        ApiError::new(ErrorCode::NotFound, "estate authority not found", false)
+                        ApiError::new(ErrorCode::NotFound, "engram authority not found", false)
                     })
             },
         )

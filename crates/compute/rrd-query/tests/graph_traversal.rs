@@ -1,6 +1,6 @@
 //! E-01 acceptance: directed, typed, depth-bounded traversal equals the exact
 //! graph oracle, and its physical evidence follows the visited edges rather
-//! than the estate.
+//! than the engram.
 //!
 //! The oracle is the breadth-first scan of every relation of the traversed
 //! type, in relation-reference order, over the complete authenticated change
@@ -655,10 +655,10 @@ fn traversal_joins_expand_beside_static_family_ranges() {
     assert!(joined_rows > 0);
 }
 
-/// A chain `a -> b -> c -> d` of `link` relations in an estate that also
+/// A chain `a -> b -> c -> d` of `link` relations in an engram that also
 /// holds `noise` disconnected `link` relations, `noise` `other` relations
 /// leaving `a`, and `noise` unrelated nodes.
-fn chain_estate<E: StorageEngine>(engine: &E, noise: usize) -> ReadStamp {
+fn chain_engram<E: StorageEngine>(engine: &E, noise: usize) -> ReadStamp {
     let mut nodes = vec![RuntimeMutation::Schema { registry: schema() }];
     nodes.extend(["a", "b", "c", "d"].map(|id| record(id, None)));
     nodes.extend((0..=noise).map(|index| record(&format!("x{index}"), None)));
@@ -707,15 +707,15 @@ fn path_keys(execution: &QueryExecution, path: RuntimeReadAccessPath) -> u64 {
 }
 
 #[test]
-fn traversal_evidence_follows_visited_edges_not_estate_size() {
+fn traversal_evidence_follows_visited_edges_not_engram_size() {
     const NOISE: usize = 400;
     let text =
         "FROM traverse:link START node:a DIRECTION OUTGOING DEPTH 8 AT VALID 100 KNOWN HEAD PROJECT node_id, depth";
     let small = RrflowMxStore::new();
-    let small_read = chain_estate(&small, 0);
+    let small_read = chain_engram(&small, 0);
     let small_run = run(&small, &small_read, text);
     let large = RrflowMxStore::new();
-    let large_read = chain_estate(&large, NOISE);
+    let large_read = chain_engram(&large, NOISE);
     let large_run = run(&large, &large_read, text);
 
     assert_eq!(rows(&small_run), rows(&large_run));
@@ -783,7 +783,7 @@ fn traversal_evidence_follows_visited_edges_not_estate_size() {
         direct.read_evidence.keys_examined + metadata.read_evidence.keys_examined
     );
 
-    // The family ranges the reader replaced grow with the estate.
+    // The family ranges the reader replaced grow with the engram.
     let family = large
         .runtime()
         .read_versioned(

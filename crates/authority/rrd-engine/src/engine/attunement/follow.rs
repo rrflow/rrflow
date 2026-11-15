@@ -214,7 +214,7 @@ impl RrdEngine {
         clock: &dyn ClockSource,
         last_fingerprint: Option<&str>,
     ) -> Result<FollowTick> {
-        if self.estate_configuration.attunement_follow.is_none() {
+        if self.engram_configuration.attunement_follow.is_none() {
             return Ok(FollowTick {
                 fingerprint: None,
                 outcome: FollowOutcome::Disabled,

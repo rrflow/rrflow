@@ -110,7 +110,7 @@ func main() {
 	vectors, err := api.Call(context.Background(), rrd.OperationVectorSearch, object(vector["search"]), read("vector-search", session, nil, time.Time{}))
 	check(err)
 	require(containsVector(array(vectors["hits"]), text(expected["vector_reference"])), "vector reference absent")
-	// The runners share one estate, so activate the generation this build returned.
+	// The runners share one engram, so activate the generation this build returned.
 	quantization := object(vector["quantization"])
 	built, err := api.Call(context.Background(), rrd.OperationVectorQuantizationBuild, object(quantization["build"]), mutation("quantization-build", session, nil, time.Time{}))
 	check(err)
@@ -157,9 +157,9 @@ func main() {
 	backups, err := api.Call(context.Background(), rrd.OperationBackupList, object(backupFixture["list"]), read("backup-list", session, nil, time.Time{}))
 	check(err)
 	require(containsBackup(array(backups["backups"]), text(backupSnapshot["backup_sha256"])), "backup absent")
-	estate, err := api.Call(context.Background(), rrd.OperationEstateRead, object(corpus["estate"]), read("estate-read", session, map[string]string{"estate": text(identity["estate"])}, time.Time{}))
+	engram, err := api.Call(context.Background(), rrd.OperationEngramRead, object(corpus["engram"]), read("engram-read", session, map[string]string{"engram": text(identity["engram"])}, time.Time{}))
 	check(err)
-	require(integer(estate["revision"]) == integer(expected["estate_revision"]), "estate revision differs")
+	require(integer(engram["revision"]) == integer(expected["engram_revision"]), "engram revision differs")
 	closed, err := api.Call(context.Background(), rrd.OperationSessionClose, object(sessionFixture["close"]), mutation("session-close", session, map[string]string{"session": session.Lease.SessionID}, time.Time{}))
 	check(err)
 	require(text(closed["state"]) == "closed", "session did not close")

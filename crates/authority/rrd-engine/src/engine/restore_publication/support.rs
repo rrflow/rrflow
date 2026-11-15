@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) fn publication_paths(
-    project: &EstateFilesystem,
+    project: &EngramFilesystem,
     locator: &ProjectLocator,
     restore_id: &CanonicalId,
 ) -> Result<PublicationPaths> {
@@ -32,7 +32,7 @@ pub(super) fn storage_root_id(locator: &ProjectLocator) -> Result<CanonicalId> {
     CanonicalId::new(name).map_err(|_| ServiceError::ProjectBindingMismatch)
 }
 
-pub(super) fn relative(project: &EstateFilesystem, path: &AnchoredPath) -> Result<String> {
+pub(super) fn relative(project: &EngramFilesystem, path: &AnchoredPath) -> Result<String> {
     path.diagnostic_path()
         .strip_prefix(project.project().diagnostic_path())
         .map_err(|_| ServiceError::ProjectBindingMismatch)?
@@ -92,7 +92,7 @@ pub(super) fn catalogued_backup(
 
 pub(super) fn active_token_key_sha256(
     active: &AnchoredPath,
-    installed: &InstalledEstateRecord,
+    installed: &InstalledEngramRecord,
 ) -> Result<String> {
     let token_key = read_token_key(&active.join(TOKEN_KEY_FILE)).map_err(storage_error)?;
     let token_key_sha256 = digest::sha256_hex(&token_key);
@@ -152,7 +152,7 @@ pub(super) fn published_receipt(
     Ok(Some(receipt))
 }
 
-/// A replay re-verifies the published estate the way the first application
+/// A replay re-verifies the published engram the way the first application
 /// did and reports its current coordinates under the recorded receipt.
 pub(super) fn replay_result(
     paths: &PublicationPaths,
@@ -168,7 +168,7 @@ pub(super) fn replay_result(
     )?;
     if report.status != InstallationVerificationStatus::Passed {
         return Err(ServiceError::Storage(
-            "published estate failed quick verification".into(),
+            "published engram failed quick verification".into(),
         ));
     }
     build_result(

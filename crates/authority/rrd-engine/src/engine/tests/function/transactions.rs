@@ -59,7 +59,7 @@ pub(super) fn transaction_binding_effects_commit_atomically_and_failures_leave_d
     let registry = DataSchemaRegistry {
         revision: 1,
         migration: "install transaction function binding fixture".into(),
-        organisation: DataEstateOrganisation::default(),
+        organisation: DataEngramOrganisation::default(),
         tables: BTreeMap::from([
             (
                 person.clone(),

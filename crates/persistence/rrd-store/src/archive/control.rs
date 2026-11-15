@@ -1,7 +1,7 @@
 //! Content-addressed, digest-verified archive of one control-journal
 //! subsequence.
 //!
-//! An application-complete backup carries the estate's control state as the
+//! An application-complete backup carries the engram's control state as the
 //! ordered control-journal entries whose keys fall under a declared set of
 //! families, not as materialized values. Readers such as the security audit
 //! chain derive state from the journal's actions and order, so a restore must
@@ -161,8 +161,8 @@ pub fn validate_control_families(families: &[String]) -> Result<()> {
 }
 
 /// A family covers its own key and every key beneath it as a path segment.
-/// `server/state/estate` covers `server/state/estate/x` but not
-/// `server/state/estate-recovery/x`.
+/// `server/state/engram` covers `server/state/engram/x` but not
+/// `server/state/engram-recovery/x`.
 pub fn control_family_covers(family: &str, key: &str) -> bool {
     key == family
         || (key.len() > family.len()
@@ -529,12 +529,12 @@ mod tests {
         assert!(validate_control_families(&["server/state/index-catalogue/scope".into()]).is_err());
         assert!(validate_control_families(&["server/state".into()]).is_err());
         assert!(control_family_covers(
-            "server/state/estate",
-            "server/state/estate/e/document"
+            "server/state/engram",
+            "server/state/engram/e/document"
         ));
         assert!(!control_family_covers(
-            "server/state/estate",
-            "server/state/estate-recovery/e"
+            "server/state/engram",
+            "server/state/engram-recovery/e"
         ));
     }
 

@@ -702,7 +702,7 @@ mod cold_history_authentication_tests {
     #[test]
     fn bounded_page_rejects_a_self_consistent_change_outside_the_captured_root() {
         let directory = tempfile::tempdir().unwrap();
-        let store = RrflowKvStore::open(&directory.path().join("estate")).unwrap();
+        let store = RrflowKvStore::open(&directory.path().join("engram")).unwrap();
         let scope = ScopeId::new("instance:proof-test").unwrap();
         let mut registry = RuntimeSchemaRegistry::empty(1, "proof test");
         registry.tables.insert(

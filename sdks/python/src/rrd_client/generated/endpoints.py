@@ -1,9 +1,9 @@
 # Generated from rrd-contract; do not edit.
-# OpenAPI SHA-256: 8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae
+# OpenAPI SHA-256: 80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb
 from typing import Final, Literal, TypedDict
 
 ENDPOINT_OPENAPI_DOCUMENT_SHA256: Final[str] = (
-    "8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae"
+    "80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb"
 )
 
 OperationId = Literal[
@@ -37,7 +37,7 @@ OperationId = Literal[
     "endpoint-configuration-apply",
     "endpoint-configuration-preview",
     "endpoint-configuration-read",
-    "estate-read",
+    "engram-read",
     "flight-launch",
     "flight-list",
     "flight-read",
@@ -281,11 +281,11 @@ ENDPOINTS: Final[dict[OperationId, Endpoint]] = {
         "mutation": False,
         "path": "/v1/configuration/endpoints/read",
     },
-    "estate-read": {
+    "engram-read": {
         "authentication": "session_bearer",
         "method": "POST",
         "mutation": False,
-        "path": "/v1/estates/{estate}/read",
+        "path": "/v1/engrams/{engram}/read",
     },
     "flight-launch": {
         "authentication": "session_bearer",

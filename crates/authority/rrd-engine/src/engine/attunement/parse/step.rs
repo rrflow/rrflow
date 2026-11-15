@@ -123,7 +123,7 @@ pub(in crate::engine::attunement) fn execute(
         .parse_policy
         .as_ref()
         .ok_or_else(|| contract("the Parse step has no parse policy"))?;
-    let mut remaining_keys = engine.estate_configuration.query.max_storage_keys;
+    let mut remaining_keys = engine.engram_configuration.query.max_storage_keys;
     let proposal = load_parse_inventory(engine, &work.before, &work.plan, &mut remaining_keys)?;
     let root = engine
         .installed_project_root
@@ -158,7 +158,7 @@ pub(in crate::engine::attunement) fn execute(
     let at = elapsed_time(work.now, work.started)?;
     let budget = policy.max_commit_bytes.min(
         engine
-            .estate_configuration
+            .engram_configuration
             .storage
             .transaction_admission_bytes,
     );
@@ -393,7 +393,7 @@ pub(in crate::engine::attunement) fn execute(
     permit.charge(
         &batch_mutations,
         engine
-            .estate_configuration
+            .engram_configuration
             .storage
             .transaction_admission_bytes,
     )?;

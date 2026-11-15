@@ -14,7 +14,7 @@ pub(super) fn installed_lifecycle(mode: &str) {
         std::fs::write(project.join("README.md"), "installed walking product\n").unwrap();
     }
     let plan_file = root.path().join("install-plan.json");
-    let configuration_file = root.path().join("estate-configuration.toml");
+    let configuration_file = root.path().join("engram-configuration.toml");
     std::fs::write(
         &configuration_file,
         r#"format_version = 3
@@ -660,7 +660,7 @@ max_elapsed_ms = 20000
 
     // Offline publication of the staged restore through the primary command
     // tree: a deterministic, no-write plan, an exact-digest apply, and a
-    // verified estate at the backup's state with the old root quarantined.
+    // verified engram at the backup's state with the old root quarantined.
     let publication_plan_file = root.path().join("restore-plan.json");
     let publication_plan_arg = publication_plan_file.to_str().unwrap();
     let plan_arguments = [

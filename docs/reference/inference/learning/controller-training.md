@@ -47,7 +47,7 @@ boundary, not invented fourth route proposals.
 
 Every versioned dataset needs:
 
-- authorized source references, estate and sharing scope, source revision,
+- authorized source references, engram and sharing scope, source revision,
   collection purpose and consent, retention and export constraints;
 - input/context and effective-configuration identities, task family, eligible
   endpoint/recipe candidates, and declared capabilities as observed then;
@@ -60,7 +60,7 @@ Every versioned dataset needs:
 - immutable export and split manifests with digests and row/exclusion counts.
 
 Training consent is separate from context sharing and cloud synchronization.
-Collecting telemetry does not authorize training on it. Do not read raw estate
+Collecting telemetry does not authorize training on it. Do not read raw engram
 storage from Python. Authorized export uses public capabilities; Parquet is
 an optional exchange representation under the
 [knowledge connector contract](../../data/knowledge-connectors.md).

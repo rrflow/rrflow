@@ -1,5 +1,5 @@
 //! Restore publication contracts: promoting one verified restore staging root
-//! into an installed estate's storage root.
+//! into an installed engram's storage root.
 //!
 //! Publication is an offline lifecycle operation in the plan/apply shape of
 //! installation: a deterministic, digest-bound plan binds the candidate, the
@@ -10,7 +10,7 @@
 use crate::attunement::{
     digest_json, validate_bounded_text, validate_contract_version, validate_project_relative_path,
 };
-use crate::{invalid, validate_sha256, CanonicalId, InstalledEstateIdentity, Result};
+use crate::{invalid, validate_sha256, CanonicalId, InstalledEngramIdentity, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,7 @@ pub const MAX_RESTORE_PUBLICATION_ACTIONS: usize = 8;
 pub enum RestorePublicationActionKind {
     /// Re-verify the candidate against its backup and the plan's evidence.
     VerifyCandidate,
-    /// Copy the estate's token key into the candidate; a backup never carries it.
+    /// Copy the engram's token key into the candidate; a backup never carries it.
     CarryTokenKey,
     /// Rename the active storage root into its quarantine location.
     QuarantineActiveRoot,
@@ -32,7 +32,7 @@ pub enum RestorePublicationActionKind {
     PublishCandidateRoot,
     /// Open the published root through the installed engine path and record
     /// the publication receipt in its control journal.
-    OpenPublishedEstate,
+    OpenPublishedEngram,
 }
 
 pub const RESTORE_PUBLICATION_ACTIONS: [RestorePublicationActionKind; 5] = [
@@ -40,7 +40,7 @@ pub const RESTORE_PUBLICATION_ACTIONS: [RestorePublicationActionKind; 5] = [
     RestorePublicationActionKind::CarryTokenKey,
     RestorePublicationActionKind::QuarantineActiveRoot,
     RestorePublicationActionKind::PublishCandidateRoot,
-    RestorePublicationActionKind::OpenPublishedEstate,
+    RestorePublicationActionKind::OpenPublishedEngram,
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -90,7 +90,7 @@ impl RestoreRootEvidence {
 pub struct RestorePublicationPlan {
     pub contract_version: u16,
     pub id: CanonicalId,
-    pub target: InstalledEstateIdentity,
+    pub target: InstalledEngramIdentity,
     pub product_version: String,
     pub executable_sha256: String,
     pub restore_id: CanonicalId,

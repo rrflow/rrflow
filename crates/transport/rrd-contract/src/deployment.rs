@@ -1,4 +1,4 @@
-//! Canonical installed-estate, deployment, and operator-configuration contracts.
+//! Canonical installed-engram, deployment, and operator-configuration contracts.
 //!
 //! These values separate durable identity and resource policy from adapter
 //! topology. They govern durable effects; they do not describe or constrain a

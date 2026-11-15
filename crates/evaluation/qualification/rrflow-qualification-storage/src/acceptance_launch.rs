@@ -115,7 +115,7 @@ pub(super) fn verify(
         .as_ref()
         .ok_or("launch allocation absent")?
         .sha256()?;
-    if campaign.allocation.estates.get() == 1 {
+    if campaign.allocation.engrams.get() == 1 {
         let result: CampaignResult = decode(&read_bounded(
             &root.join("result.json"),
             MAX_DOCUMENT_BYTES,
@@ -148,15 +148,15 @@ pub(super) fn verify(
             for boundary in &trial.boundaries {
                 check_samples(std::slice::from_ref(&boundary.sample), &allocation)?;
             }
-            for (estate, expected_child) in trial.child_results.iter().enumerate() {
+            for (engram, expected_child) in trial.child_results.iter().enumerate() {
                 let child = fleet_child(
                     campaign,
                     trial.point,
                     trial.seed,
                     trial.trial,
-                    estate as u64,
+                    engram as u64,
                 )?;
-                let directory = fleet_member_directory(root, index as u64, estate as u64);
+                let directory = fleet_member_directory(root, index as u64, engram as u64);
                 let result: CampaignResult = decode(&read_bounded(
                     &directory.join("result.json"),
                     MAX_DOCUMENT_BYTES,

@@ -10,7 +10,7 @@
       "vcpus": 4,
       "host_bytes": 8589934592,
       "engine_bytes": 2147483648,
-      "estates": 1,
+      "engrams": 1,
       "records_min": 100000,
       "edges_min": 500000,
       "vectors_min": 100000,
@@ -26,15 +26,15 @@
         25,
         50
       ],
-      "requires_estate_interference": false
+      "requires_engram_interference": false
     },
     {
-      "id": "single-service-estate",
-      "name": "Single service estate",
+      "id": "single-service-engram",
+      "name": "Single service engram",
       "vcpus": 8,
       "host_bytes": 34359738368,
       "engine_bytes": 8589934592,
-      "estates": 1,
+      "engrams": 1,
       "records_min": 1000000,
       "edges_min": 5000000,
       "vectors_min": 1000000,
@@ -50,7 +50,7 @@
         100,
         250
       ],
-      "requires_estate_interference": false
+      "requires_engram_interference": false
     },
     {
       "id": "fleet-isolation",
@@ -58,7 +58,7 @@
       "vcpus": 16,
       "host_bytes": 34359738368,
       "engine_bytes": 8589934592,
-      "estates": 10,
+      "engrams": 10,
       "records_min": 1000000,
       "edges_min": 5000000,
       "vectors_min": 1000000,
@@ -68,7 +68,7 @@
         40
       ],
       "rates": [],
-      "requires_estate_interference": true
+      "requires_engram_interference": true
     },
     {
       "id": "data-larger-than-memory",
@@ -76,7 +76,7 @@
       "vcpus": 8,
       "host_bytes": 34359738368,
       "engine_bytes": 8589934592,
-      "estates": 1,
+      "engrams": 1,
       "records_min": 0,
       "edges_min": 0,
       "vectors_min": 2000000,
@@ -84,7 +84,7 @@
       "logical_source_bytes_min": 34359738368,
       "clients": [],
       "rates": [],
-      "requires_estate_interference": false
+      "requires_engram_interference": false
     }
   ],
   "thresholds": {
@@ -94,7 +94,7 @@
         "requests_per_second": 25
       },
       {
-        "profile": "single-service-estate",
+        "profile": "single-service-engram",
         "requests_per_second": 100
       }
     ],

@@ -38,7 +38,7 @@ Observed at development/main `81fce08e` while writing E-04b's oracle
 ## Impact
 
 A vector that moved out of a collection is still found there, with content the
-estate has replaced. Search and point retrieval disagree about which version
+engram has replaced. Search and point retrieval disagree about which version
 is current.
 
 ## Remediation

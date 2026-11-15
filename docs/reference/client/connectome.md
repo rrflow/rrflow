@@ -8,7 +8,7 @@ The repository root [README](../../../README.md) owns RRFlow identity and curren
 status. The [system overview](../../architecture/system-overview.md) owns the
 engine/client boundary, the
 [instance topology](../../architecture/instance-topology.md) owns project,
-estate, instance, and deployment identity, the
+engram, instance, and deployment identity, the
 [engine data flow](../../architecture/engine-data-flow.md) owns query, context,
 reasoning, automation, and presentation flow, the
 [public contract](../protocol/public-contract.md) owns wire vocabulary and
@@ -148,7 +148,7 @@ merge queue:
 Source association is not H-06 acceptance.
 
 The desktop shows the native installation preview, requires its exact accepted
-digest, and regenerates the plan before apply. Existing estates reopen through
+digest, and regenerates the plan before apply. Existing engrams reopen through
 the same installed lifecycle. Data models display the authenticated catalogue,
 bounded native query results and read cursors; graph, vector and storage lenses
 remain public-operation projections. The local workflow requires no account.
@@ -184,7 +184,7 @@ Connectome is a projection client. It may:
 
 It cannot own or recreate:
 
-- installation, estate, project, instance, session, policy, or attunement
+- installation, engram, project, instance, session, policy, or attunement
   authority;
 - rrflowDB or rrflowKV state, rrflowMX semantics, read stamps, transactions, or
   commit decisions;
@@ -295,7 +295,7 @@ The current generated handoff is:
 
 ```text
 ServiceCapabilities
-  installed_estate? { project_id, estate_id, instance_id }
+  installed_engram? { project_id, engram_id, instance_id }
   deployment {
     contract_version, deployment_form, storage_profile,
     endpoint_presentation
@@ -311,19 +311,19 @@ ServiceCapabilities
   product_capabilities
 ```
 
-`installed_estate` is required for the D-01-installed product even though the
+`installed_engram` is required for the D-01-installed product even though the
 field remains optional for embedded/test compositions. Connectome must reject
 an identity mismatch between it and `instance`. It renders the effective
 configuration revision and ceilings but never edits `.rrflow/config.toml` or
 assumes that a ceiling activates a feature. In particular,
 `governed-reasoning-runner` is currently unavailable; its configured limits
 support future plan/apply and UI preparation, not a success badge. Context and
-query controls must default at or below the advertised estate ceilings rather
+query controls must default at or below the advertised engram ceilings rather
 than blindly sending the protocol hard maximum.
 
 The [user-selected effort contract](../inference/lfg-swag.md#user-selected-effort-and-run-budgets)
 owns reasoning controls. H-06 must show the selected preset or custom limits,
-effective estate caps, remaining time/steps/attempts and known cost, plus Stop
+effective engram caps, remaining time/steps/attempts and known cost, plus Stop
 and an explicitly previewed extension. A stopped run shows partial results and
 unresolved work with the engine's reason. Resume cannot reset consumption.
 Until the runner and configuration-apply capabilities are advertised, these
@@ -341,7 +341,7 @@ Each rendered object or aggregate retains, as applicable:
 
 | Coordinate | Required client behavior |
 |---|---|
-| Instance and scope | Retain the exact RRD instance resource and project/estate/resource path supplied by the operation; never infer scope from a label or active tab. |
+| Instance and scope | Retain the exact RRD instance resource and project/engram/resource path supplied by the operation; never infer scope from a label or active tab. |
 | Read coordinate | Retain runtime cursor, manifest generation, valid time, and schema/catalogue/policy revisions supplied by the `ReadStamp`. |
 | Semantic identity | Retain record, relation, event, reasoning-run/tree, routine-run, attunement-job, projection, plan, trace, and evidence identities rather than array position or display text. |
 | Causality | Retain request, operation, transaction, subscription, trace, causation, and idempotency coordinates supplied by the result. |
@@ -374,23 +374,23 @@ workspaces; a new adapter or view mode does not warrant another top-level
 feature area. Nested routes and breadcrumbs retain exact instance, resource
 and permitted read coordinates. A deep link never implies authorization.
 
-Inside one project, the breadcrumb is Project ▸ Estate ▸ Domain, taken from
-the engine's [estate organisation](../data/estate-organisation.md). "All
+Inside one project, the breadcrumb is Project ▸ Engram ▸ Domain, taken from
+the engine's [engram organisation](../data/engram-organisation.md). "All
 domains" is the unscoped default. Choosing a domain or tag sends that scope to
-the engine, so every view reads only that part of the estate; the client never
-filters an estate-wide result. An isolated domain appears only when the
+the engine, so every view reads only that part of the engram; the client never
+filters an engram-wide result. An isolated domain appears only when the
 session holds its grant, and otherwise shows as unavailable. Per-domain
 evidence (size, work, latency, used context, denials and truncations) is the
 drill-down for finding bottlenecks and what is working. Before H-11 serves
-organisation, the breadcrumb shows the estate alone and marks domains
+organisation, the breadcrumb shows the engram alone and marks domains
 unavailable; Connectome keeps no grouping of its own.
 
 Choosing a new or existing project previews the engine's exact installation
-plan. Once authorized, the installed lifecycle provisions one estate/rrflowDB
+plan. Once authorized, the installed lifecycle provisions one engram/rrflowDB
 and its rrflowKV storage automatically; users do not install three databases
 for DB, KV and QL. Reopening that project resolves and validates the existing
 identity. A missing, foreign or damaged binding requires an explicit recovery
-or installation decision, never silent creation of a replacement estate.
+or installation decision, never silent creation of a replacement engram.
 Switching projects detaches the previous view's subscriptions/session handles
 and isolates cached results; it does not stop independently running projects.
 Running projects concurrently does not grant context sharing.
@@ -428,7 +428,7 @@ schemas and traces. Do not force exploratory reading into a closed workflow;
 show why the durable-effect boundary needs verification. A green control must
 name what was verified and expose partial, denied or unimplemented stages.
 
-H-06 acceptance must exercise two project estates in one actual desktop build:
+H-06 acceptance must exercise two project engrams in one actual desktop build:
 install/reopen each, switch during in-flight requests, follow knowledge
 breadcrumbs, compare a baseline, inspect a retained run after engine restart,
 and explicitly fork a new authorized run. Assert no cross-project cache/session
@@ -461,9 +461,9 @@ provider connection and cloud sync status distinguishable in the UI.
 The client prepares an exact engine plan, including generated identity,
 project-bound rrflowDB/rrflowKV storage, bootstrap schema and admitted vector
 collection/model/metric bindings. rrflowQL is the query interface to this same
-estate, not another database process. Apply provisions what the user reviewed;
+engram, not another database process. Apply provisions what the user reviewed;
 D-02 executes authorized indexing automatically once its admission contract
-exists. Reopen must reuse the estate. Do not call a pending job "indexed".
+exists. Reopen must reuse the engram. Do not call a pending job "indexed".
 A changed plan is presented again; the client cannot accept a different digest.
 
 The default distribution must supply the qualified local assets required by its
@@ -548,7 +548,7 @@ event, run, file, symbol, plan, or evidence item. It displays typed edge
 identity and direction and retains the stamp and traversal bounds. A global
 orientation graph is optional, capability-gated, and bounded. Expanding a node
 submits one explicit graph/query intent to RRD; the renderer cannot perform
-client-side N+1 lookups, scan the estate, or traverse a locally reconstructed
+client-side N+1 lookups, scan the engram, or traverse a locally reconstructed
 graph as authoritative state.
 
 A timeline consumes cursor-ordered engine events, routine/reasoning transitions,
@@ -631,8 +631,8 @@ states. It does not collapse them into a generic empty view or success badge.
 Connectome may aggregate several independently authenticated RRD instances for
 operator navigation. Each panel, cache entry, route, subscription, action, and
 error retains its exact instance identity and connection. The client cannot
-merge their estate state, claim cross-instance ACID, reuse a session across
-instances, or turn the first-alpha per-project estate into a fleet database.
+merge their engram state, claim cross-instance ACID, reuse a session across
+instances, or turn the first-alpha per-project engram into a fleet database.
 
 PostgreSQL, Turso, SQLite, Dragonfly, object stores, model providers,
 generators, harnesses, and meshes appear only through their installed RRFlow

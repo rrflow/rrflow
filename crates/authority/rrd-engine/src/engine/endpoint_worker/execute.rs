@@ -162,7 +162,7 @@ impl RrdEngine {
         let scope = proposal.scope();
         if accepted.project_id != installed.installation.target.project_id
             || scope.project != installed.installation.target.project_id.as_str()
-            || scope.estate != installed.installation.target.estate_id.as_str()
+            || scope.engram != installed.installation.target.engram_id.as_str()
             || scope.root != profile.inventory_policy.logical_root.as_str()
         {
             return Err(ServiceError::ProjectBindingMismatch);

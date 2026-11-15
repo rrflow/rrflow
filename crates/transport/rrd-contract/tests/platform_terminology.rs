@@ -15,7 +15,7 @@ fn canonical_platform_terms_are_unique_complete_and_classified() {
             "RRFlow",
             "RRD",
             "organization",
-            "estate",
+            "engram",
             "project",
             "environment",
             "instance",
@@ -77,7 +77,7 @@ fn public_resource_vocabulary_contains_every_canonical_resource() {
         resources,
         BTreeSet::from([
             ResourceKind::Organization,
-            ResourceKind::Estate,
+            ResourceKind::Engram,
             ResourceKind::Project,
             ResourceKind::Instance,
             ResourceKind::Tenant,
@@ -107,6 +107,9 @@ fn historical_source_table_preserves_the_machine_term_order_until_a07() {
         .lines()
         .filter_map(|line| line.strip_prefix("| `"))
         .filter_map(|line| line.split_once('`').map(|(term, _)| term))
+        // The note is history and predates the owner's rename of its `estate`
+        // term to `engram`; only that name differs from the table.
+        .map(|term| if term == "estate" { "engram" } else { term })
         .collect::<Vec<_>>();
     let canonical = PLATFORM_TERMS
         .iter()

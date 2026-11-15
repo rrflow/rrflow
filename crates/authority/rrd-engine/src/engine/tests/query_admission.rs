@@ -38,7 +38,7 @@ fn public_query_uses_one_key_budget_after_unrelated_growth_and_native_reopen() {
         registry: DataSchemaRegistry {
             revision: 1,
             migration: "query admission".into(),
-            organisation: DataEstateOrganisation::default(),
+            organisation: DataEngramOrganisation::default(),
             tables: BTreeMap::from([(
                 kind.clone(),
                 DataTableSchema {

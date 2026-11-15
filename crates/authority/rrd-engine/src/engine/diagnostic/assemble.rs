@@ -157,10 +157,10 @@ impl RrdEngine {
             let retention_sha256 = diagnostic_retention_sha256(&retention)?;
             let query_indexes = diagnostic_query_indexes(self, &scope, &request.scope)?;
             let vector_collections = diagnostic_vector_collections(self, &scope, &request.scope)?;
-            let estate = rrd_estate::EstateRepository::new(&self.storage, self.instance.clone())
+            let engram = rrd_engram::EngramRepository::new(&self.storage, self.instance.clone())
                 .load()?
                 .as_ref()
-                .map(rrd_estate::public_snapshot);
+                .map(rrd_engram::public_snapshot);
             let changes = self.read_changefeed_page(&ReadChangefeed {
                 scope: request.scope.clone(),
                 after_cursor: request.changes_after_cursor,
@@ -199,7 +199,7 @@ impl RrdEngine {
                 &vector_artifacts,
                 &query_indexes,
                 &vector_collections,
-                estate.as_ref(),
+                engram.as_ref(),
                 &storage,
                 &changes,
                 &audit,
@@ -230,7 +230,7 @@ impl RrdEngine {
                 vector_artifacts,
                 query_indexes,
                 vector_collections,
-                estate,
+                engram,
                 storage,
                 changes,
                 audit,

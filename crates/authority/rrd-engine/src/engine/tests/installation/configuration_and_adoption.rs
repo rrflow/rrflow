@@ -1,4 +1,4 @@
-//! Sealed configuration, locator relocation, leftover folders and inherited estates.
+//! Sealed configuration, locator relocation, leftover folders and inherited engrams.
 
 use super::*;
 
@@ -101,7 +101,7 @@ max_elapsed_ms = 5000
     )
     .unwrap();
     let engine = open_at(project.path(), &executable, 1_799_999_999_750).unwrap();
-    assert_eq!(engine.estate_configuration().query.max_rows, 9);
+    assert_eq!(engine.engram_configuration().query.max_rows, 9);
     drop(engine);
     let tolerated = inspect_at(project.path(), &executable, 1_799_999_999_750).unwrap();
     assert_eq!(
@@ -159,7 +159,7 @@ pub(super) fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_for
     std::fs::rename(&original, &moved).unwrap();
     let relocated = open_at(&moved, &executable, 1_800_000_000_001).unwrap();
     assert_eq!(
-        relocated.installed_estate_identity(),
+        relocated.installed_engram_identity(),
         Some(&preview.installation.target)
     );
     drop(relocated);
@@ -233,7 +233,7 @@ pub(super) fn a_leftover_rrflow_folder_is_adopted_in_place_and_keeps_every_file(
     // Planning reports the adoption and changes nothing.
     let preview = plan(project.path());
     assert_eq!(
-        preview.installation.adopted_estate_entries.as_deref(),
+        preview.installation.adopted_engram_entries.as_deref(),
         Some(
             &[
                 "dev".to_owned(),
@@ -266,7 +266,7 @@ pub(super) fn a_leftover_rrflow_folder_is_adopted_in_place_and_keeps_every_file(
     assert!(!project.path().join(".rrflow/rrd/stale.bin").exists());
     crate::engine::token_key::validate_private_directory(&project.path().join(".rrflow")).unwrap();
 
-    // The adopted estate opens, verifies and replays like any other.
+    // The adopted engram opens, verifies and replays like any other.
     open_at(project.path(), &executable, 1_800_000_000_001).unwrap();
     let report = inspect_at(project.path(), &executable, 1_800_000_000_002).unwrap();
     assert_eq!(report.status, InstallationVerificationStatus::Passed);
@@ -307,7 +307,7 @@ pub(super) fn a_changed_leftover_rrflow_folder_refuses_the_stale_plan_without_ef
 }
 
 #[test]
-pub(super) fn an_installed_estate_is_never_adopted() {
+pub(super) fn an_installed_engram_is_never_adopted() {
     let project = tempfile::tempdir().unwrap();
     let executable = test_executable();
     let preview = plan(project.path());
@@ -335,7 +335,7 @@ pub(super) fn an_installed_estate_is_never_adopted() {
 
 #[test]
 pub(super) fn installed_backups_and_restore_staging_live_beside_the_storage_roots() {
-    use crate::engine::estate_layout::{validate_recovery_estate, EstateLayout};
+    use crate::engine::engram_layout::{validate_recovery_engram, EngramLayout};
     use rrd_contract::{
         CreateInstanceBackup, CreateSession, ListInstanceBackups, RestoreInstanceBackup,
         SessionLimits,
@@ -456,20 +456,20 @@ pub(super) fn installed_backups_and_restore_staging_live_beside_the_storage_root
         !inventory(project.path()).keys().any(|path| path
             .components()
             .any(|component| component.as_os_str() == "rrd-service")),
-        "an installed estate has no rrd-service tree"
+        "an installed engram has no rrd-service tree"
     );
 
     let layout =
-        EstateLayout::new(&storage_root_id, &preview.installation.initial_principal_id).unwrap();
-    validate_recovery_estate(
-        &super::super::super::estate_layout::EstateFilesystem::admit(
+        EngramLayout::new(&storage_root_id, &preview.installation.initial_principal_id).unwrap();
+    validate_recovery_engram(
+        &super::super::super::engram_layout::EngramFilesystem::admit(
             rrd_store::filesystem::AnchoredPath::open_root(project.path()).unwrap(),
             false,
         )
         .unwrap(),
         &layout,
     )
-    .expect("install recovery accepts an estate that holds backups and restore staging");
+    .expect("install recovery accepts an engram that holds backups and restore staging");
 
     let reopened = RrdEngine::open_installed(project.path(), &executable).unwrap();
     assert_eq!(
@@ -489,7 +489,7 @@ pub(super) fn installed_backups_and_restore_staging_live_beside_the_storage_root
 /// below under POAM-006.
 #[cfg(windows)]
 #[test]
-pub(super) fn inherited_estate_preview_adopts_the_folder_without_effects() {
+pub(super) fn inherited_engram_preview_adopts_the_folder_without_effects() {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir(root.path().join(".rrflow")).unwrap();
     let before = inventory(root.path());
@@ -503,7 +503,7 @@ pub(super) fn inherited_estate_preview_adopts_the_folder_without_effects() {
     )
     .unwrap();
     assert_eq!(
-        preview.installation.adopted_estate_entries.as_deref(),
+        preview.installation.adopted_engram_entries.as_deref(),
         Some(&[][..]),
         "an empty inherited .rrflow is adopted with no entries"
     );
@@ -513,15 +513,15 @@ pub(super) fn inherited_estate_preview_adopts_the_folder_without_effects() {
 #[cfg(windows)]
 #[test]
 #[ignore = "POAM-006: the installer still rejects an existing .rrflow with inherited permissions; #236 adopts it by relocation, this oracle asks for in-place preservation of bytes and ACLs, and no repair for that exists yet"]
-pub(super) fn existing_project_preserves_inherited_estate_and_opens_after_replay() {
+pub(super) fn existing_project_preserves_inherited_engram_and_opens_after_replay() {
     use std::process::Command;
 
     let root = tempfile::tempdir().unwrap();
-    let estate = root.path().join(".rrflow");
-    let old_storage = estate.join("rrd");
+    let engram = root.path().join(".rrflow");
+    let old_storage = engram.join("rrd");
     std::fs::create_dir_all(&old_storage).unwrap();
     std::fs::write(root.path().join("source.txt"), b"existing project").unwrap();
-    std::fs::write(estate.join("user-notes.txt"), b"leave notes unchanged").unwrap();
+    std::fs::write(engram.join("user-notes.txt"), b"leave notes unchanged").unwrap();
     std::fs::write(old_storage.join("legacy-state"), b"leave state unchanged").unwrap();
     let before = inventory(root.path());
     let acl = |path: &Path| {
@@ -529,9 +529,9 @@ pub(super) fn existing_project_preserves_inherited_estate_and_opens_after_replay
         assert!(result.status.success());
         result.stdout
     };
-    let estate_acl = acl(&estate);
+    let engram_acl = acl(&engram);
     let storage_acl = acl(&old_storage);
-    assert!(estate_acl.windows(3).any(|part| part == b"(I)"));
+    assert!(engram_acl.windows(3).any(|part| part == b"(I)"));
     assert!(storage_acl.windows(3).any(|part| part == b"(I)"));
     let preview = plan(root.path());
     assert_eq!(
@@ -554,7 +554,7 @@ pub(super) fn existing_project_preserves_inherited_estate_and_opens_after_replay
     apply();
     let engine = open_at(root.path(), &executable, 1_800_000_001_000).unwrap();
     assert_eq!(
-        engine.installed_estate_identity(),
+        engine.installed_engram_identity(),
         Some(&preview.installation.target)
     );
     drop(engine);
@@ -562,6 +562,6 @@ pub(super) fn existing_project_preserves_inherited_estate_and_opens_after_replay
     for (path, bytes) in before {
         assert_eq!(std::fs::read(root.path().join(path)).unwrap(), bytes);
     }
-    assert_eq!(acl(&estate), estate_acl);
+    assert_eq!(acl(&engram), engram_acl);
     assert_eq!(acl(&old_storage), storage_acl);
 }

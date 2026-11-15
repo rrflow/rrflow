@@ -40,17 +40,17 @@ In a second PowerShell window, from this bundle:
 The operating system chooses a free loopback port. ready authenticates and
 returns the current engine discovery endpoints. Use its
 public catalogue/schemas for client operations. Stop the owned serve process with
-Ctrl+C. Then, while the estate is stopped:
+Ctrl+C. Then, while the engram is stopped:
   .\rrflow.exe --json verify --project <same-project-directory> --level quick
 
-Restart with the same serve command. Do not delete the estate to recover a failed
-attempt. Retain the exact executable for that estate: installation binds its
-binary identity. Changing a binary is not an implicit estate migration.
+Restart with the same serve command. Do not delete the engram to recover a failed
+attempt. Retain the exact executable for that engram: installation binds its
+binary identity. Changing a binary is not an implicit engram migration.
 
 OPTIONAL: ONE REAL CONTROLLER TRIAL
 
 This separately packaged proof tool requires Python 3.11+ and an available model
-endpoint. It creates a NEW isolated installed estate in an absent output folder,
+endpoint. It creates a NEW isolated installed engram in an absent output folder,
 then runs one real proposal, restarts, verifies exact readback and rejects replay.
 It does not run a worker, change your project, train a model or label your outcome.
 
@@ -67,7 +67,7 @@ Supply all inputs yourself; no task, endpoint, model or credential is preselecte
 
 The helper is an optional offline contract tool, not a second engine. It derives
 request digests using the same Rust contract. No build tool or checkout is needed.
-No model endpoint, key, dataset, sample output or private estate is in this ZIP.
+No model endpoint, key, dataset, sample output or private engram is in this ZIP.
 
 DIAGNOSE AND RECOVER
 
@@ -80,7 +80,7 @@ and budget without provider credentials or dispatch:
 
 Uncertain remote execution stays uncertain; this package has no public operation
 to clear it. Preserve the original directory and report its actual response.
-Never upload project credential files, private environment files or estate data.
+Never upload project credential files, private environment files or engram data.
 
 --admission-only exercises installed denials with no provider credentials. It
 requires the four build/helper/profile/task input flags and an absent output path.

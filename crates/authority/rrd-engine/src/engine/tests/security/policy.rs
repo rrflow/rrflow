@@ -350,7 +350,7 @@ pub(super) fn compiled_role_policy_injects_tenant_rows_and_fields_before_query_p
             registry: DataSchemaRegistry {
                 revision: 1,
                 migration: "install tenant policy fixture".into(),
-                organisation: DataEstateOrganisation::default(),
+                organisation: DataEngramOrganisation::default(),
                 tables: BTreeMap::from([(
                     CanonicalId::new("document").unwrap(),
                     DataTableSchema {
@@ -551,7 +551,7 @@ pub(super) fn context_records_authorization_and_denies_unenforced_data_policy_be
             registry: DataSchemaRegistry {
                 revision: 1,
                 migration: "install context authorization fixture".into(),
-                organisation: DataEstateOrganisation::default(),
+                organisation: DataEngramOrganisation::default(),
                 tables: BTreeMap::from([(
                     CanonicalId::new("document").unwrap(),
                     DataTableSchema {

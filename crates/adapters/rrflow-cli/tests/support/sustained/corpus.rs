@@ -49,7 +49,7 @@ pub(super) async fn verify_reopened_window(
 }
 
 pub(super) async fn seed(
-    estate: &Estate,
+    engram: &Engram,
     work: &mut Workload,
     campaign: &StorageCampaign,
     progress: &ProgressContext<'_>,
@@ -59,14 +59,14 @@ pub(super) async fn seed(
 ) -> DriverResult<CorpusEvidence> {
     tokio::time::timeout(
         Duration::from_millis(campaign.schedule.setup_ms.get()),
-        seed_inner(estate, work, campaign, progress, clock, ordinal, opened),
+        seed_inner(engram, work, campaign, progress, clock, ordinal, opened),
     )
     .await
     .map_err(|_| "corpus setup exceeded its frozen deadline".to_owned())?
 }
 
 async fn seed_inner(
-    estate: &Estate,
+    engram: &Engram,
     work: &mut Workload,
     campaign: &StorageCampaign,
     progress: &ProgressContext<'_>,
@@ -122,7 +122,7 @@ async fn seed_inner(
         progress.writer.checkpoint_progress()?;
         for record in first..end {
             rotate_session(
-                estate,
+                engram,
                 work,
                 campaign,
                 progress.point.clients.get(),
@@ -160,7 +160,7 @@ async fn seed_inner(
     for first in (0..work.records).step_by(clients) {
         // Every previous future is complete before closing/renewing its session.
         rotate_session(
-            estate,
+            engram,
             work,
             campaign,
             progress.point.clients.get(),

@@ -582,7 +582,7 @@ pub(super) fn unrelated_git_stage_does_not_reset_source_repetition_ceiling() {
             &rrd_contract::ConfigureTaskBudget {
                 scope: fixture.selection.scope.clone(),
                 task_id: fixture.selection.task_id.clone(),
-                limits: fixture.engine.estate_configuration.reasoning.clone(),
+                limits: fixture.engine.engram_configuration.reasoning.clone(),
                 repetition_policy: Some(rrd_contract::TaskRepetitionPolicy {
                     max_equivalent_attempts: 1,
                 }),

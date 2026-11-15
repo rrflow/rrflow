@@ -31,16 +31,16 @@ pub fn run_internal_parse_worker() -> std::io::Result<()> {
 }
 #[cfg(feature = "full")]
 pub use engine::{
-    attunement_proposal_schema, load_attunement_proposal, load_estate_configuration,
+    attunement_proposal_schema, load_attunement_proposal, load_engram_configuration,
     AttunementCommand, AttunementControlResult, AttunementProposal, AttunementProposalStep,
     AttunementReceiptView, AttunementReplanPreview, AttunementReplanReceiptView,
     AttunementReplanResult, AuthorizedInvocation, ClockAssessment, ClockAssessmentStatus,
     ClockObservation, ClockObservationFailure, ClockSourceKind, ClockTrustLevel,
     DefaultAttunementPhase, DefaultInstallProfile, DistributedAuthorityRead, DistributedReadRoute,
-    EndpointCredentials, EstateAdminAction, EstateAdminResult, EstateBackupReconcileOutcome,
-    EstateReconcileOutcome, FollowOutcome, FollowTick, InstallationPlanningOptions,
+    EndpointCredentials, EngramAdminAction, EngramAdminResult, EngramBackupReconcileOutcome,
+    EngramReconcileOutcome, FollowOutcome, FollowTick, InstallationPlanningOptions,
     InstallationPreview, InstallationVerificationCheck, InstallationVerificationReport,
-    InstallationVerificationStatus, InstalledEstateRecord, InstalledTailRepairPlan,
+    InstallationVerificationStatus, InstalledEngramRecord, InstalledTailRepairPlan,
     InstalledTailRepairReceipt, Invocation, InvocationCompletion, InvocationCredential,
     NestedRepositoryDiscovery, PreparedDistributedAuthority, ProjectLocator, ProjectMapSummary,
     ReasoningBudgetStop, Result, RrdEngine, RrdOperation, ServiceError, ServiceErrorKind,

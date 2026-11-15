@@ -13,8 +13,8 @@ pub(super) enum Admission {
 }
 
 pub(super) fn inspect(
-    project: &EstateFilesystem,
-    layout: &EstateLayout,
+    project: &EngramFilesystem,
+    layout: &EngramLayout,
     preview: &InstallationPreview,
     profile: &DefaultInstallProfile,
     executable: &Path,
@@ -26,7 +26,7 @@ pub(super) fn inspect(
             let intent = read_existing_intent(project, layout, preview, executable_sha256)?;
             let result = replay_installation_result(project, preview, executable, clock)?;
             if intent.is_some() {
-                validate_recovery_estate(project, layout)?;
+                validate_recovery_engram(project, layout)?;
             }
             return Ok(Admission::Published {
                 intent: intent.map(Box::new),
@@ -46,7 +46,7 @@ pub(super) fn inspect(
             &preview.installation.configuration.clock,
             "install.apply.recover",
         )?)?;
-        validate_recovery_estate(project, layout)?;
+        validate_recovery_engram(project, layout)?;
         if project_inventory_sha256_excluding(
             project.project(),
             profile,
@@ -57,8 +57,8 @@ pub(super) fn inspect(
         }
         return Ok(Admission::Recover(Box::new(intent)));
     }
-    let adopted = preview.installation.adopted_estate_entries.as_deref();
-    reject_existing_estate(project, adopted)?;
+    let adopted = preview.installation.adopted_engram_entries.as_deref();
+    reject_existing_engram(project, adopted)?;
     validate_installation_target(project, preview.installation.target_kind)?;
     if project_inventory_sha256(project.project(), profile)?
         != preview.installation.project_precondition_sha256

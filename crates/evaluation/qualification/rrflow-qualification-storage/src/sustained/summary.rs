@@ -110,7 +110,7 @@ pub(super) fn validate_next(
 }
 
 pub(super) fn qualifies(campaign: &StorageCampaign, result: &CampaignResult) -> Result<bool> {
-    if campaign.purpose != CampaignPurpose::Qualification || campaign.allocation.estates.get() != 1
+    if campaign.purpose != CampaignPurpose::Qualification || campaign.allocation.engrams.get() != 1
     {
         return Ok(false);
     }

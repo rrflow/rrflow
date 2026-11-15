@@ -88,7 +88,7 @@ fn vector_fixture_schema(
     DataSchemaRegistry {
         revision: 1,
         migration: migration.into(),
-        organisation: DataEstateOrganisation::default(),
+        organisation: DataEngramOrganisation::default(),
         tables: BTreeMap::from([
             (document_kind.clone(), document_table),
             (

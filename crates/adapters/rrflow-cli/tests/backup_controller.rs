@@ -1,7 +1,7 @@
 use rrd_contract::{CanonicalId, InstallationTargetKind};
 use rrd_engine::RrdEngine;
-use rrd_estate::{
-    BackupJobState, BackupReconcileOutcome, DesiredPhase, DesiredTarget, EstateRepository,
+use rrd_engram::{
+    BackupJobState, BackupReconcileOutcome, DesiredPhase, DesiredTarget, EngramRepository,
     LeaseRequest, MutationContext, ObservationRequest, ObservedPhase, ReceiptBoundary,
     ReceiptRequest, ScheduleBackup, SetDesired,
 };
@@ -24,7 +24,7 @@ fn context(at: u64, request: &str, operation: &str) -> MutationContext {
     }
 }
 
-/// The distribution the estate is bound to. The binding is the file's
+/// The distribution the engram is bound to. The binding is the file's
 /// SHA-256, so the fixture the lifecycle tests also use stands in for the
 /// primary executable; hashing a debug build on every step would only slow
 /// the matrix down.
@@ -62,9 +62,9 @@ fn install_instance(state_root: &Path) -> PathBuf {
 
 fn prepare(database: &Path, state_root: &Path) -> PathBuf {
     let engine = RrflowKvStore::open(database).unwrap();
-    let repository = EstateRepository::new(&engine, id("estate-a"));
+    let repository = EngramRepository::new(&engine, id("engram-a"));
     repository
-        .create(&context(10, "create-estate", "create-estate"))
+        .create(&context(10, "create-engram", "create-engram"))
         .unwrap();
     repository
         .set_desired(&SetDesired {
@@ -82,7 +82,7 @@ fn prepare(database: &Path, state_root: &Path) -> PathBuf {
     repository
         .acquire_lease(&LeaseRequest {
             context: context(30, "lease-stop", "stop-instance"),
-            worker: id("estate-worker"),
+            worker: id("engram-worker"),
             lease_ms: 1_000,
         })
         .unwrap();
@@ -93,7 +93,7 @@ fn prepare(database: &Path, state_root: &Path) -> PathBuf {
         repository
             .record_receipt(&ReceiptRequest {
                 context: context(at, request, "stop-instance"),
-                worker: id("estate-worker"),
+                worker: id("engram-worker"),
                 lease_epoch: 1,
                 boundary,
                 evidence_sha256: evidence.repeat(64),
@@ -104,7 +104,7 @@ fn prepare(database: &Path, state_root: &Path) -> PathBuf {
     repository
         .record_observation(&ObservationRequest {
             context: context(60, "observe-stop", "stop-instance"),
-            worker: id("estate-worker"),
+            worker: id("engram-worker"),
             lease_epoch: 1,
             phase: ObservedPhase::Stopped,
             version: None,
@@ -116,7 +116,7 @@ fn prepare(database: &Path, state_root: &Path) -> PathBuf {
     repository
         .record_receipt(&ReceiptRequest {
             context: context(70, "complete-stop", "stop-instance"),
-            worker: id("estate-worker"),
+            worker: id("engram-worker"),
             lease_epoch: 1,
             boundary: ReceiptBoundary::Completed,
             evidence_sha256: "e".repeat(64),
@@ -141,13 +141,13 @@ fn command(database: &Path, state_root: &Path, at: u64) -> Command {
         "--db",
         database.to_str().unwrap(),
         "--authority-instance",
-        "estate-control-instance",
+        "engram-control-instance",
         "--state-root",
         state_root.to_str().unwrap(),
         "--distribution-executable",
         distribution_executable().to_str().unwrap(),
-        "--estate",
-        "estate-a",
+        "--engram",
+        "engram-a",
         "--worker",
         "backup-worker",
         "--lease-ms",
@@ -203,7 +203,7 @@ fn run_and_kill(database: &Path, state_root: &Path, marker: &Path, at: u64, afte
 
 fn job_state(database: &Path) -> (BackupJobState, u64) {
     let engine = RrflowKvStore::open(database).unwrap();
-    let document = EstateRepository::new(&engine, id("estate-a"))
+    let document = EngramRepository::new(&engine, id("engram-a"))
         .load()
         .unwrap()
         .unwrap();
@@ -216,7 +216,7 @@ fn job_state(database: &Path) -> (BackupJobState, u64) {
 #[test]
 fn backup_controller_kill_matrix_converges_after_the_archive_effect_gap() {
     let temporary = tempfile::tempdir().unwrap();
-    let database = temporary.path().join("estate-authority");
+    let database = temporary.path().join("engram-authority");
     let state_root = temporary.path().join("state");
     std::fs::create_dir(&state_root).unwrap();
     std::fs::create_dir(state_root.join("instances")).unwrap();

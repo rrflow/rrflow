@@ -24,7 +24,7 @@ provider activation.
 ## One engine authority
 
 The installed project's RrdEngine authenticates and authorizes catalogue reads
-and replacements. Project and instance scope must match the installed estate.
+and replacements. Project and instance scope must match the installed engram.
 A replacement carries the last observed revision and an idempotency identity;
 the catalogue and exact accepted response receipt commit atomically through
 the existing control journal. Stale writes fail rather than overwrite another
@@ -46,7 +46,7 @@ The public operation catalogue owns `knowledge-tree-list` and
 `knowledge-tree-catalogue` version 1. The separately authored, unmerged Connectome editor uses that capability before
 issuing a new operation, derives project/scope in the native session and keeps
 unsaved edits on errors. The current parent UI pin does not contain that editor;
-POAM-037 tracks its integration into the current workspace UI. Estates without the new capability retain their
+POAM-037 tracks its integration into the current workspace UI. Engrams without the new capability retain their
 existing Records, Vectors and Storage controls. An engine update and any new
 policy grants require their own deployment evidence.
 

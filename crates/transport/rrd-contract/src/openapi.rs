@@ -382,7 +382,7 @@ pub(crate) fn request_envelope_schema(name: &str) -> Result<serde_json::Value> {
         "AcceptAttunementReplan" => schema_json::<RequestEnvelope<AcceptAttunementReplan>>(),
         "ReadAttunementReceipt" => schema_json::<RequestEnvelope<ReadAttunementReceipt>>(),
         "CancelAttunement" => schema_json::<RequestEnvelope<CancelAttunement>>(),
-        "ReadEstate" => schema_json::<RequestEnvelope<ReadEstate>>(),
+        "ReadEngram" => schema_json::<RequestEnvelope<ReadEngram>>(),
         "RenewSession" => schema_json::<RequestEnvelope<RenewSession>>(),
         "RestoreInstanceBackup" => schema_json::<RequestEnvelope<RestoreInstanceBackup>>(),
         "RetrieveVectorPoints" => schema_json::<RequestEnvelope<RetrieveVectorPoints>>(),
@@ -459,7 +459,7 @@ pub(crate) fn response_envelope_schema(name: &str) -> Result<serde_json::Value> 
         }
         "AttunementCancelResult" => schema_json::<ResponseEnvelope<AttunementCancelResult>>(),
         "EndpointCatalogue" => schema_json::<ResponseEnvelope<EndpointCatalogue>>(),
-        "EstateSnapshot" => schema_json::<ResponseEnvelope<EstateSnapshot>>(),
+        "EngramSnapshot" => schema_json::<ResponseEnvelope<EngramSnapshot>>(),
         "InstanceBackupCatalogueSnapshot" => {
             schema_json::<ResponseEnvelope<InstanceBackupCatalogueSnapshot>>()
         }

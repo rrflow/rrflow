@@ -23,7 +23,7 @@ struct Args {
     distribution_executable: PathBuf,
     policy: PathBuf,
     key: PathBuf,
-    estate: CanonicalId,
+    engram: CanonicalId,
     instance: CanonicalId,
     at: u64,
     request_id: String,
@@ -42,14 +42,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = parse_args(std::env::args().skip(1))?;
     let json = match args.action {
         RecoveryAction::Prune { evaluated_at } => {
-            serde_json::to_string(&RrdEngine::prune_estate_backups_store(
+            serde_json::to_string(&RrdEngine::prune_engram_backups_store(
                 &args.db,
                 args.authority_instance,
                 &args.state_root,
                 &args.distribution_executable,
                 &args.policy,
                 &args.key,
-                args.estate,
+                args.engram,
                 args.instance,
                 evaluated_at,
                 args.at,
@@ -62,14 +62,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             backup_sha256,
             restore_id,
             started_at,
-        } => serde_json::to_string(&RrdEngine::restore_estate_backup_store(
+        } => serde_json::to_string(&RrdEngine::restore_engram_backup_store(
             &args.db,
             args.authority_instance,
             &args.state_root,
             &args.distribution_executable,
             &args.policy,
             &args.key,
-            args.estate,
+            args.engram,
             args.instance,
             backup_sha256,
             restore_id,
@@ -92,7 +92,7 @@ fn parse_args(mut arguments: impl Iterator<Item = String>) -> Result<Args, Strin
     let mut distribution_executable = None;
     let mut policy = None;
     let mut key = None;
-    let mut estate = None;
+    let mut engram = None;
     let mut instance = None;
     let mut at = None;
     let mut request_id = None;
@@ -115,7 +115,7 @@ fn parse_args(mut arguments: impl Iterator<Item = String>) -> Result<Args, Strin
             "--distribution-executable" => distribution_executable = Some(PathBuf::from(value)),
             "--policy" => policy = Some(PathBuf::from(value)),
             "--key" => key = Some(PathBuf::from(value)),
-            "--estate" => estate = Some(canonical(value, "--estate")?),
+            "--engram" => engram = Some(canonical(value, "--engram")?),
             "--instance" => instance = Some(canonical(value, "--instance")?),
             "--at" => at = Some(parse_u64(&value, "--at")?),
             "--request" => request_id = Some(value),
@@ -158,7 +158,7 @@ fn parse_args(mut arguments: impl Iterator<Item = String>) -> Result<Args, Strin
             .ok_or("--distribution-executable is required")?,
         policy: policy.ok_or("--policy is required")?,
         key: key.ok_or("--key is required")?,
-        estate: estate.ok_or("--estate is required")?,
+        engram: engram.ok_or("--engram is required")?,
         instance: instance.ok_or("--instance is required")?,
         at: at.ok_or("--at is required")?,
         request_id: request_id.ok_or("--request is required")?,
@@ -176,7 +176,7 @@ fn canonical(value: String, option: &str) -> Result<CanonicalId, String> {
 }
 
 fn usage() -> &'static str {
-    "usage: rrd-recovery-controller <prune|restore> --db PATH --authority-instance ID --state-root PATH --distribution-executable RRFLOW --policy PATH --key PATH --estate ID --instance ID --at UNIX_MS --request ID --operation ID --idempotency KEY [--evaluated-at UNIX_MS] [--backup-sha256 SHA256 --restore ID --started-at UNIX_MS]"
+    "usage: rrd-recovery-controller <prune|restore> --db PATH --authority-instance ID --state-root PATH --distribution-executable RRFLOW --policy PATH --key PATH --engram ID --instance ID --at UNIX_MS --request ID --operation ID --idempotency KEY [--evaluated-at UNIX_MS] [--backup-sha256 SHA256 --restore ID --started-at UNIX_MS]"
 }
 
 #[cfg(test)]
@@ -189,7 +189,7 @@ mod tests {
             "--db",
             "/authority",
             "--authority-instance",
-            "estate-control",
+            "engram-control",
             "--state-root",
             "/state",
             "--distribution-executable",
@@ -198,8 +198,8 @@ mod tests {
             "/policy",
             "--key",
             "/key",
-            "--estate",
-            "estate-a",
+            "--engram",
+            "engram-a",
             "--instance",
             "instance-a",
             "--at",

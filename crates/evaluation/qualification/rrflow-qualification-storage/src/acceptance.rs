@@ -160,13 +160,13 @@ impl CandidateCiReceipt {
                 "Require both complete ordinary-primary receipts",
                 "Require fresh and existing installed damage denial",
                 "Exercise installed capacity workload and backup readback",
-                "Independent installed estates under concurrent load",
+                "Independent installed engrams under concurrent load",
             ] {
                 Self::step(reopen, name)?;
             }
         }
         for os in ["macos-latest", "windows-latest"] {
-            self.job(&format!("pipeline / estate process ({os})"))?;
+            self.job(&format!("pipeline / engram process ({os})"))?;
         }
         Ok(())
     }
@@ -484,11 +484,11 @@ pub fn verify_storage_acceptance(
             .find(|p| p.id == campaign.storage.profile.as_str())
             .ok_or("unknown acceptance capacity profile")?;
         require(
-            campaign.allocation.estates.get() == profile.estates,
-            "campaign estate topology differs from owning profile",
+            campaign.allocation.engrams.get() == profile.engrams,
+            "campaign engram topology differs from owning profile",
         )?;
         let (status, qualified) = if let Some(expected) = &entry.result_sha256 {
-            if campaign.allocation.estates.get() > 1 {
+            if campaign.allocation.engrams.get() > 1 {
                 let result = verify_fleet(&directory)?;
                 require(
                     digest("rrflow-storage-fleet-result-v1", &result)? == *expected,

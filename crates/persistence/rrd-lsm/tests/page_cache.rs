@@ -78,7 +78,7 @@ fn cache_policy_validation_fails_before_path_creation() {
 #[test]
 fn cache_policy_is_process_local_and_durable_state_is_identical() {
     let root = tempfile::tempdir().unwrap();
-    let database_root = root.path().join("estate");
+    let database_root = root.path().join("engram");
     let expected = create_mixed_family_database(&database_root);
     let exact = observe(&database_root, PageCachePolicy::ExactLru, &expected);
     let scan_resistant = observe(
@@ -98,7 +98,7 @@ fn cache_policy_is_process_local_and_durable_state_is_identical() {
 #[test]
 fn scan_resistant_cache_preserves_reused_pages_across_a_mixed_family_scan() {
     let root = tempfile::tempdir().unwrap();
-    let database_root = root.path().join("estate");
+    let database_root = root.path().join("engram");
     let expected = create_mixed_family_database(&database_root);
 
     let exact = observe(&database_root, PageCachePolicy::ExactLru, &expected);

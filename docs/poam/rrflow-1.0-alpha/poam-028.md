@@ -45,7 +45,7 @@ was tolerated only while this record was not closed.
 At reopening:
 
 Vector search cost grows with the scope's whole history, not with the request.
-On the Connectome demonstration estate (270 records, 986 relations, 270
+On the Connectome demonstration engram (270 records, 986 relations, 270
 vectors), 270 exact searches examined 1,320,583 keys in 46.9 s. Search
 candidates come from the request's `ReadStamp` while both catalogues come from
 the current head, so the two can differ when a publication commits in
@@ -84,7 +84,7 @@ records the additional proof and final candidate requirement.
 The two repaired source-closure exceptions are removed. The independent
 `rrd-maintenance` log replay remains the one known exception, so POAM-028
 and C-04 remain open. Catalogue generation/lifecycle history is still read
-within its typed ranges; persistent incremental vector serving, large-estate
+within its typed ranges; persistent incremental vector serving, large-engram
 resource qualification and current-head generation lookup remain E-04 work.
 This package does not implement codebase inventory or establish that a
 stored source digest still matches an externally modified working tree.

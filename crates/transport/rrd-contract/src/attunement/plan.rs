@@ -65,7 +65,7 @@ pub struct AttunementPlan {
     #[schemars(schema_with = "attunement_version_schema")]
     pub contract_version: u16,
     pub id: CanonicalId,
-    pub target: InstalledEstateIdentity,
+    pub target: InstalledEngramIdentity,
     pub source_sha256: String,
     #[schemars(schema_with = "attunement_steps_schema")]
     pub phases: Vec<AttunementPhasePlan>,

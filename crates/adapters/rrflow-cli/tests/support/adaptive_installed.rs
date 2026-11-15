@@ -8,12 +8,12 @@ async fn assert_source_at_checkpoint(
 ) {
     #[derive(serde::Serialize)]
     struct SourceScope<'a> {
-        estate: &'a str,
+        engram: &'a str,
         project: &'a str,
         root: &'a str,
     }
     let source_scope = SourceScope {
-        estate: plan.target.estate_id.as_str(),
+        engram: plan.target.engram_id.as_str(),
         project: plan.target.project_id.as_str(),
         root: "project-source",
     };

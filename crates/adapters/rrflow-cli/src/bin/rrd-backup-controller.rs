@@ -15,7 +15,7 @@ struct Args {
     authority_instance: CanonicalId,
     state_root: PathBuf,
     distribution_executable: PathBuf,
-    estate: CanonicalId,
+    engram: CanonicalId,
     worker: CanonicalId,
     lease_ms: u64,
     at: u64,
@@ -32,12 +32,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = parse_args(std::env::args().skip(1))
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
     let hold_after_effect = std::env::var_os(HOLD_AFTER_EFFECT_ENV).map(PathBuf::from);
-    let outcome = RrdEngine::reconcile_estate_backup_store(
+    let outcome = RrdEngine::reconcile_engram_backup_store(
         &args.db,
         args.authority_instance,
         &args.state_root,
         &args.distribution_executable,
-        args.estate,
+        args.engram,
         args.worker,
         args.lease_ms,
         args.at,
@@ -93,7 +93,7 @@ fn parse_args(arguments: impl Iterator<Item = String>) -> Result<Args, String> {
     let mut authority_instance = None;
     let mut state_root = None;
     let mut distribution_executable = None;
-    let mut estate = None;
+    let mut engram = None;
     let mut worker = None;
     let mut lease_ms = 30_000;
     let mut at = None;
@@ -116,9 +116,9 @@ fn parse_args(arguments: impl Iterator<Item = String>) -> Result<Args, String> {
                     "--distribution-executable",
                 )?));
             }
-            "--estate" => {
-                estate = Some(
-                    CanonicalId::new(required(&mut arguments, "--estate")?)
+            "--engram" => {
+                engram = Some(
+                    CanonicalId::new(required(&mut arguments, "--engram")?)
                         .map_err(|error| error.to_string())?,
                 );
             }
@@ -149,7 +149,7 @@ fn parse_args(arguments: impl Iterator<Item = String>) -> Result<Args, String> {
         state_root: state_root.ok_or("--state-root is required")?,
         distribution_executable: distribution_executable
             .ok_or("--distribution-executable is required")?,
-        estate: estate.ok_or("--estate is required")?,
+        engram: engram.ok_or("--engram is required")?,
         worker: worker.ok_or("--worker is required")?,
         lease_ms,
         at: at.ok_or("--at is required")?,
@@ -181,13 +181,13 @@ mod tests {
                 "--db",
                 "/tmp/db",
                 "--authority-instance",
-                "estate-authority",
+                "engram-authority",
                 "--state-root",
                 "/tmp/state",
                 "--distribution-executable",
                 "/opt/rrflow/bin/rrflow",
-                "--estate",
-                "estate-a",
+                "--engram",
+                "engram-a",
                 "--worker",
                 "worker-a",
                 "--lease-ms",
@@ -200,13 +200,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(args.db, PathBuf::from("/tmp/db"));
-        assert_eq!(args.authority_instance.as_str(), "estate-authority");
+        assert_eq!(args.authority_instance.as_str(), "engram-authority");
         assert_eq!(args.state_root, PathBuf::from("/tmp/state"));
         assert_eq!(
             args.distribution_executable,
             PathBuf::from("/opt/rrflow/bin/rrflow")
         );
-        assert_eq!(args.estate.as_str(), "estate-a");
+        assert_eq!(args.engram.as_str(), "engram-a");
         assert_eq!(args.worker.as_str(), "worker-a");
         assert_eq!(args.lease_ms, 9_000);
         assert_eq!(args.at, 42);

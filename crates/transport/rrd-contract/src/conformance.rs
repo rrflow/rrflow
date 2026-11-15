@@ -149,8 +149,8 @@ pub struct ServiceCapabilities {
     pub implementation_version: String,
     pub deployment: DeploymentProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub installed_estate: Option<InstalledEstateIdentity>,
-    pub configuration: EstateConfiguration,
+    pub installed_engram: Option<InstalledEngramIdentity>,
+    pub configuration: EngramConfiguration,
     pub instance: ResourceId,
     pub capabilities: Vec<CapabilityDescriptor>,
     pub product_capabilities: ProductCapabilityCatalogue,
@@ -164,7 +164,7 @@ impl ServiceCapabilities {
         if self.instance.kind != ResourceKind::Instance {
             return invalid("service capability identity must be an instance resource");
         }
-        if let Some(installed) = &self.installed_estate {
+        if let Some(installed) = &self.installed_engram {
             installed.validate()?;
             if installed.instance_id != self.instance.id {
                 return invalid(

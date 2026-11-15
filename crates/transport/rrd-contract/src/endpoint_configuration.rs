@@ -1,6 +1,6 @@
 //! Project-local configuration, separate from external capability authorization.
 use crate::{
-    invalid, sha256_bytes, EndpointProfile, EndpointProfileInput, InstalledEstateIdentity, Result,
+    invalid, sha256_bytes, EndpointProfile, EndpointProfileInput, InstalledEngramIdentity, Result,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub struct ReadEndpointConfiguration {}
 #[serde(deny_unknown_fields)]
 pub struct EndpointConfiguration {
     pub format_version: u16,
-    pub identity: InstalledEstateIdentity,
+    pub identity: InstalledEngramIdentity,
     /// Zero means never configured; revocation retains a nonzero revision.
     pub revision: u64,
     pub profile: Option<EndpointProfile>,
@@ -80,7 +80,7 @@ impl PreviewEndpointConfiguration {
 #[serde(deny_unknown_fields)]
 pub struct EndpointConfigurationPlan {
     pub format_version: u16,
-    pub identity: InstalledEstateIdentity,
+    pub identity: InstalledEngramIdentity,
     pub expected_revision: u64,
     pub expected_configuration_sha256: String,
     pub profile: Option<EndpointProfile>,

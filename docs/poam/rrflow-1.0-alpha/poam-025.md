@@ -20,7 +20,7 @@ startup recovery, verification, repair, restore, and salvage.
 ## Impact
 
 A diagnostic can mutate the target, a repair can bypass installed identity/authorization, an
-arbitrary path can be treated as the estate, derived projection damage can be confused with
+arbitrary path can be treated as the engram, derived projection damage can be confused with
 canonical corruption, or an unsafe reset can hide acknowledged data loss.
 
 ## Owning gates

@@ -44,9 +44,9 @@ fn fixture() -> (ListAttunementJobs, AttunementJobPage) {
     let second = summary(1, Some(first.job_id.clone()));
     let page = AttunementJobPage {
         contract_version: ATTUNEMENT_CONTRACT_VERSION,
-        target: InstalledEstateIdentity {
+        target: InstalledEngramIdentity {
             project_id: CanonicalId::new("project").unwrap(),
-            estate_id: CanonicalId::new("estate").unwrap(),
+            engram_id: CanonicalId::new("engram").unwrap(),
             instance_id: CanonicalId::new("instance").unwrap(),
         },
         control_sequence: 1,

@@ -37,17 +37,17 @@ authorize the advanced connector execution described below.
 The engine exposes three authenticated operations under
 `/v1/configuration/endpoints/`: `read`, `preview`, and `apply`. The executable
 endpoint catalogue generates their OpenAPI and SDK projections. Read requires
-`EstateRead`; preview and apply require `EstateAdmin`. Preview is non-mutating
+`EngramRead`; preview and apply require `EngramAdmin`. Preview is non-mutating
 and does not require a mutation idempotency key. Apply is a mutation and requires
 both the normal request key and the exact approved plan digest.
 
-`EndpointConfiguration` binds the installed project, estate, and instance to
+`EndpointConfiguration` binds the installed project, engram, and instance to
 one current `EndpointProfile`. The initial revision is zero. Preview accepts an
 expected revision and the desired profile, assigns the next revision, and binds
 the prior configuration digest and a five-minute expiry. Apply validates the
 whole plan and publishes through the engine's existing control compare-and-swap
 and bounded transaction admission. It does not rewrite the immutable installed
-estate resource configuration or installation locator.
+engram resource configuration or installation locator.
 
 To remove the saved configuration, preview `profile: null` and apply that plan.
 The resulting tombstone retains the next revision. Retrying the current applied
@@ -126,7 +126,7 @@ source, evidence and knowledge families, not newly implemented type names:
 
 - Source identity includes connector/external-account scope, stable resource
   id, revision/content digest, media type, source ACL/policy revision, observed
-  time and retention/deletion obligations. Equal bytes in different estates
+  time and retention/deletion obligations. Equal bytes in different engrams
   do not merge authorization or expose a global deduplication oracle.
 - Chunk identity binds source revision, exact locator (text span, page/region,
   table/row, code range, or media interval), extraction/chunking revision and
@@ -178,11 +178,11 @@ versioned evidence, configuration, projection and job boundaries. Generate
 public operations and client models from their canonical types when admitted.
 
 A baseline captures the evidence needed to compare a proposed change, rather
-than copying an unbounded estate or freezing a user's permissions forever:
+than copying an unbounded engram or freezing a user's permissions forever:
 
 | Coordinate | Required retained identity |
 |---|---|
-| Project and reads | Exact estate/instance, relevant committed project inventory, read stamp, schema revision and source manifest/checkpoints. An unversioned foreign response is explicitly non-reproducible. |
+| Project and reads | Exact engram/instance, relevant committed project inventory, read stamp, schema revision and source manifest/checkpoints. An unversioned foreign response is explicitly non-reproducible. |
 | Knowledge construction | Source/chunk/claim locators and digests; extraction, chunking and graph-family definitions; model/template identities; accepted corrections and projection build/source cursors. |
 | Retrieval | Query/task corpus and split digests, embedding space, index/artifact revisions, filtering/fusion/reranking policy, eligible models and effective configuration. |
 | Evaluation | Verifier/rubric versions, expected facts/relations/citations, budgets, hardware/runtime profile, measurements and uncertainty. Freeze acceptance thresholds before examining candidate test results. |
@@ -224,7 +224,7 @@ reads retain their original stamp. Rollback selects a compatible prior policy
 through a new revision; it cannot undo later source corrections or deletions.
 A baseline is not a backup, native restore image or cross-project sharing grant.
 Bound concurrent builds, pinned bytes, leases, query work and cancellation;
-refuse admission when the estate cannot afford the retained comparison.
+refuse admission when the engram cannot afford the retained comparison.
 
 Qualification must join connect/import, baseline capture, query/citations,
 source edit, candidate rebuild, comparison, promotion/rejection, restart and

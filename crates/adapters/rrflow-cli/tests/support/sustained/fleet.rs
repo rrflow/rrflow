@@ -1,4 +1,4 @@
-//! Independent installed estates, sharing only the bounded workload oracle.
+//! Independent installed engrams, sharing only the bounded workload oracle.
 use super::super::process;
 use super::*;
 #[path = "fleet_campaign.rs"]
@@ -7,7 +7,7 @@ pub(super) use campaign::{execute, Participation};
 use rrd_contract::{ErrorCode, InspectStorageCursor, StorageCursorAction};
 
 struct Member {
-    estate: Estate,
+    engram: Engram,
     child: Option<process::Process>,
     work: Workload,
     original_receipts: Digest,
@@ -15,9 +15,9 @@ struct Member {
 }
 impl Member {
     async fn create(ordinal: u64, clock: Instant) -> DriverResult<Self> {
-        let estate = Estate::install("fresh");
-        let (child, client, _) = estate.start_for(clock, Duration::from_secs(600));
-        let credential = rrd_engine::RrdEngine::read_installed_api_key(&estate.project)
+        let engram = Engram::install("fresh");
+        let (child, client, _) = engram.start_for(clock, Duration::from_secs(600));
+        let credential = rrd_engine::RrdEngine::read_installed_api_key(&engram.project)
             .map_err(|e| e.to_string())?;
         let name = format!("fleet-session-{ordinal}");
         let session = client
@@ -39,7 +39,7 @@ impl Member {
             native_worker: Default::default(),
             client,
             session,
-            valid_at: estate.at,
+            valid_at: engram.at,
             dimensions: 16,
             seed: 73 + ordinal,
             records: 8,
@@ -47,7 +47,7 @@ impl Member {
             edges_per_record: 3,
             vectors_per_record: 2,
             payload_bytes: 1024,
-            query_budget: serde_json::from_value(estate.plan["configuration"]["query"].clone())
+            query_budget: serde_json::from_value(engram.plan["configuration"]["query"].clone())
                 .map_err(|e| e.to_string())?,
         };
         work.initialize().await?;
@@ -56,7 +56,7 @@ impl Member {
             let operation = work.seed_record(row)?;
             let receipt = work.execute(&operation).await?;
             if receipt.idempotent_replay {
-                return Err("fresh estate replayed foreign seed state".into());
+                return Err("fresh engram replayed foreign seed state".into());
             }
             original_receipts = digest(
                 "c07g.fleet-seed-receipts",
@@ -68,7 +68,7 @@ impl Member {
             work.verify(&work.seed_record(row)?).await?;
         }
         Ok(Self {
-            estate,
+            engram,
             child: Some(child),
             work,
             original_receipts,
@@ -81,7 +81,7 @@ impl Member {
         clock: Instant,
     ) -> DriverResult<serde_json::Value> {
         let killed = super::super::kill(self.child.take().ok_or("missing fleet child")?, clock);
-        let (child, client, identity) = self.estate.start_for(clock, Duration::from_secs(300));
+        let (child, client, identity) = self.engram.start_for(clock, Duration::from_secs(300));
         self.child = Some(child);
         self.work.client = client;
         let mut replayed = digest("c07g.fleet-seed-receipts", &ordinal)?;
@@ -108,7 +108,7 @@ impl Member {
             }
         }
         Ok(
-            serde_json::json!({"estate":ordinal,"killed":killed,"reopened":identity,
+            serde_json::json!({"engram":ordinal,"killed":killed,"reopened":identity,
             "seed_receipts_sha256":replayed,"seed_records":self.work.records,"working_slots":self.final_writes.len()}),
         )
     }
@@ -136,7 +136,7 @@ async fn deny_foreign_sessions(members: &[Member]) -> DriverResult<()> {
                 ) => {}
             _ => {
                 return Err(
-                    "foreign session was not explicitly denied by destination estate".into(),
+                    "foreign session was not explicitly denied by destination engram".into(),
                 )
             }
         }
@@ -146,9 +146,9 @@ async fn deny_foreign_sessions(members: &[Member]) -> DriverResult<()> {
 
 async fn concurrent_frame(members: &mut [Member], generation: u64) -> DriverResult<()> {
     let mut tasks = JoinSet::new();
-    // Exactly four outstanding clients per estate: one mixed write and three
+    // Exactly four outstanding clients per engram: one mixed write and three
     // different read/cancel operations, no optimistic-write rejection hidden.
-    for (estate, member) in members.iter().enumerate() {
+    for (engram, member) in members.iter().enumerate() {
         for (client, kind) in [
             StorageLoadKind::MixedWrite,
             StorageLoadKind::PointRead,
@@ -159,7 +159,7 @@ async fn concurrent_frame(members: &mut [Member], generation: u64) -> DriverResu
         .enumerate()
         {
             let work = member.work.clone();
-            let name = format!("fleet-{estate}-{generation}-{client}");
+            let name = format!("fleet-{engram}-{generation}-{client}");
             let operation = if kind == StorageLoadKind::MixedWrite {
                 work.prepare_load(
                     name,
@@ -176,19 +176,19 @@ async fn concurrent_frame(members: &mut [Member], generation: u64) -> DriverResu
                     tokio::time::timeout(Duration::from_secs(30), work.execute(&operation))
                         .await
                         .map_err(|_| "fleet operation exceeded deadline".to_owned())?;
-                Ok::<_, String>((estate, operation, result?))
+                Ok::<_, String>((engram, operation, result?))
             });
         }
     }
     while let Some(completed) = tasks.join_next().await {
-        let (estate, operation, receipt) = completed.map_err(|e| e.to_string())??;
+        let (engram, operation, receipt) = completed.map_err(|e| e.to_string())??;
         if receipt.idempotent_replay {
             return Err("fresh fleet request unexpectedly replayed".into());
         }
-        members[estate].work.verify(&operation).await?;
+        members[engram].work.verify(&operation).await?;
         if operation.kind == StorageLoadKind::MixedWrite {
-            members[estate].final_writes.clear();
-            members[estate]
+            members[engram].final_writes.clear();
+            members[engram]
                 .final_writes
                 .push((operation, receipt.receipt_sha256));
         }
@@ -197,8 +197,8 @@ async fn concurrent_frame(members: &mut [Member], generation: u64) -> DriverResu
 }
 
 #[test]
-#[ignore = "explicit native independent-estate correctness; not a capacity or soak qualification"]
-fn installed_two_estate_isolation_under_concurrent_load() {
+#[ignore = "explicit native independent-engram correctness; not a capacity or soak qualification"]
+fn installed_two_engram_isolation_under_concurrent_load() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -212,7 +212,7 @@ fn installed_two_estate_isolation_under_concurrent_load() {
         let mut readers=Vec::new();
         for member in &members {readers.push(reader::HeldReader::open(&member.work,0,clock,None).await.unwrap());}
         // Insert, update, retire and recreate identical identities with different
-        // per-estate payloads. The canonical oracle checks all model families.
+        // per-engram payloads. The canonical oracle checks all model families.
         for generation in 0..4 {concurrent_frame(&mut members,generation).await.unwrap();}
         for (member,reader) in members.iter().zip(readers) {
             let evidence=reader.finish(&member.work,clock).await.unwrap();
@@ -233,8 +233,8 @@ fn installed_two_estate_isolation_under_concurrent_load() {
                 action:StorageCursorAction::Observe {},
             },RequestOptions::read("fleet-expired-reader","fleet-expired-reader").unwrap()).await.is_err());
         }
-        println!("installed_fleet_isolation={}",serde_json::json!({"estates":2,"clients_per_estate":4,
-            "write_transitions":4,"cross_estate_session_denials":6,"ordinary_primary":true,"capacity_qualification":false}));
+        println!("installed_fleet_isolation={}",serde_json::json!({"engrams":2,"clients_per_engram":4,
+            "write_transitions":4,"cross_engram_session_denials":6,"ordinary_primary":true,"capacity_qualification":false}));
         for mut member in members {super::super::kill(member.child.take().unwrap(),clock);}
     });
 }

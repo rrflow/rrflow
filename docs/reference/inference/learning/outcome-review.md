@@ -6,7 +6,7 @@
 
 The [controller-training contract](controller-training.md) owns dataset and
 qualification requirements. This tool prepares a review queue for G-06a; it
-does not select providers, start training, write estate state or activate a
+does not select providers, start training, write engram state or activate a
 checkpoint. A successful task-family prediction is not proof that a provider
 would perform the downstream task best.
 

@@ -17,8 +17,10 @@ pub(super) fn loopback_worker_profile(
     allow_context_export: bool,
     allow_source_export: bool,
 ) -> rrd_contract::EndpointProfileInput {
-    let mut configuration: rrd_contract::EndpointConfiguration =
-        serde_json::from_slice(LOOPBACK_CONFIGURATION_BYTES).unwrap();
+    let mut configuration: rrd_contract::EndpointConfiguration = serde_json::from_slice(
+        &super::observed_configuration::project(LOOPBACK_CONFIGURATION_BYTES),
+    )
+    .unwrap();
     let allowance: rrd_contract::EndpointSelectionAllowance =
         serde_json::from_slice(LOOPBACK_ALLOWANCE_BYTES).unwrap();
     let profile = configuration.profile.take().unwrap();

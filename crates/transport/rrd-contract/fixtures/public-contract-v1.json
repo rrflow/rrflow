@@ -40,7 +40,7 @@
         },
         {
           "id": "developer",
-          "kind": "estate"
+          "kind": "engram"
         },
         {
           "id": "alpha",
@@ -75,7 +75,7 @@
       "clock": {
         "maximum_rollback_ms": 0
       },
-      "configuration_sha256": "d2013902bcc7c9efe4840170d35a35aae22e5fcffd0f1f23eca6e9c0e7fcfbf2",
+      "configuration_sha256": "67ac500465419a8ee9fee6f4ad99fb77d7f438d914d615c84cf935d67d1f1a09",
       "format_version": 3,
       "query": {
         "max_batch_rows": 256,
@@ -145,8 +145,8 @@
     },
     "implementation": "rrflow",
     "implementation_version": "1.0.0",
-    "installed_estate": {
-      "estate_id": "alpha-estate",
+    "installed_engram": {
+      "engram_id": "alpha-engram",
       "instance_id": "project-alpha",
       "project_id": "alpha-project"
     },

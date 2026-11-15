@@ -14,7 +14,7 @@ pub(super) fn workspace_packages_use_the_canonical_grouped_layout() {
         ("rrd-inference", "crates/compute/rrd-inference/Cargo.toml"),
         ("rrd-attunement", "crates/compute/rrd-attunement/Cargo.toml"),
         ("rrd-security", "crates/authority/rrd-security/Cargo.toml"),
-        ("rrd-estate", "crates/authority/rrd-estate/Cargo.toml"),
+        ("rrd-engram", "crates/authority/rrd-engram/Cargo.toml"),
         ("rrd-engine", "crates/authority/rrd-engine/Cargo.toml"),
         ("rrd-contract", "crates/transport/rrd-contract/Cargo.toml"),
         ("rrd-client", "crates/transport/rrd-client/Cargo.toml"),
@@ -248,7 +248,7 @@ pub(super) fn engine_has_exact_composition() {
         names(&[
             "rrd-attunement",
             "rrd-contract",
-            "rrd-estate",
+            "rrd-engram",
             "rrd-security",
             "rrd-cluster",
             "rrd-core",
@@ -336,7 +336,7 @@ pub(super) fn outward_consumers_cannot_bypass_the_engine_boundary() {
     let metadata = workspace_metadata();
     let internal_components = names(&[
         "rrd-attunement",
-        "rrd-estate",
+        "rrd-engram",
         "rrd-security",
         "rrd-cluster",
         "rrd-core",
@@ -368,7 +368,7 @@ pub(super) fn outward_product_sources_do_not_import_physical_components() {
         "rrd_attunement",
         "rrd_cluster",
         "rrd_core",
-        "rrd_estate",
+        "rrd_engram",
         "rrd_graph",
         "rrd_inference",
         "rrd_lsm",

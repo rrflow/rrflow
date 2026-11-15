@@ -13,7 +13,7 @@ A code read at `de435238` on 2026-11-11 counted 115 calls to `RrdEngine::open(`,
 
 - `RrdEngine::open` uses the built-in default configuration and default LSM options (`crates/authority/rrd-engine/src/engine/core.rs:212-268`).
 - `open_installed` applies the sealed installed configuration and storage options.
-- The two differ. For example, `StorageLimits::default()` has `cold_history: None` (`crates/transport/rrd-contract/src/deployment.rs:375-378`), while the shipped configuration turns the cold tier on (`crates/authority/rrd-engine/assets/install/default-estate-configuration-v3.toml:62-70`).
+- The two differ. For example, `StorageLimits::default()` has `cold_history: None` (`crates/transport/rrd-contract/src/deployment.rs:375-378`), while the shipped configuration turns the cold tier on (`crates/authority/rrd-engine/assets/install/default-engram-configuration-v3.toml:62-70`).
 
 Separately, tests have no named tiers. Deeper tests are 44 `#[ignore]` tests run by exact name, plus environment-variable and feature gates. The full CI lane is a hand-written list of about 72 `cargo test` lines, repeated per platform.
 

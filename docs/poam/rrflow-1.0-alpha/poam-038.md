@@ -77,7 +77,7 @@ Roadmap owner: [Gate D](../../roadmap/rrflow-1.0/gate-d.md#project-workflow-buil
 Every attunement phase recomputes its bound source identity (the project's
 source revision where it has one, and its inventory digest) before its effect,
 and commits a checkpoint only when that identity matches the plan. A mismatch
-returns a typed stale-plan failure with no project or estate write and requires
+returns a typed stale-plan failure with no project or engram write and requires
 an explicit re-plan; the accepted plan is never edited in place. Tests change a
 project file between plan and `Start` and between two phases, through the
 shipped `rrflow`, and a test changes a storage root between restore planning and

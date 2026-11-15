@@ -6,9 +6,9 @@ impl RrdEngine {
     /// preferred kind alternates; if it has no work, the other is tried once.
     /// Native admission does not queue. Cold reads may still wait for storage;
     /// this ordering is not a wall-clock or cross-thread fairness guarantee.
-    /// Volatile estates have no physical maintenance.
+    /// Volatile engrams have no physical maintenance.
     pub fn maintain_storage(&self) -> Result<bool> {
-        let prefer_cold = self.estate_configuration.storage.cold_history.is_some()
+        let prefer_cold = self.engram_configuration.storage.cold_history.is_some()
             && self
                 .cold_history_next
                 .fetch_xor(true, std::sync::atomic::Ordering::Relaxed);

@@ -45,7 +45,7 @@ may register more projects than can run at once. Admission, waiting, idle
 shutdown, restart, failures and resource pressure must be visible; capacity is
 bounded by configured policy and measured resources, not a promised unlimited
 number or a hardcoded product-wide count. Preserve each project's durable
-estate and identity; never silently stop a process owned by another operator or
+engram and identity; never silently stop a process owned by another operator or
 share context across projects. See the
 [instance-management acceptance](rrflow-1.0/gate-h.md#resource-managed-project-instances).
 
@@ -127,7 +127,7 @@ owner instructions; an unrelated open question does not block safe work.
 
 [Open Gate C accepted evidence](rrflow-1.0/gate-c-evidence.md)
 
-### Gate D — install, configure, and attune one real estate
+### Gate D — install, configure, and attune one real engram
 
 [Open Gate D](rrflow-1.0/gate-d.md)
 

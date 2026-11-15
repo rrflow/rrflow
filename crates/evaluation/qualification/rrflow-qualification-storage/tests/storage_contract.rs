@@ -14,7 +14,7 @@ fn fixtures() -> (StorageManifest, StorageResult) {
         {"logical_id":"write-c", "request_sha256":hash('e'), "effect_sha256":hash('f'), "resolution":"either"}
     ]);
     let operations: Vec<ExpectedOperation> = serde_json::from_value(expected.clone()).unwrap();
-    let configuration = rrd_contract::EstateConfiguration::default();
+    let configuration = rrd_contract::EngramConfiguration::default();
     let mut memtable = json!({});
     for field in [
         "versions",
@@ -90,7 +90,7 @@ fn fixtures() -> (StorageManifest, StorageResult) {
             "write_ahead_log":{"payload_bytes":0,"payload_max_bytes":67108864}, "maintenance":maintenance,
             "segment_set":{"segments":0,"segment_bytes":0,"l0_segments":0,"l0_compaction_trigger":8,"compaction_debt_segments":0,"compaction_target_segment_bytes":8388608},
             "page_cache":page_cache,"segment_io":io}},
-        "budgets":{"atomic_batch_bytes":1048576,"atomic_mutations":1024,"mutable_bytes":134217728,"mutable_versions":1048576,"queue_bytes":4194304,"queue_requests":8,"queue_wait_ms":1000,"maintenance_bytes":16777216,"maintenance_workers":1,"cache_bytes":1048576,"decoded_bytes":1048576,"retained_bytes":1048576,"recovery_memory_bytes":1048576,"recovery_replay_bytes":16777216,"recovery_frames":10000,"recovery_ms":10000,"process_bytes":268435456,"host_bytes":536870912,"estates":2,"disk_bytes":1073741824,"temporary_disk_bytes":16777216,"recovery_reserve_bytes":16777216,"run_ms":60000,"attempts":100},
+        "budgets":{"atomic_batch_bytes":1048576,"atomic_mutations":1024,"mutable_bytes":134217728,"mutable_versions":1048576,"queue_bytes":4194304,"queue_requests":8,"queue_wait_ms":1000,"maintenance_bytes":16777216,"maintenance_workers":1,"cache_bytes":1048576,"decoded_bytes":1048576,"retained_bytes":1048576,"recovery_memory_bytes":1048576,"recovery_replay_bytes":16777216,"recovery_frames":10000,"recovery_ms":10000,"process_bytes":268435456,"host_bytes":536870912,"engrams":2,"disk_bytes":1073741824,"temporary_disk_bytes":16777216,"recovery_reserve_bytes":16777216,"run_ms":60000,"attempts":100},
         "bindings":[{"operation":"transaction-commit", "availability":"available", "driver_sha256":hash('5')}],
         "required_cases":[{"id":"ack-history", "operation":"transaction-commit", "seed":7,"expected_ledger_sha256":expected_digest(&operations).unwrap()}]
     })).unwrap();
@@ -214,7 +214,7 @@ fn rejects_unknown_fields_and_invalid_scalar_domains() {
 fn rejects_budget_overflow_cross_field_conflicts_and_false_effective_policy() {
     for (field, value) in [
         ("process_bytes", 1),
-        ("estates", MAX_EXACT_INTEGER),
+        ("engrams", MAX_EXACT_INTEGER),
         ("atomic_batch_bytes", 134217729),
         ("atomic_mutations", 1048577),
         ("disk_bytes", 33554432),

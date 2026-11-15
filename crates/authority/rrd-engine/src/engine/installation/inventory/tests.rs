@@ -17,7 +17,7 @@ fn selected_source_read_binds_inventory_identity_and_charges_budget() {
         &root,
         &profile,
         SourceScope {
-            estate: "estate".into(),
+            engram: "engram".into(),
             project: "project".into(),
             root: "root".into(),
         },
@@ -284,7 +284,7 @@ fn project_precondition_binds_version_three_policy_git_inputs_and_eligible_sourc
     let (profile, _) = DefaultInstallProfile::load("default").unwrap();
     assert_eq!(
         project_inventory_sha256(root.path(), &profile).unwrap(),
-        "31a1b80977ce83f586733848513b6d9079fecf3337034f4a4e6ad05208c9af9a"
+        "edb4ae9b577c16fc70140c5e5f046d2e57700bbda5aa62bc13cbbae16935f475"
     );
 }
 

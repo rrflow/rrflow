@@ -267,15 +267,15 @@ fn runtime_id(id: &CanonicalId) -> Result<RuntimeType> {
 }
 
 fn runtime_organisation(
-    organisation: &DataEstateOrganisation,
-) -> Result<rrd_core::RuntimeEstateOrganisation> {
+    organisation: &DataEngramOrganisation,
+) -> Result<rrd_core::RuntimeEngramOrganisation> {
     let memberships = |entries: &BTreeMap<CanonicalId, CanonicalId>| {
         entries
             .iter()
             .map(|(identity, domain)| Ok((runtime_id(identity)?, runtime_id(domain)?)))
             .collect::<Result<BTreeMap<_, _>>>()
     };
-    Ok(rrd_core::RuntimeEstateOrganisation {
+    Ok(rrd_core::RuntimeEngramOrganisation {
         domains: organisation
             .domains
             .iter()

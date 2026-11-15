@@ -47,7 +47,7 @@ Surveyed on `development/main` at `a4e32942`:
 
    This follows AWS's "Making retries safe with idempotent APIs" and Stripe's idempotent-request guidance, and it satisfies H-04's "one explicit operation-semantic retry, cancellation, and uncertain-outcome policy".
 3. **The client has one call path.**
-   - `call_operation::<O>` handles every method, typed path parameters (`{session}`, `{transaction}`, `{estate}`) and the declared retry class.
+   - `call_operation::<O>` handles every method, typed path parameters (`{session}`, `{transaction}`, `{engram}`) and the declared retry class.
    - `session_call`, `generated_attunement_call` and the runtime catalogue lookups are removed.
    - The typed methods stay as one-line wrappers, because the CLI, MCP server and Lab call them.
 4. **Special cases are explicit.** A test pins an allow-list of `session-create`, `session-renew`, the five public GETs and the WebSocket connect. The test requires generated callable operations plus allow-listed ones to equal the catalogue exactly: nothing missing, nothing extra.

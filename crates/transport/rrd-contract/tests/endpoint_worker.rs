@@ -1,16 +1,17 @@
 //! Explicit configuration perturbations, never provider qualification records.
+#[path = "support/observed_configuration.rs"]
+mod observed_configuration;
 use rrd_contract::*;
 use serde::Serialize;
 use serde_json::Value;
 use std::{collections::BTreeMap, path::PathBuf};
 
 fn fixture(name: &str) -> Vec<u8> {
-    std::fs::read(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/endpoint-selection-observed/available")
-            .join(name),
+    observed_configuration::read(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/endpoint-selection-observed/available"),
+        name,
     )
-    .unwrap()
 }
 
 fn proposed() -> (EndpointConfiguration, EndpointWorkerPolicy) {

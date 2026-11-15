@@ -23,7 +23,7 @@ pub enum PolicyUnit {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PolicyScope {
-    EstateProcess,
+    EngramProcess,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -107,7 +107,7 @@ impl StorageManifest {
                 value,
                 unit,
                 kind,
-                scope: PolicyScope::EstateProcess,
+                scope: PolicyScope::EngramProcess,
                 change_rule: PolicyChangeRule::NoInstalledStorageReconfigurationCapability,
             })
             .collect())
@@ -136,23 +136,23 @@ impl Budgets {
         )?;
         if let Some(aggregate) = self.aggregate_process_bytes {
             let reserved = sum
-                .checked_mul(self.estates.get())
+                .checked_mul(self.engrams.get())
                 .ok_or("aggregate reservation overflow")?;
             require(
                 self.process_bytes.get() <= aggregate.get()
                     && reserved <= aggregate.get()
                     && aggregate.get() <= self.host_bytes.get(),
-                "shared process pool does not contain estate reservations and fit host budget",
+                "shared process pool does not contain engram reservations and fit host budget",
             )?;
         } else {
             let host = self
                 .process_bytes
                 .get()
-                .checked_mul(self.estates.get())
+                .checked_mul(self.engrams.get())
                 .ok_or("host reservation overflow")?;
             require(
                 host <= self.host_bytes.get(),
-                "estate reservations exceed host budget",
+                "engram reservations exceed host budget",
             )?;
         }
         require(

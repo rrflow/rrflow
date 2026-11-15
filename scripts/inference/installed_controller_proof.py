@@ -606,7 +606,7 @@ def main():
                                 encoding='utf-8', timeout=30, check=True)
                             return json.loads(result.stdout)
 
-                        # These are actual operator policy changes on this isolated estate,
+                        # These are actual operator policy changes on this isolated engram,
                         # not altered provider observations or invented training labels.
                         restricted = json.loads(json.dumps(profile))
                         restricted['selection_policy']['allow_network'] = False

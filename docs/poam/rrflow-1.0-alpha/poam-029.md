@@ -28,7 +28,7 @@ window, all three attempts fail while the runtime cursor does not move.
 ## Impact
 
 Under steady authenticated traffic the diagnostic read is unavailable. On the
-Connectome demonstration estate, the Storage lens could not read for the whole
+Connectome demonstration engram, the Storage lens could not read for the whole
 47 s similarity-map build, whose 270 vector searches are audited reads. A
 client can only retry, and the read cannot report the load that prevents it.
 
@@ -44,4 +44,4 @@ The observed read in the engine test assembles while an audited read runs
 inside every window, and every section still verifies against one stamp (for
 example, by assembling from one storage snapshot, or by reading the audit
 section through the captured control sequence). The test is inverted, and the
-live read completes during a vector-map build on an installed estate.
+live read completes during a vector-map build on an installed engram.

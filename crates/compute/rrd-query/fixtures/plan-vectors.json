@@ -400,7 +400,7 @@
             "name": "versioned_source_read",
             "selected": false,
             "exact": true,
-            "reason": "rejected: relation and record family ranges grow with the estate, not with the visited neighbourhood"
+            "reason": "rejected: relation and record family ranges grow with the engram, not with the visited neighbourhood"
           },
           {
             "name": "derived_projection",
@@ -410,7 +410,7 @@
           }
         ]
       },
-      "digest": "c84240d8653d0f05cee5bc5e9c9cd9c517aff13dea6cc0229c63377718bcd471"
+      "digest": "54ea72d52db59588f19ad96b3ece3d270af6d6857cff842580e5bd5f09ea810d"
     }
   }
 ]

@@ -18,7 +18,7 @@ var (
 	canonicalPattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 	pathParameter      = regexp.MustCompile(`\{([a-z]+)\}`)
 	resourceKinds      = map[string]struct{}{
-		"organization": {}, "estate": {}, "project": {}, "instance": {}, "node": {},
+		"organization": {}, "engram": {}, "project": {}, "instance": {}, "node": {},
 		"shard": {}, "collection": {}, "table": {}, "record": {}, "transaction": {},
 		"snapshot": {}, "backup": {}, "operation": {},
 	}
@@ -194,12 +194,12 @@ func makeContext(options RequestOptions, endpoint Endpoint) (*requestEnvelopeCon
 
 func defaultResource(instance string, parameters map[string]string) ([]ResourceSegment, error) {
 	segments := make([]ResourceSegment, 0, 2)
-	if estate := parameters["estate"]; estate != "" {
-		identifier, err := canonical(estate, "estate")
+	if engram := parameters["engram"]; engram != "" {
+		identifier, err := canonical(engram, "engram")
 		if err != nil {
 			return nil, err
 		}
-		segments = append(segments, ResourceSegment{Kind: "estate", ID: identifier})
+		segments = append(segments, ResourceSegment{Kind: "engram", ID: identifier})
 	}
 	return append(segments, ResourceSegment{Kind: "instance", ID: instance}), nil
 }

@@ -39,7 +39,7 @@ fn encoding() -> ParquetEncoding {
 #[test]
 fn stamped_native_history_encodes_compressed_rows_and_survives_reopen() {
     let directory = tempfile::tempdir().unwrap();
-    let path = directory.path().join("estate");
+    let path = directory.path().join("engram");
     let store = RrflowKvStore::open(&path).unwrap();
     let scope = ScopeId::new("instance:cold").unwrap();
     let mut registry = RuntimeSchemaRegistry::empty(1, "cold history fixture");

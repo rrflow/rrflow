@@ -33,7 +33,7 @@ No licence selection or change is authorized by this observation.
 
 The checkout source graph is guarded, but RRFlow can still omit required assets, depend on
 an undeclared helper/fetch/toolchain/service, or claim cross-platform delivery from a
-component build that cannot install and operate an estate.
+component build that cannot install and operate an engram.
 
 ## Owning gates
 

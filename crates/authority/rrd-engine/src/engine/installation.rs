@@ -18,10 +18,10 @@ use super::clock::{assess, observe_required, require_accepted, ClockSource, Host
 
 use super::*;
 
-use crate::engine::estate_layout::{
-    create_estate_directories, existing_estate_entries, reject_existing_estate, safe_join,
-    validate_estate_directories, validate_managed_relative, validate_recovery_estate,
-    EstateFilesystem, EstateLayout, LOCATOR_RELATIVE_PATH, STORAGE_DIRECTORY,
+use crate::engine::engram_layout::{
+    create_engram_directories, existing_engram_entries, reject_existing_engram, safe_join,
+    validate_engram_directories, validate_managed_relative, validate_recovery_engram,
+    EngramFilesystem, EngramLayout, LOCATOR_RELATIVE_PATH, STORAGE_DIRECTORY,
 };
 
 use crate::engine::memory_engram::build_memory_engram_plan;
@@ -34,10 +34,10 @@ use crate::engine::token_key::{
 use rrd_contract::{
     attunement_plan_sha256, installation_plan_sha256, installation_result_sha256, AttunementJob,
     AttunementJobState, AttunementPhase, AttunementPhasePlan, AttunementPlan, DeploymentProfile,
-    EstateConfiguration, EstateConfigurationInput, InstallationActionDisposition,
+    EngramConfiguration, EngramConfigurationInput, InstallationActionDisposition,
     InstallationActionKind, InstallationActionResult, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationResult, InstallationTargetKind,
-    InstalledEstateIdentity, PersistMemoryEstate, StorageProfileKind, ATTUNEMENT_CONTRACT_VERSION,
+    InstalledEngramIdentity, PersistMemoryEngram, StorageProfileKind, ATTUNEMENT_CONTRACT_VERSION,
     INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
     MAX_ATTUNEMENT_DESCRIPTION_BYTES, MAX_ATTUNEMENT_PHASES,
 };
@@ -59,7 +59,7 @@ use std::io::{Read, Write};
 const INSTALL_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/default-profile-v3.json");
 
 const DEFAULT_CONFIGURATION_BYTES: &[u8] =
-    include_bytes!("../../assets/install/default-estate-configuration-v3.toml");
+    include_bytes!("../../assets/install/default-engram-configuration-v3.toml");
 
 const CLYFFY_PROFILE_BYTES: &[u8] = include_bytes!("../../assets/install/clyffy-profile-v3.json");
 

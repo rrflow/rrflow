@@ -127,7 +127,7 @@ no value in it is a secret.
   work. Explicit experimental proposal and observation-delivery operations can
   call their configured bindings under current authorization and limits.
   The embedding registry remains process-local, and `rrflow install` seals
-  [`EstateConfiguration`](../../../crates/transport/rrd-contract/src/deployment.rs)
+  [`EngramConfiguration`](../../../crates/transport/rrd-contract/src/deployment.rs)
   limits. Admitted runtime resolution on configuration changes remains separate
   from storing a profile.
 - Activation. A binding is configuration. Discovery creates an inactive typed
@@ -147,6 +147,6 @@ no value in it is a secret.
 - D-06 owns the previewed immutable binding and its activation rules; this
   contract is its binding shape.
 - Governed configuration revisions after install consume `EndpointProfile` as
-  a revisioned record beside `EstateConfiguration`.
+  a revisioned record beside `EngramConfiguration`.
 - H-07 owns endpoint resolution through a mesh; G owns the LFG and SWAG
   plug-in configurations that bind their models through this contract.

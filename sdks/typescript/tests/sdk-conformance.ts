@@ -27,7 +27,7 @@ interface Corpus {
   protocol_version: number;
   incompatible_protocol_version: number;
   required_domains: string[];
-  identity: { instance: string; estate: string; principal: string; api_key: string };
+  identity: { instance: string; engram: string; principal: string; api_key: string };
   session: { create: JsonObject; renew: JsonObject; close: JsonObject };
   transaction: {
     preview_begin: JsonObject;
@@ -65,7 +65,7 @@ interface Corpus {
     expected_actor: string;
   };
   backup: { create: JsonObject & { label: string }; list: JsonObject };
-  estate: JsonObject;
+  engram: JsonObject;
   expected: {
     endpoint_count: number;
     query_identity: string;
@@ -73,7 +73,7 @@ interface Corpus {
     quantized_access_path: string;
     indexed_access_path: string;
     indexed_reference: string;
-    estate_revision: number;
+    engram_revision: number;
     typed_error: string;
     retry_attempts: number;
   };
@@ -94,7 +94,7 @@ assert.deepEqual(
     "cancellation",
     "cold_history",
     "crud",
-    "estate",
+    "engram",
     "live_feeds",
     "query",
     "retries",
@@ -238,7 +238,7 @@ assert.ok(
     (hit) => `${hit.reference.kind}:${hit.reference.id}` === corpus.expected.vector_reference,
   ),
 );
-// The quantization lifecycle. The runners share one estate, so this runner
+// The quantization lifecycle. The runners share one engram, so this runner
 // activates the generation its own build returned.
 const quantization = corpus.vector.quantization;
 const built = await client.call(
@@ -343,12 +343,12 @@ const backups = await client.call(
   read("backup-list", session),
 );
 assert.ok(backups.backups.some((entry) => entry.backup_sha256 === backup.backup.backup_sha256));
-const estate = await client.call(
-  "estate-read",
-  corpus.estate as RequestPayload<"estate-read">,
-  read("estate-read", session, { estate: corpus.identity.estate }),
+const engram = await client.call(
+  "engram-read",
+  corpus.engram as RequestPayload<"engram-read">,
+  read("engram-read", session, { engram: corpus.identity.engram }),
 );
-assert.equal(estate.revision, corpus.expected.estate_revision);
+assert.equal(engram.revision, corpus.expected.engram_revision);
 const closed = await client.call(
   "session-close",
   corpus.session.close as RequestPayload<"session-close">,

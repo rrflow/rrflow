@@ -7,13 +7,13 @@
 RRFlow is the database and reasoning system. Kubernetes is one optional outward
 deployment environment for that system. The Kubernetes adapter may materialize
 and observe an engine-authorized deployment plan; it cannot become a second
-source of project, estate, instance, policy, transaction, job, or lifecycle
+source of project, engram, instance, policy, transaction, job, or lifecycle
 truth.
 
 The [instance topology](../../architecture/instance-topology.md) owns project,
-estate, RRD instance, and physical-placement identity. The
+engram, RRD instance, and physical-placement identity. The
 [deployment-profile reference](modes.md) owns deployment form, storage profile,
-and endpoint presentation. The [estate-control reference](../operations/estate-control.md)
+and endpoint presentation. The [engram-control reference](../operations/engram-control.md)
 owns prepared external effects, fencing, observations, and receipts. The
 [security authority](../security/authority.md) owns identity and authorization.
 The [engine data flow](../../architecture/engine-data-flow.md) owns rrflowKV,
@@ -32,7 +32,7 @@ The first alpha Kubernetes profile is exactly:
 
 ```text
 one project
-  -> one estate / rrflowDB
+  -> one engram / rrflowDB
   -> one installed RRD instance
   -> deployment form: single_node_server
   -> storage profile: rrflow_kv
@@ -81,7 +81,7 @@ submits observations and receipts through public engine operations.
 Kubernetes object state is external observation. A successful API patch, Pod
 phase, Job completion, Service address, TCP connection, or status condition
 does not commit RRFlow state. Only an accepted `RrdEngine` transaction can
-advance the canonical installed binding, estate operation, observation,
+advance the canonical installed binding, engram operation, observation,
 receipt, audit, outbox, or cursor.
 
 ## Installation and cold start
@@ -100,12 +100,12 @@ not justify a second installer. D-01 must use one bootstrap path:
    no plaintext secret and grants no general RRFlow mutation authority.
 4. A bounded installer workload mounts the new volume and executes the same
    engine-owned D-01 install apply used by other deployment forms. It commits
-   the project/estate/instance binding, installed profile, security bootstrap,
+   the project/engram/instance binding, installed profile, security bootstrap,
    and idempotent operation evidence through `RrdEngine`.
 5. The RRD workload may start only from that committed binding. Missing,
    mismatched, stale, foreign, or partially committed installation state fails
    closed; startup never creates or repairs it implicitly.
-6. Authenticated application readiness proves the expected project, estate,
+6. Authenticated application readiness proves the expected project, engram,
    instance, storage profile, configuration, capability, and artifact digests.
    The adapter returns that observation for engine acceptance.
 
@@ -125,7 +125,7 @@ The Kubernetes API carries the minimum non-secret projection needed to execute
 one prepared plan. Exact public Rust and wire types are frozen in A-07/B-04;
 the semantic fields must bind:
 
-- operation, idempotency, project, estate, and RRD instance identities;
+- operation, idempotency, project, engram, and RRD instance identities;
 - installed deployment form, storage profile, and endpoint presentation;
 - desired generation plus engine lease/fence or equivalent stale-worker token;
 - plan, configuration, capability, distribution, and executable-image digests;
@@ -135,7 +135,7 @@ the semantic fields must bind:
 - credential, trust, and configuration references without secret values;
 - exact adapter contract/API identity and plan expiry; and
 - issuer/verification evidence sufficient to reject a fabricated, replayed,
-  foreign-estate, or altered projection.
+  foreign-engram, or altered projection.
 
 The plan must not contain caller-selected absolute host paths, caller time as
 authorization truth, raw credentials, mutable rrflowDB records, a second
@@ -240,7 +240,7 @@ Kubernetes probes and RRFlow readiness answer different questions:
 | Startup | the process has completed bounded startup and can answer the narrow health mechanism; it protects slow initialization from premature liveness restarts |
 | Liveness | the process event loop is responsive enough to recover from a deadlock; it does not run a broad database query or depend on an external provider |
 | Readiness | the installed binding is open, the expected rrflowKV writer is exclusive, required security/configuration revisions are active, and authenticated RRFlow operations can be served |
-| Adapter deployment receipt | challenge-bound proof identifies the expected project, estate, instance, plan, image, configuration, storage profile, and capabilities; `RrdEngine` has accepted it |
+| Adapter deployment receipt | challenge-bound proof identifies the expected project, engram, instance, plan, image, configuration, storage profile, and capabilities; `RrdEngine` has accepted it |
 
 A TCP probe proves only that a socket accepted a connection. It cannot prove
 the database, authenticated identity, rrflowKV state, graph/index projections,
@@ -318,7 +318,7 @@ must all converge without releasing protection early or deleting foreign data.
   `RrdEngine` policy still govern every operation.
 - Wardenclyffe/Zuul Zero or another mesh may carry or resolve the configured
   endpoint through the H-07 adapter. Mesh membership does not create an
-  estate, identity, permission, deployment receipt, or storage authority.
+  engram, identity, permission, deployment receipt, or storage authority.
 
 ## Current implementation audit
 
@@ -369,7 +369,7 @@ The current package and checked manifests are characterization inputs only:
    storage handle and Kubernetes status remains external observation.
 3. **D-01/D-02:** implement network-denied preview/apply, the bounded installer
    workload, idempotent engine job/receipt persistence, restart recovery, and
-   the exact new/existing project estate binding.
+   the exact new/existing project engram binding.
 4. **H-04/H-05:** expose the same authenticated operations, readiness facts,
    and correlated causal evidence through public RRD surfaces. Traces observe
    the operation; they never complete it.
@@ -422,10 +422,10 @@ test seam remain explicit in its reviewed package map.
 |---|---|
 | Pure contract | closed decoding, bounds, digest/signature/fence/idempotency, deterministic rendering, old-shape rejection, no secrets or arbitrary commands/paths |
 | Kubernetes API | real supported API server (for example kind), CRD admission/defaulting/status, SSA ownership/conflict, watch/relist, every owned-resource event, owner GC, controller restart |
-| Installation | network-denied clean cluster; preview writes nothing; explicit apply initializes one estate once; kill/restart at every bootstrap/job/receipt boundary; close/reopen matches all identities/digests |
+| Installation | network-denied clean cluster; preview writes nothing; explicit apply initializes one engram once; kill/restart at every bootstrap/job/receipt boundary; close/reopen matches all identities/digests |
 | Single-engine semantics | through the installed endpoint, commit and reopen representative documents, temporal graph edges, scalar/unique indexes, BM25, vectors/HNSW exact rerank, RRF, reasoning tree/context/evidence, and a stamped streamed Arrow/DataFusion query |
 | Differential and durability | the same non-durability semantic corpus matches embedded/server baselines; Kubernetes rrflowKV alone proves WAL/crash/reopen, writer exclusion, PVC reattach, compaction/pinned-reader safety, and ENOSPC behavior |
-| Readiness and updates | wrong estate/instance/image/config/profile/capability fails; socket-only false positive fails; update is prepared/fenced, conflict-safe, restartable, and never creates two writers |
+| Readiness and updates | wrong engram/instance/image/config/profile/capability fails; socket-only false positive fails; update is prepared/fenced, conflict-safe, restartable, and never creates two writers |
 | Deletion and recovery | retained default, backup/hold gating, explicit destruction separation, finalizer restart/stuck-delete/lost-ack convergence, foreign-resource denial, restore and reopened semantic verification |
 | Security and networking | namespace-scoped least privilege, no controller Secret read/list/watch, no data-plane API token, restricted Pod admission, mTLS/credential rotation, exact NetworkPolicy allow/deny, mesh-independent authorization |
 | Resources and release | CPU/memory/storage/diagnostic bounds, cancellation/timeouts, sustained operation, signed digest-pinned multi-architecture image, SBOM, clean offline install, deterministic checked manifests |

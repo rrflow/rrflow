@@ -191,7 +191,7 @@ impl RrdEngine {
 
     fn knowledge_scope(&self, project_id: &CanonicalId, scope: &str) -> Result<ScopeId> {
         if self
-            .installed_estate_identity()
+            .installed_engram_identity()
             .is_none_or(|identity| &identity.project_id != project_id)
         {
             return Err(ServiceError::ProjectBindingMismatch);

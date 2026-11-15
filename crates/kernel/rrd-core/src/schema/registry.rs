@@ -6,8 +6,8 @@ use super::*;
 pub struct RuntimeSchemaRegistry {
     pub revision: u64,
     pub migration: String,
-    #[serde(default, skip_serializing_if = "RuntimeEstateOrganisation::is_default")]
-    pub organisation: RuntimeEstateOrganisation,
+    #[serde(default, skip_serializing_if = "RuntimeEngramOrganisation::is_default")]
+    pub organisation: RuntimeEngramOrganisation,
     /// Sole logical-model authority for every schema-bound table. Specialized
     /// maps below add family-specific constraints; they never create a table
     /// or infer its model.
@@ -25,7 +25,7 @@ impl RuntimeSchemaRegistry {
         Self {
             revision,
             migration: migration.into(),
-            organisation: RuntimeEstateOrganisation::default(),
+            organisation: RuntimeEngramOrganisation::default(),
             tables: BTreeMap::new(),
             records: BTreeMap::new(),
             relations: BTreeMap::new(),

@@ -1,6 +1,6 @@
 use crate::{
     invalid, AuditPage, CanonicalId, ChangefeedPage, DataObjectReceipt, DataProperties,
-    DataSchemaRegistry, EstateSnapshot, ProductCapabilityCatalogue, QueryIndexCatalogueSnapshot,
+    DataSchemaRegistry, EngramSnapshot, ProductCapabilityCatalogue, QueryIndexCatalogueSnapshot,
     Readiness, ResourceId, StorageProfileKind, VectorCollectionCatalogueSnapshot,
     MAX_CHANGEFEED_PAGE, MAX_MESSAGE_BYTES,
 };

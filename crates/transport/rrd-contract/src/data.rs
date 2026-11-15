@@ -207,7 +207,7 @@ pub struct DataTagReference {
 /// identity starts with `rrflow-`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct DataEstateOrganisation {
+pub struct DataEngramOrganisation {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub domains: BTreeMap<CanonicalId, DataDomainSchema>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -220,7 +220,7 @@ pub struct DataEstateOrganisation {
     pub kind_tags: BTreeMap<CanonicalId, BTreeSet<DataTagReference>>,
 }
 
-impl DataEstateOrganisation {
+impl DataEngramOrganisation {
     pub fn is_default(&self) -> bool {
         self.domains.is_empty()
             && self.categories.is_empty()
@@ -258,8 +258,8 @@ pub(crate) fn default_data_domain(identity: &str) -> &'static str {
 pub struct DataSchemaRegistry {
     pub revision: u64,
     pub migration: String,
-    #[serde(default, skip_serializing_if = "DataEstateOrganisation::is_default")]
-    pub organisation: DataEstateOrganisation,
+    #[serde(default, skip_serializing_if = "DataEngramOrganisation::is_default")]
+    pub organisation: DataEngramOrganisation,
     pub tables: BTreeMap<CanonicalId, DataTableSchema>,
     #[serde(default)]
     pub records: BTreeMap<CanonicalId, DataRecordSchema>,

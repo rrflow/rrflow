@@ -15,7 +15,7 @@ _CORRELATION = re.compile(r"^[A-Za-z0-9._:-]+$")
 _CANONICAL = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _RESOURCE_KINDS = {
     "organization",
-    "estate",
+    "engram",
     "project",
     "instance",
     "node",
@@ -71,8 +71,8 @@ def request_context(options: RequestOptions, mutation: bool) -> dict[str, Any]:
 
 def default_resource(instance: str, parameters: Mapping[str, str]) -> tuple[ResourceSegment, ...]:
     segments = []
-    if estate := parameters.get("estate"):
-        segments.append(ResourceSegment("estate", canonical_id(estate, "estate")))
+    if engram := parameters.get("engram"):
+        segments.append(ResourceSegment("engram", canonical_id(engram, "engram")))
     segments.append(ResourceSegment("instance", instance))
     return tuple(segments)
 

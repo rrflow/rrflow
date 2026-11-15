@@ -57,7 +57,7 @@ It must not invent a clean commit, exact custom profile, or complete feature
 closure. `RRFLOW_BUILD_MANIFEST` is a **build-time** input; setting it on an
 installed process cannot change its embedded record. The manifest contains no
 raw environment values, absolute source paths, credentials, clock timestamp
-or estate configuration. The local receipt identifies the binary path outside
+or engram configuration. The local receipt identifies the binary path outside
 the public build record.
 
 The build helper is not a hermetic-build or supply-chain attestation service.
@@ -67,7 +67,7 @@ Cargo configuration, or byte-identical output across hosts. Declared metadata
 can be forged by a different builder. Clean source plus matching compilation
 units is necessary evidence, never sufficient release qualification.
 
-Effective estate configuration remains the engine-owned
+Effective engram configuration remains the engine-owned
 `ServiceCapabilities.configuration` with its existing revision and digest.
 The startup record identifies the **local primary executable**. It does not
 pretend that a local CLI `ready` invocation identifies a remote server.

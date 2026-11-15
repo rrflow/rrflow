@@ -1,6 +1,6 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae
-export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae" as const;
+// OpenAPI SHA-256: 80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb
+export const ENDPOINT_OPENAPI_DOCUMENT_SHA256 = "80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb" as const;
 
 export const endpoints = {
   "attunement-cancel": {
@@ -171,9 +171,9 @@ export const endpoints = {
     "authentication": "session_bearer",
     "mutation": true
   },
-  "estate-read": {
+  "engram-read": {
     "method": "POST",
-    "path": "/v1/estates/{estate}/read",
+    "path": "/v1/engrams/{engram}/read",
     "authentication": "session_bearer",
     "mutation": false
   },

@@ -13,7 +13,7 @@
     "cache_bytes": 1048576,
     "decoded_bytes": 1048576,
     "disk_bytes": 1073741824,
-    "estates": 2,
+    "engrams": 2,
     "host_bytes": 536870912,
     "maintenance_bytes": 16777216,
     "maintenance_workers": 1,
@@ -35,9 +35,9 @@
   "candidate": {
     "clean": true,
     "commit": "1111111111111111111111111111111111111111",
-    "configuration_sha256": "d2013902bcc7c9efe4840170d35a35aae22e5fcffd0f1f23eca6e9c0e7fcfbf2",
+    "configuration_sha256": "67ac500465419a8ee9fee6f4ad99fb77d7f438d914d615c84cf935d67d1f1a09",
     "executable_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
-    "public_catalogue_sha256": "fab5fb9d90a132f8569717a7150ce16b099aaa70166ebca9a16949c567c18eea",
+    "public_catalogue_sha256": "f445114649aedaae1de77698fd1bacf6f9c1cf8997507764717b9e5f1cca316a",
     "tree": "2222222222222222222222222222222222222222"
   },
   "corpus_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
@@ -59,7 +59,7 @@
     "clock": {
       "maximum_rollback_ms": 0
     },
-    "configuration_sha256": "d2013902bcc7c9efe4840170d35a35aae22e5fcffd0f1f23eca6e9c0e7fcfbf2",
+    "configuration_sha256": "67ac500465419a8ee9fee6f4ad99fb77d7f438d914d615c84cf935d67d1f1a09",
     "format_version": 3,
     "query": {
       "max_batch_rows": 256,

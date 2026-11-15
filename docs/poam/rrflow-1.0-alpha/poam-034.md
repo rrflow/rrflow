@@ -24,7 +24,7 @@ constraints against everything stored in the commit's scope:
 `RuntimeSchemaRegistry::validate_objects` then checks the constraints over the
 loaded set. The load is triggered by the registry rather than by the commit's
 own mutations, so a commit that writes no constrained table pays it too. The
-memory-estate seat-representation relation in `rrd-engine` declares
+memory-engram seat-representation relation in `rrd-engine` declares
 `unique_pair` and `max_outgoing`. Found while designing the H-06c task records;
 H-06b dropped `unique_pair` from the prompt-flight use edge, which the engine
 constructs unique, so prompt flights do not add this cost to a scope.
@@ -32,7 +32,7 @@ constructs unique, so prompt flights do not add this cost to a scope.
 ## Impact
 
 Write cost grows with the number of records or relations in a scope, not with
-the size of the commit. An estate that declares any pair, degree, or unique
+the size of the commit. An engram that declares any pair, degree, or unique
 property constraint slows every write as it grows, and the memory used by
 validation grows with it.
 

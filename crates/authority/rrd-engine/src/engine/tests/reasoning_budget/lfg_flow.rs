@@ -1,7 +1,7 @@
 //! Synthetic HTTP services exercise the real engine composition, not model quality.
 use super::*;
 use rrd_contract::{
-    ApplyEndpointConfiguration, EndpointLocator, EndpointProfileInput, InstalledEstateIdentity,
+    ApplyEndpointConfiguration, EndpointLocator, EndpointProfileInput, InstalledEngramIdentity,
     LfgAnalysisPolicy, PreviewEndpointConfiguration, ReadTaskAttempt,
 };
 use std::io::{Read, Write};
@@ -263,9 +263,9 @@ fn run_flow(scenario: Scenario, real_lfg: Option<String>) {
     };
     let controller = TcpListener::bind("127.0.0.1:0").unwrap();
     let worker_listener = execute_worker.then(|| controller.try_clone().unwrap());
-    engine.installed_estate = Some(InstalledEstateIdentity {
+    engine.installed_engram = Some(InstalledEngramIdentity {
         project_id: CanonicalId::new("lfg-flow-project").unwrap(),
-        estate_id: CanonicalId::new("lfg-flow-estate").unwrap(),
+        engram_id: CanonicalId::new("lfg-flow-engram").unwrap(),
         instance_id: instance(),
     });
     let profile = configuration.profile.as_mut().unwrap();
@@ -385,7 +385,7 @@ fn run_flow(scenario: Scenario, real_lfg: Option<String>) {
             SecurityAction::TaskWrite,
             SecurityAction::ReasoningWrite,
             SecurityAction::ReasoningRead,
-            SecurityAction::EstateAdmin,
+            SecurityAction::EngramAdmin,
         ]
         .into_iter()
         .map(|action| rrd_security::ResourceGrant {
@@ -495,7 +495,11 @@ fn run_flow(scenario: Scenario, real_lfg: Option<String>) {
     let response_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../transport/rrd-contract/tests/fixtures/endpoint-selection-observed/available/choice-response.json");
     let mut response: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(response_path).unwrap()).unwrap();
+        serde_json::from_slice(&crate::engine::tests::observed_configuration::read(
+            response_path.parent().unwrap(),
+            "choice-response.json",
+        ))
+        .unwrap();
     if reject_controller {
         response = serde_json::json!({"synthetic": "invalid controller response"});
     }

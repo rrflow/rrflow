@@ -26,7 +26,7 @@ names describe cooperating layers, not independent products or stores:
 
 | Layer | Responsibility |
 |---|---|
-| rrflowDB | One persistent AI estate containing governed knowledge, temporal graph state, reasoning state, evidence, and indexes. |
+| rrflowDB | One persistent AI engram containing governed knowledge, temporal graph state, reasoning state, evidence, and indexes. |
 | `RrdEngine` | Sole semantic transaction coordinator: authenticates, authorizes, binds read stamps, validates mutations and model proposals, and invokes the selected storage profile. |
 | rrflowKV | Durable physical profile: WAL, sequence allocation, MVCC snapshots, mutable memtable, immutable segments, manifests, flush, compaction, and recovery. |
 | rrflowMX | Non-durable physical profile implementing the same semantic storage port for volatile and conformance execution. |
@@ -116,7 +116,7 @@ than rebuilding the log. rrflowQL traversal now selects the native adjacency
 reader: it reads each start identity, then per breadth-first level the
 frontier's temporal adjacency ranges and the identity history of every relation
 they name, and matches an independent full-replay oracle. Context graph
-expansion and memory-estate seat planning still materialize a scope snapshot and
+expansion and memory-engram seat planning still materialize a scope snapshot and
 remain Gate E-01 work. A structural differential is neither a committed mutation
 nor a live query result until its owning `RrdEngine` operation validates and
 commits the corresponding proposal.
@@ -126,7 +126,7 @@ commits the corresponding proposal.
 Canonical relationships are typed, temporal records under the same rrflowDB
 transaction authority as endpoint records, audit and index deltas. Changes
 belonging to one accepted operation commit atomically. Relationship and
-endpoint identities remain estate-scoped `(table, id)` pairs;
+endpoint identities remain engram-scoped `(table, id)` pairs;
 schemaless record properties do not change identity. A graph view is a bounded,
 request-specific projection of those relationships, not a graph database,
 second transaction owner or a reason to require a custom graph query language.
@@ -172,7 +172,7 @@ index seeks, frontier size, overlapping LSM runs, version histories, proof
 validation, cache misses and decoded pages add real work, so an unconditional
 `O(E)` bound independent of all those inputs is not established. E-01/F-01
 must hold the neighborhood and relevant history fixed while increasing
-unrelated estate size and report edge visits, seeks, examined keys and pages,
+unrelated engram size and report edge visits, seeks, examined keys and pages,
 versions, bytes, cache hits/misses, allocations, CPU and tail latency. Include
 high-degree/cyclic graphs, cold/warm cache, many runs, updates, deletes, old
 stamps, interruption, compaction and restart. Compare against an independent
@@ -316,7 +316,7 @@ fallback contracts above.
 
 These mechanisms do not create separate databases. Graph adjacency, BM25
 postings, canonical vectors, approximate generations, reasoning state, and
-governance evidence remain typed families inside one rrflowDB estate and one
+governance evidence remain typed families inside one rrflowDB engram and one
 `RrdEngine` transaction/read-stamp authority. rrflowQL chooses eligible access
 paths; DataFusion consumes streams and computes but never publishes canonical
 state.
@@ -564,7 +564,7 @@ runner, or diagnostics protocol of its own.
 
 One launch runs inside one authenticated read stamp:
 
-1. Authorize `flight_launch` and enforce the estate recall ceilings on the
+1. Authorize `flight_launch` and enforce the engram recall ceilings on the
    flight's declared context budget.
 2. Derive the flight identity from instance, session, and idempotency key.
    A stamped identity read returns an existing flight as an exact replay; the
@@ -592,7 +592,7 @@ evidence.
 
 A read names the flight's record by identity, then, at the same stamp, each
 edge by its deterministic identity (`<flight-id>.<rank>`) and each event by
-its log cursor, so it costs the flight's own size and never the estate's.
+its log cursor, so it costs the flight's own size and never the engram's.
 The list is a stamped read of the flight record kind and still grows with the
 number of flights until a cursor-ordered access path exists (Gate E). Neither
 replays the runtime log. Flight rows, edges, and events are ordinary temporal
@@ -660,7 +660,7 @@ routine completed; only its authoritative state and commit receipt can.
 At HTTP, WebSocket, SDK, MCP, CLI, embedded, and adapter ingress, RRD validates
 and continues W3C `traceparent`/`tracestate` context or creates a new trace.
 `RrdEngine` binds it to the request correlation and idempotency coordinates,
-authenticated actor, estate/scope, authorization decision, `ReadStamp`, plan,
+authenticated actor, engram/scope, authorization decision, `ReadStamp`, plan,
 projection, reasoning cursor, source evidence, and any resulting commit.
 Synchronous child work retains parentage. Work caused later by a committed
 event, projection delta, retry, or routine activity uses a typed causal link
@@ -706,7 +706,7 @@ labels and they cannot grant authority:
 | Evidence | Canonical `TraceLink` | Required coordinates |
 |---|---|---|
 | Request correlation | `Request` | request and public operation IDs, optional parent request ID, and only the digest of an idempotency key |
-| Actor and estate scope | `ActorScope` | authenticated/attributed actor identity and exact `ScopeId`; a caller label alone is insufficient |
+| Actor and engram scope | `ActorScope` | authenticated/attributed actor identity and exact `ScopeId`; a caller label alone is insufficient |
 | Authorization | `Authorization` | allow/deny decision, policy revision, and authorization-evidence digest |
 | Read snapshot | `Read` | complete validated `ReadStamp`, including schema/catalogue revision, commit cursor, head digest, and manifest identity |
 | Runtime/snapshot position | `RuntimeCursor`, `Snapshot` | examined runtime cursor or immutable snapshot identity plus cursor |
@@ -886,7 +886,7 @@ Every metric point uses only the applicable subset of these attributes:
 `rrflow.boundary`, `rrflow.operation`, `rrflow.outcome`,
 `rrflow.storage.profile`, `rrflow.access.path`, `rrflow.work.kind`,
 `rrflow.queue.kind`, `rrflow.cache.kind`, and bounded `error.type`. Values come
-from closed catalogues at the instrumenting site. Estate, project, actor,
+from closed catalogues at the instrumenting site. Engram, project, actor,
 session, request, trace, span, query, record, file/path, provider, model,
 collection, index generation, routine/job, error message, and user-supplied
 values are prohibited metric attributes. Those identities belong in protected
@@ -1026,7 +1026,7 @@ projections in the owning implementation PR.
 | Invalid model behavior | Invalid/denied/expired decision counts, exact descriptor/input/output digests in authorized evidence, token/time/resource use | Reject effects and charge consumed budget. Bound retries/escalation. Public UI reports the failure class and permitted next action without exposing prompts or hidden reasoning. |
 | Sync incomplete | Per-direction checkpoint/lag, conflict/retention-gap/revocation state from canonical transfer records | UI distinguishes offline, transferring, conflicted and acknowledged convergence; missing or stale observations display unknown. Detail IDs stay in protected records, not metric labels. |
 | Telemetry impaired | Exporter failures/dropped samples, queue occupancy and effective sampling/capture policy | Drop bounded diagnostics, increment self-telemetry and retain truthful engine outcomes. Exporter outage must not deadlock or roll back a successful commit. |
-| Noisy neighbor | Fleet resource/admission series plus authorized per-estate detail and the isolated baseline | Enforce estate allocations or change placement through an authorized control-plane action; never mix estate data or add unbounded estate-ID metric dimensions. |
+| Noisy neighbor | Fleet resource/admission series plus authorized per-engram detail and the isolated baseline | Enforce engram allocations or change placement through an authorized control-plane action; never mix engram data or add unbounded engram-ID metric dimensions. |
 
 Freshness matters: every operational projection reports its observation time
 and source coordinate. A live socket is not authenticated readiness, a healthy
@@ -1215,7 +1215,7 @@ rrflow install preview
         -> produce exact plan and plan digest; no writes
 
 explicit apply(plan digest)
-        -> RrdEngine creates estate + durable attunement job
+        -> RrdEngine creates engram + durable attunement job
         -> authorize one bounded inventory read plan
         -> enumerate metadata under the project root
         -> stream eligible file bytes for digest/classification only
@@ -1238,8 +1238,8 @@ parser, or model owns project discovery.
 
 | Record | Required semantics |
 |---|---|
-| `SourceTreeSnapshot` | Estate and project identity; logical root coordinate; snapshot identity and root digest; prior snapshot/cursor when incremental; inventory-policy, walker, and hasher revisions; entry/error totals; bounded-work accounting; creation commit. Host-absolute paths are evidence-local metadata, not portable record identities. |
-| `SourceTreeEntry` | Stable identity from the estate plus normalized root-relative path; parent identity; entry kind (`directory`, `file`, `symlink`, `mount`, or `error`); size, executable/mode facts allowed by policy; content digest only for eligible files; classification and detector evidence; observed metadata revision. |
+| `SourceTreeSnapshot` | Engram and project identity; logical root coordinate; snapshot identity and root digest; prior snapshot/cursor when incremental; inventory-policy, walker, and hasher revisions; entry/error totals; bounded-work accounting; creation commit. Host-absolute paths are evidence-local metadata, not portable record identities. |
+| `SourceTreeEntry` | Stable identity from the engram plus normalized root-relative path; parent identity; entry kind (`directory`, `file`, `symlink`, `mount`, or `error`); size, executable/mode facts allowed by policy; content digest only for eligible files; classification and detector evidence; observed metadata revision. |
 | `SourceTreeChangeSet` | Deterministically ordered additions, modifications, removals, and rename candidates between two committed snapshots, with old/new entry identities and the evidence used for each classification. |
 | `InventoryPolicy` | Versioned root, traversal, ignore, content, secret, generated/vendor/cache, symlink, mount, size, file-count, byte, concurrency, timeout, and cancellation rules plus one canonical digest. |
 | `InventoryError` | Root-relative coordinate, operation, stable error class, retryability, and redacted evidence for unreadable, vanished, replaced, or changed-during-read entries. Errors are data; they are never silently omitted. |
@@ -1289,7 +1289,7 @@ rules in order:
    replacement, or mutation during the read becomes an explicit error or a
    bounded retry; mixed bytes never receive a clean content digest.
 
-The initial safety profile excludes at least `.git`, RRFlow estate files,
+The initial safety profile excludes at least `.git`, RRFlow engram files,
 `target`, `node_modules`, common generated/build/vendor/cache trees, sockets,
 devices, and files over the configured ceiling. Exact defaults belong to the
 versioned policy template and its tests, not prose-only special cases.
@@ -1489,13 +1489,13 @@ A skill package is content, not an agent or plugin runtime. Its immutable
 manifest binds:
 
 - canonical identity, revision, media type, byte size, and content digest;
-- compatible engine/operation schemas and required estate capabilities;
+- compatible engine/operation schemas and required engram capabilities;
 - instruction, input/output-schema, example, evaluation, and resource
   descriptors, each pinned by digest;
 - context-token/byte limits, data classification, provenance, dependency
   digests, and retirement state; and
 - requested capabilities and secret references, which remain inert until
-  separately allowed by estate policy.
+  separately allowed by engram policy.
 
 Attunement may install generic skill packages and record eligibility, but
 activation is a separate persisted policy decision. A routine step resolves an
@@ -1549,7 +1549,7 @@ current and temporal records, both adjacency directions, scalar/unique values,
 BM25 terms/postings, canonical vectors, projection generations/deltas, engine
 events, trigger cursors, routine state/checkpoints, skill manifests/bindings,
 outbox delivery, and audit evidence. Physical key families accelerate one
-logical rrflowDB estate; they do not become public APIs or independent stores.
+logical rrflowDB engram; they do not become public APIs or independent stores.
 
 ### MCP and presentation boundary
 
@@ -1676,7 +1676,7 @@ system's authority:
   WAL/segment recovery, filter-aware candidates, and persisted index behavior.
 - [CloudEvents](https://github.com/cloudevents/spec/blob/main/cloudevents/spec.md)
   informs transport-neutral occurrence identity and producer-scoped duplicate
-  handling; RRFlow retains its own closed, estate-bound event contract.
+  handling; RRFlow retains its own closed, engram-bound event contract.
 - [Temporal workflow determinism](https://github.com/temporalio/documentation/blob/main/docs/encyclopedia/workflow/workflow-definition.mdx)
   informs deterministic replay and the separation of external activities from
   durable control flow; RRFlow does not add Temporal as another runtime.

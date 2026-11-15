@@ -7,7 +7,7 @@ use rrd_contract::{
     attunement_capability_configuration_sha256, attunement_plan_sha256,
     attunement_replan_preview_sha256, attunement_replan_seed, derive_attunement_phases,
     derive_attunement_plan, AttunementEvidence, AttunementPhase, AttunementPhasePlan,
-    AttunementPlan, AttunementReplanPreview, CanonicalId, InstalledEstateIdentity,
+    AttunementPlan, AttunementReplanPreview, CanonicalId, InstalledEngramIdentity,
     ATTUNEMENT_CAPABILITIES, ATTUNEMENT_CONTRACT_VERSION, ATTUNEMENT_EVIDENCE_FORMAT_VERSION,
 };
 
@@ -72,9 +72,9 @@ fn predecessor() -> AttunementPlan {
     let mut plan = AttunementPlan {
         contract_version: ATTUNEMENT_CONTRACT_VERSION,
         id: id("attune-predecessor"),
-        target: InstalledEstateIdentity {
+        target: InstalledEngramIdentity {
             project_id: id("project"),
-            estate_id: id("estate"),
+            engram_id: id("engram"),
             instance_id: id("instance"),
         },
         source_sha256: "2".repeat(64),

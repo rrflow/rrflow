@@ -186,7 +186,7 @@ global file plan are generated projections. No file was moved or deleted, and
 Deep research was required because the design crosses portable identity,
 configuration integrity, memory execution, observability, installation
 security, SDK generation, and later release trust. The new
-[code-grounded research synthesis](../../../research/rrflow-canonical-estate-configuration-and-runtime-controls.md)
+[code-grounded research synthesis](../../../research/rrflow-canonical-engram-configuration-and-runtime-controls.md)
 uses primary specifications and official documentation for RFC 8785, Apache
 Arrow, Apache DataFusion, OpenTelemetry, Rust atomic create-new behavior,
 OpenAPI, The Update Framework, and Kubernetes configuration/API separation.

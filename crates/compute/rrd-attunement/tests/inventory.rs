@@ -2,7 +2,7 @@ use rrd_attunement::inventory::*;
 
 fn scope() -> SourceScope {
     SourceScope {
-        estate: "estate-one".into(),
+        engram: "engram-one".into(),
         project: "project-one".into(),
         root: "source".into(),
     }
@@ -482,12 +482,12 @@ fn a_caller_cannot_inject_an_uncomputed_file_digest() {
 }
 
 #[test]
-fn prior_source_cannot_cross_estate_project_or_root() {
+fn prior_source_cannot_cross_engram_project_or_root() {
     let before = sample(false);
     for field in 0..3 {
         let mut source = scope();
         match field {
-            0 => source.estate = "other".into(),
+            0 => source.engram = "other".into(),
             1 => source.project = "other".into(),
             _ => source.root = "other".into(),
         }
@@ -502,7 +502,7 @@ fn prior_source_cannot_cross_estate_project_or_root() {
 fn even_an_empty_root_digest_is_bound_to_its_source_scope() {
     let before = builder(None).finish(true).unwrap();
     let mut other = scope();
-    other.estate = "other-estate".into();
+    other.engram = "other-engram".into();
     let after = Builder::new(other, revisions(), limits(), None)
         .unwrap()
         .finish(true)

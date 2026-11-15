@@ -46,7 +46,7 @@ The remaining text records the earlier proposal and must not be used to schedule
 a DuckDB adapter, runtime or interoperability gate.
 
 rrflowDB remains the Rust-native semantic database over rrflowKV. DuckDB is
-an optional analytical consumer or source, never the estate's transaction,
+an optional analytical consumer or source, never the engram's transaction,
 receipt, authorization, recovery or readiness authority. The existing
 [Parquet export](knowledge-connectors.md#bundled-query-export) is the starting
 exchange boundary. Its existence does not establish DuckDB compatibility.
@@ -102,7 +102,7 @@ metadata before interpretation. Preserve identity, scope, read-manifest digest,
 known cursor, schema revision, authorization identity, column types and
 nullability. A derived result retains the source receipt plus exact DuckDB
 version, query/parameter digest and limits. Metadata is provenance, not a grant
-to disclose an export or to read another estate. An exported snapshot stays at
+to disclose an export or to read another engram. An exported snapshot stays at
 its declared cursor; it must never be relabeled current after later mutations.
 
 The initial conformance corpus covers empty results, nulls, booleans, signed
@@ -178,7 +178,7 @@ platform, expected values, errors, resource traces and reopen receipts.
 Required cases include wrong digest/profile/scope, stale authorization,
 unsupported types, malformed/truncated input, memory/spill/output pressure,
 SQL configuration/extension/file escape, worker death, cancellation, source
-lock conflict, duplicate import, lost response and restart. Two estates must
+lock conflict, duplicate import, lost response and restart. Two engrams must
 remain isolated. An external client fixture proves only interoperability;
 bundled execution additionally needs offline signed-bundle and native sandbox
 proof. Connectome may display the planned integration, but must not advertise

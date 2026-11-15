@@ -93,7 +93,7 @@ pub fn create_logical_backup<E: StorageEngine>(
 /// `control_families`.
 ///
 /// The caller owns the control-key layout and declares which families are
-/// estate control state. Secrets never live in control values (the token key
+/// engram control state. Secrets never live in control values (the token key
 /// and operator credential are files outside every family), and transient
 /// families such as sessions, subscriptions, and operation receipts stay out
 /// of the scope. Logical replay, object bytes, catalogues, and control entries

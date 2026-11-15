@@ -5,7 +5,7 @@
 **Owner:** bounded H-11a package evidence; [Gate H](../../../roadmap/rrflow-1.0/gate-h.md) owns acceptance of H-11
 
 This record reports the H-11a package of the
-[estate organisation contract](../../../reference/data/estate-organisation.md).
+[estate organisation contract](../../../reference/data/engram-organisation.md).
 It adds domains, categories, memberships and kind tags to the schema registry.
 It does not scope any read, enforce isolation or report per-domain evidence;
 those are H-11b to H-11e. H-11 stays unchecked and POAM-042 stays open.

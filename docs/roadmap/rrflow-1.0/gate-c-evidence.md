@@ -204,11 +204,11 @@ implements project inventory nor proves filesystem freshness or SWAG execution.
   memtable publication; missing authenticated accumulator state at a nonzero
   cursor fails closed on rrflowMX, rrflowKV, and rrflowKV reopen.
 - C-05b at `e1a855791fcc0dfcccb7ba72db10bc1804a045f3` requires
-  `EstateDocument` authority and all eight backup/recovery maps and requires
+  `EngramDocument` authority and all eight backup/recovery maps and requires
   the bound recovery-policy snapshot in both internal and public backup-job
   state. The absence branches, legacy comment, and successful incomplete
   fixtures are removed. Negative tests reject omission of every named field;
-  one fresh estate/backup/recovery corpus is identical on rrflowMX, rrflowKV,
+  one fresh engram/backup/recovery corpus is identical on rrflowMX, rrflowKV,
   and rrflowKV reopen. This accepts the evidence required to close POAM-018.
 - C-05c at `cd1bf495ece3c6698cde1cca413bfbe7be55588c` removes the unused
   `rrflow-cli` development dependency on `rrd-lsm` and adds an executable

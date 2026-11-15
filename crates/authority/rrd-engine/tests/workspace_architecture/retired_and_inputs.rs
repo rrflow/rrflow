@@ -7,8 +7,8 @@ pub(super) fn outward_cli_owns_current_auxiliary_executables_while_physical_crat
     let metadata = workspace_metadata();
     let product_executables = names(&[
         "rrd-backup-controller",
-        "rrd-estate-admin",
-        "rrd-estate-controller",
+        "rrd-engram-admin",
+        "rrd-engram-controller",
         "rrd-recovery-controller",
     ]);
     let cli_targets = &metadata.packages["rrflow-cli"].targets;
@@ -24,7 +24,7 @@ pub(super) fn outward_cli_owns_current_auxiliary_executables_while_physical_crat
         !cli_targets.contains("rrd-security-bootstrap"),
         "standalone security bootstrap must not remain a Cargo target"
     );
-    for package in ["rrd-estate", "rrd-security"] {
+    for package in ["rrd-engram", "rrd-security"] {
         let unexpected = metadata.packages[package]
             .targets
             .intersection(&product_executables)

@@ -19,7 +19,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -57,7 +57,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -94,7 +94,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 self.service
@@ -127,7 +127,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -166,7 +166,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -235,7 +235,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -265,7 +265,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateRead,
+            RrdOperation::EngramRead,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -296,7 +296,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateAdmin,
+            RrdOperation::EngramAdmin,
             None,
             |envelope, session, token| {
                 self.service
@@ -327,7 +327,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateRead,
+            RrdOperation::EngramRead,
             None,
             |envelope, session, token| {
                 envelope.payload.validate().map_err(|error| {
@@ -366,7 +366,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateRead,
+            RrdOperation::EngramRead,
             None,
             |envelope, session, token| {
                 self.service
@@ -393,7 +393,7 @@ impl AppState {
             headers,
             body,
             now,
-            RrdOperation::EstateRead,
+            RrdOperation::EngramRead,
             None,
             |envelope, session, token| {
                 self.service

@@ -1,5 +1,5 @@
 // Generated from rrd-contract; do not edit.
-// OpenAPI SHA-256: 8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae
+// OpenAPI SHA-256: 80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb
 namespace Rrflow.Rrd;
 
 public enum OperationId
@@ -34,7 +34,7 @@ public enum OperationId
     EndpointConfigurationApply,
     EndpointConfigurationPreview,
     EndpointConfigurationRead,
-    EstateRead,
+    EngramRead,
     FlightLaunch,
     FlightList,
     FlightRead,
@@ -105,7 +105,7 @@ public sealed record Endpoint(
 
 public static class EndpointCatalog
 {
-    public const string OpenApiDocumentSha256 = "8c3b29a2a5af942de85d39126bab05c0fb479a3947ed11ac8c8faecf4c304bae";
+    public const string OpenApiDocumentSha256 = "80cc50ab077aa773e47d53135dcd12095240af88129fd84bf0ccbe81ca4ed4cb";
     public const int Count = 83;
 
     public static Endpoint Get(OperationId operation) => operation switch
@@ -140,7 +140,7 @@ public static class EndpointCatalog
         OperationId.EndpointConfigurationApply => new("endpoint-configuration-apply", "POST", "/v1/configuration/endpoints/apply", Authentication.SessionBearer, true),
         OperationId.EndpointConfigurationPreview => new("endpoint-configuration-preview", "POST", "/v1/configuration/endpoints/preview", Authentication.SessionBearer, false),
         OperationId.EndpointConfigurationRead => new("endpoint-configuration-read", "POST", "/v1/configuration/endpoints/read", Authentication.SessionBearer, false),
-        OperationId.EstateRead => new("estate-read", "POST", "/v1/estates/{estate}/read", Authentication.SessionBearer, false),
+        OperationId.EngramRead => new("engram-read", "POST", "/v1/engrams/{engram}/read", Authentication.SessionBearer, false),
         OperationId.FlightLaunch => new("flight-launch", "POST", "/v1/flights", Authentication.SessionBearer, true),
         OperationId.FlightList => new("flight-list", "POST", "/v1/flights/list", Authentication.SessionBearer, false),
         OperationId.FlightRead => new("flight-read", "POST", "/v1/flights/read", Authentication.SessionBearer, false),

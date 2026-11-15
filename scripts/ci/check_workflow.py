@@ -49,7 +49,7 @@ LANE_CONDITIONS = {
     "repository-invariants": "    if: ${{ needs.changes.outputs.full != 'true' }}\n",
 }
 FULL_LANE_JOBS = (
-    "native-arm64", "topology-smoke", "estate-portability", "verify", "engine-suites",
+    "native-arm64", "topology-smoke", "engram-portability", "verify", "engine-suites",
     "optional-features", "pgvector-feature", "storage-contract-preflight", "installed-reopen",
     "installed-crash",
 )
@@ -59,7 +59,7 @@ GATE_EXPECTATIONS = {
     "engine-fast": ("ENGINE_LANE", "ENGINE_FAST_RESULT"),
     "native-arm64": ("FULL_LANE", "ARM64_RESULT"),
     "topology-smoke": ("FULL_LANE", "TOPOLOGY_RESULT"),
-    "estate-portability": ("FULL_LANE", "PORTABILITY_RESULT"),
+    "engram-portability": ("FULL_LANE", "PORTABILITY_RESULT"),
     "verify": ("FULL_LANE", "VERIFY_RESULT"),
     "engine-suites": ("FULL_LANE", "ENGINE_SUITES_RESULT"),
     "sdk-conformance": ("SDK_SELECTED", "SDK_CONFORMANCE_RESULT"),
@@ -710,7 +710,7 @@ def verify_engine_suites(block: str) -> tuple[int, int]:
     )
     require(
         "matrix.name == 'service-protocol'" in block
-        and "cargo build -p rrflow-cli --bin rrd-estate-controller --locked" in block,
+        and "cargo build -p rrflow-cli --bin rrd-engram-controller --locked" in block,
         "the service-protocol suite must explicitly build its controller fixture",
     )
     return len(suites), len(routed)
@@ -809,7 +809,7 @@ def verify_standalone_rrflowdb(jobs: dict[str, str]) -> None:
             '          python_command=python3\n'
             '          if [ "$RUNNER_OS" = Windows ]; then suffix=".exe"; python_command=python; fi\n'
             f"          {run}\n")
-    for name in ("topology-smoke", "estate-portability"):
+    for name in ("topology-smoke", "engram-portability"):
         block = jobs[name]
         require(block.count(step) == 1 and block.count(run) == 1,
                 f"{name} must unconditionally build and run the native standalone rrflowDB example")
@@ -1217,7 +1217,7 @@ def main() -> None:
         "installed-reopen",
         "installed-crash",
         "topology-smoke",
-        "estate-portability",
+        "engram-portability",
         "verify",
         "engine-suites",
         "sdk-conformance",
@@ -1234,7 +1234,7 @@ def main() -> None:
             "timeout-minutes:" in block, f"CI job {job} must have an explicit timeout"
         )
 
-    for job in ["topology-smoke", "estate-portability"]:
+    for job in ["topology-smoke", "engram-portability"]:
         for command in [
             "cargo test -p rrd-lsm --lib admission_tests --locked",
             "cargo test -p rrd-lsm --test write_admission --locked",
@@ -1273,7 +1273,7 @@ def main() -> None:
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- installed_100_acknowledged_reopens --ignored --nocapture --test-threads=2",
         "cargo clippy -p rrflow-cli --test installed_reopen --release --locked -- -D warnings",
         "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::capacity_workload::installed_capacity_workload_smoke --exact --ignored --nocapture",
-        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture",
+        "cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_engram_isolation_under_concurrent_load --exact --ignored --nocapture",
         "run: >-\n          cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::damage:: --ignored --nocapture --test-threads=2",
         "RRFLOW_REOPEN_RECEIPT_DIR:",
         "'attempts': 5150",
@@ -1303,7 +1303,7 @@ def main() -> None:
             "ordinary artifact exclusion must precede diagnostic compilation")
     require(
         "cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings"
-        in jobs["estate-portability"],
+        in jobs["engram-portability"],
         "native installed lifecycle tests must not hide platform warnings",
     )
     require(
@@ -1312,7 +1312,7 @@ def main() -> None:
         "installed lifecycle must enforce offline isolation and test its artifact/mount policy",
     )
 
-    for native in ["topology-smoke", "estate-portability"]:
+    for native in ["topology-smoke", "engram-portability"]:
         require("scripts/ci/run_filesystem_containment.py" in jobs[native],
                 f"{native} must execute native mount containment qualification")
         require("scripts/ci/run_private_owner.py" in jobs[native]
@@ -1398,13 +1398,13 @@ def main() -> None:
         "Linux topology smoke must run the primary installed lifecycle exactly once",
     )
     require(
-        jobs["estate-portability"].count(installed_lifecycle) == 1,
+        jobs["engram-portability"].count(installed_lifecycle) == 1,
         "macOS/Windows portability must run the same primary installed lifecycle exactly once",
     )
     require(
-        "- windows-latest" in jobs["estate-portability"]
-        and "- macos-latest" in jobs["estate-portability"],
-        "estate portability must retain Windows and macOS development runners",
+        "- windows-latest" in jobs["engram-portability"]
+        and "- macos-latest" in jobs["engram-portability"],
+        "engram portability must retain Windows and macOS development runners",
     )
 
     suite_count, package_count = verify_engine_suites(jobs["engine-suites"])
@@ -1414,7 +1414,7 @@ def main() -> None:
         jobs["optional-features"], jobs["pgvector-feature"]
     )
     require(
-        reusable.count("cargo build -p rrflow-cli --bin rrd-estate-controller --locked")
+        reusable.count("cargo build -p rrflow-cli --bin rrd-engram-controller --locked")
         == 2,
         "portability and service-protocol qualification must both declare the controller fixture",
     )

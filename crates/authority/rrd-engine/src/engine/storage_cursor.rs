@@ -106,7 +106,7 @@ impl RrdEngine {
                     return Err(ServiceError::IdempotencyConflict);
                 }
             } else {
-                let limit = self.estate_configuration.storage.active_read_views.min(64) as usize;
+                let limit = self.engram_configuration.storage.active_read_views.min(64) as usize;
                 if registry.len() >= limit {
                     return Err(ServiceError::StorageAdmission(
                         "storage inspection cursor slots exhausted".into(),

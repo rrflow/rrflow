@@ -239,7 +239,7 @@ impl RrdHttpServer {
         let mut cold_sweep = cold_maintenance_interval(
             state
                 .service
-                .estate_configuration()
+                .engram_configuration()
                 .storage
                 .cold_history
                 .as_ref(),
@@ -267,7 +267,7 @@ impl RrdHttpServer {
         let (follow_stop, follow_stopped) = std::sync::mpsc::channel::<()>();
         let follower = state
             .service
-            .estate_configuration()
+            .engram_configuration()
             .attunement_follow
             .map(|policy| {
                 let follow_state = Arc::clone(&state);

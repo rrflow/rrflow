@@ -170,7 +170,7 @@ fn competing_plans_and_recovery_are_excluded_at_every_installation_boundary() {
     for stage in [
         InstallApplyStage::LeaseAcquired,
         InstallApplyStage::IntentPublished,
-        InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::EngramDirectoriesReady,
         InstallApplyStage::BootstrapStaged,
         InstallApplyStage::BootstrapReady,
         InstallApplyStage::StorageReady,
@@ -218,7 +218,7 @@ fn process_death_releases_admission_without_regenerating_prepared_secrets() {
     for stage in [
         InstallApplyStage::LeaseAcquired,
         InstallApplyStage::IntentPublished,
-        InstallApplyStage::EstateDirectoriesReady,
+        InstallApplyStage::EngramDirectoriesReady,
         InstallApplyStage::BootstrapStaged,
         InstallApplyStage::BootstrapReady,
         InstallApplyStage::StorageReady,
@@ -233,7 +233,7 @@ fn process_death_releases_admission_without_regenerating_prepared_secrets() {
         let preview: InstallationPreview =
             serde_json::from_slice(&std::fs::read(fixture.path().join("plan.json")).unwrap())
                 .unwrap();
-        let layout = crate::engine::estate_layout::EstateLayout::new(
+        let layout = crate::engine::engram_layout::EngramLayout::new(
             &preview.installation.storage_root_id,
             &preview.installation.initial_principal_id,
         )

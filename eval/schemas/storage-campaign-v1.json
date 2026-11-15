@@ -28,7 +28,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-estate disjoint reservations must fit this aggregate."
+          "description": "Optional shared native pool. Individual ceilings are not reservations;\nthe summed per-engram disjoint reservations must fit this aggregate."
         },
         "atomic_batch_bytes": {
           "$ref": "#/$defs/Limit"
@@ -48,7 +48,7 @@
         "disk_bytes": {
           "$ref": "#/$defs/Limit"
         },
-        "estates": {
+        "engrams": {
           "$ref": "#/$defs/Limit"
         },
         "host_bytes": {
@@ -122,7 +122,7 @@
         "recovery_ms",
         "process_bytes",
         "host_bytes",
-        "estates",
+        "engrams",
         "disk_bytes",
         "temporary_disk_bytes",
         "recovery_reserve_bytes",
@@ -189,7 +189,7 @@
         "engine_bytes": {
           "$ref": "#/$defs/Limit"
         },
-        "estates": {
+        "engrams": {
           "$ref": "#/$defs/Limit"
         },
         "host_bytes": {
@@ -220,7 +220,7 @@
         "vcpus",
         "host_bytes",
         "engine_bytes",
-        "estates",
+        "engrams",
         "records",
         "edges",
         "vectors",
@@ -1103,6 +1103,62 @@
       ],
       "type": "string"
     },
+    "EngramConfiguration": {
+      "additionalProperties": false,
+      "description": "Effective, immutable configuration bound to an installation plan and\nsurfaced to every client. Mutating it requires a future governed\nconfigure-plan/configure-apply operation.",
+      "properties": {
+        "attunement_follow": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttunementFollowPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clock": {
+          "$ref": "#/$defs/ClockPolicy"
+        },
+        "configuration_sha256": {
+          "type": "string"
+        },
+        "format_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "query": {
+          "$ref": "#/$defs/QueryBudget"
+        },
+        "reasoning": {
+          "$ref": "#/$defs/ReasoningLimits"
+        },
+        "recall": {
+          "$ref": "#/$defs/RecallLimits"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "storage": {
+          "$ref": "#/$defs/StorageLimits"
+        }
+      },
+      "required": [
+        "format_version",
+        "revision",
+        "clock",
+        "storage",
+        "reasoning",
+        "recall",
+        "query",
+        "configuration_sha256"
+      ],
+      "type": "object"
+    },
     "Environment": {
       "additionalProperties": false,
       "properties": {
@@ -1160,62 +1216,6 @@
         "mount_options",
         "flush_primitive",
         "measurement_tool"
-      ],
-      "type": "object"
-    },
-    "EstateConfiguration": {
-      "additionalProperties": false,
-      "description": "Effective, immutable configuration bound to an installation plan and\nsurfaced to every client. Mutating it requires a future governed\nconfigure-plan/configure-apply operation.",
-      "properties": {
-        "attunement_follow": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AttunementFollowPolicy"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "clock": {
-          "$ref": "#/$defs/ClockPolicy"
-        },
-        "configuration_sha256": {
-          "type": "string"
-        },
-        "format_version": {
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
-        },
-        "query": {
-          "$ref": "#/$defs/QueryBudget"
-        },
-        "reasoning": {
-          "$ref": "#/$defs/ReasoningLimits"
-        },
-        "recall": {
-          "$ref": "#/$defs/RecallLimits"
-        },
-        "revision": {
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "storage": {
-          "$ref": "#/$defs/StorageLimits"
-        }
-      },
-      "required": [
-        "format_version",
-        "revision",
-        "clock",
-        "storage",
-        "reasoning",
-        "recall",
-        "query",
-        "configuration_sha256"
       ],
       "type": "object"
     },
@@ -1829,7 +1829,7 @@
           "type": "integer"
         },
         "installed_configuration": {
-          "$ref": "#/$defs/EstateConfiguration"
+          "$ref": "#/$defs/EngramConfiguration"
         },
         "profile": {
           "$ref": "#/$defs/Id"

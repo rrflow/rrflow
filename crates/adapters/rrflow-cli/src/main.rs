@@ -2,7 +2,7 @@
 //!
 //! The binary owns no raw database or provider-specific lifecycle. It plans
 //! and applies the engine-owned installation contract, opens that installed
-//! estate for service, authenticates live readiness, and verifies it read-only.
+//! engram for service, authenticates live readiness, and verifies it read-only.
 
 mod build_identity;
 mod build_metadata;

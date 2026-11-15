@@ -1,4 +1,4 @@
-"""Write a system's estate configuration for `install plan --configuration`.
+"""Write a system's engram configuration for `install plan --configuration`.
 
 A system with declared engine settings gets a copy of the bundled defaults with those
 `[storage]` values replaced, and this prints its path. Installation seals that file, and an

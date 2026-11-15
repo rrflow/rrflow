@@ -149,7 +149,7 @@ pub(super) fn corpus_value(
 ) -> Vec<u8> {
     let mut output = Vec::with_capacity(bytes);
     let structured =
-        format!("family={family}|record={ordinal:08x}|version={version}|estate=rrflow|");
+        format!("family={family}|record={ordinal:08x}|version={version}|engram=rrflow|");
     let mut state = seed
         ^ (family as u64).rotate_left(11)
         ^ (ordinal as u64).rotate_left(29)

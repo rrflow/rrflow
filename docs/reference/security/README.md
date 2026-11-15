@@ -12,7 +12,7 @@ the [system overview](../../architecture/system-overview.md#security-boundary).
 | Subject | Durable warp | Checkout record | State |
 |---|---|---|---|
 | Security authority | [`rrflow://rrflow-instance/data/reference/security/authority`](rrflow://rrflow-instance/data/reference/security/authority) | [`authority.md`](authority.md) | implemented foundations; single-transaction, stamp, bootstrap, and release convergence remain open |
-| Local-estate authorization | [`rrflow://rrflow-instance/data/reference/security/local-estate-authorization`](rrflow://rrflow-instance/data/reference/security/local-estate-authorization) | [`local-estate-authorization.md`](local-estate-authorization.md) | useful fail-closed constraints; current file policy is a second authority and must converge directly |
+| Local-engram authorization | [`rrflow://rrflow-instance/data/reference/security/local-engram-authorization`](rrflow://rrflow-instance/data/reference/security/local-engram-authorization) | [`local-engram-authorization.md`](local-engram-authorization.md) | useful fail-closed constraints; current file policy is a second authority and must converge directly |
 
 Both references remain subordinate to the single security boundary enforced
 through `RrdEngine`.

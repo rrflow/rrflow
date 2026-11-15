@@ -36,7 +36,7 @@ struct Observation {
 thread_local! { static OBSERVATION: RefCell<Option<Observation>> = const { RefCell::new(None) }; }
 
 /// Called exactly once by diagnostic `serve`, before opening its installed
-/// estate. The caller supplies the locator-bound root, never the controller.
+/// engram. The caller supplies the locator-bound root, never the controller.
 /// Newline or EOF delimits a <=4096-byte private pipe message. Null disarms.
 pub fn configure_from_stdin(root: &Path) -> io::Result<()> {
     if CONFIGURED.swap(true, Ordering::AcqRel) {

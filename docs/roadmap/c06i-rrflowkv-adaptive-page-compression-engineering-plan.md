@@ -41,7 +41,7 @@ inside the sole immutable segment format. Segment v6 directly replaces v5.
 The default writer attempts LZ4 independently for each of the six existing
 Arrow-layout buffers and retains the raw buffer unless the stored block saves
 at least 1,250 basis points (12.5 percent). A configurable `none` writer policy
-remains available for measurement and deliberately uncompressed estates.
+remains available for measurement and deliberately uncompressed engrams.
 
 This is the narrowest retained change supported by both repository evidence
 and primary sources:

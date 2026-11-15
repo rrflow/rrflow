@@ -5,7 +5,7 @@
 **Owner:** durable provider-neutral seat identity and `rrflow://` record-warp semantics
 
 An RRFlow seat is the durable identity the engine resolves as self inside one
-estate. A provider account may represent a seat, but never replaces or owns
+engram. A provider account may represent a seat, but never replaces or owns
 it. Changing Claude, OpenAI, Gemini, Grok, LFG, or another provider therefore
 does not change the RRFlow identity.
 
@@ -52,7 +52,7 @@ provider's subject digest, and a valid representation cannot bypass a denied
 operation.
 
 The provider-neutral schemas are implemented in
-[`memory_estate.rs`](../../crates/transport/rrd-contract/src/memory_estate.rs),
+[`memory_engram.rs`](../../crates/transport/rrd-contract/src/memory_engram.rs),
 and their authorized planning and resolution are composed by
 [`RrdEngine`](../../crates/authority/rrd-engine/src/engine/memory_engram.rs).
 
@@ -72,7 +72,7 @@ while the checkout link remains a recovery path.
 
 The bootstrap coordinate for this project's primary seat is
 [`rrflow://rrflow-instance/data/rrflow-seat/clyffy`](rrflow://rrflow-instance/data/rrflow-seat/clyffy).
-An installed estate substitutes its actual instance identity in that URI.
+An installed engram substitutes its actual instance identity in that URI.
 
 Warp resolution validates the URI, converts its record kind and ID into a
 canonical anchor, and invokes the same bounded temporal
@@ -82,7 +82,7 @@ not open physical keys or create a second retrieval mechanism.
 ## CLI operations
 
 No seat-identity CLI operation is currently exposed. The implemented engine
-boundary is `RrdEngine::plan_memory_estate`, followed by
+boundary is `RrdEngine::plan_memory_engram`, followed by
 the ordinary authenticated transaction commit,
 `RrdEngine::resolve_seat_identity`, and `RrdEngine::resolve_memory_warp`. The
 planner produces strict seat, provider-identity, and representation-relation
@@ -110,8 +110,8 @@ seat in its one semantic install commit. The deleted raw CLI test is no longer
 product evidence.
 
 This is characterization of a useful persisted foundation, not proof of the
-complete installed Clyffy path. The current `MemoryEstate*` type and module
-names conflate seat identity with an estate; callers still commit the returned mutation plan through the
+complete installed Clyffy path. The current `MemoryEngram*` type and module
+names conflate seat identity with an engram; callers still commit the returned mutation plan through the
 generic transaction API; resolution reconstructs a broad runtime
 snapshot; the older claim path accepts an arbitrary producer actor string; and
 the authenticated session, representation edge, authorization decision, route

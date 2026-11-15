@@ -1,4 +1,4 @@
-# POAM-020 — canonical project, estate, and instance topology
+# POAM-020 — canonical project, engram, and instance topology
 
 **Status:** active parent-owned POA&M detail
 **Coordinate:** `rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-020`
@@ -10,13 +10,13 @@ independently.
 
 ## Observed deficiency
 
-The installed product now has one active project/estate/instance representation:
+The installed product now has one active project/engram/instance representation:
 `.rrflow/config.toml` locates the engine-owned installed record and every product caller
 opens it read-only. `.rrflow/instance.toml`, `InstanceManifest`,
 `ProjectAuthorityBinding`, their raw-root openers, and all product creation callers are
 removed. Two semantic conflicts remain: public `PLATFORM_TERMS`/`ResourcePath` mirrors a
-superseded historical organization/estate/project hierarchy while accepting arbitrary
-resource-kind order, and `EstateAuthorityState` defines another
+superseded historical organization/engram/project hierarchy while accepting arbitrary
+resource-kind order, and `EngramAuthorityState` defines another
 organization/account/project/environment/instance/node/shard hierarchy. Environment is
 absent from the public resource vocabulary, cluster identities use another loose string
 family, and the remaining shapes are not yet proven equivalent across rrflowMX and
@@ -28,7 +28,7 @@ rrflowKV.
 
 The D-01 offline-qualification inspection reproduced two different empty
 project directories receiving exactly the same installation plan digest and
-project/estate/instance IDs from `rrflow install plan --mode fresh`. The
+project/engram/instance IDs from `rrflow install plan --mode fresh`. The
 observed executable SHA-256 was
 `6853715de7b816f7e9c1e921ceb670f6350bc2fb0d088e0d5cb30df6fb7d0623`.
 `installation_identity_seed` binds mode, inventory, profile, executable and
@@ -38,7 +38,7 @@ credential generation does not correct the duplicated logical identity.
 
 D-01 must bind an independent, previewed installation identity while retaining
 deterministic planning, exact apply/recovery and portable installed locators.
-Changing a live root path cannot redefine an installed estate. Qualification
+Changing a live root path cannot redefine an installed engram. Qualification
 must include two identical-content projects, foreign-plan/locator/credential
 denials and unchanged identity through relocation and reopen. This is an open
 deficiency in that baseline, not repaired by the offline harness. The bounded
@@ -46,9 +46,9 @@ identity repair and its evidence are recorded below; broader topology closure
 still requires the complete acceptance matrix.
 
 Product startup can no longer manufacture its own installation authority, but resource
-authorization can still depend on historical word order, an estate can be mistaken for a
+authorization can still depend on historical word order, an engram can be mistaken for a
 multi-project fleet, physical placement can diverge from semantic scope, and unfinished
-estate/cluster consumers can resolve a different hierarchy from the installed identity.
+engram/cluster consumers can resolve a different hierarchy from the installed identity.
 
 ## Owning gates
 
@@ -66,17 +66,17 @@ Roadmap owners: [Gate A](../../roadmap/rrflow-1.0/gate-a.md),
 The [independent installation identity package](../../evidence/change-journals/gate-d/d-01-independent-installation-identities.md)
 adds an explicit OS-random identity input, deterministic version-2 plans and
 an initial-root digest checked before new apply or interrupted recovery.
-The same content no longer implicitly allocates one estate for distinct
+The same content no longer implicitly allocates one engram for distinct
 projects. Its tests cover foreign-plan/credential rejection, independent
 installed identities, relocation and eight-stage recovery. Caller reuse of an
 identity input is not authorized project sharing; a new independent project
 must allocate a new value. This repair does not close the topology vocabulary,
 fleet, cross-surface or synchronization deficiencies above.
 
-Freeze one project ↔ estate ↔ instance relationship graph and operation-specific resource
-grammar; retain only the implemented D-01 locator and engine-persisted installed-estate
+Freeze one project ↔ engram ↔ instance relationship graph and operation-specific resource
+grammar; retain only the implemented D-01 locator and engine-persisted installed-engram
 binding plus their strict identity, containment, digest, relocation, and foreign-state
 checks; remove historical-table conformance, arbitrary path ordering, and the duplicate
-estate topology; then pass fresh/existing preview/apply, MX/KV
+engram topology; then pass fresh/existing preview/apply, MX/KV
 semantic, unauthorized/nested/neighbor/escape/foreign/move, cross-surface identity,
 clustered-placement, restart, and offline release tests.

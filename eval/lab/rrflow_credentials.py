@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print shell exports for an installed RRFlow estate's lab credentials.
+"""Print shell exports for an installed RRFlow engram's lab credentials.
 
 Only run_system.sh should call this, inside an eval. It reads the installed locator
 and the owner-only API key document it names, and writes neither anywhere.

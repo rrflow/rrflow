@@ -9,7 +9,7 @@ internal sealed class OperationBinding
 {
     private static readonly HashSet<string> ResourceKinds = new(StringComparer.Ordinal)
     {
-        "organization", "estate", "project", "instance", "node", "shard", "collection",
+        "organization", "engram", "project", "instance", "node", "shard", "collection",
         "table", "record", "transaction", "snapshot", "backup", "operation",
     };
 
@@ -122,11 +122,11 @@ internal sealed class OperationBinding
         string instance)
     {
         List<ResourceSegment> result = new();
-        if (parameters.TryGetValue("estate", out string? estate))
+        if (parameters.TryGetValue("engram", out string? engram))
         {
             result.Add(new ResourceSegment(
-                "estate",
-                EndpointResolver.CanonicalIdentifier(estate, "estate")));
+                "engram",
+                EndpointResolver.CanonicalIdentifier(engram, "engram")));
         }
         result.Add(new ResourceSegment("instance", instance));
         return result;

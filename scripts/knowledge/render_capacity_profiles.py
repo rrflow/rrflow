@@ -40,44 +40,44 @@ def render(text):
         profile = {"id": name.lower().replace(" ", "-"), "name": name}
         if index < 2:
             cpu, host, engine, records, edges, vectors, dimensions = match(
-                r"(\d+) vCPU, (\d+) GiB host RAM; engine RSS ceiling (\d+) GiB; (?:one estate with )?([\d,]+) records, ([\d,]+) edges, ([\d,]+) dense (\d+)-dimensional vectors", allocation)
+                r"(\d+) vCPU, (\d+) GiB host RAM; engine RSS ceiling (\d+) GiB; (?:one engram with )?([\d,]+) records, ([\d,]+) edges, ([\d,]+) dense (\d+)-dimensional vectors", allocation)
             clients, rates = match(r"([\d/]+) (?:concurrent )?clients; offered ([\d/]+) requests/s; .+", load)
             profile.update(vcpus=int(cpu), host_bytes=int(host)*GIB, engine_bytes=int(engine)*GIB,
-                           estates=1, records_min=number(records), edges_min=number(edges),
+                           engrams=1, records_min=number(records), edges_min=number(edges),
                            vectors_min=number(vectors), vector_dimensions=int(dimensions),
                            logical_source_bytes_min=number(records)*payload_bytes,
                            clients=[int(v) for v in clients.split("/")], rates=[int(v) for v in rates.split("/")],
-                           requires_estate_interference=False)
+                           requires_engram_interference=False)
         elif index == 2:
-            cpu, host, engine, estate_word = match(
-                r"(\d+) vCPU, (\d+) GiB host RAM; (\d+) GiB aggregate engine RSS ceiling; (\w+) desktop-sized estates, aggregate corpus \4 times the desktop row", allocation)
+            cpu, host, engine, engram_word = match(
+                r"(\d+) vCPU, (\d+) GiB host RAM; (\d+) GiB aggregate engine RSS ceiling; (\w+) desktop-sized engrams, aggregate corpus \4 times the desktop row", allocation)
             words = {word: i for i, word in enumerate("zero one two three four five six seven eight nine ten".split())}
-            estates = words[estate_word]
-            clients, = match(r"(\d+) clients per estate; measure quiet, equal-load and one abusive estate at 2x its admitted rate; .+", load)
+            engrams = words[engram_word]
+            clients, = match(r"(\d+) clients per engram; measure quiet, equal-load and one abusive engram at 2x its admitted rate; .+", load)
             desktop = profiles[0]
             profile.update(vcpus=int(cpu), host_bytes=int(host)*GIB, engine_bytes=int(engine)*GIB,
-                           estates=estates, records_min=desktop["records_min"]*estates,
-                           edges_min=desktop["edges_min"]*estates, vectors_min=desktop["vectors_min"]*estates,
+                           engrams=engrams, records_min=desktop["records_min"]*engrams,
+                           edges_min=desktop["edges_min"]*engrams, vectors_min=desktop["vectors_min"]*engrams,
                            vector_dimensions=desktop["vector_dimensions"],
-                           logical_source_bytes_min=desktop["logical_source_bytes_min"]*estates,
-                           clients=[int(clients)*estates], rates=[], requires_estate_interference=True)
+                           logical_source_bytes_min=desktop["logical_source_bytes_min"]*engrams,
+                           clients=[int(clients)*engrams], rates=[], requires_engram_interference=True)
         else:
             source, vectors, dimensions = match(
-                r"Same single-estate allocation; at least (\d+) GiB measured logical source data and ([\d,]+) dense (\d+)-dimensional vectors; source bytes, on-disk bytes and index bytes reported independently", allocation)
+                r"Same single-engram allocation; at least (\d+) GiB measured logical source data and ([\d,]+) dense (\d+)-dimensional vectors; source bytes, on-disk bytes and index bytes reported independently", allocation)
             service = profiles[1]
             ceiling, = match(r"Repeat selective and broad queries, ingestion, compaction, backup and cancellation under the (\d+) GiB engine ceiling; .+", load)
             if int(ceiling)*GIB != service["engine_bytes"]:
                 raise ValueError("data-larger-than-memory ceiling conflicts with its allocation")
             profile.update(vcpus=service["vcpus"], host_bytes=service["host_bytes"], engine_bytes=service["engine_bytes"],
-                           estates=1, records_min=0, edges_min=0, vectors_min=number(vectors),
+                           engrams=1, records_min=0, edges_min=0, vectors_min=number(vectors),
                            vector_dimensions=int(dimensions), logical_source_bytes_min=int(source)*GIB,
-                           clients=[], rates=[], requires_estate_interference=False)
+                           clients=[], rates=[], requires_engram_interference=False)
         profiles.append(profile)
-    if [p["id"] for p in profiles] != ["desktop", "single-service-estate", "fleet-isolation", "data-larger-than-memory"]:
+    if [p["id"] for p in profiles] != ["desktop", "single-service-engram", "fleet-isolation", "data-larger-than-memory"]:
         raise ValueError("owning profile coordinates changed")
     threshold_section = text.split("### Proposed pass/fail thresholds\n", 1)[1].split("### Workload and evidence structure", 1)[0]
     normalized = " ".join(threshold_section.split())
-    values = re.search(r"At desktop (\d+) requests/s and single-estate (\d+) requests/s, propose point-read p95 <= (\d+) ms, durable-commit p95 <= (\d+) ms, and bounded recall/context p95 <= (\d+) ms, all client end-to-end on loopback, with corresponding p99 ceilings of (\d+)/(\d+)/(\d+) ms", normalized)
+    values = re.search(r"At desktop (\d+) requests/s and single-engram (\d+) requests/s, propose point-read p95 <= (\d+) ms, durable-commit p95 <= (\d+) ms, and bounded recall/context p95 <= (\d+) ms, all client end-to-end on loopback, with corresponding p99 ceilings of (\d+)/(\d+)/(\d+) ms", normalized)
     error = re.search(r"unexpected terminal errors must be <= ([0-9.]+)%", normalized)
     if values is None or error is None:
         raise ValueError("J-04 nominal threshold grammar changed")
@@ -86,7 +86,7 @@ def render(text):
     if error_bps != int(error_bps) or not 0 <= error_bps <= 10000:
         raise ValueError("J-04 error threshold is not exact basis points")
     thresholds = {"nominal_rates": [{"profile": "desktop", "requests_per_second": desktop_rate},
-                                     {"profile": "single-service-estate", "requests_per_second": service_rate}],
+                                     {"profile": "single-service-engram", "requests_per_second": service_rate}],
                   "point_read": {"p95_ns": point95*1000000, "p99_ns": point99*1000000},
                   "mixed_write": {"p95_ns": write95*1000000, "p99_ns": write99*1000000},
                   "range_read": {"p95_ns": range95*1000000, "p99_ns": range99*1000000},

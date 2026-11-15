@@ -331,7 +331,7 @@ fn exercise_partial_page<E: StorageEngine>(engine: &E) -> Vec<(u64, rrd_security
     for index in 2..=4 {
         repository.append_audit(&audit(index)).unwrap();
     }
-    // Sessions, estate records and other control writes interleave with audit
+    // Sessions, engram records and other control writes interleave with audit
     // records in a real journal; one is enough to move the page boundaries.
     engine
         .control()

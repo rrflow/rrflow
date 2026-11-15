@@ -22,7 +22,7 @@ private data in a report.
 A report should state the affected component (engine crate, adapter, SDK,
 deployment manifest, or documentation), the revision tested, exact steps to
 reproduce, and the observed impact. A proof of concept that runs against an
-installed estate created with `rrflow install plan` and `rrflow install apply`
+installed engram created with `rrflow install plan` and `rrflow install apply`
 is the most useful form.
 
 ## Response
@@ -36,7 +36,7 @@ credited in the pull request unless they ask not to be.
 ## Scope notes
 
 - The engine authenticates and authorizes every invocation on an installed
-  estate; an anonymous invocation is accepted only before security is
+  engram; an anonymous invocation is accepted only before security is
   initialized, and installation initializes it.
 - Plain HTTP binds to loopback only; a remote bind requires configured mTLS.
 - The engine refuses an executable whose file link count is not exactly one

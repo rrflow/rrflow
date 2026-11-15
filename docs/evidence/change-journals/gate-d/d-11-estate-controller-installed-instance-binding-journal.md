@@ -40,4 +40,4 @@ pull request, CI run, and merge evidence: pull request #14 carries the candidate
 - [POAM-006](../../../poam/rrflow-1.0-alpha/poam-006.md)
 - [Restore publication journal](d-11-restore-publication-journal.md)
 - [Installed product lifecycle](../../../reference/deployment/installed-lifecycle.md)
-- [Local estate authorization](../../../reference/security/local-estate-authorization.md)
+- [Local estate authorization](../../../reference/security/local-engram-authorization.md)

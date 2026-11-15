@@ -111,7 +111,7 @@ a deterministic greedy relevance/diversity pass.
 
 Result shaping supports points, bounded groups, bounded facets, and a bounded
 directed similarity matrix. Groups and facets summarize only the already
-bounded candidate universe; they are not whole-estate OLAP aggregations.
+bounded candidate universe; they are not whole-engram OLAP aggregations.
 
 The result carries the read manifest, cursor, full query-plan digest, ordered
 stage evidence, and per-hit contributions. That evidence is returned to the

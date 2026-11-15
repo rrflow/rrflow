@@ -58,7 +58,7 @@ fn addressed_point_reads_exclude_unrelated_growth_and_preserve_temporal_reopen()
     }
     commit_vectors(&engine, &lease, 400, unrelated);
     // Fixed admission must fund the requested histories and their proofs, not
-    // every vector in the estate. The old whole-family path exhausts it.
+    // every vector in the engram. The old whole-family path exhausts it.
     let after = retrieve(&engine, &lease, "documents", 1, 128, 450);
     assert_eq!(after.points, first.points);
     assert_eq!(after.missing, vec![reference("embedding", "missing")]);

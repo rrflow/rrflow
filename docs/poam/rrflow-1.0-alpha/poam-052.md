@@ -17,7 +17,7 @@ takes only `scope`, `query`, `valid_at`, `seeds`, `max_graph_depth`, `max_items`
 `max_output_bytes` and `max_storage_keys`. The engine ranks by reciprocal-rank
 fusion of seed anchors, BM25 text matches, exact vector scores and graph
 expansion. A caller cannot turn a source on or off or change how the sources are
-weighed, and the estate's `[recall]` configuration holds limits only.
+weighed, and the engram's `[recall]` configuration holds limits only.
 
 This is a source finding. No ranking experiment has been run.
 

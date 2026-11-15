@@ -36,7 +36,7 @@ D-03/D-04/D-05 real-project workflow and consumed E/F prerequisites in the
 [current dependency spine](../../roadmap/rrflow-1.0/executable-dependency-spine.md).
 `engine/installation.rs` persists a pending job; its `installation/inventory.rs`
 provides installation preconditions, not the committed source inventory.
-`EstateConfiguration` is sealed installed configuration, not proof of live global
+`EngramConfiguration` is sealed installed configuration, not proof of live global
 preference inheritance. Connectome's phase descriptions are `contract-pending`;
 its real data lenses do not establish source-generated graph/vector content.
 These are verified implementation gaps, not requests for another storage soak.
@@ -105,10 +105,10 @@ seals one versioned `host_system_time` / `unverified` observation, exact retry p
 it, recovery/replay/open enforce the format-2 rollback policy, and read-only verification
 reports typed current/tolerated/exceeded/unavailable evidence. Authenticated time, OS synchronization diagnosis and
 authorized correction and runtime-wide temporal high-water rules remain open.
-The estate-controller
+The engram-controller
 backup, prune, and restore paths resolve a managed instance through its installed locator
 and distribution binding and act on the instance's own catalogue and staging roots; the
-estate cannot yet register backups the served engine created, so a retention decision over
+engram cannot yet register backups the served engine created, so a retention decision over
 such a catalogue is refused.
 
 ## Nested repository setup gap
@@ -139,7 +139,7 @@ acceptance remain open.
 D-01/D-03 and H-06 own remediation and the real-checkout acceptance in
 [Gate D](../../roadmap/rrflow-1.0/gate-d.md#nested-repository-setup). It includes
 bounded, explicitly authorized metadata roots and source identity, user choice,
-exact-plan revalidation, both estate layouts, restart and isolation. No new
+exact-plan revalidation, both engram layouts, restart and isolation. No new
 gate or completed status follows from this decision.
 
 ## Build-plan admission gaps
@@ -158,7 +158,7 @@ Verified at `337d136210ff59b2359f898e717166c087dd5bfc`:
   a worker enforces time, memory or retry limits. D-02c must map actual enforced
   budgets, setting ownership and revision behavior before unattended work.
 - The global-default/per-project settings UI needs an admitted configuration
-  operation; sealed `EstateConfiguration` and endpoint configuration alone do
+  operation; sealed `EngramConfiguration` and endpoint configuration alone do
   not establish it. Public action/field changes remain disallowed pending the
   owner's clarification of whether missing planned operations may be added.
 
@@ -168,7 +168,7 @@ constraint is resolved, installed/UI job control and global configuration are
 explicitly **blocked for implementation admission**, not merely unscheduled.
 The owner's later implementation instruction lifts the planning hold for the
 bounded embedded D-02 package. `read_attunement`/`control_attunement` now operate
-on the installed job under existing EstateRead/EstateAdmin grants, with durable
+on the installed job under existing EngramRead/EngramAdmin grants, with durable
 CAS/receipts, lease fencing, cancellation/recovery and a real Connect checkpoint.
 No HTTP operation or UI control is added. Inventory fails explicitly as
 unavailable, so source ingestion, complete budgets/settings and turnkey dispatch
@@ -235,13 +235,13 @@ Focused and interruption/reopen checks pass; full candidate and real-repository
 qualification remain pending. This does not establish zero-content-read
 freshness, reduced RSS, safe upgrades or completed D-03 acceptance.
 
-On 2026-11-12 an installed estate made by one build of `rrflow` refused to serve under a rebuilt binary from the same source (`ProjectBindingMismatch`), because the installation binds `executable_sha256`; the [code-knowledge real run](../../evidence/change-journals/gate-d/d-02-code-knowledge-slice-20261112.md) reinstalled for every build. Upgrading an installed engine in place remains unsupported.
+On 2026-11-12 an installed engram made by one build of `rrflow` refused to serve under a rebuilt binary from the same source (`ProjectBindingMismatch`), because the installation binds `executable_sha256`; the [code-knowledge real run](../../evidence/change-journals/gate-d/d-02-code-knowledge-slice-20261112.md) reinstalled for every build. Upgrading an installed engine in place remains unsupported.
 
 The [installed incremental trial](../../evidence/change-journals/gate-d/d-03-incremental-installed-trial.md)
-records an initial fresh-estate `ProjectBindingMismatch` before server readiness.
+records an initial fresh-engram `ProjectBindingMismatch` before server readiness.
 Offline inspection and a separate restart subsequently passed without modifying
 the binding; the cause remains unresolved and must be diagnosed before native
-qualification. Continuing that preserved estate proved 4,279 initial mutations,
+qualification. Continuing that preserved engram proved 4,279 initial mutations,
 three on unchanged input, six after an ordinary README edit and successor plan,
 then three on another unchanged run, with exact reopen and offline verification.
 This does not erase the initial failure or establish a repeatable turnkey start.
@@ -249,7 +249,7 @@ This does not erase the initial failure or establish a repeatable turnkey start.
 PR227's [startup binding separation](../../evidence/change-journals/gate-d/d-03-startup-binding-inspection.md)
 characterizes an independent lockout: invalid project Git input prevents opening
 otherwise valid installed engine state because startup unnecessarily computes
-the full source-inspection report. The focused correction preserves all estate
+the full source-inspection report. The focused correction preserves all engram
 binding checks and keeps source admission on dependent operations; startup and
 job readback pass, invalid-input Start denies, repaired input starts, and bootstrap
 tampering still denies startup. All 342 engine tests and strict lint pass locally.
@@ -269,19 +269,19 @@ Connect checkpoint and cursor; no Inventory completion was published. The
 [bounded publication repair](../../evidence/change-journals/gate-d/d-03-bounded-inventory-publication.md)
 uses engine-owned observation groups and private resumable progress, with the
 complete snapshot/head/checkpoint/receipt published only in the final atomic
-transaction. The same source revision in a separately installed candidate estate
+transaction. The same source revision in a separately installed candidate engram
 passes Inventory, restart, an ordinary-edit successor and second Inventory.
 Interruption and edits during partial publication cannot certify completion;
 the edited job can accept a successor. This is draft Windows evidence, not
 full D-03 acceptance. Final manifests/retirements still have a physical batch
 bound, and retention/scale/native-race qualification remain open.
 
-The rebuilt executable cannot reopen the original installed estate because its
+The rebuilt executable cannot reopen the original installed engram because its
 hash differs from the sealed binding. That denial is preserved; no locator or
 stored binding was rewritten. An authorized, recoverable binary replacement
 path is still required before public deployment can promise safe upgrades.
 The successful same-revision trial is a separate installation, not an upgrade
-or recovery of the old estate. D/J and POAM-006 remain open.
+or recovery of the old engram. D/J and POAM-006 remain open.
 
 The [D-01.3 real-process oracle](../../evidence/change-journals/gate-d/d-01-install-exclusion-oracle.md)
 reproduced concurrent recovery of a live install intent: a second process
@@ -403,7 +403,7 @@ open. No alpha outcome or parent POA&M item closes on this bounded repair.
 
 The [D-01 closure packages](../../roadmap/rrflow-1.0/gate-d.md#d-01-remaining-closure-packages)
 now bind the next work to the current implementation and native failure oracles.
-Inspection at `1815af32` verifies that estate-directory creation still uses
+Inspection at `1815af32` verifies that engram-directory creation still uses
 default Windows permissions, managed-path helpers return names after checking
 them, and publication/cleanup and non-secret reads use later path operations.
 The installation contract validates eight fixed managed paths, with no complete
@@ -421,12 +421,12 @@ exact-candidate reconciliation. Retain PR 43/44/45's bounded successes. The
 roadmap owns the detailed order and acceptance; this ledger remains open for
 the unresolved D-01 requirements and the later D/J lifecycle work.
 
-## Private estate-directory admission (2026-10-21)
+## Private engram-directory admission (2026-10-21)
 
 A native Windows regression demonstrated that exact installation recovery
 accepted permissive permissions on `.rrflow/rrd/roots`. D-01.1 supplies private
 creation and handle-based ownership/mode/DACL admission for the four
-engine-owned estate directories. Apply checks existing boundaries before
+engine-owned engram directories. Apply checks existing boundaries before
 recovery secrets/store effects; installed locator, credential, open and
 inspection paths require all four. Permission drift is refused without repair
 or changes to project-owned parents. The existing private-file implementation

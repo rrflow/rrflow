@@ -11,7 +11,7 @@ pub(super) fn installation_identity_seed(
     configuration_sha256: &str,
 ) -> Result<String> {
     json_sha256(&(
-        "rrflow-installed-estate-v3",
+        "rrflow-installed-engram-v3",
         installation_identity,
         target_kind,
         project_precondition_sha256,
@@ -21,7 +21,7 @@ pub(super) fn installation_identity_seed(
     ))
 }
 
-pub(super) fn initial_project_root_sha256(project: &EstateFilesystem) -> Result<String> {
+pub(super) fn initial_project_root_sha256(project: &EngramFilesystem) -> Result<String> {
     let canonical = project
         .project()
         .diagnostic_path()
@@ -39,7 +39,7 @@ pub(super) fn installation_actions(
         InstallationActionKind::ValidateProject,
         InstallationActionKind::AcquireInstallationLease,
         InstallationActionKind::PrepareCredentials,
-        InstallationActionKind::CreateEstateDirectories,
+        InstallationActionKind::CreateEngramDirectories,
         InstallationActionKind::MaterializeBootstrap,
         InstallationActionKind::CreateStorageRoot,
         InstallationActionKind::DeliverCredentials,
@@ -93,9 +93,9 @@ pub(super) fn validate_sealed_preview(
         &installation.configuration.configuration_sha256,
     )?;
     let install_id = canonical_prefixed("install", &seed)?;
-    let expected_target = InstalledEstateIdentity {
+    let expected_target = InstalledEngramIdentity {
         project_id: canonical_prefixed("project", &seed)?,
-        estate_id: canonical_prefixed("estate", &seed)?,
+        engram_id: canonical_prefixed("engram", &seed)?,
         instance_id: canonical_prefixed("instance", &seed)?,
     };
     let expected_attunement_id = canonical_prefixed("attune", &seed)?;
@@ -116,7 +116,7 @@ pub(super) fn validate_sealed_preview(
     let expected_phases = planned_attunement_steps(&steps)?;
     let absent = digest::sha256_hex(b"rrflow-install-managed-path-absent-v1");
     let expected_paths =
-        EstateLayout::new(&install_id, &profile.initial_principal_id)?.managed_paths(&absent);
+        EngramLayout::new(&install_id, &profile.initial_principal_id)?.managed_paths(&absent);
     let expected_actions = installation_actions(
         &installation.configuration.configuration_sha256,
         &preview.attunement.plan_sha256,
@@ -135,7 +135,7 @@ pub(super) fn validate_sealed_preview(
         || installation.bootstrap
             != bootstrap::build(
                 profile,
-                &EstateLayout::new(&install_id, &profile.initial_principal_id)?,
+                &EngramLayout::new(&install_id, &profile.initial_principal_id)?,
             )?
         || installation.initial_principal_id != profile.initial_principal_id
         || installation.initial_grants
@@ -162,19 +162,19 @@ pub(super) fn validate_sealed_preview(
 pub(super) fn canonical_project(
     project: &Path,
     target_kind: InstallationTargetKind,
-) -> Result<EstateFilesystem> {
+) -> Result<EngramFilesystem> {
     let project = canonical_project_root(project)?;
     validate_installation_target(&project, target_kind)?;
     Ok(project)
 }
 
-pub(super) fn canonical_project_root(project: &Path) -> Result<EstateFilesystem> {
+pub(super) fn canonical_project_root(project: &Path) -> Result<EngramFilesystem> {
     let project = AnchoredPath::open_root(project).map_err(storage_error)?;
-    EstateFilesystem::admit(project, true)
+    EngramFilesystem::admit(project, true)
 }
 
 pub(super) fn validate_installation_target(
-    project: &EstateFilesystem,
+    project: &EngramFilesystem,
     target_kind: InstallationTargetKind,
 ) -> Result<()> {
     if target_kind == InstallationTargetKind::FreshProject {

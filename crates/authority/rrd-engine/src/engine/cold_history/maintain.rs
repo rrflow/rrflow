@@ -53,7 +53,7 @@ impl RrdEngine {
         }
         let mut result = ColdHistoryReadResult {
             scope: request.scope.clone(),
-            enabled: self.estate_configuration.storage.cold_history.is_some(),
+            enabled: self.engram_configuration.storage.cold_history.is_some(),
             current_generation: state.generation,
             through_cursor: state.through_cursor,
             pending: state.pending.is_some(),
@@ -244,7 +244,7 @@ impl RrdEngine {
     /// Offer one configured cold-history quantum. The server coalesces offers;
     /// embedded callers own their own scheduling.
     pub fn maintain_cold_history(&self) -> Result<bool> {
-        let Some(policy) = self.estate_configuration.storage.cold_history.as_ref() else {
+        let Some(policy) = self.engram_configuration.storage.cold_history.as_ref() else {
             return Ok(false);
         };
         let _guard = match self.cold_history_gate.try_lock() {

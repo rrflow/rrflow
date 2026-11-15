@@ -89,7 +89,7 @@ a query prunes any I/O or that a zero-copy path exists.
 | Immutable application objects | Content-addressed source artifacts and multimodal payload bytes referenced by canonical records | Memory and local adapters implemented; provider-neutral S3 port implemented without a production transport |
 | Vector artifact residency | Process-local pinned, cached, or cold opening of immutable vector artifacts | Implemented separately under the [vector residency contract](../vector/memory-tiers.md); never canonical state |
 | Physical snapshot transfer | Authenticated manifest closure used to move or restore one rrflowKV image | Local file/bundle export and installation implemented; no hibernation coordinator or configured cold destination |
-| DevForge filesystem placement | Shared immutable tool/model lower layer plus per-estate writable workspace and rrflowKV upper layer | Roadmap target only; it is not implemented by rrflowKV segment I/O |
+| DevForge filesystem placement | Shared immutable tool/model lower layer plus per-engram writable workspace and rrflowKV upper layer | Roadmap target only; it is not implemented by rrflowKV segment I/O |
 
 The process-local cache is intentionally custom and specific to authenticated
 segment pages. Moka is not a dependency of RRFlow, Arrow, or DataFusion and is
@@ -141,8 +141,8 @@ rrflowKV can flush and export an authenticated snapshot closure to a new local
 file, then validate and install that file into a compatible database. Export
 and install have explicit crash boundaries; a new manifest publication makes
 the imported state visible. This is a transfer primitive, not hibernation: it
-does not quiesce engine requests, bind estate identity and configuration,
-upload to a configured cold tier, reclaim hot state, or resume the same estate.
+does not quiesce engine requests, bind engram identity and configuration,
+upload to a configured cold tier, reclaim hot state, or resume the same engram.
 
 ## Missing hot-to-cold system
 
@@ -157,7 +157,7 @@ RRFlow currently has no component that:
 - proves retention pins keep every required manifest, segment, Arrow buffer,
   and referenced object alive; or
 - reports hot, cold, cached, transferred, compressed, logical, and allocated
-  bytes as independent quantities across a full estate lifecycle.
+  bytes as independent quantities across a full engram lifecycle.
 
 DataFusion must not fill that gap by opening arbitrary files or object URLs.
 Gate C-06 first establishes selected-segment-pinned Arrow-compatible pages and
@@ -167,8 +167,8 @@ a configured cold-tier adapter while `RrdEngine` owns quiesce and resume.
 
 The DevForge CoW lower/upper filesystem contract is separately owned by Gates
 D-07 through D-09. Shared toolchains, dependency mounts, and model inputs may
-live below an estate, but every mutable rrflowKV WAL, manifest, segment,
-catalogue, graph, and reasoning-state byte belongs to that estate's writable
+live below an engram, but every mutable rrflowKV WAL, manifest, segment,
+catalogue, graph, and reasoning-state byte belongs to that engram's writable
 upper layer.
 
 ## Current executable evidence

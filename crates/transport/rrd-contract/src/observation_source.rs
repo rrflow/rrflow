@@ -1,5 +1,5 @@
 //! Explicit, inactive observation-source configuration; no collector is activated here.
-use crate::{invalid, sha256_bytes, CanonicalId, CorrelationId, InstalledEstateIdentity, Result};
+use crate::{invalid, sha256_bytes, CanonicalId, CorrelationId, InstalledEngramIdentity, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -78,7 +78,7 @@ fn bounded(value: &impl Serialize) -> Result<()> {
 #[serde(deny_unknown_fields)]
 pub struct ObservationSourceConfiguration {
     pub format_version: u16,
-    pub identity: InstalledEstateIdentity,
+    pub identity: InstalledEngramIdentity,
     pub revision: u64,
     pub sources: Vec<ObservationSourceBinding>,
     pub last_applied_plan_sha256: Option<String>,
@@ -129,7 +129,7 @@ impl PreviewObservationSourceConfiguration {
 #[serde(deny_unknown_fields)]
 pub struct ObservationSourceConfigurationPlan {
     pub format_version: u16,
-    pub identity: InstalledEstateIdentity,
+    pub identity: InstalledEngramIdentity,
     pub session_id: CorrelationId,
     pub expected_revision: u64,
     pub expected_configuration_sha256: String,

@@ -1,4 +1,4 @@
-# POAM-018 — accepted complete estate and backup shapes
+# POAM-018 — accepted complete engram and backup shapes
 
 **Status:** active parent-owned POA&M detail
 **Coordinate:** `rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-018`
@@ -10,7 +10,7 @@ independently.
 
 ## Observed deficiency
 
-C-05b removed the successful incomplete estate and backup-job shapes. `EstateDocument` now
+C-05b removed the successful incomplete engram and backup-job shapes. `EngramDocument` now
 requires authority and all eight backup/recovery maps; internal and public backup jobs
 require the bound recovery-policy snapshot; the absence branch, legacy comment, and
 successful missing-field fixtures are gone.
@@ -18,7 +18,7 @@ successful missing-field fixtures are gone.
 ## Impact
 
 The specific multiple-shape risk is removed. POAM-019 separately tracks conversion of the
-still-monolithic estate aggregate and direct repository into native engine records.
+still-monolithic engram aggregate and direct repository into native engine records.
 
 ## Owning gates
 
@@ -30,6 +30,6 @@ Roadmap owners: [Gate C](../../roadmap/rrflow-1.0/gate-c.md) and
 ## Closure evidence
 
 The C-05b execution record traces every removed default and repeated public shape; negative
-tests reject omission of all nine estate fields and both policy snapshots, a fresh
-estate/backup/recovery corpus is identical on rrflowMX and rrflowKV after rrflowKV reopen,
+tests reject omission of all nine engram fields and both policy snapshots, a fresh
+engram/backup/recovery corpus is identical on rrflowMX and rrflowKV after rrflowKV reopen,
 and the complete default workspace test and Clippy matrices pass.

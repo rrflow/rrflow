@@ -75,7 +75,7 @@ impl RrdEngine {
         }
         let denied = if at < budget.last_observed_at_unix_ms {
             Some(ReasoningBudgetStop::ClockRollback)
-        } else if budget.configuration_sha256 != self.estate_configuration.configuration_sha256 {
+        } else if budget.configuration_sha256 != self.engram_configuration.configuration_sha256 {
             Some(ReasoningBudgetStop::ConfigurationChanged)
         } else if at >= budget.deadline_unix_ms
             || budget.charged_elapsed_ms >= budget.limits.max_run_elapsed_ms

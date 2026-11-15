@@ -31,10 +31,10 @@ impl Drop for ServerFixturePermit {
     }
 }
 
-pub(super) fn estate_context(at: u64, operation: &str) -> rrd_estate::MutationContext {
-    rrd_estate::MutationContext {
+pub(super) fn engram_context(at: u64, operation: &str) -> rrd_engram::MutationContext {
+    rrd_engram::MutationContext {
         at,
-        actor: "rrd-estate".into(),
+        actor: "rrd-engram".into(),
         request_id: format!("request-{operation}"),
         operation_id: CanonicalId::new(operation).unwrap(),
     }

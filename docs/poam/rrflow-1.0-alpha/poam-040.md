@@ -43,7 +43,7 @@ Verified at development `main` `04fae276`:
   only, and the CLI offers no job or receipt inspection.
 - The public audit read keeps only `security.audit` entries from the control
   journal (`audit_since` in [`rrd-security`](../../../crates/authority/rrd-security/src/lib.rs)),
-  so attunement and estate control transitions cannot be read through it.
+  so attunement and engram control transitions cannot be read through it.
 - `CommitReceipt` carries no principal or read stamp and has no read-by-id
   operation; it is returned again only on a retried commit.
 - A memory read leaves no durable receipt: `context-assemble` packets are not

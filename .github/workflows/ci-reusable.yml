@@ -215,7 +215,7 @@ jobs:
       - name: Capture clean primary build provenance
         run: python3 scripts/build_rrflow.py --profile dev --output "$RUNNER_TEMP/rrflow-build-receipt.json"
 
-  estate-portability:
+  engram-portability:
     name: engram process (${{ matrix.os }})
     needs: [changes]
     if: ${{ needs.changes.outputs.full == 'true' }}
@@ -244,7 +244,7 @@ jobs:
           cache-on-failure: true
           save-if: ${{ github.event_name != 'merge_group' }}
       - name: Test persistent engram authority and commands
-        run: cargo test -p rrd-estate --all-targets --locked
+        run: cargo test -p rrd-engram --all-targets --locked
       - name: Test RRD daemon process contract
         run: cargo test -p rrd-server --bin rrd-server --locked
       - name: Test native secret file permissions and handle identity
@@ -328,11 +328,11 @@ jobs:
       - name: Deny installed lifecycle test warnings
         run: cargo clippy -p rrflow-cli --test installed_lifecycle --test lifecycle_process --locked -- -D warnings
       - name: Build cross-package controller fixture
-        run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
+        run: cargo build -p rrflow-cli --bin rrd-engram-controller --locked
       - name: Test process fault injection (not product-readiness evidence)
-        run: cargo test -p rrd-server --test local_estate_driver --locked -- --nocapture
+        run: cargo test -p rrd-server --test local_engram_driver --locked -- --nocapture
       - name: Deny process-boundary warnings
-        run: cargo clippy -p rrd-estate -p rrd-server --all-targets --locked -- -D warnings
+        run: cargo clippy -p rrd-engram -p rrd-server --all-targets --locked -- -D warnings
 
   verify:
     name: verify
@@ -479,7 +479,7 @@ jobs:
           - name: query-retrieval
             packages: "-p rrd-query -p rrd-vector -p rrd-inference -p rrd-attunement -p rrd-operator-knowledge"
           - name: engine-authority
-            packages: "-p rrd-contract -p rrd-cluster -p rrd-engine -p rrd-estate -p rrd-security"
+            packages: "-p rrd-contract -p rrd-cluster -p rrd-engine -p rrd-engram -p rrd-security"
           - name: service-protocol
             packages: "-p rrd-server -p rrd-client -p rrflow-mcp -p rrflow-cli"
           - name: product-operations
@@ -504,7 +504,7 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
       - name: Build cross-package controller fixture
         if: ${{ matrix.name == 'service-protocol' }}
-        run: cargo build -p rrflow-cli --bin rrd-estate-controller --locked
+        run: cargo build -p rrflow-cli --bin rrd-engram-controller --locked
       - name: Test cohesive engine subsystem
         run: cargo test $PACKAGE_SELECTION --all-targets --locked --no-fail-fast
       - name: Deny cohesive engine subsystem warnings
@@ -774,7 +774,7 @@ jobs:
         timeout-minutes: 10
         run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::campaign::installed_sampler_trace_matches_server_and_store --exact --ignored --nocapture
       - name: Independent installed engrams under concurrent load
-        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_estate_isolation_under_concurrent_load --exact --ignored --nocapture
+        run: cargo test -p rrflow-cli --test installed_reopen --release --locked -- sustained::fleet::installed_two_engram_isolation_under_concurrent_load --exact --ignored --nocapture
       - name: Require fresh and existing installed damage denial
         timeout-minutes: 10
         run: >-
@@ -1128,7 +1128,7 @@ jobs:
       - repository-invariants
       - native-arm64
       - topology-smoke
-      - estate-portability
+      - engram-portability
       - verify
       - engine-suites
       - sdk-conformance
@@ -1153,7 +1153,7 @@ jobs:
           ENGINE_FAST_RESULT: ${{ needs.engine-fast.result }}
           ARM64_RESULT: ${{ needs.native-arm64.result }}
           TOPOLOGY_RESULT: ${{ needs.topology-smoke.result }}
-          PORTABILITY_RESULT: ${{ needs.estate-portability.result }}
+          PORTABILITY_RESULT: ${{ needs.engram-portability.result }}
           VERIFY_RESULT: ${{ needs.verify.result }}
           ENGINE_SUITES_RESULT: ${{ needs.engine-suites.result }}
           SDK_CONFORMANCE_RESULT: ${{ needs.sdk-conformance.result }}
@@ -1183,7 +1183,7 @@ jobs:
           expect "$ENGINE_LANE" "$ENGINE_FAST_RESULT" engine-fast
           expect "$FULL_LANE" "$ARM64_RESULT" native-arm64
           expect "$FULL_LANE" "$TOPOLOGY_RESULT" topology-smoke
-          expect "$FULL_LANE" "$PORTABILITY_RESULT" estate-portability
+          expect "$FULL_LANE" "$PORTABILITY_RESULT" engram-portability
           expect "$FULL_LANE" "$VERIFY_RESULT" verify
           expect "$FULL_LANE" "$ENGINE_SUITES_RESULT" engine-suites
           expect "$SDK_SELECTED" "$SDK_CONFORMANCE_RESULT" sdk-conformance

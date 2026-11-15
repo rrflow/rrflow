@@ -54,7 +54,7 @@ pub(crate) fn fixture() -> (StorageCampaign, SustainedSegment) {
     let mut manifest: StorageManifest =
         serde_json::from_str(include_str!("../../tests/fixtures/storage/manifest.json")).unwrap();
     manifest.evidence_class = EvidenceClass::NativeCapacity;
-    manifest.budgets.estates = limit(1);
+    manifest.budgets.engrams = limit(1);
     let mut result: StorageResult =
         serde_json::from_str(include_str!("../../tests/fixtures/storage/result.json")).unwrap();
     result.manifest_sha256 = manifest_digest(&manifest).unwrap();
@@ -66,7 +66,7 @@ pub(crate) fn fixture() -> (StorageCampaign, SustainedSegment) {
             vcpus: limit(1),
             host_bytes: manifest.budgets.host_bytes,
             engine_bytes: manifest.budgets.process_bytes,
-            estates: manifest.budgets.estates,
+            engrams: manifest.budgets.engrams,
             records: limit(1),
             edges: limit(1),
             vectors: limit(1),
@@ -647,7 +647,7 @@ fn bind_desktop(campaign: &mut StorageCampaign) {
         vcpus: limit(profile.vcpus),
         host_bytes: limit(profile.host_bytes),
         engine_bytes: limit(profile.engine_bytes),
-        estates: limit(profile.estates),
+        engrams: limit(profile.engrams),
         records: limit(profile.records_min),
         edges: limit(profile.edges_min),
         vectors: limit(profile.vectors_min),
@@ -656,7 +656,7 @@ fn bind_desktop(campaign: &mut StorageCampaign) {
     };
     campaign.storage.budgets.host_bytes = campaign.allocation.host_bytes;
     campaign.storage.budgets.process_bytes = campaign.allocation.engine_bytes;
-    campaign.storage.budgets.estates = campaign.allocation.estates;
+    campaign.storage.budgets.engrams = campaign.allocation.engrams;
     campaign.points[0].requests_per_second = limit(profile.rates[0]);
 }
 
@@ -673,7 +673,7 @@ fn qualification_binds_owning_allocation_corpus_and_load_coordinates() {
             2 => invalid.allocation.vcpus = limit(1),
             3 => invalid.allocation.host_bytes = limit(1),
             4 => invalid.allocation.engine_bytes = limit(1),
-            5 => invalid.allocation.estates = limit(2),
+            5 => invalid.allocation.engrams = limit(2),
             6 => invalid.allocation.records = limit(1),
             7 => invalid.allocation.edges = limit(1),
             8 => invalid.allocation.vectors = limit(1),

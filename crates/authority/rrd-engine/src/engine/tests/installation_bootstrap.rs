@@ -38,7 +38,7 @@ fn installation_preview_covers_transient_intent_before_storage_creation() {
         &mut |stage, _| {
             if stage == InstallApplyStage::IntentPublished {
                 observed_intent_boundary = true;
-                // Enumerate actual effects, independently of EstateLayout and
+                // Enumerate actual effects, independently of EngramLayout and
                 // the intent filename constructor. Never read secret payloads.
                 for entry in std::fs::read_dir(project.path()).unwrap() {
                     let relative = PathBuf::from(entry.unwrap().file_name());
@@ -104,8 +104,8 @@ fn shared_sdk_corpus_identity_matches_bundled_installation() {
         corpus.identity.instance
     );
     assert_eq!(
-        preview.installation.target.estate_id,
-        corpus.identity.estate
+        preview.installation.target.engram_id,
+        corpus.identity.engram
     );
     assert!(paths(&project).is_empty());
 }
@@ -170,7 +170,7 @@ fn bundled_bootstrap_closes_observed_files_records_and_inactive_specializations(
         assert!(!bootstrap.template_text.contains('\r'));
         let storage = PathBuf::from(&plan.managed_path(Kind::StorageRoot).relative_path);
         // Independent literal paths: do not derive expected intent/staging
-        // names by calling the implementation's EstateLayout builder.
+        // names by calling the implementation's EngramLayout builder.
         let expected: BTreeSet<_> = [
             ".rrflow".to_owned(),
             ".rrflow/rrd".to_owned(),
@@ -395,11 +395,11 @@ fn linked_bootstrap_bytes_are_platform_stable_and_unknown_profiles_have_no_effec
     for (profile, sha256) in [
         (
             "default",
-            "7e3d1a671d57c6239c9974effb5cee0ef34c01ae923dc206a10f79684b20682b",
+            "421a2a51a2c534f49d11a2922aabd49a3bb53d1ec8313fbedb9f3d73d8abaaf4",
         ),
         (
             "clyffy",
-            "ea6ee6d492f73a77325e9185bf478dcd10ed86c1ab4af6c233372760543c28a3",
+            "8dbe9cec0b06555ba1bc352401144bc4430b7cb8cb752657b861c47650a4a773",
         ),
     ] {
         let project = tempfile::tempdir().unwrap();
@@ -434,8 +434,8 @@ fn linked_bootstrap_bytes_are_platform_stable_and_unknown_profiles_have_no_effec
 /// as large as the largest native transaction it allows.
 #[test]
 fn bundled_configuration_enables_rrflow_cld() {
-    let text = include_str!("../../../assets/install/default-estate-configuration-v3.toml");
-    let input: rrd_contract::EstateConfigurationInput = toml::from_str(text).unwrap();
+    let text = include_str!("../../../assets/install/default-engram-configuration-v3.toml");
+    let input: rrd_contract::EngramConfigurationInput = toml::from_str(text).unwrap();
     let policy = input
         .storage
         .cold_history

@@ -249,7 +249,7 @@ pub(super) fn initialized_security_authority_binds_sessions_and_denies_ungranted
     }));
     assert!(records
         .iter()
-        .any(|record| { record["action"] == "estate_read" && record["decision"] == "denied" }));
+        .any(|record| { record["action"] == "engram_read" && record["decision"] == "denied" }));
     assert!(records.iter().any(|record| {
         record["action"] == "vector_collection_ensure" && record["decision"] == "denied"
     }));

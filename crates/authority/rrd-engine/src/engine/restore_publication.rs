@@ -1,5 +1,5 @@
 //! Restore publication: promoting a verified restore staging root into the
-//! installed estate's storage root.
+//! installed engram's storage root.
 //!
 //! The candidate keeps the storage root's own name, so the installed record,
 //! the locator, and the single-root install-recovery rule stay as they are;
@@ -17,15 +17,15 @@ mod support;
 
 pub(in crate::engine) use support::*;
 
-use super::estate_layout::{
-    instance_operation_root, reject_existing_symlink_path, safe_join, EstateFilesystem,
+use super::engram_layout::{
+    instance_operation_root, reject_existing_symlink_path, safe_join, EngramFilesystem,
     BACKUPS_DIRECTORY_NAME, RESTORES_DIRECTORY_NAME, STORAGE_DIRECTORY,
 };
 
 use super::installation::{
     canonical_prefixed, decode_control, engram_configuration_key, json_sha256, read_locator,
     require_locator_record_match, runtime_manifest_from_inspection, sha256_file,
-    DefaultInstallProfile, InstallationVerificationStatus, InstalledEstateRecord, ProjectLocator,
+    DefaultInstallProfile, InstallationVerificationStatus, InstalledEngramRecord, ProjectLocator,
     INSTALLED_RECORD_KEY,
 };
 
@@ -207,7 +207,7 @@ struct PublicationReceipt {
 }
 
 struct PublicationPaths {
-    project: EstateFilesystem,
+    project: EngramFilesystem,
     active: AnchoredPath,
     candidate: AnchoredPath,
     quarantine: AnchoredPath,
@@ -219,8 +219,8 @@ struct PublicationPaths {
 /// Read-only evidence and installed control state of one storage root.
 struct RootReading {
     evidence: RestoreRootEvidence,
-    installed: InstalledEstateRecord,
-    configuration: EstateConfiguration,
+    installed: InstalledEngramRecord,
+    configuration: EngramConfiguration,
 }
 
 impl RootReading {
@@ -230,13 +230,13 @@ impl RootReading {
             root,
             super::core::installed_storage_options(&locator.storage)?,
         )?;
-        let installed: InstalledEstateRecord =
-            decode_control(&inspector, INSTALLED_RECORD_KEY, "installed estate record")?;
+        let installed: InstalledEngramRecord =
+            decode_control(&inspector, INSTALLED_RECORD_KEY, "installed engram record")?;
         installed.validate()?;
-        let configuration: EstateConfiguration = decode_control(
+        let configuration: EngramConfiguration = decode_control(
             &inspector,
             &engram_configuration_key(&locator.identity.instance_id),
-            "estate configuration",
+            "engram configuration",
         )?;
         configuration.validate().map_err(contract_error)?;
         if configuration.storage != locator.storage {

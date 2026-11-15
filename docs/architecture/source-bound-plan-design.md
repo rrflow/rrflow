@@ -21,7 +21,7 @@ That inventory is bounded and rejects some observed races, but its own source
 states that it is not an atomic snapshot or D-03 inventory. At that historical
 baseline the installed engine did not retain the project-root anchor. Current
 development main `e73ba9287dafba5d8fb8fb6a990fd145ffd01ab3` does retain the
-admitted `installed_project_root` when opening an installed estate
+admitted `installed_project_root` when opening an installed engram
 ([root-capability journal](../evidence/change-journals/gate-d/d-02-retained-project-root.md));
 that capability alone neither authorizes source reads nor establishes a snapshot.
 `Start` still checks the plan digest but not the current source. Connect puts
@@ -51,7 +51,7 @@ below are semantic requirements for future contracts, not implemented schemas.
 
 An effect-bearing plan version binds, at minimum:
 
-- stable estate/project identity, immutable plan ID and digest, version and
+- stable engram/project identity, immutable plan ID and digest, version and
   optional predecessor; requester and intended recipient or capability;
 - a source binding and configuration/policy identities, with explicit scope,
   completeness, budget and authorization requirements;
@@ -72,7 +72,7 @@ An approved effect-bearing plan is the official execution plan for that scoped
 work; provisional drafts remain clearly identified and have no effect authority.
 
 For source-dependent effects, the source binding names a committed D-03
-`SourceTreeSnapshot` and its root digest, project/estate and logical root,
+`SourceTreeSnapshot` and its root digest, project/engram and logical root,
 inventory policy and implementation
 revisions, completeness/errors, and the relevant captured input identities.
 Where a Git revision exists, bind its algorithm and commit identity as
@@ -105,12 +105,12 @@ identity and is never relabelled as a D-03 snapshot.
    that names it; unrelated exploration and effects can continue.
 2. An authorized actor accepts the exact plan and handoff. Before a dependent
    effect the engine reacquires the permitted root capability, validates
-   estate, source, policy, configuration, authorization, budget, plan and job
+   engram, source, policy, configuration, authorization, budget, plan and job
    revision, and re-reads the bound source as required by the owning gate.
    A digest comparison after an incomplete or raced scan is not verification.
 3. If an ordinary edit changes a bound input, the engine returns a typed stale
    result identifying the changed scope and next action. It performs no
-   prohibited project or estate domain effect for that attempted mutation.
+   prohibited project or engram domain effect for that attempted mutation.
    Existing security/audit behavior is separate. The owner must resolve how the
    objective's no-write oracle accounts for any authorized audit record; this
    proposal does not change that requirement. A status read may report the last
@@ -136,7 +136,7 @@ identity and is never relabelled as a D-03 snapshot.
    job creation and fencing remain engine-owned future behavior.
 
 The replan operation must be available without reinstalling or deleting the
-estate. Cancellation and recovery must remain possible even when ordinary work
+engram. Cancellation and recovery must remain possible even when ordinary work
 budgets are exhausted, as the existing attunement control already intends.
 Replan is not an automatic approval or an overwrite of the old plan.
 
@@ -175,7 +175,7 @@ the proposal for a supported application path; do not claim the guarantee or
 silently discard the user's edit. Native platform and concurrent-writer tests
 must establish any future adapter's actual boundary.
 
-For derived estate state, consuming immutable captured bytes can honestly
+For derived engram state, consuming immutable captured bytes can honestly
 prove *which snapshot* produced an output. It does not by itself prove the
 live project still matched at the later commit. Publication that claims
 current-source consistency needs a qualified common synchronization boundary
@@ -231,7 +231,7 @@ changing what the user approved.
 
 ## Acceptance scenarios for future implementation
 
-Use the shipped `rrflow` and real installed estates; independently observe
+Use the shipped `rrflow` and real installed engrams; independently observe
 source artifacts, engine readback, receipts and audit. At an exact candidate:
 
 | Scenario | Required observable result |
