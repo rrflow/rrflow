@@ -136,6 +136,8 @@ in the real checkout. The [repair journal](../../evidence/change-journals/gate-d
 retains the failing oracle and limits. The installer repair and real-project
 acceptance remain open.
 
+Retained existing-directory admission landed on 2026-11-15 ([journal](../../evidence/change-journals/gate-d/existing-project-retained-admission-20261115.md)): an existing `.rrflow` and `.rrflow/rrd` are kept in place and bound by native identity and security, and the preservation oracle passes on Windows, including process death at each install stage. Still open: Linux and macOS evidence, the crash windows inside a staging or proof write, re-admission after a changed retained descriptor, and a run against the owner's real checkout.
+
 D-01/D-03 and H-06 own remediation and the real-checkout acceptance in
 [Gate D](../../roadmap/rrflow-1.0/gate-d.md#nested-repository-setup). It includes
 bounded, explicitly authorized metadata roots and source identity, user choice,

@@ -133,7 +133,7 @@ impl RrdEngine {
                 "installation apply mode or expected digest does not match the preview".into(),
             ));
         }
-        let mut project = canonical_project_root(project)?;
+        let mut project = canonical_project_root(project, true)?;
         validate_engram_directories(&project, true)?;
         let executable_sha256 = sha256_file(executable)?;
         if executable_sha256 != preview.installation.executable_sha256 {
@@ -146,10 +146,7 @@ impl RrdEngine {
         }
 
         let started = Instant::now();
-        let layout = EngramLayout::new(
-            &preview.installation.storage_root_id,
-            &preview.installation.initial_principal_id,
-        )?;
+        let layout = EngramLayout::for_plan(&preview.installation)?;
         validate_sealed_preview(preview, &profile, &profile_sha256, &executable_sha256)?;
 
         // Refused preconditions must not create even an empty admission file.
@@ -179,7 +176,7 @@ impl RrdEngine {
             admission::Admission::Published { intent, result } => {
                 if let Some(intent) = intent {
                     let (_, _, locator_bytes) = read_locator_anchored(&project)?;
-                    validate_recovery_engram(&project, &layout)?;
+                    validate_recovery_engram(&project, &layout, &preview.installation)?;
                     observe_install_stage(
                         preview,
                         started,
@@ -213,11 +210,6 @@ impl RrdEngine {
                 *intent
             }
             admission::Admission::New(clock_anchor) => {
-                // Adoption precedes the intent: an interrupted move changes the
-                // listed entries, so the stale plan is refused and re-planned.
-                if let Some(entries) = &preview.installation.adopted_engram_entries {
-                    project.adopt_engram_directory(preview.installation.id.as_str(), entries)?;
-                }
                 let (intent, recovery_state) = load_or_create_intent(
                     &project,
                     &layout,
@@ -233,7 +225,7 @@ impl RrdEngine {
                 {
                     return Err(ServiceError::ProjectBindingMismatch);
                 }
-                validate_recovery_engram(&project, &layout)?;
+                validate_recovery_engram(&project, &layout, &preview.installation)?;
                 observe_install_stage(
                     preview,
                     started,
@@ -261,8 +253,8 @@ impl RrdEngine {
             .managed_path(InstallationManagedPathKind::OperatorCredential)
             .relative_path
             .clone();
-        create_engram_directories(&mut project)?;
-        validate_recovery_engram(&project, &layout)?;
+        create_engram_directories(&mut project, &preview.installation)?;
+        validate_recovery_engram(&project, &layout, &preview.installation)?;
         let locator_path = safe_join(&project, LOCATOR_RELATIVE_PATH)?;
         observe_install_stage(
             preview,
@@ -583,11 +575,19 @@ impl RrdEngine {
             .map_err(|error| ServiceError::Contract(error.to_string()))?
             .into_bytes();
         let locator_sha256 = digest::sha256_hex(&locator_bytes);
-        publish_new_file(
-            &locator_path,
-            &safe_join(&project, &layout.locator_pending)?,
-            &locator_bytes,
-        )?;
+        let locator_pending = safe_join(&project, &layout.locator_pending)?;
+        if let Some(proof) = &layout.locator_proof {
+            publish_into_retained_parent(
+                &locator_path,
+                &locator_pending,
+                &safe_join(&project, proof)?,
+                &locator_bytes,
+                &preview.installation.plan_sha256,
+                &mut || Ok(()),
+            )?;
+        } else {
+            publish_new_file(&locator_path, &locator_pending, &locator_bytes)?;
+        }
         observe_install_stage(
             preview,
             started,

@@ -115,8 +115,22 @@ pub(super) fn validate_sealed_preview(
     validate_parse_policy_limits(&steps, profile, &installation.configuration)?;
     let expected_phases = planned_attunement_steps(&steps)?;
     let absent = digest::sha256_hex(b"rrflow-install-managed-path-absent-v1");
-    let expected_paths =
-        EngramLayout::new(&install_id, &profile.initial_principal_id)?.managed_paths(&absent);
+    let expected_layout = EngramLayout::for_plan(installation)?;
+    let mut expected_paths = expected_layout.managed_paths(&absent);
+    for (expected, actual) in expected_paths
+        .iter_mut()
+        .take(2)
+        .zip(&installation.managed_paths)
+    {
+        if actual.removal_rule == rrd_contract::InstallationRemovalRule::RetainExistingDirectory {
+            expected.precondition_sha256 = actual.precondition_sha256.clone();
+            expected.existing_directory_identity_sha256 =
+                actual.existing_directory_identity_sha256.clone();
+            expected.existing_directory_security_sha256 =
+                actual.existing_directory_security_sha256.clone();
+            expected.removal_rule = actual.removal_rule;
+        }
+    }
     let expected_actions = installation_actions(
         &installation.configuration.configuration_sha256,
         &preview.attunement.plan_sha256,
@@ -133,10 +147,7 @@ pub(super) fn validate_sealed_preview(
         || installation.configuration.revision != 1
         || installation.initial_seat != profile.specialization.seat
         || installation.bootstrap
-            != bootstrap::build(
-                profile,
-                &EngramLayout::new(&install_id, &profile.initial_principal_id)?,
-            )?
+            != bootstrap::build(profile, &expected_layout, &installation.managed_paths)?
         || installation.initial_principal_id != profile.initial_principal_id
         || installation.initial_grants
             != rrd_contract::installation_initial_grants(
@@ -163,14 +174,27 @@ pub(super) fn canonical_project(
     project: &Path,
     target_kind: InstallationTargetKind,
 ) -> Result<EngramFilesystem> {
-    let project = canonical_project_root(project)?;
+    let project = canonical_project_root(project, false)?;
     validate_installation_target(&project, target_kind)?;
     Ok(project)
 }
 
-pub(super) fn canonical_project_root(project: &Path) -> Result<EngramFilesystem> {
+pub(super) fn canonical_installing_project(
+    project: &Path,
+    target_kind: InstallationTargetKind,
+) -> Result<EngramFilesystem> {
+    let project = canonical_project_root(project, true)?;
+    validate_installation_target(&project, target_kind)?;
+    Ok(project)
+}
+
+pub(super) fn canonical_project_root(project: &Path, installing: bool) -> Result<EngramFilesystem> {
     let project = AnchoredPath::open_root(project).map_err(storage_error)?;
-    EngramFilesystem::admit(project, true)
+    if installing {
+        EngramFilesystem::admit_for_install(project)
+    } else {
+        EngramFilesystem::admit(project, true)
+    }
 }
 
 pub(super) fn validate_installation_target(

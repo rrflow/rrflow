@@ -625,17 +625,16 @@ does not silently retry with larger defaults. Configuration format 2 and locator
 format 1 are replaced pre-release shapes and are rejected, not migrated or
 silently defaulted. Product version remains 1.0.0.
 
-A new install adopts a leftover `.rrflow` folder in place (owner decision,
-2026-10-31). The plan lists the folder's top-level entries in
-`adopted_engram_entries`; plans without a leftover folder keep their existing
-digest. Apply refuses the plan if those entries changed, makes the folder
-private (owner-only DACL on Windows, mode 0700 elsewhere) only when the current
-user owns it and it is a real folder, then moves each listed entry, including a
-pre-canonical `instance.toml`, into `.rrflow/previous/<plan id>/`. Nothing is
-deleted or merged, and moved entries keep their own permissions. An interrupted
-adoption changes the listed entries, so the stale plan is refused and a fresh
-plan adopts what remains. A project with a locator is an installed engram and
-is never adopted.
+A new install keeps a leftover `.rrflow` folder exactly where it is (the
+owner's 2026-10-31 decision was that such a folder must be adopted in place,
+not refused; the relocation into `.rrflow/previous/<plan id>/` that an earlier
+implementation chose was never the owner's). The folder and `.rrflow/rrd` are
+bound in the plan by native object identity and security descriptor, nothing
+inside them is moved, deleted or re-permissioned, and RRFlow creates its own
+private `roots` and `credentials` beside the project's entries. A pre-canonical
+`instance.toml` stays where it is; only a project with a locator is an
+installed engram and is refused.
+
 The tracked development manifest has been deleted because no source path reads
 it. The clock substrate proves only relative rollback against a sealed anchor:
 it does not authenticate or correct UTC, detect every forward error or drift,
@@ -703,13 +702,34 @@ making it a projection of the Inventory records.
 
 ### Private engram-directory admission
 
-The four engine-owned boundaries `.rrflow`, `.rrflow/rrd`,
-`.rrflow/rrd/roots` and `.rrflow/credentials` are created with private native
-security. Unix creation requests mode `0700`; admission requires that mode
-and effective-user ownership on the opened directory. Windows creation
-supplies a protected owner/LocalSystem DACL with object/container inheritance;
-admission inspects the directory handle's owner, DACL and non-reparse disk
-attributes. The default project-parent ACL is not used as the security policy.
+New engine-owned boundaries `.rrflow`, `.rrflow/rrd`, `.rrflow/rrd/roots`
+and `.rrflow/credentials` use private native security. Unix creation requests
+mode `0700`; admission requires that mode and effective-user ownership on the
+opened directory. Windows creation supplies a protected owner/LocalSystem DACL
+with object/container inheritance; admission inspects the directory handle's
+owner, DACL and non-reparse disk attributes. The default project-parent ACL is
+not used as the security policy for these private objects.
+
+For an existing project, a preview instead retains an existing `.rrflow` or
+`.rrflow/rrd` as a project-owned ancestor. The approved plan binds its native
+object identity and security descriptor (`existing_directory_identity_sha256`,
+`existing_directory_security_sha256`, removal rule `retain_existing_directory`);
+existing contents and permissions are left in place. The private `roots` and
+`credentials` directories must still be new and pass private admission. The
+locator and bootstrap are staged in the private credential directory, each with
+an identity-bound publication proof, so an identical project-owned file is never
+taken for an RRFlow output. A changed ancestor before apply requires a new
+preview; ordinary source edits can be replanned. Existing data are not migrated
+into the newly created storage root.
+
+Retained-ancestor security snapshots are implemented for Windows (owner, group
+and DACL from the opened handle) and Linux (owner, group, mode and POSIX ACLs);
+other Unix targets fail closed for this case. Known limits: a changed retained
+security descriptor after installation fails closed and has no re-admission
+command; an interruption inside a staging or proof write can leave an unproven
+file that retry refuses rather than recovers, and the stage-boundary tests do
+not prove every possible write window; native filesystem IDs may be reused after
+deletion. Linux and macOS behaviour is covered only by the gate.
 
 Apply and recovery validate every present boundary before reading recovery
 secrets or advancing store work. Installed locator, credential, open and
@@ -718,9 +738,8 @@ only during new or interrupted apply. A changed mode, unsupported ACL or
 non-directory object is refused without permission repair; project-owned
 parents are never tightened. Creation does not replace an existing object.
 
-These checks extend the private-object boundary. Existing pre-alpha engrams
-with incompatible directory permissions
-are refused rather than silently upgraded.
+These checks extend the private-object boundary. A pre-existing private child
+or conflicting managed file is refused rather than silently adopted.
 
 ### Retained filesystem authority
 

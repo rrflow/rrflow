@@ -10,13 +10,14 @@ const TEMPLATE: &str = include_str!("../../../assets/install/templates/generic-p
 pub(super) fn build(
     profile: &DefaultInstallProfile,
     layout: &EngramLayout,
+    paths: &[rrd_contract::InstallationManagedPath],
 ) -> Result<InstallationBootstrap> {
     let formats = rrd_store::RrflowKvStore::initialization_formats();
-    let paths = layout.managed_paths(&digest::sha256_hex(
-        b"rrflow-install-managed-path-absent-v1",
-    ));
     let mut private_directories: Vec<_> = paths[..4]
         .iter()
+        .filter(|path| {
+            path.removal_rule != rrd_contract::InstallationRemovalRule::RetainExistingDirectory
+        })
         .map(|path| path.relative_path.clone())
         .collect();
     private_directories.sort();
@@ -26,6 +27,12 @@ pub(super) fn build(
         layout.install_intent.clone(),
         rrd_contract::INSTALLATION_LEASE_PATH.to_owned(),
     ];
+    for path in paths {
+        if let Some(proof) = &path.publication_proof {
+            private_files.push(path.relative_path.clone());
+            private_files.push(proof.relative_path.clone());
+        }
+    }
     private_files.sort();
     let mut bootstrap = InstallationBootstrap {
         format_version: INSTALLATION_BOOTSTRAP_VERSION,
@@ -73,12 +80,20 @@ pub(super) fn materialize(
     staged: &mut dyn FnMut() -> Result<()>,
 ) -> Result<()> {
     let bytes = preview.installation.bootstrap.rendered_instructions();
-    publish_new_file_with_stage(
-        &project.managed(&layout.bootstrap)?,
-        &project.managed(&layout.bootstrap_pending)?,
-        bytes.as_bytes(),
-        staged,
-    )
+    let output = project.managed(&layout.bootstrap)?;
+    let pending = project.managed(&layout.bootstrap_pending)?;
+    if let Some(proof) = &layout.bootstrap_proof {
+        publish_into_retained_parent(
+            &output,
+            &pending,
+            &project.managed(proof)?,
+            bytes.as_bytes(),
+            &preview.installation.plan_sha256,
+            staged,
+        )
+    } else {
+        publish_new_file_with_stage(&output, &pending, bytes.as_bytes(), staged)
+    }
 }
 
 pub(super) fn verify(project: &EngramFilesystem, plan: &InstallationPlan) -> Result<()> {
@@ -90,6 +105,17 @@ pub(super) fn verify(project: &EngramFilesystem, plan: &InstallationPlan) -> Res
     let bytes = read_regular_bounded(&path, MAX_LOCATOR_BYTES)?;
     if digest::sha256_hex(&bytes) != plan.bootstrap.instructions_sha256 {
         return Err(ServiceError::ProjectBindingMismatch);
+    }
+    if let Some(proof) = &plan
+        .managed_path(InstallationManagedPathKind::BootstrapPending)
+        .publication_proof
+    {
+        require_publication_proof(
+            &path,
+            &project.managed(&proof.relative_path)?,
+            &bytes,
+            &plan.plan_sha256,
+        )?;
     }
     Ok(())
 }

@@ -285,7 +285,6 @@ pub(super) fn installation_plan(attunement: &AttunementPlan) -> InstallationPlan
                 estimated_write_bytes: 256,
             },
         ],
-        adopted_engram_entries: None,
         plan_sha256: digest(0),
     };
     plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();

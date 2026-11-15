@@ -48,6 +48,132 @@ pub(in super::super) fn publish_new_file(
     publish_new_file_with_stage(path, temporary, bytes, &mut || Ok(()))
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PublicationProof {
+    format_version: u16,
+    plan_sha256: String,
+    content_sha256: String,
+    object_identity_sha256: String,
+}
+
+fn read_publication_proof(path: &AnchoredPath) -> Result<Option<PublicationProof>> {
+    match read_private_anchored(path, MAX_LOCATOR_BYTES) {
+        Ok(bytes) => Ok(Some(decode_json(&bytes, "publication ownership proof")?)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(storage_error(error)),
+    }
+}
+
+fn observed_publication(path: &AnchoredPath, expected: &[u8]) -> Result<String> {
+    let mut file = path.open_read().map_err(storage_error)?;
+    let before = path
+        .source_observation_for_file(&file)
+        .map_err(storage_error)?;
+    if before.kind() != rrd_store::filesystem::SourceKind::File
+        || before.bytes() != expected.len() as u64
+    {
+        return Err(ServiceError::ProjectBindingMismatch);
+    }
+    let mut actual = Vec::new();
+    (&mut file)
+        .take(MAX_LOCATOR_BYTES + 1)
+        .read_to_end(&mut actual)
+        .map_err(storage_error)?;
+    let after = path
+        .source_observation_for_file(&file)
+        .map_err(storage_error)?;
+    if before != after || actual != expected {
+        return Err(ServiceError::ProjectBindingMismatch);
+    }
+    before.object_identity_sha256().map_err(storage_error)
+}
+
+pub(super) fn require_publication_proof(
+    path: &AnchoredPath,
+    proof: &AnchoredPath,
+    bytes: &[u8],
+    plan_sha256: &str,
+) -> Result<()> {
+    let proof = read_publication_proof(proof)?.ok_or(ServiceError::ProjectBindingMismatch)?;
+    if proof.format_version != 1
+        || proof.plan_sha256 != plan_sha256
+        || proof.content_sha256 != digest::sha256_hex(bytes)
+        || proof.object_identity_sha256 != observed_publication(path, bytes)?
+    {
+        return Err(ServiceError::ProjectBindingMismatch);
+    }
+    Ok(())
+}
+
+/// Publish into a retained project directory only after sealing the identity
+/// of the staged private file. An equal pre-existing file is not ownership.
+pub(super) fn publish_into_retained_parent(
+    path: &AnchoredPath,
+    temporary: &AnchoredPath,
+    proof: &AnchoredPath,
+    bytes: &[u8],
+    plan_sha256: &str,
+    staged: &mut dyn FnMut() -> Result<()>,
+) -> Result<()> {
+    if bytes.len() as u64 > MAX_LOCATOR_BYTES {
+        return Err(ServiceError::ProjectBindingMismatch);
+    }
+    if path.try_exists().map_err(storage_error)? {
+        require_publication_proof(path, proof, bytes, plan_sha256)?;
+        if temporary.try_exists().map_err(storage_error)? {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        return Ok(());
+    }
+    let created = if !temporary.try_exists().map_err(storage_error)? {
+        if read_publication_proof(proof)?.is_some() {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        write_private_anchored(temporary, bytes).map_err(storage_error)?;
+        true
+    } else {
+        if read_private_anchored(temporary, MAX_LOCATOR_BYTES).map_err(storage_error)? != bytes {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        false
+    };
+    let identity = observed_publication(temporary, bytes)?;
+    match read_publication_proof(proof)? {
+        Some(record) => {
+            if record.format_version != 1
+                || record.plan_sha256 != plan_sha256
+                || record.content_sha256 != digest::sha256_hex(bytes)
+                || record.object_identity_sha256 != identity
+            {
+                return Err(ServiceError::ProjectBindingMismatch);
+            }
+        }
+        None if created => {
+            let record = PublicationProof {
+                format_version: 1,
+                plan_sha256: plan_sha256.into(),
+                content_sha256: digest::sha256_hex(bytes),
+                object_identity_sha256: identity,
+            };
+            write_private_anchored(proof, &serde_json::to_vec(&record).map_err(contract_json)?)
+                .map_err(storage_error)?;
+        }
+        None => return Err(ServiceError::ProjectBindingMismatch),
+    }
+    staged()?;
+    match temporary.rename_new_to(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            require_publication_proof(path, proof, bytes, plan_sha256)?;
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        Err(error) => return Err(storage_error(error)),
+    }
+    require_publication_proof(path, proof, bytes, plan_sha256)?;
+    Ok(())
+}
+
 pub(super) fn publish_new_file_with_stage(
     path: &AnchoredPath,
     temporary: &AnchoredPath,
@@ -117,6 +243,15 @@ pub(super) fn cleanup_locator_pending(
     layout: &EngramLayout,
     locator_bytes: &[u8],
 ) -> Result<()> {
+    if layout.locator_proof.is_some() {
+        if safe_join(project, &layout.locator_pending)?
+            .try_exists()
+            .map_err(storage_error)?
+        {
+            return Err(ServiceError::ProjectBindingMismatch);
+        }
+        return Ok(());
+    }
     cleanup_pending_file(&safe_join(project, &layout.locator_pending)?, locator_bytes)
 }
 

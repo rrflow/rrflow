@@ -1,6 +1,7 @@
 # Adopt a leftover `.rrflow` folder in place
 
-**Status:** active implementation evidence; owner-directed import unblocker
+**Status:** historical implementation evidence; the relocation it describes was replaced
+**Superseded by:** [retained admission, 2026-11-15](existing-project-retained-admission-20261115.md)
 **Coordinate:** `rrflow://rrflow-instance/data/change-journal/adopt-leftover-rrflow-folder`
 **Owner:** [Gate D](../../../roadmap/rrflow-1.0/gate-d.md), installed lifecycle ([contract](../../../reference/deployment/installed-lifecycle.md))
 

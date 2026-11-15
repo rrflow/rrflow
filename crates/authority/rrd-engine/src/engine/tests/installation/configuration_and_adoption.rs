@@ -224,24 +224,23 @@ pub(super) fn leftover_rrflow(project: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 }
 
 #[test]
-pub(super) fn a_leftover_rrflow_folder_is_adopted_in_place_and_keeps_every_file() {
+pub(super) fn a_leftover_rrflow_folder_is_retained_untouched_and_the_engram_installs_beside_it() {
     let project = tempfile::tempdir().unwrap();
     let executable = test_executable();
     let leftover = leftover_rrflow(project.path());
     let before = inventory(project.path());
 
-    // Planning reports the adoption and changes nothing.
+    // Planning binds the project's own `.rrflow` and `.rrflow/rrd` by native
+    // identity and security, and changes nothing.
     let preview = plan(project.path());
-    assert_eq!(
-        preview.installation.adopted_engram_entries.as_deref(),
-        Some(
-            &[
-                "dev".to_owned(),
-                "instance.toml".to_owned(),
-                "rrd".to_owned()
-            ][..]
-        )
-    );
+    for path in &preview.installation.managed_paths[..2] {
+        assert_eq!(
+            path.removal_rule,
+            rrd_contract::InstallationRemovalRule::RetainExistingDirectory
+        );
+        assert!(path.existing_directory_identity_sha256.is_some());
+        assert!(path.existing_directory_security_sha256.is_some());
+    }
     assert_eq!(inventory(project.path()), before);
 
     let result = RrdEngine::apply_installation_at(
@@ -255,18 +254,14 @@ pub(super) fn a_leftover_rrflow_folder_is_adopted_in_place_and_keeps_every_file(
     .unwrap();
     assert!(!result.idempotent_replay);
 
-    // Every leftover byte is retained below `.rrflow/previous/<plan id>/`.
-    let retained = project
-        .path()
-        .join(".rrflow/previous")
-        .join(preview.installation.id.as_str());
-    assert_eq!(inventory(&retained), leftover);
-    assert!(!project.path().join(".rrflow/instance.toml").exists());
-    assert!(!project.path().join(".rrflow/dev").exists());
-    assert!(!project.path().join(".rrflow/rrd/stale.bin").exists());
-    crate::engine::token_key::validate_private_directory(&project.path().join(".rrflow")).unwrap();
+    // Every leftover byte is exactly where it was; nothing moved aside.
+    let after = inventory(&project.path().join(".rrflow"));
+    for (path, bytes) in &leftover {
+        assert_eq!(after.get(path), Some(bytes), "{} changed", path.display());
+    }
+    assert!(!project.path().join(".rrflow/previous").exists());
 
-    // The adopted engram opens, verifies and replays like any other.
+    // The engram installed beside it opens, verifies and replays like any other.
     open_at(project.path(), &executable, 1_800_000_000_001).unwrap();
     let report = inspect_at(project.path(), &executable, 1_800_000_000_002).unwrap();
     assert_eq!(report.status, InstallationVerificationStatus::Passed);
@@ -303,7 +298,6 @@ pub(super) fn a_changed_leftover_rrflow_folder_refuses_the_stale_plan_without_ef
     )
     .is_err());
     assert_eq!(inventory(project.path()), before);
-    assert!(!project.path().join(".rrflow/previous").exists());
 }
 
 #[test]
@@ -468,6 +462,7 @@ pub(super) fn installed_backups_and_restore_staging_live_beside_the_storage_root
         )
         .unwrap(),
         &layout,
+        &preview.installation,
     )
     .expect("install recovery accepts an engram that holds backups and restore staging");
 
@@ -483,13 +478,12 @@ pub(super) fn installed_backups_and_restore_staging_live_beside_the_storage_root
 
 /// #247 characterized the pre-#236 installer: an existing `.rrflow` folder
 /// with ordinary inherited permissions was rejected before preview, and the
-/// storage error had to name the directory. #236 adopts that folder instead,
-/// so the same shape now previews as an adoption with no entries and still
-/// has no file effects. The in-place preservation oracle #247 asked for stays
-/// below under POAM-006.
+/// storage error had to name the directory. The folder is now retained as it
+/// is: the same shape previews as a retained ancestor with no file effects,
+/// and the in-place preservation oracle below installs beside it.
 #[cfg(windows)]
 #[test]
-pub(super) fn inherited_engram_preview_adopts_the_folder_without_effects() {
+pub(super) fn inherited_engram_preview_retains_the_folder_without_effects() {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir(root.path().join(".rrflow")).unwrap();
     let before = inventory(root.path());
@@ -503,16 +497,15 @@ pub(super) fn inherited_engram_preview_adopts_the_folder_without_effects() {
     )
     .unwrap();
     assert_eq!(
-        preview.installation.adopted_engram_entries.as_deref(),
-        Some(&[][..]),
-        "an empty inherited .rrflow is adopted with no entries"
+        preview.installation.managed_paths[0].removal_rule,
+        rrd_contract::InstallationRemovalRule::RetainExistingDirectory,
+        "an empty inherited .rrflow is retained, not adopted or moved"
     );
     assert_eq!(inventory(root.path()), before);
 }
 
 #[cfg(windows)]
 #[test]
-#[ignore = "POAM-006: the installer still rejects an existing .rrflow with inherited permissions; #236 adopts it by relocation, this oracle asks for in-place preservation of bytes and ACLs, and no repair for that exists yet"]
 pub(super) fn existing_project_preserves_inherited_engram_and_opens_after_replay() {
     use std::process::Command;
 

@@ -7,7 +7,7 @@
  },
  "oversize": {
   "crates/operations/rrd-maintenance/src/lib.rs": 1556,
-  "crates/transport/rrd-contract/src/lib.rs": 327
+  "crates/transport/rrd-contract/src/lib.rs": 326
  },
  "patterns": {
   "boxed_error": {

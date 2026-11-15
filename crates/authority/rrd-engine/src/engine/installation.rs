@@ -19,16 +19,17 @@ use super::clock::{assess, observe_required, require_accepted, ClockSource, Host
 use super::*;
 
 use crate::engine::engram_layout::{
-    create_engram_directories, existing_engram_entries, reject_existing_engram, safe_join,
-    validate_engram_directories, validate_managed_relative, validate_recovery_engram,
-    EngramFilesystem, EngramLayout, LOCATOR_RELATIVE_PATH, STORAGE_DIRECTORY,
+    bind_existing_ancestors, create_engram_directories, reject_existing_engram, safe_join,
+    validate_engram_directories, validate_managed_relative, validate_plan_ancestors,
+    validate_recovery_engram, EngramFilesystem, EngramLayout, ENGRAM_DIRECTORY,
+    LOCATOR_RELATIVE_PATH, STORAGE_DIRECTORY,
 };
 
 use crate::engine::memory_engram::build_memory_engram_plan;
 
 use crate::engine::token_key::{
-    read_api_key_document_anchored as read_api_key_document,
-    read_token_key_anchored as read_token_key, ApiKeyDocument,
+    read_api_key_document_anchored as read_api_key_document, read_private_anchored,
+    read_token_key_anchored as read_token_key, write_private_anchored, ApiKeyDocument,
 };
 
 use rrd_contract::{

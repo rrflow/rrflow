@@ -13,6 +13,85 @@ use std::path::{Path, PathBuf};
 
 const FIRST_APPLY_MS: u64 = 1_800_000_000_000;
 
+#[cfg(windows)]
+#[test]
+fn retained_inherited_directories_recover_each_install_stage_without_changing_user_files() {
+    let stages = [
+        InstallApplyStage::LeaseAcquired,
+        InstallApplyStage::IntentPublished,
+        InstallApplyStage::EngramDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
+        InstallApplyStage::StorageReady,
+        InstallApplyStage::TokenReady,
+        InstallApplyStage::CredentialReady,
+        InstallApplyStage::EngineCommitted,
+        InstallApplyStage::LocatorPublished,
+        InstallApplyStage::IntentAcknowledged,
+    ];
+    for stage in stages {
+        let project = project_fixture();
+        let engram = project.path().join(".rrflow");
+        let storage = engram.join("rrd");
+        std::fs::create_dir_all(&storage).unwrap();
+        std::fs::write(engram.join("user-notes"), b"preserve user notes").unwrap();
+        std::fs::write(storage.join("prior-state"), b"preserve prior state").unwrap();
+        let acl = |path: &Path| {
+            let output = std::process::Command::new("icacls")
+                .arg(path)
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            output.stdout
+        };
+        let engram_acl = acl(&engram);
+        let storage_acl = acl(&storage);
+        let executable = test_executable();
+        let preview = plan(project.path(), &executable);
+        let interrupted = RrdEngine::apply_installation_with_failure(
+            project.path(),
+            InstallationTargetKind::ExistingProject,
+            &preview,
+            &preview.installation.plan_sha256,
+            FIRST_APPLY_MS,
+            &executable,
+            stage,
+        );
+        assert!(interrupted.is_err(), "stage {stage:?} must interrupt");
+        let result = RrdEngine::apply_installation_at(
+            project.path(),
+            InstallationTargetKind::ExistingProject,
+            &preview,
+            &preview.installation.plan_sha256,
+            FIRST_APPLY_MS + 1,
+            &executable,
+        )
+        .unwrap_or_else(|error| panic!("stage {stage:?} could not recover: {error}"));
+        assert_eq!(result.plan_sha256, preview.installation.plan_sha256);
+        let engine = RrdEngine::open_installed_with_clock(
+            project.path(),
+            &executable,
+            &FixedClock::at(FIRST_APPLY_MS + 2),
+        )
+        .unwrap();
+        assert_eq!(
+            engine.installed_engram_identity(),
+            Some(&preview.installation.target)
+        );
+        drop(engine);
+        assert_eq!(
+            std::fs::read(engram.join("user-notes")).unwrap(),
+            b"preserve user notes"
+        );
+        assert_eq!(
+            std::fs::read(storage.join("prior-state")).unwrap(),
+            b"preserve prior state"
+        );
+        assert_eq!(acl(&engram), engram_acl);
+        assert_eq!(acl(&storage), storage_acl);
+    }
+}
+
 fn test_executable() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
 }

@@ -2,35 +2,7 @@
 
 use super::*;
 
-/// Adopted entries are single, sorted, unique top-level names below `.rrflow`.
-pub fn validate_adopted_engram_entries(entries: &[String]) -> Result<()> {
-    if entries.len() > MAX_ADOPTED_ENGRAM_ENTRIES {
-        return invalid("the existing .rrflow folder has too many entries to adopt");
-    }
-    for entry in entries {
-        validate_bounded_text(entry, "adopted .rrflow entry", 255)?;
-        if matches!(entry.as_str(), "." | ".." | ADOPTED_ENGRAM_DIRECTORY)
-            || entry.contains(['/', '\\', ':'])
-        {
-            return invalid("adopted .rrflow entries must be plain top-level names");
-        }
-    }
-    if entries.windows(2).any(|pair| pair[0] >= pair[1]) {
-        return invalid("adopted .rrflow entries must be sorted and unique");
-    }
-    Ok(())
-}
-
 pub fn installation_plan_sha256(plan: &InstallationPlan) -> Result<String> {
-    let base = installation_plan_base_sha256(plan)?;
-    match &plan.adopted_engram_entries {
-        // Plans without adoption keep their established digest exactly.
-        None => Ok(base),
-        Some(entries) => digest_json(b"rrflow-installation-plan-v4-adoption", &(base, entries)),
-    }
-}
-
-pub(super) fn installation_plan_base_sha256(plan: &InstallationPlan) -> Result<String> {
     digest_json(
         b"rrflow-installation-plan-v4",
         &(

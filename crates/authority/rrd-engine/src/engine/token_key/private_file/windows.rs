@@ -29,10 +29,9 @@ use windows_sys::Win32::Security::Authorization::{
 
 use windows_sys::Win32::Security::{
     EqualSid, GetAce, GetLengthSid, GetSecurityDescriptorControl, GetTokenInformation, IsValidAcl,
-    IsValidSecurityDescriptor, IsValidSid, IsWellKnownSid, TokenOwner, TokenUser,
-    WinLocalSystemSid, ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, DACL_SECURITY_INFORMATION,
-    GROUP_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION, PSID, SE_DACL_PROTECTED, TOKEN_OWNER,
-    TOKEN_QUERY, TOKEN_USER,
+    IsValidSecurityDescriptor, IsValidSid, IsWellKnownSid, TokenUser, WinLocalSystemSid,
+    ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, DACL_SECURITY_INFORMATION, GROUP_SECURITY_INFORMATION,
+    OWNER_SECURITY_INFORMATION, PSID, SE_DACL_PROTECTED, TOKEN_QUERY, TOKEN_USER,
 };
 
 use windows_sys::Win32::Storage::FileSystem::{
@@ -56,17 +55,6 @@ struct CurrentUser {
     // Pointer-sized elements give TOKEN_USER its required alignment. The SID
     // pointer returned by GetTokenInformation points into this retained buffer.
     storage: Vec<usize>,
-}
-
-struct DefaultOwner {
-    storage: Vec<usize>,
-}
-
-impl DefaultOwner {
-    fn sid(&self) -> PSID {
-        // SAFETY: query populated an aligned TOKEN_OWNER; storage never resizes.
-        unsafe { (*self.storage.as_ptr().cast::<TOKEN_OWNER>()).Owner }
-    }
 }
 
 impl CurrentUser {
@@ -117,58 +105,6 @@ impl CurrentUser {
         unsafe { (*self.storage.as_ptr().cast::<TOKEN_USER>()).User.Sid }
     }
 
-    /// The owner Windows assigns to objects this token creates. For an
-    /// administrator's token that is BUILTIN\Administrators, not the user, so
-    /// a folder the same account made can carry a different owner SID than
-    /// `sid()` and still be its own.
-    fn default_owner(&self) -> io::Result<DefaultOwner> {
-        let mut raw = null_mut();
-        // SAFETY: a valid pseudo process handle and a writable output handle.
-        if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw) } == 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: successful OpenProcessToken transfers one owned real handle.
-        let token = unsafe { OwnedHandle::from_raw_handle(raw) };
-        let mut length = 0;
-        // SAFETY: zero-length query requests only the required allocation size.
-        let first = unsafe {
-            GetTokenInformation(
-                token.as_raw_handle(),
-                TokenOwner,
-                null_mut(),
-                0,
-                &mut length,
-            )
-        };
-        if first != 0
-            || io::Error::last_os_error().raw_os_error() != Some(ERROR_INSUFFICIENT_BUFFER as i32)
-            || !(size_of::<TOKEN_OWNER>() as u32..=64 * 1024).contains(&length)
-        {
-            return Err(denied("cannot bound the current Windows default owner"));
-        }
-        let mut storage = vec![0usize; (length as usize).div_ceil(size_of::<usize>())];
-        // SAFETY: aligned storage has at least length writable bytes; the token
-        // remains open and the output-length pointer is valid.
-        if unsafe {
-            GetTokenInformation(
-                token.as_raw_handle(),
-                TokenOwner,
-                storage.as_mut_ptr().cast(),
-                length,
-                &mut length,
-            )
-        } == 0
-        {
-            return Err(io::Error::last_os_error());
-        }
-        let result = DefaultOwner { storage };
-        // SAFETY: GetTokenInformation populated a complete TOKEN_OWNER and SID.
-        if unsafe { IsValidSid(result.sid()) } == 0 {
-            return Err(denied("invalid Windows default owner"));
-        }
-        Ok(result)
-    }
-
     fn text(&self) -> io::Result<String> {
         let mut raw = null_mut();
         // SAFETY: sid is valid while self is alive; raw receives an allocation.
@@ -214,137 +150,6 @@ pub(super) fn open_relative(
     directory: bool,
 ) -> io::Result<File> {
     open_relative_with_access(parent, name, create, directory, false, 0)
-}
-
-/// Make one existing directory, owned by the current user, private in place.
-/// Its contents are not touched; the caller decides what moves below it.
-pub(super) fn adopt_directory_relative(parent: &File, name: &std::ffi::OsStr) -> io::Result<File> {
-    use windows_sys::Win32::Security::Authorization::SetSecurityInfo;
-    use windows_sys::Win32::Security::{
-        GetSecurityDescriptorDacl, PROTECTED_DACL_SECURITY_INFORMATION,
-    };
-    use windows_sys::Win32::Storage::FileSystem::{WRITE_DAC, WRITE_OWNER};
-    // The owner holds WRITE_DAC implicitly; WRITE_OWNER is granted only by the
-    // private DACL, so ownership is taken after that DACL is in place.
-    let file = open_relative_with_access(parent, name, false, true, false, WRITE_DAC).map_err(
-        |error| {
-            io::Error::new(
-                error.kind(),
-                format!("cannot open the leftover folder for adoption: {error}"),
-            )
-        },
-    )?;
-    let mut information = BY_HANDLE_FILE_INFORMATION::default();
-    // SAFETY: file owns the live handle and information is writable.
-    if unsafe { GetFileType(file.as_raw_handle()) } != FILE_TYPE_DISK
-        || unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) } == 0
-        || information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY == 0
-        || information.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    {
-        return Err(denied(
-            "the existing .rrflow folder must be a real folder, not a link",
-        ));
-    }
-    let user = CurrentUser::query()?;
-    let mut owner = null_mut();
-    let mut raw = null_mut();
-    // SAFETY: the handle grants READ_CONTROL; raw owns the returned descriptor.
-    let status = unsafe {
-        GetSecurityInfo(
-            file.as_raw_handle(),
-            SE_FILE_OBJECT,
-            OWNER_SECURITY_INFORMATION,
-            &mut owner,
-            null_mut(),
-            null_mut(),
-            null_mut(),
-            &mut raw,
-        )
-    };
-    if status != 0 {
-        return Err(io::Error::from_raw_os_error(status as i32));
-    }
-    let _owner_descriptor = LocalAllocation(raw);
-    let default_owner = user.default_owner()?;
-    // SAFETY: owner points into the retained descriptor; all SIDs are live.
-    // A folder this account created is owned either by the user or by the
-    // token's default owner (BUILTIN\Administrators for an administrator),
-    // which is what the GitHub Windows runner and any elevated shell produce.
-    if owner.is_null()
-        || unsafe { IsValidSid(owner) } == 0
-        || (unsafe { EqualSid(owner, user.sid()) } == 0
-            && unsafe { EqualSid(owner, default_owner.sid()) } == 0)
-    {
-        return Err(denied(
-            "the existing .rrflow folder belongs to another account",
-        ));
-    }
-    let text = user.text()?;
-    let private = descriptor(&format!("D:P(A;OICI;FA;;;{text})(A;OICI;FA;;;SY)"))?;
-    let mut present = 0;
-    let mut dacl = null_mut();
-    let mut defaulted = 0;
-    // SAFETY: private owns the converted descriptor; outputs are live.
-    if unsafe { GetSecurityDescriptorDacl(private.0, &mut present, &mut dacl, &mut defaulted) } == 0
-        || present == 0
-        || dacl.is_null()
-    {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: the handle grants WRITE_DAC and the DACL lives in `private`.
-    let status = unsafe {
-        SetSecurityInfo(
-            file.as_raw_handle(),
-            SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-            null_mut(),
-            null_mut(),
-            dacl,
-            null(),
-        )
-    };
-    if status != 0 {
-        let error = io::Error::from_raw_os_error(status as i32);
-        return Err(io::Error::new(
-            error.kind(),
-            format!("cannot make the leftover folder private: {error}"),
-        ));
-    }
-    // A fresh private folder is created with the user as its owner. A leftover
-    // made under an elevated token or on a hosted runner is owned by
-    // BUILTIN\Administrators instead; the private DACL just set grants the
-    // user WRITE_OWNER, so ownership is taken through a second handle and the
-    // adopted folder becomes indistinguishable from a fresh one.
-    // SAFETY: owner points into the retained descriptor and user.sid() is live.
-    if unsafe { EqualSid(owner, user.sid()) } == 0 {
-        let owning = open_relative_with_access(parent, name, false, true, false, WRITE_OWNER)
-            .map_err(|error| {
-                io::Error::new(
-                    error.kind(),
-                    format!("cannot open the leftover folder to take ownership: {error}"),
-                )
-            })?;
-        // SAFETY: the handle grants WRITE_OWNER and the SID lives in `user`.
-        let status = unsafe {
-            SetSecurityInfo(
-                owning.as_raw_handle(),
-                SE_FILE_OBJECT,
-                OWNER_SECURITY_INFORMATION,
-                user.sid(),
-                null_mut(),
-                null_mut(),
-                null(),
-            )
-        };
-        if status != 0 {
-            let error = io::Error::from_raw_os_error(status as i32);
-            return Err(io::Error::new(
-                error.kind(),
-                format!("cannot take ownership of the leftover folder: {error}"),
-            ));
-        }
-    }
-    Ok(file)
 }
 
 pub(super) fn open_empty_relative(

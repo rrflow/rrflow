@@ -8,6 +8,7 @@ pub(super) struct InstalledEngram {
     executable: PathBuf,
     instance: CanonicalId,
     active_root: PathBuf,
+    installation: rrd_contract::InstallationPlan,
 }
 
 /// Installs a project, opens it as the product does, and authenticates with
@@ -57,6 +58,7 @@ pub(super) fn install_and_open() -> (InstalledEngram, RrdEngine, SessionLease) {
         _project: project,
         executable,
         instance: preview.installation.target.instance_id.clone(),
+        installation: preview.installation.clone(),
     };
     (engram, engine, lease)
 }
@@ -618,6 +620,7 @@ fn a_staged_restore_is_published_in_place_and_the_engram_opens_from_the_backup()
         )
         .unwrap(),
         &layout,
+        &engram.installation,
     )
     .expect("install recovery accepts the published engram");
 

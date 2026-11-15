@@ -49,12 +49,6 @@ mod platform {
             "native directory enforcement unavailable",
         ))
     }
-    pub(super) fn adopt_directory_relative(_: &File, _: &std::ffi::OsStr) -> io::Result<File> {
-        Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "native directory adoption unavailable",
-        ))
-    }
     pub(super) fn directory_security_sha256(_: &File) -> io::Result<String> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -103,18 +97,6 @@ pub(in crate::engine) fn create_private_directory_anchored(
         .ok_or_else(|| denied("private directory has no parent"))?
         .sync_directory()?;
     Ok(directory)
-}
-
-/// Make an existing directory owned by the current user private in place and
-/// retain it, as an explicitly planned adoption rather than a silent repair.
-pub(in crate::engine) fn adopt_private_directory_anchored(
-    path: &AnchoredPath,
-) -> io::Result<AnchoredPath> {
-    path.open_directory_with(|parent, name| {
-        let file = platform::adopt_directory_relative(parent, name)?;
-        platform::validate_directory(&file)?;
-        Ok(file)
-    })
 }
 
 pub(in crate::engine) fn read_private_anchored(

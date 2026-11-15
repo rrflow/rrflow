@@ -9,13 +9,12 @@ use serde::{Deserialize, Serialize};
 mod private_file;
 #[allow(unused_imports)]
 pub(in crate::engine) use private_file::directory_security_sha256;
-pub(in crate::engine) use private_file::{
-    adopt_private_directory_anchored, create_private_directory_anchored,
-    open_private_empty_anchored, pin_private_directory, read_private_anchored,
-    write_private_anchored,
-};
 #[cfg(test)]
-pub(in crate::engine) use private_file::{validate_private_directory, write_private_new};
+pub(in crate::engine) use private_file::write_private_new;
+pub(in crate::engine) use private_file::{
+    create_private_directory_anchored, open_private_empty_anchored, pin_private_directory,
+    read_private_anchored, write_private_anchored,
+};
 
 pub const TOKEN_KEY_BYTES: usize = 32;
 const API_KEY_DOCUMENT_FORMAT: u16 = 1;

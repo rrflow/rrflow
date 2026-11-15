@@ -44,30 +44,6 @@ pub(super) fn open_relative(
     Ok(unsafe { File::from_raw_fd(descriptor) })
 }
 
-/// Make one existing directory, owned by the effective user, private in place.
-/// Its contents are not touched; the caller decides what moves below it.
-pub(super) fn adopt_directory_relative(parent: &File, name: &std::ffi::OsStr) -> io::Result<File> {
-    use std::os::fd::AsRawFd;
-    let file = open_relative(parent, name, false, true)?;
-    let metadata = file.metadata()?;
-    if !metadata.is_dir() {
-        return Err(denied(
-            "the existing .rrflow folder must be a real folder, not a link",
-        ));
-    }
-    // SAFETY: geteuid has no pointer arguments or preconditions.
-    if metadata.uid() != unsafe { libc::geteuid() } {
-        return Err(denied(
-            "the existing .rrflow folder belongs to another account",
-        ));
-    }
-    // SAFETY: the descriptor is live for this call.
-    if unsafe { libc::fchmod(file.as_raw_fd(), 0o700) } != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(file)
-}
-
 #[cfg(test)]
 pub(super) fn open_directory(path: &Path, create: bool) -> io::Result<File> {
     let path = rrd_store::filesystem::AnchoredPath::from_path(path)?;
@@ -92,9 +68,13 @@ pub(super) fn validate_directory(file: &File) -> io::Result<()> {
 pub(super) fn directory_security_sha256(file: &File) -> io::Result<String> {
     use std::os::fd::AsRawFd;
     fn acl(file: &File, name: &std::ffi::CStr) -> io::Result<Option<Vec<u8>>> {
-        // SAFETY: fd is live and the first call requests the current length only.
-        let size =
-            unsafe { libc::fgetxattr(file.as_raw_fd(), name.as_ptr(), std::ptr::null_mut(), 0) };
+        // A retained directory handle may be an O_PATH descriptor, which the
+        // f*xattr calls refuse (EBADF). The kernel's per-descriptor link names
+        // the same inode without resolving any project path.
+        let link = std::ffi::CString::new(format!("/proc/self/fd/{}", file.as_raw_fd()))
+            .map_err(io::Error::other)?;
+        // SAFETY: link and name are NUL-terminated; the first call requests the length only.
+        let size = unsafe { libc::getxattr(link.as_ptr(), name.as_ptr(), std::ptr::null_mut(), 0) };
         if size < 0 {
             let error = io::Error::last_os_error();
             if error.raw_os_error() == Some(libc::ENODATA) {
@@ -110,8 +90,8 @@ pub(super) fn directory_security_sha256(file: &File) -> io::Result<String> {
         let mut bytes = vec![0u8; size];
         // SAFETY: bytes owns size writable bytes; the native function reports actual bytes.
         let actual = unsafe {
-            libc::fgetxattr(
-                file.as_raw_fd(),
+            libc::getxattr(
+                link.as_ptr(),
                 name.as_ptr(),
                 bytes.as_mut_ptr().cast(),
                 size,

@@ -13,7 +13,7 @@ impl RrdEngine {
         executable: &Path,
         clock: &dyn ClockSource,
     ) -> Result<Self> {
-        let project = canonical_project_root(project)?;
+        let project = canonical_project_root(project, false)?;
         Self::open_installed_anchored(&project, executable, clock)
     }
 
@@ -25,7 +25,7 @@ impl RrdEngine {
         let preflight =
             Self::with_installed_binding(project, executable, clock, "install.open.preflight", Ok)?;
         require_accepted(&preflight.clock)?;
-        let (project, locator, _) = read_locator_anchored(project)?;
+        let (project, locator, locator_bytes) = read_locator_anchored(project)?;
         let (_, profile_sha256) = DefaultInstallProfile::load(locator.profile_id.as_str())?;
         if sha256_file(executable)? != locator.executable_sha256
             || profile_sha256 != locator.profile_sha256
@@ -52,6 +52,19 @@ impl RrdEngine {
         let installed: InstalledEngramRecord = decode_json(&bytes, "installed engram record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        validate_plan_ancestors(&project, &installed.installation, false, false)?;
+        if let Some(proof) = &installed
+            .installation
+            .managed_path(InstallationManagedPathKind::LocatorPending)
+            .publication_proof
+        {
+            require_publication_proof(
+                &project.managed(LOCATOR_RELATIVE_PATH)?,
+                &project.managed(&proof.relative_path)?,
+                &locator_bytes,
+                &installed.installation.plan_sha256,
+            )?;
+        }
         bootstrap::verify(&project, &installed.installation)?;
         if locator.identity.instance_id != preflight.locator.identity.instance_id
             || locator.plan_sha256 != preflight.locator.plan_sha256
@@ -226,12 +239,24 @@ impl RrdEngine {
             decode_control(&inspector, INSTALLED_RECORD_KEY, "installed engram record")?;
         installed.validate()?;
         require_locator_record_match(&locator, &installed)?;
+        validate_plan_ancestors(&project, &installed.installation, false, false)?;
+        if let Some(proof) = &installed
+            .installation
+            .managed_path(InstallationManagedPathKind::LocatorPending)
+            .publication_proof
+        {
+            require_publication_proof(
+                &project.managed(LOCATOR_RELATIVE_PATH)?,
+                &project.managed(&proof.relative_path)?,
+                &locator_bytes,
+                &installed.installation.plan_sha256,
+            )?;
+        }
         bootstrap::verify(&project, &installed.installation)?;
-        let layout = EngramLayout::new(
-            &installed.installation.storage_root_id,
-            &installed.installation.initial_principal_id,
-        )?;
-        if installed.installation.bootstrap != bootstrap::build(&profile, &layout)? {
+        let layout = EngramLayout::for_plan(&installed.installation)?;
+        if installed.installation.bootstrap
+            != bootstrap::build(&profile, &layout, &installed.installation.managed_paths)?
+        {
             return Err(ServiceError::ProjectBindingMismatch);
         }
         let configuration: EngramConfiguration = decode_control(

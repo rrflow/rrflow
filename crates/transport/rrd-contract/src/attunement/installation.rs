@@ -239,18 +239,8 @@ pub struct InstallationPlan {
     pub attunement_plan_id: CanonicalId,
     pub attunement_plan_sha256: String,
     pub actions: Vec<InstallationPlanAction>,
-    /// Present when the project already holds a `.rrflow` folder that is not
-    /// an installed engram. Apply makes that folder private in place and moves
-    /// exactly these top-level entries into `.rrflow/previous/<plan id>/`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub adopted_engram_entries: Option<Vec<String>>,
     pub plan_sha256: String,
 }
-
-/// The most entries one adoption moves; a larger leftover tree is refused.
-pub const MAX_ADOPTED_ENGRAM_ENTRIES: usize = 256;
-/// The `.rrflow` entry that retains adopted contents; never itself adopted.
-pub const ADOPTED_ENGRAM_DIRECTORY: &str = "previous";
 
 impl InstallationPlan {
     pub fn validate(&self) -> Result<()> {
@@ -512,9 +502,6 @@ impl InstallationPlan {
             if action.kind != expected_kind {
                 return invalid("installation actions are missing, duplicated, or out of order");
             }
-        }
-        if let Some(entries) = &self.adopted_engram_entries {
-            validate_adopted_engram_entries(entries)?;
         }
         validate_sha256(&self.plan_sha256, "installation plan_sha256")?;
         if self.plan_sha256 != installation_plan_sha256(self)? {

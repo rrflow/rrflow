@@ -266,6 +266,71 @@ fn process_death_releases_admission_without_regenerating_prepared_secrets() {
     }
 }
 
+#[cfg(windows)]
+#[test]
+fn retained_engram_recovers_after_process_death_without_taking_user_files() {
+    for stage in [
+        InstallApplyStage::LeaseAcquired,
+        InstallApplyStage::IntentPublished,
+        InstallApplyStage::EngramDirectoriesReady,
+        InstallApplyStage::BootstrapStaged,
+        InstallApplyStage::BootstrapReady,
+        InstallApplyStage::StorageReady,
+        InstallApplyStage::TokenReady,
+        InstallApplyStage::CredentialReady,
+        InstallApplyStage::EngineCommitted,
+        InstallApplyStage::LocatorPublished,
+        InstallApplyStage::IntentAcknowledged,
+    ] {
+        let fixture = fixture();
+        let project = fixture.path().join("project");
+        let engram = project.join(".rrflow");
+        let storage = engram.join("rrd");
+        std::fs::create_dir_all(&storage).unwrap();
+        std::fs::write(engram.join("user-note"), b"original note").unwrap();
+        std::fs::write(storage.join("user-state"), b"original state").unwrap();
+        let acl = |path: &Path| {
+            let output = Command::new("icacls").arg(path).output().unwrap();
+            assert!(output.status.success());
+            output.stdout
+        };
+        let engram_acl = acl(&engram);
+        let storage_acl = acl(&storage);
+        let executable = fixture.path().join("distribution-fixture");
+        let preview = RrdEngine::plan_installation(
+            &project,
+            InstallationTargetKind::ExistingProject,
+            &"1".repeat(64),
+            "default",
+            None,
+            &executable,
+        )
+        .unwrap();
+        std::fs::write(
+            fixture.path().join("plan.json"),
+            serde_json::to_vec(&preview).unwrap(),
+        )
+        .unwrap();
+        let mut owner = spawn_at(fixture.path(), "owner", stage);
+        wait_file(&fixture.path().join("paused"), &mut owner);
+        owner.0.kill().unwrap();
+        owner.0.wait().unwrap();
+        let mut recovery = spawn(fixture.path(), "contender");
+        wait_success(&mut recovery);
+        assert_eq!(outcome(fixture.path(), "contender"), "success", "{stage:?}");
+        assert_eq!(
+            std::fs::read(engram.join("user-note")).unwrap(),
+            b"original note"
+        );
+        assert_eq!(
+            std::fs::read(storage.join("user-state")).unwrap(),
+            b"original state"
+        );
+        assert_eq!(acl(&engram), engram_acl, "{stage:?}");
+        assert_eq!(acl(&storage), storage_acl, "{stage:?}");
+    }
+}
+
 #[test]
 fn unrelated_projects_can_install_while_another_project_is_paused() {
     let first = fixture();

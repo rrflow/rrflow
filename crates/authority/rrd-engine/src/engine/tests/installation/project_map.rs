@@ -100,6 +100,7 @@ pub(super) fn an_installed_project_that_holds_its_map_still_reopens_replays_and_
         )
         .unwrap(),
         &layout,
+        &preview.installation,
     )
     .expect("install recovery accepts a project that holds its map and its pending file");
 
