@@ -344,7 +344,7 @@ Remaining remote refs checked 2026-11-15 (second pass):
 |---|---|---|
 | `gh-readonly-queue/main/pr-285`, `-349`, `-367`, `-376`, `-382` | Contained | Merge-queue scratch refs. `git log --no-merges main..<ref>` lists nothing: every non-merge commit is on `main`, and `b5821ac88` (the #285 NEON repair) is an ancestor of `main` |
 | `origin/backup/agent/c07-backup-scheduling`, `c07-run-progress`, `rrflowdb-postgres-identity`, `rrflowdb-postgres-plan` | Contained | Each file the branch adds (`c-07g-integrated-native-growth.md`, the three `rrflowdb-postgresql-*` journals, `docs/reference/protocol/postgresql.md`) exists on `main`; `c07-run-progress` has no file change |
-| `origin/codex/consolidate-project-structure-and-context` | **Superseded** | 2026-09-02 design from before the RRFlow name: `scripts/project_shape.py` and a consolidation contract. `main` derives inventory from Git and enforces shape with `scripts/ci/check_code_shape.py`; the contract's one-engine flow is owned by the README and ADRs |
+| `origin/codex/consolidate-project-structure-and-context` | **Superseded** | 2026-09-02 consolidation contract written under an earlier internal engine name (the owner confirmed on 2026-11-15 that name is the rrflowLSM lineage; the architecture test bars it from this repository): `scripts/project_shape.py` and a consolidation contract. `main` derives inventory from Git and enforces shape with `scripts/ci/check_code_shape.py`; the contract's one-engine flow is owned by the README and ADRs |
 
 The `origin` remote is the official repository and was only read.
 
