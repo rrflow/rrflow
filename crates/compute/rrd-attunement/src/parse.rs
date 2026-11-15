@@ -9,8 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tree_sitter::{Language, Parser, Tree};
 
-pub const PARSE_PROPOSAL_VERSION: u16 = 1;
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParseLimits {
@@ -31,25 +29,6 @@ pub enum ParseError {
     LimitExceeded,
     Cancelled,
     ParserUnavailable,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SyntaxNode {
-    pub kind: String,
-    pub start_byte: u64,
-    pub end_byte: u64,
-    pub error: bool,
-    pub missing: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParseProposal {
-    pub format_version: u16,
-    pub source_id: String,
-    pub content_sha256: String,
-    pub language: String,
-    pub parser_revision: String,
-    pub nodes: Vec<SyntaxNode>,
 }
 
 fn grammar(language: &str) -> Option<(Language, &'static str)> {
@@ -79,6 +58,8 @@ pub fn parser_revision(language: &str) -> Option<&'static str> {
     grammar(language).map(|(_, revision)| revision)
 }
 
+/// The selected language is explicit; this function never guesses from a path.
+/// Grammars are linked build inputs and are not fetched during execution.
 pub(crate) struct Parsed {
     pub tree: Tree,
     pub language: Language,
@@ -87,9 +68,7 @@ pub(crate) struct Parsed {
     pub deadline: Duration,
 }
 
-/// Validates the request and parses `source` within `limits`. The selected
-/// language is explicit; this function never guesses from a path. Grammars are
-/// linked build inputs and are not fetched during execution.
+/// Validates the request and parses `source` within `limits`.
 pub(crate) fn parse_tree(
     source_id: &str,
     expected_sha256: &str,
@@ -178,100 +157,4 @@ pub(crate) fn parse_tree(
         started,
         deadline,
     })
-}
-
-/// Every named, error and missing node of `source`, within `limits`.
-pub fn parse_source(
-    source_id: &str,
-    expected_sha256: &str,
-    language: &str,
-    source: &[u8],
-    limits: &ParseLimits,
-    cancelled: impl Fn() -> bool,
-) -> Result<ParseProposal, ParseError> {
-    let Parsed {
-        tree,
-        revision,
-        started,
-        deadline,
-        ..
-    } = parse_tree(
-        source_id,
-        expected_sha256,
-        language,
-        source,
-        limits,
-        &cancelled,
-    )?;
-    let mut cursor = tree.walk();
-    let mut depth = 1u64;
-    let mut visited = 0u64;
-    let mut output = ParseProposal {
-        format_version: PARSE_PROPOSAL_VERSION,
-        source_id: source_id.into(),
-        content_sha256: expected_sha256.into(),
-        language: language.into(),
-        parser_revision: revision.into(),
-        nodes: Vec::new(),
-    };
-    let mut output_bytes = serde_json::to_vec(&output)
-        .map_err(|_| ParseError::LimitExceeded)?
-        .len() as u64;
-    if output_bytes > limits.output_bytes {
-        return Err(ParseError::LimitExceeded);
-    }
-    loop {
-        if cancelled() {
-            return Err(ParseError::Cancelled);
-        }
-        if started.elapsed() >= deadline || depth > limits.depth {
-            return Err(ParseError::LimitExceeded);
-        }
-        visited = visited.checked_add(1).ok_or(ParseError::LimitExceeded)?;
-        if visited > limits.nodes {
-            return Err(ParseError::LimitExceeded);
-        }
-        let node = cursor.node();
-        if node.is_named() || node.is_error() || node.is_missing() {
-            let start = node.start_byte();
-            let end = node.end_byte();
-            if start > end || end > source.len() {
-                return Err(ParseError::ParserUnavailable);
-            }
-            let proposed = SyntaxNode {
-                kind: node.kind().into(),
-                start_byte: start as u64,
-                end_byte: end as u64,
-                error: node.is_error(),
-                missing: node.is_missing(),
-            };
-            let node_bytes = serde_json::to_vec(&proposed)
-                .map_err(|_| ParseError::LimitExceeded)?
-                .len() as u64;
-            output_bytes = output_bytes
-                .checked_add(node_bytes)
-                .and_then(|bytes| bytes.checked_add(u64::from(!output.nodes.is_empty())))
-                .ok_or(ParseError::LimitExceeded)?;
-            if output_bytes > limits.output_bytes {
-                return Err(ParseError::LimitExceeded);
-            }
-            output.nodes.push(proposed);
-        }
-        if cursor.goto_first_child() {
-            depth = depth.checked_add(1).ok_or(ParseError::LimitExceeded)?;
-            continue;
-        }
-        while !cursor.goto_next_sibling() {
-            if !cursor.goto_parent() {
-                if cancelled() {
-                    return Err(ParseError::Cancelled);
-                }
-                if started.elapsed() >= deadline {
-                    return Err(ParseError::LimitExceeded);
-                }
-                return Ok(output);
-            }
-            depth -= 1;
-        }
-    }
 }
