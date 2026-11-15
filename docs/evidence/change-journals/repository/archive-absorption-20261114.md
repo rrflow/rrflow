@@ -306,6 +306,20 @@ Verdict: the rename landed; this ref is resolved.
 
 One file, `.claude/settings.json`: two permission rules pointing at a long-gone scratchpad and two `additionalDirectories` under a deleted worktree. Nothing in it applies to any other checkout, and the owner's standing rule is that permission rules live in the ignored `.claude/settings.local.json`. **Dropped, nothing absorbed.** It was in the bundle and was deleted from `refs/archive` on 2026-11-15.
 
+### `wip/rrflow-existing-project` (left `main` 2026-11-14)
+
+The uncommitted work of draft PR #247 on a `main` of 2026-11-02 (838 commits behind): 18 files, +1,360 −121. It is a competing design for installing into a project that already holds a `.rrflow` folder. It records the existing `.rrflow` and `.rrflow/rrd` ancestors in the sealed plan with their native identity and security descriptor, leaves their contents and permissions untouched, and stages the locator and bootstrap in the private credential directory behind a publication proof.
+
+| Item | Verdict | Evidence |
+|---|---|---|
+| The design: retain the existing folder untouched, bind its descriptor | **Superseded by the owner's decision, not absorbed** | The owner decided on 2026-10-31 that a leftover `.rrflow` "must be adopted in place, not refused" ([journal](../gate-d/adopt-leftover-rrflow-folder.md)). `main` implements that (#236): `adopted_engram_entries` in the plan, `.rrflow` made private in place, each entry moved with no-replace renames into `.rrflow/previous/<plan id>/`, nothing deleted. Commit `d6af8fc90` (2026-11-10) settled #236 against #247 and left #247's preservation oracle ignored |
+| The preservation oracle (bytes and ACLs unchanged in place) | **Already on `main`, ignored** | `existing_project_preserves_inherited_engram_and_opens_after_replay`, `#[ignore]` under POAM-006. Run with `--ignored` on 2026-11-15 it fails at `configuration_and_adoption.rs:563`: the file it reads back is no longer in place because adoption moved it into `previous/`. That is the documented difference between the two designs, not a defect found here |
+| Its own list of defects: unproven staging after a crash refuses instead of recovering; no re-admission after a changed ancestor ACL; non-Linux Unix descriptors unimplemented; Linux, macOS, full suite, CI never run | **Kept as a record** | The ref is in the bundle as `d76fee096`; its intermediate journal is `docs/evidence/change-journals/gate-d/existing-project-retained-admission-wip.md` on that commit |
+
+**Open tension, for the owner:** the ignored oracle and the owner-decided behaviour ask for different things (leave bytes and ACLs untouched, versus move entries aside). Nothing was changed to hide that; the oracle stays ignored with its reason. Changing `main` to the retained design would replace #236, change the sealed plan's digest and rewrite its tests, so it needs the owner's word, not an inference from an agent-written oracle.
+
+**Resolved.** The ref was in the bundle and was deleted from `refs/archive` on 2026-11-15.
+
 ## Remote branches on `rrflow/rrflow-development` (checked 2026-11-15)
 
 The archive covered local refs only. The remote also holds 37 branches. 19 appear above. The rest:
@@ -328,4 +342,4 @@ No remote branch has been deleted.
 
 ## Still open
 
-`wip/rrflow-existing-project` (1,360 lines of unfinished work, one design decision), and the kept ref above.
+Only the ref kept deliberately above.
