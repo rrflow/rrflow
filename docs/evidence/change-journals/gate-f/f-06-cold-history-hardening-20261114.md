@@ -48,6 +48,27 @@ A planner that will choose between the cold copy and the hot store (S9) has to t
 - `cargo test -p rrd-server --locked`: 37 passed.
 - `cargo clippy -p rrd-query -p rrd-engine --all-targets --locked -- -D warnings`: passed.
 
+## 3. Native upkeep cannot starve the cold copy (landed)
+
+**Defect on `main`.** Two layers offered native maintenance first and cold history only when native had nothing to do:
+
+- `RrdEngine::maintain_storage` tried native, and returned if it did work.
+- The server's maintenance worker held one pending slot and dropped every offer made while a quantum ran.
+
+A store with standing compaction debt therefore never advanced its cold copy. Under S9 the planner may read the cold copy only when its watermark covers the read, so a copy that falls behind whenever native work exists is a copy that is rarely usable.
+
+**Reproduced.** `embedded_maintenance_publishes_cold_history_while_native_debt_remains` keeps compaction debt above zero and calls `maintain_storage`. On `main` it failed with "cold work must be offered while native debt remains" (committed failing as `d9c80c921` before the fix).
+
+**Change:**
+
+- `rrd-engine/src/engine/maintenance.rs`, `core.rs`: when cold history is configured, the preferred kind alternates between calls; if it has no work the other is tried once.
+- `rrd-server/src/http/maintenance.rs`: one pending flag per kind; repeated offers coalesce; when both are pending the worker alternates after each started quantum.
+- `docs/reference/storage/tiered-persistence.md` describes the scheduling.
+
+**Oracles:** the engine test above, now passing, with a generation published while debt remains; `pending_kinds_alternate_and_duplicate_offers_stay_bounded` and `idle_maintenance_coalesces_offers_and_joins_inflight_work` for the worker; `publication_waits_for_a_foreground_transaction` still passes, so alternation did not break the transaction-gate wait.
+
+**Limits.** This is ordering, not a wall-clock guarantee: a long native quantum still delays the cold one behind it.
+
 ## Not established
 
 - Not run on Linux or macOS here.

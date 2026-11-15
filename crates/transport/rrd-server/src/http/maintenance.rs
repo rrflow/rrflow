@@ -1,5 +1,5 @@
 //! One joined worker driven by native and configured cold-history sweeps.
-//! Offers while busy are skipped; they never accumulate maintenance jobs.
+//! Offers coalesce to at most one pending quantum of each kind.
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 
@@ -11,9 +11,27 @@ pub(super) enum MaintenanceWork {
 
 #[derive(Default)]
 struct State {
-    pending: Option<MaintenanceWork>,
-    running: bool,
+    native_pending: bool,
+    cold_pending: bool,
+    last_started: Option<MaintenanceWork>,
     stopped: bool,
+}
+
+impl State {
+    fn take_next(&mut self) -> Option<MaintenanceWork> {
+        let work = match (self.native_pending, self.cold_pending, self.last_started) {
+            (false, false, _) => return None,
+            (true, true, Some(MaintenanceWork::Native)) => MaintenanceWork::ColdHistory,
+            (true, _, _) => MaintenanceWork::Native,
+            (false, true, _) => MaintenanceWork::ColdHistory,
+        };
+        match work {
+            MaintenanceWork::Native => self.native_pending = false,
+            MaintenanceWork::ColdHistory => self.cold_pending = false,
+        }
+        self.last_started = Some(work);
+        Some(work)
+    }
 }
 
 pub(super) struct MaintenanceWorker {
@@ -33,17 +51,15 @@ impl MaintenanceWorker {
                 let (state, wake) = &*worker;
                 loop {
                     let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                    while guard.pending.is_none() && !guard.stopped {
+                    while !guard.native_pending && !guard.cold_pending && !guard.stopped {
                         guard = wake.wait(guard).unwrap_or_else(|e| e.into_inner());
                     }
                     if guard.stopped {
                         break;
                     }
-                    let work = guard.pending.take().expect("pending maintenance work");
-                    guard.running = true;
+                    let work = guard.take_next().expect("pending maintenance work");
                     drop(guard);
                     step(work);
-                    state.lock().unwrap_or_else(|e| e.into_inner()).running = false;
                 }
             })?;
         Ok(Self {
@@ -60,10 +76,17 @@ impl MaintenanceWorker {
         }
         let (state, wake) = &*self.shared;
         let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
-        if state.stopped || state.running || state.pending.is_some() {
+        if state.stopped {
             return Ok(false);
         }
-        state.pending = Some(work);
+        let pending = match work {
+            MaintenanceWork::Native => &mut state.native_pending,
+            MaintenanceWork::ColdHistory => &mut state.cold_pending,
+        };
+        if *pending {
+            return Ok(false);
+        }
+        *pending = true;
         wake.notify_one();
         Ok(true)
     }
@@ -75,7 +98,8 @@ impl Drop for MaintenanceWorker {
         {
             let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
             state.stopped = true;
-            state.pending = None;
+            state.native_pending = false;
+            state.cold_pending = false;
             wake.notify_one();
         }
         // An admitted quantum uses installed cooperative I/O/maintenance
@@ -95,7 +119,7 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn idle_maintenance_skips_busy_offers_and_joins_inflight_work() {
+    fn idle_maintenance_coalesces_offers_and_joins_inflight_work() {
         let (started, began) = mpsc::sync_channel(1);
         let (release, released) = mpsc::sync_channel(0);
         let worker = MaintenanceWorker::start(move |work| {
@@ -108,6 +132,7 @@ mod tests {
             began.recv_timeout(Duration::from_secs(5)).unwrap(),
             MaintenanceWork::ColdHistory
         );
+        assert!(worker.offer(MaintenanceWork::Native).unwrap());
         for _ in 0..100 {
             assert!(!worker.offer(MaintenanceWork::Native).unwrap());
         }
@@ -120,6 +145,47 @@ mod tests {
         release.send(()).unwrap();
         stopped.recv_timeout(Duration::from_secs(5)).unwrap();
         shutdown.join().unwrap();
+        assert!(began.try_recv().is_err());
+    }
+
+    #[test]
+    fn pending_kinds_alternate_and_duplicate_offers_stay_bounded() {
+        let (started, began) = mpsc::sync_channel(1);
+        let (release, released) = mpsc::sync_channel(0);
+        let worker = MaintenanceWorker::start(move |work| {
+            started.send(work).unwrap();
+            released.recv_timeout(Duration::from_secs(5)).unwrap();
+        })
+        .unwrap();
+        assert!(worker.offer(MaintenanceWork::Native).unwrap());
+        assert_eq!(
+            began.recv_timeout(Duration::from_secs(5)).unwrap(),
+            MaintenanceWork::Native
+        );
+        assert!(worker.offer(MaintenanceWork::Native).unwrap());
+        assert!(worker.offer(MaintenanceWork::ColdHistory).unwrap());
+        for _ in 0..100 {
+            assert!(!worker.offer(MaintenanceWork::Native).unwrap());
+            assert!(!worker.offer(MaintenanceWork::ColdHistory).unwrap());
+        }
+        release.send(()).unwrap();
+        assert_eq!(
+            began.recv_timeout(Duration::from_secs(5)).unwrap(),
+            MaintenanceWork::ColdHistory
+        );
+        assert!(worker.offer(MaintenanceWork::ColdHistory).unwrap());
+        release.send(()).unwrap();
+        assert_eq!(
+            began.recv_timeout(Duration::from_secs(5)).unwrap(),
+            MaintenanceWork::Native
+        );
+        release.send(()).unwrap();
+        assert_eq!(
+            began.recv_timeout(Duration::from_secs(5)).unwrap(),
+            MaintenanceWork::ColdHistory
+        );
+        release.send(()).unwrap();
+        drop(worker);
         assert!(began.try_recv().is_err());
     }
 

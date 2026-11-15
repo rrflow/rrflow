@@ -99,6 +99,9 @@ pub struct RrdEngine {
     pub(crate) transaction_gate: super::transaction_admission::TransactionGate,
     /// Serializes background cold-history work without queuing callers.
     pub(super) cold_history_gate: Mutex<()>,
+    /// Alternates which kind of upkeep an embedded quantum prefers, so native
+    /// work that never runs out cannot starve cold history. Not durable state.
+    pub(super) cold_history_next: std::sync::atomic::AtomicBool,
     /// Tracks invocation reservations currently executing through a supported
     /// adapter. Session-backed methods use this to distinguish a correctly
     /// wrapped call from a direct embedded call and make the latter leave a
@@ -280,6 +283,7 @@ impl RrdEngine {
             token_key,
             transaction_gate: super::transaction_admission::TransactionGate::default(),
             cold_history_gate: Mutex::new(()),
+            cold_history_next: std::sync::atomic::AtomicBool::new(false),
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),
@@ -328,6 +332,7 @@ impl RrdEngine {
             token_key,
             transaction_gate: super::transaction_admission::TransactionGate::default(),
             cold_history_gate: Mutex::new(()),
+            cold_history_next: std::sync::atomic::AtomicBool::new(false),
             active_invocations: Mutex::new(BTreeMap::new()),
             vector_residency: Mutex::new(vector_residency),
             hnsw_accelerators: Mutex::new(rrd_vector::HnswAcceleratorRegistry::default()),

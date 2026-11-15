@@ -59,11 +59,15 @@ be guaranteed and the server emits a warning.
 The elapsed-time limit is cooperative between source entries and encoding
 steps; a single native read, compression operation or filesystem sync may
 run past it. Source reads can wait on native storage; nonblocking admission and
-starvation bounds are not yet established. The configured interval controls
-offers to the existing joined maintenance worker; offers made while it is busy
-are skipped. Native maintenance and cursor cleanup retain their one-second sweep.
-The period is a target, not a minimum spacing or latency guarantee; timer
-delays and worker contention can change when offers occur.
+wall-clock starvation bounds are not yet established. The configured interval
+controls offers to the existing joined maintenance worker. Each work kind has
+at most one pending offer; repeated offers coalesce, and when both kinds are
+pending the worker alternates after each started quantum. An embedded engine
+alternates the same way between calls to `maintain_storage`, so native upkeep
+that never runs out of work cannot keep cold history from advancing. Native
+maintenance and cursor cleanup retain their one-second sweep. The period is a
+target, not a minimum spacing or latency guarantee; an active operation can
+still block.
 
 These files are derived runtime history, not replacements for the WAL, source
 history, security/control audit, or the separate logical backup. The source is
