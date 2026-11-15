@@ -665,6 +665,96 @@ fn a_worker_adapter_the_engine_does_not_implement_is_refused_before_any_effect()
     );
 }
 
+/// A selection that names its prompt flight is admitted only when the retained
+/// flight is that task's and matches the identity the request states. Anything
+/// else is refused before the controller is called.
+#[test]
+fn a_selection_must_match_the_prompt_flight_it_names() {
+    use rrd_contract::{
+        EndpointSelectionFlightIdentity, LaunchPromptFlight, PromptFlightContextMode,
+        PromptFlightContextRequest, PromptFlightProvider,
+    };
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let (_root, engine, lease, selection) =
+        admitted_fixture(&format!("http://{}/v1", listener.local_addr().unwrap()));
+    let launch = |task_id: Option<CanonicalId>, key: &str| {
+        engine
+            .launch_prompt_flight(
+                &lease.session_id,
+                &lease.token,
+                &id(key),
+                &LaunchPromptFlight {
+                    scope: SCOPE.into(),
+                    prompt: "protocol-test prompt".into(),
+                    provider: PromptFlightProvider::Observe,
+                    context_mode: PromptFlightContextMode::Fresh,
+                    context: PromptFlightContextRequest {
+                        valid_at: 1_200,
+                        seeds: Vec::new(),
+                        max_graph_depth: 2,
+                        max_items: 8,
+                        max_output_bytes: 65_536,
+                        max_storage_keys: 4_096,
+                    },
+                    acceptance_marker: None,
+                    task_id,
+                },
+                1_300,
+                key,
+                key,
+            )
+            .unwrap()
+            .flight
+            .record
+    };
+    let bound = launch(Some(selection.task_id.clone()), "flight-bound");
+    let unbound = launch(None, "flight-unbound");
+    let identity = |record: &rrd_contract::PromptFlightRecord| EndpointSelectionFlightIdentity {
+        flight_id: record.flight_id.clone(),
+        prompt_cohort_sha256: record.cohort_sha256.clone(),
+        context_request_sha256: record
+            .context
+            .as_ref()
+            .map(|context| context.request_sha256.clone()),
+    };
+    let propose = |flight: EndpointSelectionFlightIdentity| {
+        let mut request = selection.clone();
+        request.flight = Some(flight);
+        engine.propose_task_endpoint_with_clock(
+            &lease.session_id,
+            &lease.token,
+            &request,
+            "flight-select",
+            "flight-select",
+            &FixedClock::at(1_400),
+        )
+    };
+    let mut wrong_cohort = identity(&bound);
+    wrong_cohort.prompt_cohort_sha256 = digest::sha256_hex(b"another cohort");
+    let mut wrong_context = identity(&bound);
+    wrong_context.context_request_sha256 = Some(digest::sha256_hex(b"another context request"));
+    for (name, flight) in [
+        ("cohort differs", wrong_cohort),
+        ("context request differs", wrong_context),
+        ("flight belongs to no task", identity(&unbound)),
+    ] {
+        assert!(
+            matches!(
+                propose(flight),
+                Err(ServiceError::TaskAttemptInvalidated(
+                    rrd_contract::TaskAttemptInvalidation::InputsChanged
+                ))
+            ),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        listener.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock,
+        "a refused flight must not reach the controller"
+    );
+}
+
 #[test]
 fn every_worker_permission_is_required_before_effect() {
     for action in [
