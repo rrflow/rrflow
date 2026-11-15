@@ -256,6 +256,21 @@ Six commits. Whole-tree check: 739 added lines, 291 nowhere on `main`, two decla
 
 Verdict: absorbed. It cost a contract version: version 2 attunement state is rejected.
 
+### `wip/f06-main-integration-20261107`: first items absorbed, the ref stays open
+
+Uncommitted F-06 cold-storage hardening on top of a head `main` already has. Its two recorded defects describe `main` today, so they are in the POA&M now. The code items are not ported yet.
+
+| Item | Status | Evidence |
+|---|---|---|
+| TypeScript SDK silently rounds 64-bit integers | **Was untracked; verified on `main`** | [POAM-082](../../../poam/rrflow-1.0-alpha/poam-082.md): `sdks/typescript/src/transport.ts:35` |
+| Rust SDK conformance test passes without running | **Was untracked; verified on `main`** | [POAM-083](../../../poam/rrflow-1.0-alpha/poam-083.md): `rrd-client/tests/sdk_conformance.rs:51-53` |
+| Fair scheduling between native maintenance and CLD publication | Open: to port | `main` drops offers made while a quantum runs (`rrd-server/src/http/maintenance.rs`) and tries native first (`engine/maintenance.rs:9-14`) |
+| A timeout keeps its identity through cold encode, decode and Parquet export | Open: to port | `main` decides after the fact from the clock (`engine/cold_history/files.rs:25`) |
+| Bounded, deadline-checked artifact read | Open: to port | `main` reads the artifact with one `read_to_end` (`engine/cold_history/maintain.rs:181`) |
+| Kill-at-each-boundary publication test, restricted-grant denial test, lock-free admission test, exact-once installed read-back, SDK cold-history conformance | Open: to port | Tests `main` does not have |
+
+Also recorded while verifying this ref, though not from it: the 2026-11-14 nightly failed on Windows creating its disposable account, [POAM-084](../../../poam/rrflow-1.0-alpha/poam-084.md).
+
 ## Kept in the archive deliberately
 
 | Ref | Why |

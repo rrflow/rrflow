@@ -95,3 +95,6 @@
 | POAM-079 | High | Open | [most engine tests run on built-in defaults, not the installed configuration](rrflow-1.0-alpha/poam-079.md) |
 | POAM-080 | High | Open | [vector scans pay fixed per-candidate work and the planner prices codecs like exact scans](rrflow-1.0-alpha/poam-080.md) |
 | POAM-081 | High | Open | [task and flight lists read every version before paging](rrflow-1.0-alpha/poam-081.md) |
+| POAM-082 | High | Open | [the TypeScript SDK silently rounds 64-bit integers](rrflow-1.0-alpha/poam-082.md) |
+| POAM-083 | High | Open | [the Rust SDK conformance test passes without running](rrflow-1.0-alpha/poam-083.md) |
+| POAM-084 | High | Open | [the Windows offline qualification sometimes cannot create its disposable account](rrflow-1.0-alpha/poam-084.md) |
