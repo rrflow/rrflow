@@ -87,3 +87,4 @@ fn inspect_at(
 mod apply_and_open;
 mod configuration_and_adoption;
 mod defaults_and_identity;
+mod project_map;

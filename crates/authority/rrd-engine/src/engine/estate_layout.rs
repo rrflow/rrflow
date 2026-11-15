@@ -418,6 +418,16 @@ pub(super) fn validate_recovery_estate(
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or(ServiceError::ProjectBindingMismatch)?;
+    // The project map is a replaceable projection that install and serve
+    // write below `.rrflow`; its owner names the two files.
+    let [project_map, project_map_pending] =
+        [PROJECT_MAP_RELATIVE_PATH, project_map::PROJECT_MAP_PENDING].map(|relative| {
+            Path::new(relative)
+                .file_name()
+                .and_then(|value| value.to_str())
+                .ok_or(ServiceError::ProjectBindingMismatch)
+        });
+    let (project_map, project_map_pending) = (project_map?, project_map_pending?);
     validate_directory_entries(
         project,
         ESTATE_DIRECTORY,
@@ -426,6 +436,8 @@ pub(super) fn validate_recovery_estate(
             "credentials",
             "config.toml",
             "bootstrap.md",
+            project_map,
+            project_map_pending,
             ADOPTED_ESTATE_DIRECTORY,
             locator_pending,
             bootstrap_pending,

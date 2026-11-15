@@ -228,6 +228,10 @@ max_elapsed_ms = 20000
         std::fs::read(project.join(".rrflow/bootstrap.md")).unwrap(),
         bootstrap.rendered_instructions().as_bytes()
     );
+    let project_map = project.join(".rrflow/project-map.md");
+    let map_at_install =
+        std::fs::read_to_string(&project_map).expect("install apply writes the project map");
+    assert!(map_at_install.starts_with("# Project map: "));
     for (relative, bytes) in &before {
         assert_eq!(
             std::fs::read(project.join(relative)).unwrap(),
@@ -319,8 +323,19 @@ max_elapsed_ms = 20000
         true
     );
 
+    assert_eq!(
+        std::fs::read_to_string(&project_map).unwrap(),
+        map_at_install,
+        "replaying install rewrote an unchanged project map"
+    );
+    // Serve regenerates a missing map, with the same content for the same project.
+    std::fs::remove_file(&project_map).unwrap();
     let (mut child, address) = RunningEngine::start(&project, &mut lifecycle_output);
     let address = address.as_str();
+    assert_eq!(
+        std::fs::read_to_string(&project_map).expect("serve writes the project map"),
+        map_at_install
+    );
 
     let ready = invoke(&[
         "--json",

@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 use std::io::Write as _;
 
 pub const PROJECT_MAP_RELATIVE_PATH: &str = ".rrflow/project-map.md";
-const PROJECT_MAP_PENDING: &str = ".rrflow/.project-map.pending";
+pub(super) const PROJECT_MAP_PENDING: &str = ".rrflow/.project-map.pending";
 const NOTES_START: &str = "<!-- rrflow:notes:start -->";
 const NOTES_END: &str = "<!-- rrflow:notes:end -->";
 const DEFAULT_NOTES: &str = "Write anything that helps: what this project is for, how you like to work,\nwhere to begin. RRFlow keeps this section exactly as you leave it.";
