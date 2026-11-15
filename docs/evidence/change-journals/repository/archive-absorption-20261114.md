@@ -286,17 +286,19 @@ A repaired blanket estate-to-engram substitution on a main eight days old, saved
 
 | Item | Status | Evidence |
 |---|---|---|
-| The rename itself, and the old-to-new map | **Carried as plan input; the rename is not done** | [Review](engram-rename-review-20261114.md) (a reviewer's reading, claims not re-run) and POAM-078, which now points at it. The rename is one package of about 345 files and is the largest work left |
+| The rename itself, and the old-to-new map | **Applied on `main` 2026-11-15 (`eb6c89a38`, repaired by `44143b72f`; gate green)** | [Review](engram-rename-review-20261114.md) (a reviewer's reading, claims not re-run) and POAM-078, which now points at it. [Journal](engram-rename-applied-20261115.md). Connectome's own rename stays open in its repository |
 | The attempt's own journal: OpenAPI digests, 289 changed leaves, the reopen failure on a persisted `estate_id`, operation descriptions | **Kept as a record** | [engram-connectome-repair-2026-11-07.md](../gate-h/engram-connectome-repair-2026-11-07.md), unchanged but for its header; its POAM-053 collides with an unrelated entry, so no POA&M file was taken |
 | Project map has no caller | **Restored** | [Journal](../gate-d/project-map-callers-restored-20261114.md) |
 | An unimplemented worker adapter must fail closed | **Reproduced on `main`; fixed** | `engine/endpoint_worker/execute.rs`; test failing first |
 | A selection must match the prompt flight it names | **Reproduced on `main`; fixed** | `engine/endpoint_proposal.rs`; test failing first |
 | Routing narrows the offered candidates | **Read on `main`, not run; fixed** | Proposal and worker. No engine test sends a routed request |
 | Observation exports carry the selector identity | **Missing on `main`; ported** | `rrd-observation/src/references.rs`, `observation_delivery/persistence.rs`; validation test |
-| Capture-fixture technique for renaming a field without rewriting recorded bytes | Open, belongs to the rename | Review, item 2.6 |
+| Capture-fixture technique for renaming a field without rewriting recorded bytes | **Done** | `observed_configuration` projection helpers; [journal](engram-rename-applied-20261115.md) |
 | Its `connectome` gitlink and Workbench paragraph | Superseded | `main` pins a newer Connectome |
 
 All five dropped behaviours are in [one journal](engram-rename-dropped-behaviours-20261114.md).
+
+**Resolved.** The ref was in the bundle (`d7ef0a13b`) and was deleted from `refs/archive` on 2026-11-15 after the rename landed.
 
 Verdict: everything that can be taken without doing the rename is on `main`. The ref stays open until the rename lands or the owner accepts the review as its replacement.
 
