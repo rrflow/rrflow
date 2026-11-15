@@ -336,7 +336,7 @@ The archive covered local refs only. The remote also holds 37 branches. 19 appea
 | `agent/c07-windows-characterization-evidence` | Content on `main`; only a merge commit differs | `c-07g-windows-characterization-terminal.md` exists on `main` |
 | `agent/poam-flush-stalls` | Content on `main`; merge commits only | `gate-e/e-04-flush-stall-record.md` exists on `main` |
 | `copilot/fix-installed-domain-crash` | **Superseded** | Retry on a busy `hdiutil create`; `main`'s `run_native_capacity.py` has its own, wider `is_busy_darwin_create` retry (five attempts, partial-image cleanup) |
-| `gh-readonly-queue/main/pr-285-…` | Merge-queue scratch ref for PRs #285 and #287 | `docs/guides/getting-started.md` (from #287) is on `main`; #285's content not re-proven |
+| `gh-readonly-queue/main/pr-285-…` | Merge-queue scratch ref for PRs #285 and #287 | `docs/guides/getting-started.md` (from #287) is on `main`; #285's kernel functions (`score_dense_neon`, `score_dense_avx2`, `neon_sums`, `avx2_sums`, `cosine_from_lanes`, the underflow test) are all on `main`, in `rrd-vector/src/hnsw/score.rs` after the split (checked 2026-11-15 by symbol, not ancestry) |
 
 Remaining remote refs checked 2026-11-15 (second pass):
 
