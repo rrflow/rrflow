@@ -69,6 +69,16 @@ A store with standing compaction debt therefore never advanced its cold copy. Un
 
 **Limits.** This is ordering, not a wall-clock guarantee: a long native quantum still delays the cold one behind it.
 
+## 4. Three tests `main` did not have (landed)
+
+Each passes on `main` as it is; they guard behaviour that had no test.
+
+- **`publication_survives_process_termination_at_each_boundary`.** The test runs itself as a child, parks it at one of four points of a publication (staging file written, staging file synced, artifact renamed, receipt committed), kills it, and reopens the store. It requires exactly one generation whose Parquet rows equal the source changes, and that a further maintenance call publishes nothing more. The four checkpoints are test-only hooks in `publish_file` and after the receipt commit. `main` had a restart test, but nothing that killed a process mid-publication.
+- **`cold_history_denies_row_or_field_restricted_changefeed_grants`.** A principal whose changefeed grant is restricted to some fields, and one restricted to some rows, are both refused cold-history status and generation reads; an unrestricted one is allowed. The refusal was already implemented. Once the planner reads the cold copy for ordinary scans, this test is what stops that refusal being dropped without row and field policies being applied instead.
+- **`immutable_file_admission_skips_held_database_locks`.** Admission of an immutable file returns "not now" while a reader or a writer holds the database lock, and succeeds once they are gone.
+
+The crash test's source oracle is one helper in the test file, which the existing restart test now uses too, so the file still has exactly one direct read of the change log.
+
 ## Not established
 
 - Not run on Linux or macOS here.

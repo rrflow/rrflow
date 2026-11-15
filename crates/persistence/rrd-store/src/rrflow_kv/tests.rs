@@ -944,3 +944,17 @@ fn snapshot_object_closure_denies_foreign_project_references() {
     let error = rrflow_kv_snapshot_object_references(&bundle, &first_scope).unwrap_err();
     assert!(error.to_string().contains("project scope"));
 }
+
+// Carried from the archived worktree f06-main-integration-20261107.
+#[test]
+fn immutable_file_admission_skips_held_database_locks() {
+    let directory = tempfile::tempdir().unwrap();
+    let store = RrflowKvStore::open(&directory.path().join("cold-admission")).unwrap();
+    let reader = store.database.read().unwrap();
+    assert!(!store.try_admit_immutable_file(1).unwrap());
+    drop(reader);
+    let writer = store.lock().unwrap();
+    assert!(!store.try_admit_immutable_file(1).unwrap());
+    drop(writer);
+    assert!(store.try_admit_immutable_file(1).unwrap());
+}

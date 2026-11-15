@@ -268,7 +268,10 @@ Uncommitted F-06 cold-storage hardening on top of a head `main` already has. Its
 | Fair scheduling between native maintenance and CLD publication | **Ported; the starvation was reproduced on `main`** | With compaction debt present the cold copy was never offered work (failing test `d9c80c921`). Fixed in `engine/maintenance.rs`, `engine/core.rs` and `rrd-server/src/http/maintenance.rs`; three tests |
 | A timeout keeps its identity through cold encode, decode and Parquet export | **Ported** | `rrd-query` (`Error::DeadlineExceeded`, `ColdHistoryReadError`, the Parquet sink's recorded failure), `engine/cold_history/{files,maintain}.rs`, `engine/query_export.rs`; eight tests. [Journal](../gate-f/f-06-cold-history-hardening-20261114.md) |
 | Bounded, deadline-checked artifact read | **Ported** | `read_cold_artifact` in `engine/cold_history/files.rs`; test `artifact_read_checks_deadline_and_exact_length` |
-| Kill-at-each-boundary publication test, restricted-grant denial test, lock-free admission test, exact-once installed read-back, SDK cold-history conformance | Open: to port | Tests `main` does not have |
+| Kill-at-each-boundary publication test | **Ported; passes on `main`** | `engine/cold_history/tests.rs`, `publication_survives_process_termination_at_each_boundary`, with test-only checkpoints in `files.rs` and `maintain.rs` |
+| Restricted-grant denial test | **Ported; passes on `main`** | `cold_history_denies_row_or_field_restricted_changefeed_grants`, same file |
+| Lock-free admission test | **Ported; passes on `main`** | `rrd-store/src/rrflow_kv/tests.rs`, `immutable_file_admission_skips_held_database_locks` |
+| Exact-once installed read-back; SDK cold-history conformance in all five SDKs | Open: to port | Tests `main` does not have |
 
 Also recorded while verifying this ref, though not from it: the 2026-11-14 nightly failed on Windows creating its disposable account, [POAM-084](../../../poam/rrflow-1.0-alpha/poam-084.md).
 

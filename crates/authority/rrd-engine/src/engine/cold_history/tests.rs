@@ -3,6 +3,48 @@ use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use rrd_contract::ColdHistoryCompression;
 use rrd_core::{RuntimeLogicalModel, RuntimeRecord, RuntimeSchemaRegistry, RuntimeTableSchema};
 
+/// A test child parks here when its environment names this checkpoint, so its
+/// parent can kill it at exactly this point of a publication.
+pub(super) fn publication_checkpoint(name: &str) {
+    if std::env::var("RRFLOW_COLD_CRASH_CHECKPOINT").as_deref() != Ok(name) {
+        return;
+    }
+    let marker = std::env::var_os("RRFLOW_COLD_CRASH_MARKER").expect("checkpoint marker");
+    std::fs::write(marker, name).expect("write checkpoint marker");
+    let deadline = Instant::now() + Duration::from_secs(90);
+    while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
+        std::thread::park_timeout(remaining);
+    }
+    panic!("publication checkpoint was not terminated by its parent");
+}
+
+/// Kills and reaps its child when dropped, so a failing parent leaves none behind.
+struct OwnedTestChild(std::process::Child);
+
+impl Drop for OwnedTestChild {
+    fn drop(&mut self) {
+        if !matches!(self.0.try_wait(), Ok(Some(_))) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+}
+
+/// The source changes a pending publication must contain: the oracle.
+fn expected_changes(
+    engine: &RrdEngine,
+    stamp: &ReadStamp,
+    after: u64,
+    limit: usize,
+) -> Vec<RuntimeChange> {
+    engine
+        .storage
+        .runtime()
+        .read_changes(stamp, after, limit)
+        .unwrap()
+        .changes
+}
+
 fn policy() -> ColdHistoryPolicy {
     ColdHistoryPolicy {
         interval_ms: 1_000,
@@ -100,16 +142,12 @@ fn prepared_history_replays_after_restart_and_new_writes_then_detects_corruption
     let prepared = state(&engine);
     let pending = prepared.pending.as_ref().unwrap();
     assert_eq!(prepared.through_cursor, 0);
-    let original = engine
-        .storage
-        .runtime()
-        .read_changes(
-            &pending.stamp,
-            pending.requested_after,
-            pending.scan_limit as usize,
-        )
-        .unwrap()
-        .changes;
+    let original = expected_changes(
+        &engine,
+        &pending.stamp,
+        pending.requested_after,
+        pending.scan_limit as usize,
+    );
     let directory = engine
         .storage
         .as_rrflow_kv()
@@ -693,4 +731,259 @@ fn embedded_maintenance_publishes_cold_history_while_native_debt_remains() {
     assert!(engine.maintain_storage().unwrap());
     assert_eq!(state(&engine).generation, 1);
     assert!(debt() > 0);
+}
+
+// Carried from the archived worktree f06-main-integration-20261107.
+#[test]
+fn cold_history_denies_row_or_field_restricted_changefeed_grants() {
+    use rrd_security::{
+        DataPolicy, PolicyPredicate, Principal, PrincipalKind, ResourceGrant, SecurityRepository,
+        SecurityState,
+    };
+    use std::collections::BTreeSet;
+
+    let root = tempfile::tempdir().unwrap();
+    let mut engine = open(&root.path().join("estate"));
+    seed(&engine);
+    let policy = policy();
+    engine.estate_configuration.storage.cold_history = Some(policy.clone());
+    assert!(engine.maintain_cold_history_at(&policy, 100).unwrap());
+    assert!(engine.maintain_cold_history_at(&policy, 101).unwrap());
+    assert_eq!(state(&engine).generation, 1);
+
+    let resource = ResourcePath {
+        segments: vec![ResourceId::new(ResourceKind::Instance, "cold").unwrap()],
+    };
+    let principal = |name: &str, credential: &[u8], data_policy: Option<DataPolicy>| {
+        let id = CanonicalId::new(name).unwrap();
+        Principal {
+            id,
+            kind: PrincipalKind::User,
+            credential_sha256: digest::sha256_hex(credential),
+            credential_revision: 1,
+            not_before_unix_ms: 1,
+            expires_at_unix_ms: u64::MAX,
+            disabled: false,
+            role_ids: BTreeSet::new(),
+            grants: vec![
+                ResourceGrant {
+                    action: SecurityAction::SessionCreate,
+                    resource_prefix: resource.clone(),
+                    data_policy: None,
+                },
+                ResourceGrant {
+                    action: SecurityAction::ChangefeedRead,
+                    resource_prefix: resource.clone(),
+                    data_policy,
+                },
+            ],
+        }
+    };
+    let restricted_fields = principal(
+        "restricted-fields",
+        b"restricted-fields-key",
+        Some(DataPolicy {
+            tenant: None,
+            rows: Vec::new(),
+            allowed_fields: Some(BTreeSet::from(["body".into()])),
+        }),
+    );
+    let restricted_rows = principal(
+        "restricted-rows",
+        b"restricted-rows-key",
+        Some(DataPolicy {
+            tenant: None,
+            rows: vec![PolicyPredicate {
+                field: "body".into(),
+                value: RuntimeValue::String("before".into()),
+            }],
+            allowed_fields: None,
+        }),
+    );
+    let unrestricted = principal("unrestricted", b"unrestricted-key", None);
+    SecurityRepository::new(&engine.storage, CanonicalId::new("cold").unwrap())
+        .initialize(
+            SecurityState {
+                format_version: rrd_security::SECURITY_FORMAT,
+                revision: 1,
+                principals: BTreeMap::from([
+                    (restricted_fields.id.clone(), restricted_fields),
+                    (restricted_rows.id.clone(), restricted_rows),
+                    (unrestricted.id.clone(), unrestricted),
+                ]),
+                roles: BTreeMap::new(),
+                identity_bindings: BTreeMap::new(),
+                jwt_issuers: BTreeMap::new(),
+            },
+            1,
+            "cold-security-test",
+            "cold-security-init",
+            "cold-security-init",
+        )
+        .unwrap();
+    let request = CreateSession {
+        limits: SessionLimits {
+            idle_timeout_ms: 5_000,
+            absolute_timeout_ms: 10_000,
+            max_open_transactions: 2,
+        },
+    };
+    for (name, key, denied) in [
+        (
+            "restricted-fields",
+            b"restricted-fields-key".as_slice(),
+            true,
+        ),
+        ("restricted-rows", b"restricted-rows-key".as_slice(), true),
+        ("unrestricted", b"unrestricted-key".as_slice(), false),
+    ] {
+        let session_request_id = format!("cold-{name}-session-request");
+        let lease = engine
+            .create_authenticated_session(
+                &CanonicalId::new(name).unwrap(),
+                key,
+                &request,
+                &CorrelationId::new(format!("cold-{name}-session")).unwrap(),
+                1_000,
+                &session_request_id,
+                &session_request_id,
+            )
+            .unwrap();
+        for generation in [None, Some(1)] {
+            let read_request_id = format!("cold-{name}-read-{}", generation.unwrap_or(0));
+            let result = engine.read_cold_history(
+                &lease.session_id,
+                &lease.token,
+                &ReadColdHistory {
+                    scope: "instance:cold".into(),
+                    generation,
+                    max_artifact_bytes: 1024 * 1024,
+                    budget: rrd_contract::QueryBudget::default(),
+                },
+                1_100,
+                &read_request_id,
+                &read_request_id,
+            );
+            if denied {
+                assert!(
+                    matches!(result, Err(ServiceError::PermissionDenied)),
+                    "{name} generation {generation:?}: {result:?}"
+                );
+            } else {
+                let result = result.unwrap();
+                assert_eq!(result.generation.is_some(), generation.is_some());
+                if generation.is_some() {
+                    assert_eq!(result.changes.len(), 2);
+                }
+            }
+        }
+    }
+}
+
+// Carried from the archived F-06 worktree: a publication killed at any of its
+// four durable boundaries reopens to exactly one generation whose rows equal
+// the source changes.
+#[test]
+fn publication_survives_process_termination_at_each_boundary() {
+    use std::process::{Command, Stdio};
+
+    const TEST_NAME: &str =
+        "engine::cold_history::tests::publication_survives_process_termination_at_each_boundary";
+    if let Some(path) = std::env::var_os("RRFLOW_COLD_CRASH_ESTATE") {
+        let engine = open(Path::new(&path));
+        engine.maintain_cold_history_at(&policy(), 101).unwrap();
+        panic!("publication completed without reaching the requested checkpoint");
+    }
+
+    for checkpoint in [
+        "stage_written",
+        "stage_synced",
+        "artifact_renamed",
+        "receipt_committed",
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("estate");
+        let marker = root.path().join("checkpoint");
+        let engine = open(&path);
+        seed(&engine);
+        assert!(engine.maintain_cold_history_at(&policy(), 100).unwrap());
+        let prepared = state(&engine);
+        let pending = prepared.pending.as_ref().unwrap();
+        let expected = expected_changes(
+            &engine,
+            &pending.stamp,
+            pending.requested_after,
+            pending.scan_limit as usize,
+        );
+        let expected_cursor = pending.through_cursor;
+        drop(engine);
+
+        let mut child = OwnedTestChild(
+            Command::new(std::env::current_exe().unwrap())
+                .arg("--exact")
+                .arg(TEST_NAME)
+                .arg("--nocapture")
+                .env("RRFLOW_COLD_CRASH_ESTATE", &path)
+                .env("RRFLOW_COLD_CRASH_CHECKPOINT", checkpoint)
+                .env("RRFLOW_COLD_CRASH_MARKER", &marker)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while std::fs::read(&marker).ok().as_deref() != Some(checkpoint.as_bytes()) {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                panic!("child exited before {checkpoint}: {status}");
+            }
+            if Instant::now() >= deadline {
+                panic!("child did not reach {checkpoint}");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        drop(child);
+
+        let engine = open(&path);
+        let reopened = state(&engine);
+        if checkpoint == "receipt_committed" {
+            assert_eq!(reopened.generation, 1);
+            assert!(reopened.pending.is_none());
+            assert_eq!(reopened.through_cursor, expected_cursor);
+        } else {
+            assert_eq!(reopened.generation, 0, "{checkpoint}");
+            assert_eq!(reopened.through_cursor, 0, "{checkpoint}");
+            assert!(reopened.pending.is_some(), "{checkpoint}");
+            assert!(engine.maintain_cold_history_at(&policy(), 102).unwrap());
+        }
+        let published = state(&engine);
+        assert_eq!(published.generation, 1, "{checkpoint}");
+        assert_eq!(published.through_cursor, expected_cursor, "{checkpoint}");
+        assert!(published.pending.is_none(), "{checkpoint}");
+        let key = "server/state/cold/cold-history/generation/00000000000000000001";
+        let receipt: ColdReceipt =
+            serde_json::from_slice(&engine.storage.control().get(key).unwrap().unwrap()).unwrap();
+        let artifact = engine
+            .storage
+            .as_rrflow_kv()
+            .unwrap()
+            .anchored_path()
+            .join("cold-history")
+            .join(format!("{}.parquet", receipt.pending.artifact_sha256));
+        let reader = ParquetRecordBatchReaderBuilder::try_new(artifact.open_read().unwrap())
+            .unwrap()
+            .build()
+            .unwrap();
+        let actual = reader
+            .flat_map(|batch| rrd_query::record_batch_to_rows(&batch.unwrap()).unwrap())
+            .map(|row| {
+                let RuntimeValue::String(json) = &row.values["change_json"] else {
+                    panic!("history value")
+                };
+                serde_json::from_str::<RuntimeChange>(json).unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "{checkpoint}");
+        assert!(!engine.maintain_cold_history_at(&policy(), 103).unwrap());
+        assert_eq!(state(&engine).generation, 1, "{checkpoint}");
+    }
 }

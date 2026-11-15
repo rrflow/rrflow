@@ -315,10 +315,16 @@ pub(super) fn publish_file(
         .open(&staging)
         .map_err(io_error)?;
     file.write_all(bytes).map_err(io_error)?;
+    #[cfg(test)]
+    tests::publication_checkpoint("stage_written");
     check_deadline(deadline)?;
     file.sync_all().map_err(io_error)?;
     drop(file);
+    #[cfg(test)]
+    tests::publication_checkpoint("stage_synced");
     check_deadline(deadline)?;
     staging.rename_new_to(final_path).map_err(io_error)?;
+    #[cfg(test)]
+    tests::publication_checkpoint("artifact_renamed");
     verify_file(final_path, digest, bytes.len(), deadline)
 }

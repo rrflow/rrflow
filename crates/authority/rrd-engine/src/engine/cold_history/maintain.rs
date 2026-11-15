@@ -458,6 +458,8 @@ impl RrdEngine {
                 ),
                 transition(&key, previous, &state, now, "cold_history.published")?,
             ])?;
+            #[cfg(test)]
+            tests::publication_checkpoint("receipt_committed");
             tracing::info!(target: "rrflow::parquet_compactor", generation, rows = receipt.pending.rows, bytes = receipt.pending.artifact_bytes, "cold history generation published");
             return Ok(true);
         }
