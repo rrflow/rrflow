@@ -330,14 +330,12 @@ impl RrdEngine {
         let allowance = selector
             .allowance(&configuration)
             .map_err(worker_contract)?;
-        // A routed selection was made over the candidates its router narrowed
-        // to; its retained allowance digest is that of the narrowed allowance.
+        // A routed selection was made over its narrowed candidates.
         let allowance = match &selection.routing {
-            Some(routing) => routing
-                .narrow_allowance(&allowance)
-                .map_err(worker_contract)?,
-            None => allowance,
-        };
+            Some(r) => r.narrow_allowance(&allowance),
+            None => Ok(allowance),
+        }
+        .map_err(worker_contract)?;
         if selection.allowance_sha256
             != allowance.sha256(&configuration).map_err(worker_contract)?
         {
@@ -361,14 +359,7 @@ impl RrdEngine {
             .iter()
             .find(|worker| &worker.binding_id == binding_id)
             .ok_or_else(|| ServiceError::Contract("selected worker is not configured".into()))?;
-        // The contract admits adapters this engine build cannot run. Refuse
-        // before any reservation, spend or provider call; nothing was started.
-        if !worker.adapter.is_native_chat_adapter() {
-            return Err(ServiceError::EndpointCallFailed {
-                reason: "selected worker adapter is not implemented by this engine build",
-                execution_may_continue: false,
-            });
-        }
+        require_native_adapter(&worker.adapter)?;
         let binding = profile
             .bindings
             .iter()

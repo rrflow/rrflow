@@ -90,3 +90,16 @@ pub(super) fn equivalent_worker_work_digest(
 pub(super) fn worker_contract(error: impl std::fmt::Display) -> ServiceError {
     ServiceError::Contract(error.to_string())
 }
+
+/// The contract admits adapters this engine build cannot run. Refuse one before
+/// any reservation, spend or provider call: nothing has started, so nothing may
+/// continue.
+pub(super) fn require_native_adapter(adapter: &rrd_contract::EndpointWorkerAdapter) -> Result<()> {
+    if adapter.is_native_chat_adapter() {
+        return Ok(());
+    }
+    Err(ServiceError::EndpointCallFailed {
+        reason: "selected worker adapter is not implemented by this engine build",
+        execution_may_continue: false,
+    })
+}
