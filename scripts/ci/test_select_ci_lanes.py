@@ -2,10 +2,12 @@
 """Regressions for the proportional candidate CI lane selection."""
 
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
-from select_ci_lanes import LANES, select, with_dependents, workspace_graph
+from select_ci_lanes import LANES, PINNED_BY, ROOT, select, with_dependents, workspace_graph
+from workspace_packages import member_directories
 
 METADATA = {
     "workspace_members": ["core", "lsm", "engine", "cli", "eval", "lab"],
@@ -81,7 +83,29 @@ class LaneSelectionTests(unittest.TestCase):
     def test_transport_crate_edit_runs_conformance_too(self):
         selected, packages = self.lanes("crates/transport/rrd-contract/src/lib.rs")
         self.assertEqual(selected, {"sdk", "engine"})
-        self.assertEqual(packages, "-p rrd-contract")
+        self.assertEqual(packages, "-p rrd-contract -p rrflow-qualification-storage")
+
+    def test_a_crate_that_pins_the_changed_crates_identity_is_tested_not_only_compiled(self):
+        # The storage qualification fixture records the public catalogue's
+        # digest. Compiling that crate cannot see the fixture go stale.
+        result = select(["crates/transport/rrd-contract/src/catalogue.rs"], metadata=METADATA, root=self.root)
+        self.assertIn("-p rrflow-qualification-storage", result["packages"])
+        self.assertNotIn("rrflow-qualification-storage", result["dependents"])
+        # A crate that pins nothing selects nothing extra.
+        self.assertEqual(self.lanes("crates/persistence/rrd-lsm/src/lib.rs")[1], "-p rrd-lsm")
+
+    def test_every_pinning_crate_is_a_workspace_member_that_depends_on_its_owner(self):
+        members = {name: directory for directory, name in member_directories(ROOT).items()}
+        self.assertTrue(PINNED_BY)
+        for owner, pinners in PINNED_BY.items():
+            self.assertIn(owner, members)
+            for pinner in pinners:
+                with self.subTest(owner=owner, pinner=pinner):
+                    self.assertIn(pinner, members)
+                    with (ROOT / members[pinner] / "Cargo.toml").open("rb") as source:
+                        manifest = tomllib.load(source)
+                    self.assertIn(owner, manifest.get("dependencies", {}),
+                                  f"{pinner} no longer depends on {owner}; remove it from PINNED_BY")
 
     def test_no_changed_path_selects_the_full_matrix(self):
         # The full matrix is release qualification: nightly and on demand only.

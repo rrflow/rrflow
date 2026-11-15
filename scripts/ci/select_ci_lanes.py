@@ -8,6 +8,10 @@ edit tests that crate and compiles everything that depends on it; a workspace
 manifest, lock file or toolchain change compiles the whole workspace. A path
 this module does not recognize runs every light lane.
 
+Compiling a dependent cannot see a golden file in it going stale. A crate
+whose tests pin another crate's public identity is therefore tested, not only
+compiled, whenever that crate changes: see `PINNED_BY`.
+
 No changed path selects the full matrix. The full matrix is release
 qualification (native installed lifecycle on three operating systems, crash
 injection, reopen and capacity): it runs nightly against main and on demand
@@ -67,6 +71,14 @@ DOCS_PATTERNS = (
     ".github/PULL_REQUEST_TEMPLATE.md",
     "LICENSE",
 )
+# Owner crate -> crates whose tests hold a golden derived from the owner's
+# public identity. A change to the owner tests them too. Without this, the
+# 2026-11-14 catalogue change passed its gate while the storage qualification
+# fixture's `public_catalogue_sha256` went stale; the next push that touched a
+# crate reading that fixture found main already broken.
+PINNED_BY: dict[str, tuple[str, ...]] = {
+    "rrd-contract": ("rrflow-qualification-storage",),
+}
 
 
 def matches(path: str, patterns: tuple[str, ...]) -> bool:
@@ -170,6 +182,7 @@ def select(paths: list[str], *, metadata: dict | None = None, root: Path = ROOT,
         # The full matrix already covers every light lane.
         lanes = {lane: lane == "full" for lane in LANES}
     elif lanes["engine"]:
+        packages |= {pinner for owner in sorted(packages) for pinner in PINNED_BY.get(owner, ())}
         selection = " ".join(f"-p {name}" for name in sorted(packages))
         if workspace:
             dependents = "--workspace"

@@ -150,6 +150,16 @@ matrix.
 A path the classifier does not recognize runs every light lane, compiles the
 whole workspace, and is named in the job log.
 
+Compiling a dependent cannot see a golden file in it going stale. A crate
+whose tests pin another crate's public identity is therefore tested, not only
+compiled, when that crate changes. `PINNED_BY` in
+`scripts/ci/select_ci_lanes.py` owns the list: today a change to
+`rrd-contract` also tests `rrflow-qualification-storage`, whose fixture
+records the public catalogue's digest. The cause and the fix are in the
+[journal](../evidence/change-journals/repository/ci-pinned-identity-20261114.md).
+Any other behaviour of a dependent that a change breaks is found by the
+nightly full matrix, not by the gate.
+
 **Qualification matrix (`full`).** The full matrix covers the native installed
 lifecycle on Linux, macOS, Windows and Linux ARM64, crash injection, the
 100-cycle reopen, native capacity, the partitioned engine suites, optional
