@@ -164,27 +164,14 @@ impl RrdEngine {
             .anchored_path()
             .join("cold-history")
             .join(format!("{}.parquet", receipt.pending.artifact_sha256));
-        let file = path.open_read().map_err(io_error)?;
+        let mut file = path.open_read().map_err(io_error)?;
         if file.metadata().map_err(io_error)?.len() != receipt.pending.artifact_bytes {
             return Err(ServiceError::Storage(
                 "cold history artifact length mismatch".into(),
             ));
         }
         let length = native(receipt.pending.artifact_bytes)?;
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(length.saturating_add(1))
-            .map_err(|_| {
-                ServiceError::ConfigurationLimit("cold history artifact allocation failed".into())
-            })?;
-        file.take(receipt.pending.artifact_bytes.saturating_add(1))
-            .read_to_end(&mut bytes)
-            .map_err(io_error)?;
-        if bytes.len() != length {
-            return Err(ServiceError::Storage(
-                "cold history artifact changed while reading".into(),
-            ));
-        }
+        let bytes = read_cold_artifact(&mut file, length, deadline)?;
         let expectation = ColdHistoryReadExpectation {
             stamp: receipt.pending.stamp.clone(),
             requested_after: receipt.pending.requested_after,
@@ -204,7 +191,7 @@ impl RrdEngine {
                 deadline,
             },
         )
-        .map_err(ServiceError::from)?;
+        .map_err(cold_read_error)?;
         if decoded.row_groups as u64 != receipt.pending.row_groups {
             return Err(ServiceError::Storage(
                 "cold history row-group count differs from its receipt".into(),
@@ -517,7 +504,7 @@ impl RrdEngine {
                 Err(rrd_query::Error::Budget(_)) if scan_limit > 1 => {
                     scan_limit = (scan_limit / 2).max(1)
                 }
-                Err(error) => return Err(cold_query_error(error, deadline)),
+                Err(error) => return Err(error.into()),
             }
         };
         let source_sha256 = source_digest(&stamp, &page);

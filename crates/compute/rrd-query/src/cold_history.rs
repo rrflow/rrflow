@@ -57,15 +57,68 @@ pub struct DecodedColdHistoryPage {
     pub observed_arrow_bytes: usize,
 }
 
+/// Failure identity from decoding an admitted cold-history artifact.
+#[derive(Debug)]
+pub enum ColdHistoryReadError {
+    DeadlineExceeded,
+    Query(Error),
+}
+
+impl std::fmt::Display for ColdHistoryReadError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DeadlineExceeded => formatter.write_str("cold history read deadline exceeded"),
+            Self::Query(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for ColdHistoryReadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::DeadlineExceeded => None,
+            Self::Query(error) => Some(error),
+        }
+    }
+}
+
+impl From<Error> for ColdHistoryReadError {
+    fn from(error: Error) -> Self {
+        Self::Query(error)
+    }
+}
+
+impl From<serde_json::Error> for ColdHistoryReadError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Query(error.into())
+    }
+}
+
 /// Verify a complete bounded artifact against an engine-owned expectation and
 /// return typed changes. This checks recorded rows, not scoped completeness.
 pub fn decode_cold_history_page(
     bytes: Vec<u8>,
     expected: &ColdHistoryReadExpectation,
     limits: ColdHistoryReadLimits,
-) -> Result<DecodedColdHistoryPage> {
-    if Instant::now() >= limits.deadline
-        || limits.max_rows == 0
+) -> std::result::Result<DecodedColdHistoryPage, ColdHistoryReadError> {
+    decode_cold_history_page_with_clock(bytes, expected, limits, Instant::now)
+}
+
+fn decode_cold_history_page_with_clock(
+    bytes: Vec<u8>,
+    expected: &ColdHistoryReadExpectation,
+    limits: ColdHistoryReadLimits,
+    mut now: impl FnMut() -> Instant,
+) -> std::result::Result<DecodedColdHistoryPage, ColdHistoryReadError> {
+    let mut check = || {
+        if now() >= limits.deadline {
+            Err(ColdHistoryReadError::DeadlineExceeded)
+        } else {
+            Ok(())
+        }
+    };
+    check()?;
+    if limits.max_rows == 0
         || limits.max_batch_rows == 0
         || limits.max_encoded_bytes == 0
         || limits.max_decoded_bytes == 0
@@ -75,18 +128,14 @@ pub fn decode_cold_history_page(
         || expected.requested_after > expected.through_cursor
         || expected.through_cursor > expected.stamp.commit_cursor
     {
-        return Err(Error::Budget(
-            "invalid or exceeded cold history read limits".into(),
-        ));
+        return Err(Error::Budget("invalid or exceeded cold history read limits".into()).into());
     }
     expected
         .stamp
         .validate()
         .map_err(|error| Error::Integrity(error.to_string()))?;
     if rrd_core::digest::sha256_hex(&bytes) != expected.artifact_sha256 {
-        return Err(Error::Integrity(
-            "cold history artifact digest mismatch".into(),
-        ));
+        return Err(Error::Integrity("cold history artifact digest mismatch".into()).into());
     }
     let encoded_bytes = bytes.len();
     let builder = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(bytes))
@@ -95,9 +144,7 @@ pub fn decode_cold_history_page(
     if metadata.file_metadata().num_rows() < 0
         || metadata.file_metadata().num_rows() as u64 != expected.rows
     {
-        return Err(Error::Integrity(
-            "cold history row count differs from receipt".into(),
-        ));
+        return Err(Error::Integrity("cold history row count differs from receipt".into()).into());
     }
     let entries = metadata
         .file_metadata()
@@ -123,9 +170,7 @@ pub fn decode_cold_history_page(
         || metadata_value("rrflow.cold.through_cursor")? != expected.through_cursor.to_string()
         || metadata_value("rrflow.cold.head_cursor")? != expected.stamp.commit_cursor.to_string()
     {
-        return Err(Error::Integrity(
-            "cold history metadata differs from receipt".into(),
-        ));
+        return Err(Error::Integrity("cold history metadata differs from receipt".into()).into());
     }
     let row_groups = metadata.row_groups().len();
     let mut uncompressed = 0u64;
@@ -139,9 +184,7 @@ pub fn decode_cold_history_page(
         }
     }
     if uncompressed > limits.max_decoded_bytes as u64 {
-        return Err(Error::Budget(
-            "cold history decoded-byte budget exceeded".into(),
-        ));
+        return Err(Error::Budget("cold history decoded-byte budget exceeded".into()).into());
     }
     // An admission estimate, not an allocator-level peak-RSS guarantee.
     let reserved = usize::try_from(uncompressed)
@@ -150,9 +193,9 @@ pub fn decode_cold_history_page(
         .and_then(|size| size.checked_add(encoded_bytes))
         .ok_or_else(|| Error::Budget("cold history read reservation overflow".into()))?;
     if reserved > limits.max_memory_bytes {
-        return Err(Error::Budget(
-            "cold history read reservation exceeds memory budget".into(),
-        ));
+        return Err(
+            Error::Budget("cold history read reservation exceeds memory budget".into()).into(),
+        );
     }
     let mut changes = Vec::new();
     changes
@@ -165,24 +208,23 @@ pub fn decode_cold_history_page(
         .build()
         .map_err(|error| Error::Integrity(format!("cold history reader failed: {error}")))?;
     for batch in reader {
-        if Instant::now() >= limits.deadline {
-            return Err(Error::Budget("cold history read deadline exceeded".into()));
-        }
+        check()?;
         let batch = batch
             .map_err(|error| Error::Integrity(format!("cold history batch failed: {error}")))?;
         observed_arrow_bytes = observed_arrow_bytes
             .checked_add(batch.get_array_memory_size())
             .ok_or_else(|| Error::Budget("cold history observed bytes overflow".into()))?;
         if observed_arrow_bytes > limits.max_decoded_bytes {
-            return Err(Error::Budget(
-                "cold history observed Arrow bytes exceed budget".into(),
-            ));
+            return Err(
+                Error::Budget("cold history observed Arrow bytes exceed budget".into()).into(),
+            );
         }
         for row in record_batch_to_rows(&batch)? {
+            check()?;
             let Some(RuntimeValue::String(json)) = row.values.get("change_json") else {
-                return Err(Error::Integrity(
-                    "cold history change payload is absent".into(),
-                ));
+                return Err(
+                    Error::Integrity("cold history change payload is absent".into()).into(),
+                );
             };
             let change: RuntimeChange = serde_json::from_str(json)?;
             if change.scope != expected.stamp.scope
@@ -193,17 +235,19 @@ pub fn decode_cold_history_page(
             {
                 return Err(Error::Integrity(
                     "cold history row does not match its typed change".into(),
-                ));
+                )
+                .into());
             }
             previous = change.cursor;
             changes.push(change);
         }
     }
     if changes.len() as u64 != expected.rows {
-        return Err(Error::Integrity(
-            "cold history decoded row count differs from receipt".into(),
-        ));
+        return Err(
+            Error::Integrity("cold history decoded row count differs from receipt".into()).into(),
+        );
     }
+    check()?;
     Ok(DecodedColdHistoryPage {
         changes,
         encoded_bytes,
@@ -254,7 +298,9 @@ pub fn encode_cold_history_page(
     let mut previous = page.requested_after;
     for change in &page.changes {
         if Instant::now() >= limits.deadline {
-            return Err(Error::Budget("cold history deadline exceeded".into()));
+            return Err(Error::DeadlineExceeded(
+                "cold history deadline exceeded".into(),
+            ));
         }
         if change.scope != stamp.scope
             || change.cursor <= previous
@@ -439,9 +485,13 @@ struct BoundedJson {
 
 impl Write for BoundedJson {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if Instant::now() >= self.deadline
-            || bytes.len() > self.limit.saturating_sub(self.bytes.len())
-        {
+        if Instant::now() >= self.deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "cold history JSON deadline exceeded",
+            ));
+        }
+        if bytes.len() > self.limit.saturating_sub(self.bytes.len()) {
             return Err(io::Error::other("cold history JSON budget exceeded"));
         }
         self.bytes
@@ -465,7 +515,98 @@ fn bounded_json<T: serde::Serialize>(
         limit: *remaining,
         deadline,
     };
-    serde_json::to_writer(&mut output, value).map_err(|error| Error::Budget(error.to_string()))?;
+    serde_json::to_writer(&mut output, value).map_err(|error| {
+        if error.io_error_kind() == Some(io::ErrorKind::TimedOut) {
+            Error::DeadlineExceeded(error.to_string())
+        } else {
+            Error::Budget(error.to_string())
+        }
+    })?;
     *remaining -= output.bytes.len();
     String::from_utf8(output.bytes).map_err(|error| Error::Integrity(error.to_string()))
+}
+
+#[cfg(test)]
+mod deadline_tests {
+    use super::*;
+    use rrd_core::{RuntimeReadValidation, ScopeId};
+    use std::time::Duration;
+
+    #[test]
+    fn cold_json_preserves_deadline_and_resource_identity() {
+        let mut limit = 1024;
+        assert!(matches!(
+            bounded_json(&"payload", &mut limit, Instant::now()),
+            Err(Error::DeadlineExceeded(_))
+        ));
+        let mut limit = 1;
+        assert!(matches!(
+            bounded_json(
+                &"payload",
+                &mut limit,
+                Instant::now() + Duration::from_secs(30)
+            ),
+            Err(Error::Budget(_))
+        ));
+    }
+
+    #[test]
+    fn empty_artifact_cannot_finish_after_deadline() {
+        let stamp =
+            ReadStamp::new(ScopeId::new("instance:cold").unwrap(), None, 0, 0, None).unwrap();
+        let page = RuntimeChangePage {
+            requested_after: 0,
+            through_cursor: 0,
+            head_cursor: 0,
+            validation: RuntimeReadValidation::new("test", 0, 0),
+            changes: Vec::new(),
+        };
+        let end = Instant::now() + Duration::from_secs(30);
+        let encoded = encode_cold_history_page(
+            &stamp,
+            &page,
+            ParquetExportLimits {
+                max_rows: 1,
+                max_columns: 32,
+                max_input_bytes: 1024 * 1024,
+                max_output_bytes: 1024 * 1024,
+                row_group_rows: 1,
+                max_memory_bytes: 64 * 1024 * 1024,
+                deadline: end,
+            },
+            ParquetEncoding::default(),
+        )
+        .unwrap()
+        .artifact
+        .bytes;
+        let expected = ColdHistoryReadExpectation {
+            stamp,
+            requested_after: 0,
+            through_cursor: 0,
+            rows: 0,
+            artifact_sha256: rrd_core::digest::sha256_hex(&encoded),
+        };
+        let limits = ColdHistoryReadLimits {
+            max_rows: 1,
+            max_encoded_bytes: 1024 * 1024,
+            max_decoded_bytes: 1024 * 1024,
+            max_memory_bytes: 64 * 1024 * 1024,
+            max_batch_rows: 1,
+            deadline: end,
+        };
+        let mut calls = 0;
+        let result = decode_cold_history_page_with_clock(encoded, &expected, limits, || {
+            calls += 1;
+            if calls == 1 {
+                end - Duration::from_secs(1)
+            } else {
+                end
+            }
+        });
+        assert!(matches!(
+            result,
+            Err(ColdHistoryReadError::DeadlineExceeded)
+        ));
+        assert!(calls >= 2);
+    }
 }

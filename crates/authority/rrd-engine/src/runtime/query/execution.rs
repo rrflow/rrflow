@@ -397,7 +397,9 @@ pub fn execute_traced_query<E: StorageEngine>(
         Err(error) => {
             let outcome = if matches!(
                 error,
-                rrd_query::Error::Budget(_) | rrd_query::Error::StorageAdmission(_)
+                rrd_query::Error::Budget(_)
+                    | rrd_query::Error::DeadlineExceeded(_)
+                    | rrd_query::Error::StorageAdmission(_)
             ) {
                 TraceOutcome::Denied
             } else {

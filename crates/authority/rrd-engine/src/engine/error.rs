@@ -255,6 +255,7 @@ impl From<rrd_query::Error> for ServiceError {
         match error {
             rrd_query::Error::StorageAdmission(message) => Self::StorageAdmission(message),
             rrd_query::Error::Budget(message) => Self::ConfigurationLimit(message),
+            rrd_query::Error::DeadlineExceeded(_) => Self::DeadlineExceeded,
             other => Self::Query(other.to_string()),
         }
     }

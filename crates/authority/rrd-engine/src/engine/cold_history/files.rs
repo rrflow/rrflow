@@ -22,12 +22,59 @@ pub(super) fn cold_source_error(error: rrd_store::Error) -> ServiceError {
     }
 }
 
-pub(super) fn cold_query_error(error: rrd_query::Error, deadline: Instant) -> ServiceError {
-    if matches!(error, rrd_query::Error::Budget(_)) && Instant::now() >= deadline {
-        ServiceError::DeadlineExceeded
-    } else {
-        error.into()
+/// A read's failure keeps the identity its cause had: a deadline stays a
+/// deadline and a budget stays a budget, whatever the clock says afterwards.
+pub(super) fn cold_read_error(error: ColdHistoryReadError) -> ServiceError {
+    match error {
+        ColdHistoryReadError::DeadlineExceeded => ServiceError::DeadlineExceeded,
+        ColdHistoryReadError::Query(error) => error.into(),
     }
+}
+
+/// Read an artifact of a known length in bounded requests, rechecking the
+/// cooperative deadline between calls. One filesystem read can still block
+/// beyond the deadline.
+pub(super) fn read_cold_artifact(
+    reader: &mut impl Read,
+    expected_bytes: usize,
+    deadline: Instant,
+) -> Result<Vec<u8>> {
+    let ceiling = expected_bytes.checked_add(1).ok_or_else(|| {
+        ServiceError::ConfigurationLimit("cold history artifact length overflow".into())
+    })?;
+    check_deadline(deadline)?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(ceiling).map_err(|_| {
+        ServiceError::ConfigurationLimit("cold history artifact allocation failed".into())
+    })?;
+    bytes.resize(ceiling, 0);
+    let mut used = 0;
+    while used < ceiling {
+        check_deadline(deadline)?;
+        let end = used.saturating_add(64 * 1024).min(ceiling);
+        let count = match reader.read(&mut bytes[used..end]) {
+            Ok(count) => count,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(io_error(error)),
+        };
+        check_deadline(deadline)?;
+        if count > end - used {
+            return Err(ServiceError::Storage(
+                "cold history reader returned an invalid length".into(),
+            ));
+        }
+        if count == 0 {
+            break;
+        }
+        used += count;
+    }
+    if used != expected_bytes {
+        return Err(ServiceError::Storage(
+            "cold history artifact changed while reading".into(),
+        ));
+    }
+    bytes.truncate(used);
+    Ok(bytes)
 }
 
 pub(super) fn valid_sha256(value: &str) -> bool {
@@ -69,7 +116,7 @@ pub(super) fn encode(
     deadline: Instant,
 ) -> Result<rrd_query::ColdHistoryPage> {
     encode_cold_history_page(stamp, page, limits(policy, deadline)?, encoding(policy))
-        .map_err(|error| cold_query_error(error, deadline))
+        .map_err(ServiceError::from)
 }
 
 pub(super) fn source_digest(stamp: &ReadStamp, page: &rrd_core::RuntimeChangePage) -> String {

@@ -4,6 +4,10 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{self, Write},
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -80,26 +84,52 @@ pub struct ParquetExport {
     pub observed_writer_bytes: usize,
 }
 
+// Parquet's buffered footer can stringify its sink error. Preserve the first
+// failure beside this writer so an elapsed clock cannot change its identity.
+const SINK_NO_FAILURE: u8 = 0;
+const SINK_DEADLINE: u8 = 1;
+const SINK_BYTE_LIMIT: u8 = 2;
+const SINK_ALLOCATION: u8 = 3;
+
 struct BoundedOutput {
     bytes: Vec<u8>,
     limit: usize,
     deadline: Instant,
+    failure: Arc<AtomicU8>,
 }
 
 impl Write for BoundedOutput {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         if Instant::now() >= self.deadline {
+            let _ = self.failure.compare_exchange(
+                SINK_NO_FAILURE,
+                SINK_DEADLINE,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            );
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
                 "Parquet deadline exceeded",
             ));
         }
         if bytes.len() > self.limit.saturating_sub(self.bytes.len()) {
+            let _ = self.failure.compare_exchange(
+                SINK_NO_FAILURE,
+                SINK_BYTE_LIMIT,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            );
             return Err(io::Error::other("Parquet byte budget exceeded"));
         }
-        self.bytes
-            .try_reserve_exact(bytes.len())
-            .map_err(io::Error::other)?;
+        self.bytes.try_reserve_exact(bytes.len()).map_err(|error| {
+            let _ = self.failure.compare_exchange(
+                SINK_NO_FAILURE,
+                SINK_ALLOCATION,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            );
+            io::Error::other(error)
+        })?;
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
     }
@@ -109,9 +139,33 @@ impl Write for BoundedOutput {
     }
 }
 
+fn json_budget_error(error: serde_json::Error) -> Error {
+    if error.io_error_kind() == Some(io::ErrorKind::TimedOut) {
+        Error::DeadlineExceeded(error.to_string())
+    } else {
+        Error::Budget(error.to_string())
+    }
+}
+
+fn parquet_write_error(error: parquet::errors::ParquetError, failure: &AtomicU8) -> Error {
+    if failure.load(Ordering::Relaxed) == SINK_DEADLINE {
+        Error::DeadlineExceeded(error.to_string())
+    } else {
+        Error::Budget(error.to_string())
+    }
+}
+
+fn parquet_setup_error(error: parquet::errors::ParquetError, failure: &AtomicU8) -> Error {
+    if failure.load(Ordering::Relaxed) == SINK_DEADLINE {
+        Error::DeadlineExceeded(error.to_string())
+    } else {
+        Error::Execution(error.to_string())
+    }
+}
+
 fn check_deadline(deadline: Instant) -> Result<()> {
     if Instant::now() >= deadline {
-        return Err(Error::Budget("Parquet deadline exceeded".into()));
+        return Err(Error::DeadlineExceeded("Parquet deadline exceeded".into()));
     }
     Ok(())
 }
@@ -174,9 +228,9 @@ pub fn export_parquet_encoded(
         bytes: Vec::new(),
         limit: limits.max_input_bytes,
         deadline: limits.deadline,
+        failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
     };
-    serde_json::to_writer(&mut input, &(rows, metadata))
-        .map_err(|error| Error::Budget(error.to_string()))?;
+    serde_json::to_writer(&mut input, &(rows, metadata)).map_err(json_budget_error)?;
     let input_bytes = input.bytes.len();
     drop(input);
     let columns = fields.len() + 1;
@@ -219,19 +273,21 @@ pub fn export_parquet_encoded(
                 .collect(),
         ))
         .build();
+    let failure = Arc::new(AtomicU8::new(SINK_NO_FAILURE));
     let sink = BoundedOutput {
         bytes: Vec::new(),
         limit: limits.max_output_bytes,
         deadline: limits.deadline,
+        failure: Arc::clone(&failure),
     };
     let mut writer = ArrowWriter::try_new(sink, batch.schema(), Some(properties))
-        .map_err(|error| Error::Execution(error.to_string()))?;
+        .map_err(|error| parquet_setup_error(error, &failure))?;
     let mut observed_writer_bytes = 0;
     for start in (0..rows.len()).step_by(limits.row_group_rows) {
         check_deadline(limits.deadline)?;
         writer
             .write(&batch.slice(start, limits.row_group_rows.min(rows.len() - start)))
-            .map_err(|error| Error::Budget(error.to_string()))?;
+            .map_err(|error| parquet_write_error(error, &failure))?;
         observed_writer_bytes = observed_writer_bytes.max(writer.memory_size());
         if arrow_bytes.saturating_add(writer.memory_size()) > limits.max_memory_bytes {
             return Err(Error::Budget(
@@ -240,12 +296,12 @@ pub fn export_parquet_encoded(
         }
         writer
             .flush()
-            .map_err(|error| Error::Budget(error.to_string()))?;
+            .map_err(|error| parquet_write_error(error, &failure))?;
     }
     let row_groups = writer.flushed_row_groups().len();
     let output = writer
         .into_inner()
-        .map_err(|error| Error::Budget(error.to_string()))?;
+        .map_err(|error| parquet_write_error(error, &failure))?;
     check_deadline(limits.deadline)?;
     Ok(ParquetExport {
         bytes: output.bytes,
@@ -255,4 +311,109 @@ pub fn export_parquet_encoded(
         reserved_working_bytes: reservation,
         observed_writer_bytes,
     })
+}
+
+#[cfg(test)]
+mod deadline_tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn buffered_parquet_footer_preserves_sink_timeout() {
+        let sink = BoundedOutput {
+            bytes: Vec::new(),
+            limit: 1024 * 1024,
+            deadline: Instant::now(),
+            failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
+        };
+        let schema = std::sync::Arc::new(datafusion::arrow::datatypes::Schema::new(vec![
+            datafusion::arrow::datatypes::Field::new(
+                "value",
+                datafusion::arrow::datatypes::DataType::Utf8,
+                true,
+            ),
+        ]));
+        let failure = Arc::clone(&sink.failure);
+        let writer = ArrowWriter::try_new(sink, schema, None).unwrap();
+        let error = match writer.into_inner() {
+            Ok(_) => panic!("expired sink returned a file"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            parquet_write_error(error, &failure),
+            Error::DeadlineExceeded(_)
+        ));
+    }
+
+    #[test]
+    fn buffered_parquet_footer_preserves_sink_byte_limit() {
+        let sink = BoundedOutput {
+            bytes: Vec::new(),
+            limit: 1,
+            deadline: Instant::now() + Duration::from_secs(30),
+            failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
+        };
+        let schema = Arc::new(datafusion::arrow::datatypes::Schema::new(vec![
+            datafusion::arrow::datatypes::Field::new(
+                "value",
+                datafusion::arrow::datatypes::DataType::Utf8,
+                true,
+            ),
+        ]));
+        let failure = Arc::clone(&sink.failure);
+        let writer = ArrowWriter::try_new(sink, schema, None).unwrap();
+        let error = match writer.into_inner() {
+            Ok(_) => panic!("limited sink returned a file"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            parquet_write_error(error, &failure),
+            Error::Budget(_)
+        ));
+    }
+
+    #[test]
+    fn writer_and_json_preserve_timeout_and_resource_identity() {
+        let mut expired = BoundedOutput {
+            bytes: Vec::new(),
+            limit: 128,
+            deadline: Instant::now(),
+            failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
+        };
+        let error = serde_json::to_writer(&mut expired, &"payload").unwrap_err();
+        assert!(matches!(
+            json_budget_error(error),
+            Error::DeadlineExceeded(_)
+        ));
+        let mut limited = BoundedOutput {
+            bytes: Vec::new(),
+            limit: 1,
+            deadline: Instant::now() + Duration::from_secs(30),
+            failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
+        };
+        let error = serde_json::to_writer(&mut limited, &"payload").unwrap_err();
+        assert!(matches!(json_budget_error(error), Error::Budget(_)));
+        let mut expired = BoundedOutput {
+            bytes: Vec::new(),
+            limit: 128,
+            deadline: Instant::now(),
+            failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
+        };
+        let error = expired.write_all(b"payload").unwrap_err();
+        assert!(matches!(
+            parquet_write_error(error.into(), &expired.failure),
+            Error::DeadlineExceeded(_)
+        ));
+        let mut limited = BoundedOutput {
+            bytes: Vec::new(),
+            limit: 1,
+            deadline: Instant::now() + Duration::from_secs(30),
+            failure: Arc::new(AtomicU8::new(SINK_NO_FAILURE)),
+        };
+        let error = limited.write_all(b"payload").unwrap_err();
+        assert!(matches!(
+            parquet_write_error(error.into(), &limited.failure),
+            Error::Budget(_)
+        ));
+    }
 }

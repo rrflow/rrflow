@@ -35,7 +35,7 @@ pub use bm25::{
 };
 pub use catalog::{Catalog, SchemaVersion, SourceWatermarks};
 pub use cold_history::{
-    decode_cold_history_page, encode_cold_history_page, ColdHistoryPage,
+    decode_cold_history_page, encode_cold_history_page, ColdHistoryPage, ColdHistoryReadError,
     ColdHistoryReadExpectation, ColdHistoryReadLimits, DecodedColdHistoryPage,
     COLD_HISTORY_FORMAT_VERSION,
 };

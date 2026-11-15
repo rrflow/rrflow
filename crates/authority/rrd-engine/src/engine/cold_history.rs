@@ -8,8 +8,9 @@ use rrd_contract::{
     ColdHistoryGenerationSnapshot, ColdHistoryPolicy, ColdHistoryReadResult, ReadColdHistory,
 };
 use rrd_query::{
-    decode_cold_history_page, encode_cold_history_page, ColdHistoryReadExpectation,
-    ColdHistoryReadLimits, ParquetCompression, ParquetEncoding, ParquetExportLimits,
+    decode_cold_history_page, encode_cold_history_page, ColdHistoryReadError,
+    ColdHistoryReadExpectation, ColdHistoryReadLimits, ParquetCompression, ParquetEncoding,
+    ParquetExportLimits,
 };
 use rrd_store::filesystem::{AnchoredPath, OpenOptions};
 use std::io::{Read, Write};

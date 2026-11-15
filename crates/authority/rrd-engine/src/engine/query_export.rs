@@ -87,19 +87,7 @@ impl RrdEngine {
                 deadline,
             },
         )
-        .map_err(|error| {
-            if Instant::now() >= deadline {
-                ServiceError::DeadlineExceeded
-            } else {
-                match error {
-                    rrd_query::Error::StorageAdmission(message) => {
-                        ServiceError::StorageAdmission(message)
-                    }
-                    rrd_query::Error::Budget(message) => ServiceError::ConfigurationLimit(message),
-                    other => ServiceError::Query(other.to_string()),
-                }
-            }
-        })?;
+        .map_err(ServiceError::from)?;
         let export = QueryExport {
             profile: PARQUET_EXPORT_PROFILE.into(),
             media_type: "application/vnd.apache.parquet".into(),

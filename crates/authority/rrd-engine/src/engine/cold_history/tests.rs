@@ -495,3 +495,142 @@ fn encoded_output_limit_is_reported_as_a_resource_failure() {
         ColdHistoryFailureCode::ResourceLimit
     );
 }
+
+// Carried from the archived F-06 worktree (2026-11-07): a failure keeps the
+// identity its cause had, and an artifact is read in bounded requests.
+
+#[test]
+fn encoder_errors_keep_their_cause_after_deadline() {
+    let deadline = Instant::now();
+    let budget = rrd_query::Error::Budget("admitted bytes exceeded".into());
+    assert!(Instant::now() >= deadline);
+    assert!(matches!(
+        ServiceError::from(budget),
+        ServiceError::ConfigurationLimit(_)
+    ));
+    assert!(matches!(
+        ServiceError::from(rrd_query::Error::DeadlineExceeded("expired".into())),
+        ServiceError::DeadlineExceeded
+    ));
+}
+
+#[test]
+fn decoder_deadline_and_resource_failures_are_distinct() {
+    let stamp = ReadStamp::new(ScopeId::new("instance:cold").unwrap(), None, 0, 0, None).unwrap();
+    let expected = ColdHistoryReadExpectation {
+        stamp,
+        requested_after: 0,
+        through_cursor: 0,
+        rows: 0,
+        artifact_sha256: "0".repeat(64),
+    };
+    let deadline = Instant::now();
+    let limits = ColdHistoryReadLimits {
+        max_rows: 1,
+        max_encoded_bytes: 1,
+        max_decoded_bytes: 1,
+        max_memory_bytes: 64,
+        max_batch_rows: 1,
+        deadline,
+    };
+    let timeout = decode_cold_history_page(vec![0], &expected, limits).unwrap_err();
+    assert!(matches!(
+        cold_read_error(timeout),
+        ServiceError::DeadlineExceeded
+    ));
+    let future = Instant::now() + Duration::from_millis(500);
+    let resource = decode_cold_history_page(
+        vec![0, 0],
+        &expected,
+        ColdHistoryReadLimits {
+            deadline: future,
+            ..limits
+        },
+    )
+    .unwrap_err();
+    while Instant::now() < future {
+        std::thread::sleep(future.saturating_duration_since(Instant::now()));
+    }
+    assert!(matches!(
+        cold_read_error(resource),
+        ServiceError::ConfigurationLimit(_)
+    ));
+}
+
+#[test]
+fn artifact_read_checks_deadline_and_exact_length() {
+    use std::io::{self, Cursor, Read};
+
+    let deadline = Instant::now() + Duration::from_secs(60);
+    assert_eq!(
+        read_cold_artifact(&mut Cursor::new(b"cold"), 4, deadline).unwrap(),
+        b"cold"
+    );
+    assert!(read_cold_artifact(&mut Cursor::new(b"cold"), 3, deadline).is_err());
+    assert!(read_cold_artifact(&mut Cursor::new(b"cold"), 5, deadline).is_err());
+
+    struct TrackingReader<'a> {
+        source: Cursor<&'a [u8]>,
+        largest_request: usize,
+        calls: usize,
+    }
+    impl Read for TrackingReader<'_> {
+        fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+            self.largest_request = self.largest_request.max(bytes.len());
+            self.calls += 1;
+            self.source.read(bytes)
+        }
+    }
+    let data: Vec<u8> = (0..(2 * 64 * 1024 + 17))
+        .map(|index| (index % 251) as u8)
+        .collect();
+    let mut tracked = TrackingReader {
+        source: Cursor::new(&data),
+        largest_request: 0,
+        calls: 0,
+    };
+    assert_eq!(
+        read_cold_artifact(&mut tracked, data.len(), deadline).unwrap(),
+        data
+    );
+    assert!(tracked.calls >= 3);
+    assert!(tracked.largest_request <= 64 * 1024);
+
+    struct InterruptedOnce {
+        state: u8,
+    }
+    impl Read for InterruptedOnce {
+        fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+            self.state += 1;
+            match self.state {
+                1 => Err(io::ErrorKind::Interrupted.into()),
+                2 => {
+                    bytes[0] = b'x';
+                    Ok(1)
+                }
+                _ => Ok(0),
+            }
+        }
+    }
+    assert_eq!(
+        read_cold_artifact(&mut InterruptedOnce { state: 0 }, 1, deadline).unwrap(),
+        b"x"
+    );
+
+    struct SlowReader {
+        calls: usize,
+    }
+    impl Read for SlowReader {
+        fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+            self.calls += 1;
+            std::thread::sleep(Duration::from_millis(750));
+            bytes[0] = b'x';
+            Ok(1)
+        }
+    }
+    let mut slow = SlowReader { calls: 0 };
+    let error =
+        read_cold_artifact(&mut slow, 4, Instant::now() + Duration::from_millis(500)).unwrap_err();
+    assert!(matches!(error, ServiceError::DeadlineExceeded));
+    assert_eq!(slow.calls, 1);
+}
