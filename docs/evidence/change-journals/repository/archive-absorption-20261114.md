@@ -76,6 +76,135 @@ Verdict: absorbed. One deficiency was recovered.
 
 Verdict: absorbed.
 
+### The three C-07 merge-trial worktrees (left `main` 2026-10-29)
+
+Each was an uncommitted trial merge of one branch onto another, made to see whether it still applied. Their files were later split into folders on `main`, so a same-path comparison proves nothing. Each was checked against the whole of `main` instead: every added line (generated SDK output excluded) searched at any path, and every declared identifier searched as a word. Lines found nowhere were then read one by one.
+
+| Ref | Added lines checked | Nowhere on `main` | Declared identifiers nowhere on `main` |
+|---|---|---|---|
+| `wip/h04-c07-merge-preflight` | 2,460 | 39 | 1 |
+| `wip/c07-pr206-preflight` | 2,079 | 72 | 0 |
+| `wip/c07-h04-stale-preflight` | 2,644 | 146 | 0 |
+
+`wip/h04-c07-merge-preflight` (C-07 native capacity and the storage cursor, merged onto the H-04 candidate):
+
+| Item | Status | Evidence |
+|---|---|---|
+| Storage cursor contract tests, three of them | On `main` | `crates/transport/rrd-contract/tests/public_contract/storage_cursor.rs:82,129,169` |
+| Range and record-kind cursor checks over a real server | On `main` | `rrflow-cli/tests/support/running_engine.rs:200`, `rrd-client/tests/real_server/negotiation.rs:869` |
+| Sampler trace test and its helpers | On `main` | `rrflow-cli/tests/support/sustained/campaign.rs:176,262,347`; CI selects it at `ci-reusable.yml:774` |
+| `ReaderSelection` and its identity test | On `main` | `support/sustained/reader.rs:47,60`; `rrflow-qualification-storage/src/sustained/tests.rs:6` |
+| Native worker fixtures and their selectors | On `main` | `support/sustained/native_worker.rs:273,567,599,680`; `scripts/ci/selected_tests.py:36-39` |
+| Failure capture for `hdiutil create` | On `main` | `scripts/ci/run_native_capacity.py:37,54,97` |
+| Test that a busy create is attempted once | Superseded | `main` retries a finished busy create five times and never retries an unfinished one: `scripts/ci/test_native_capacity.py:380,397,528` |
+| Manual preflight running three fresh and existing pairs | Superseded | `c07-native-preflight.yml` now runs selected cases through `scripts/ci/run_macos_capacity_preflight.py:18-25` |
+| The other unmatched lines | Superseded | An older contract digest, imports from `rrflow_eval::storage` (now `rrflow-qualification-storage`), and visibility keywords |
+
+`wip/c07-pr206-preflight` (the endpoint proposal controller, merged onto a C-07 branch):
+
+| Item | Status | Evidence |
+|---|---|---|
+| Controlled attempt reserve and finish | On `main` | `engine/reasoning_budget/reserve.rs:47`, `finish.rs:29,56` |
+| Capacity lease state and its corruption check | On `main`, extended | `engine/endpoint_proposal/capacity.rs:175` checks the format version and the bound across outstanding, worker and assessment leases (`:231`) |
+| An attempt cannot hold two outputs | On `main`, extended | `rrd-contract/src/reasoning_budget.rs:330-340` now covers result, proposal and worker output |
+| Proposal bound to the policy allowance and the task scope | On `main` | `rrd-contract/src/endpoint_proposal.rs:376,569` |
+| Endpoint failure keeps "may continue" truthful | On `main` | `engine/endpoint_proposal.rs:253,270,646` |
+| Unknown request fields refused | On `main` | `engine/tests/reasoning_budget/proposal.rs:274` |
+| Installed controller proof and fault relay scripts | On `main` | `scripts/inference/installed_controller_proof.py:836`, `installed_controller_fault_relay.py:78` |
+| The other unmatched lines | Superseded | Old catalogue counts (63 endpoints, 54 security actions), an old contract digest, old fixture digests, earlier wording of `lfg-swag.md` |
+
+`wip/c07-h04-stale-preflight` (the first form of the attunement replan, merged onto the landed C-07 parent):
+
+| Item | Status | Evidence |
+|---|---|---|
+| Replan receipt validation, source observation, generation counter | On `main` | `engine/attunement/replan.rs:6,98,113,127` |
+| Replan precondition | Superseded by a wider rule | The trial allowed a replan only after at most one checkpoint and an Inventory failure. `main` allows it after Connect, Inventory and Parse checkpoints and for any retryable `phase-unavailable` failure past Connect: `engine/attunement/replan.rs:155-193` |
+| Preview bound to the predecessor revision | On `main` | `rrd-contract/src/attunement/replan.rs:141` |
+| Installed, HTTP, contract and crash tests | On `main` | `rrflow-cli/tests/installed_lifecycle/replan.rs:59`, `rrd-server/tests/http_process/installed_flows.rs:6`, `rrd-contract/tests/attunement_contract/operations.rs:24`, `validation.rs:492`, `engine/tests/attunement/replan.rs:532` |
+| Python installed attunement test | On `main`, stricter | `sdks/python/tests/test_installed_attunement.py:34`; CI requires two passing tests where the trial required one: `ci-reusable.yml:593` |
+| Generated client operations module | Superseded | Renamed to `crate::operations`: `rrd-client/src/attunement.rs:3` |
+
+Verdict for all three: nothing to port. This check also met the miscased `InstalledengramRecord`, `MemoryengramPlan` and `DataengramOrganisation` on `main`; they are already tracked in POAM-078 and belong to the rename.
+
+### `branch/wip/project-map-pre-main` (left `main` 2026-10-30)
+
+One local commit, an early draft of `dd27aa96a` "Create and refresh a project map for installed projects", which is in `main`'s history. Whole-tree check: 478 added lines, 166 nowhere on `main`.
+
+| Item | Status | Evidence |
+|---|---|---|
+| `refresh_project_map`, the census and the owner's notes markers | On `main`, later form | `crates/authority/rrd-engine/src/engine/project_map.rs:36-81` reads `project_entries` and the shared language table instead of its own walk |
+| Ignore rules through the third-party `ignore` crate, and its test | Superseded | `main` reads Git's index and ignore files itself (`installation/inventory/git_inputs.rs`, `rrd-attunement/src/git.rs`) and has no `ignore` dependency; `inventory/tests.rs:368,423` cover ignored folders |
+| Install and serve call the map and print one line | **Was lost from `main`; restored** | Merge `4c2f2a6a1` (2026-11-09) dropped the caller that `dd27aa96a` added, leaving the function with none. Restored in `crates/adapters/rrflow-cli/src/installed.rs` |
+| Install recovery admits `project-map.md` and its pending file | **Was lost; restored** | `engine/estate_layout.rs`, `validate_recovery_estate` |
+| Test `the_project_map_describes_the_project_and_keeps_the_owners_notes` | **Was lost; restored** | `engine/tests/installation/project_map.rs`, with a second test for recovery, replay and reopening |
+| The contract's "Project map" section | **Was lost; restored** | `docs/reference/deployment/installed-lifecycle.md#project-map`, which the map's journal already linked to |
+
+Verdict: absorbed. Nothing was taken from the draft itself; the four lost pieces were restored from `main`'s own commit and are recorded in [their journal](../gate-d/project-map-callers-restored-20261114.md).
+
+### `wip/c07-write-conflict-diagnosis` (left `main` 2026-10-30)
+
+Its committed work is on `main`. The uncommitted part was a trial merge of the source-bound replan branch. Whole-tree check: 7,175 added lines, 362 nowhere on `main`, one declared identifier nowhere on `main`.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Source-bound replan, selected plans, the `rrd-attunement` crate and their tests | On `main` | `engine/attunement/{control,inventory,replan}.rs`, `engine/installation/profile.rs:138,174`, `rrd-contract/tests/attunement_contract/operations.rs:6,379`, `validation.rs:508`, `rrd-engine/tests/workspace_architecture/dependencies.rs:219`, `rrflow-cli/tests/installed_lifecycle/plans.rs:6` |
+| Whole-set revalidation of the inventory after reading | On `main` | `installation/inventory/scan.rs:148-149` |
+| A plan must end with a Verify step | Superseded on purpose | `335fb83a6` (2026-11-03) made Verify optional but last-only: `installation/profile.rs:144-148`, `rrd-contract/src/attunement/plan.rs:75` |
+| Unit test `source_change_and_stale_transaction_keep_distinct_recovery_actions` | **Was missing; ported** | `crates/transport/rrd-server/src/http/response.rs`. `main` tested only the stale-transaction side of the two errors mapped ahead of the generic table |
+| Journal `c-07-recovery-inventory-integration.md` | **Was missing; ported unchanged** | [gate-c](../gate-c/c-07-recovery-inventory-integration.md). Its numbers were recomputed on 2026-11-14 from the retained files under `target/c07-semantic-4k-fa945bc7/evidence` and `target/c07-cadence-4k/evidence`: 150 mixed writes, one overlapping pair (336 rejected, 337 acknowledged, 41,657,100 ns), both SHA-256 values, the two cadence groups and their finish order all match |
+| The other unmatched lines | Superseded | Earlier wording, old digests, and test timing constants |
+
+Verdict: absorbed.
+
+### `branch/codex/attunement-job-discovery` (left `main` 2026-10-31)
+
+One commit: a paged list of a project's attunement jobs. Whole-tree check: 336 added lines, 32 nowhere on `main`, no declared identifier missing.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Contract types, engine listing, HTTP handler, client operation | On `main` | `rrd-contract/src/attunement/discovery.rs`, `engine/attunement/discovery.rs:7-145` |
+| Successor lineage rule | On `main`, wider | `discovery.rs:119-130` also accepts a succeeded predecessor, which the branch refused |
+| Five engine tests | On `main` | `engine/tests/attunement/discovery.rs`; the unmatched lines are fixed time offsets that `main` replaced with the returned job's own times |
+
+Verdict: nothing to port.
+
+### `branch/agent/hdiutil-held-helper-20261111` and `branch/agent/macos-image-teardown-20261111` (left `main` 2026-11-11)
+
+Four commits and one commit. The teardown branch's single change (`bcac69311`) is the same work as the held-helper branch's `70e4170f7`, which its journal says it carried. Later that day `c2cc5baa7` on `main` replaced the per-case image create with one template per suite, so neither branch applied any more.
+
+| Item | Status | Evidence |
+|---|---|---|
+| Retry a busy create whose escaped helper still holds the output | **Was missing; ported by hand** | `main`'s one remaining create refused exactly the failure that was observed (`stderr_open: true`). Now in `scripts/ci/run_native_capacity.py` (`darwin_template`, `is_busy_darwin_create`, `held_output`) and `run_offline_lifecycle.py` (`wait_closed`), with three tests that fail against the old guard |
+| Capacity tests keep simulated retry lines out of real job logs | **Ported** | `scripts/ci/test_native_capacity.py`, `setUp` |
+| Wait for the device node after each detach, and its four tests | Superseded | On `main` no create follows a detach. The branch's own preflight measured every wait as 0 ms |
+| POAM-074's wrong file attribution, and the held-output cause | **Was missing; ported** | [POAM-074](../../../poam/rrflow-1.0-alpha/poam-074.md) |
+| The branch's journal: cause, run 43017327376, two preflight runs | **Carried** | Into [the port's journal](../gate-c/c-07-hdiutil-held-output-retry-20261114.md), with the branch named as the source. Not restored as a file, because its "changed paths" describe code `main` does not have |
+
+Verdict: both absorbed. The port is unit-tested only; nothing has run on macOS.
+
+### Five refs checked against the whole of `main`, nothing to port
+
+Each was checked the same way as the trial worktrees: every added line searched at any path, every declared identifier searched as a word, and the lines found nowhere read one by one.
+
+| Ref | Lines checked | Nowhere on `main` | Identifiers missing | What the unmatched lines are |
+|---|---|---|---|---|
+| `branch/agent/d04-source-spans-reconcile-wip-20261109` | 4,346 | 119 | 0 | A merge of `main` as it stood on 2026-11-09. The lines are older forms of code `main` later split: worker packets (`endpoint_worker/execute.rs`), batched versioned scans (`rrd-store/src/access/versioned_read/ranges.rs:72-84`), HNSW cost sampling and reachability repair (`rrd-vector/src/hnsw/{config.rs:15,graph.rs:168}`), page charge accounting (`rrd-lsm/src/segment/reader/cursors.rs:135`). The "no loaded binding" search refusal is on `main` as the `refuse` closure at `engine/vector/search/operations.rs:339-352` |
+| `branch/agent/vector-generation-read-path-wip-20261109` | 8,652 | 222 | 0 | Also a merge of `main`. Its two red regressions are live tests on `main` (`engine/tests/vector_index/hnsw_read_path.rs:820,884`) and passed in the engine library run on 2026-11-14 (479 passed, 0 failed). Its one new paragraph in `docs/reference/vector/search.md` described the defect those tests exposed; `main`'s line 100 describes the fix |
+| `branch/agent/d03-snapshot-visibility-wip-20261109` | 246 | 20 | 0 | The storage-contract preflight job. On `main` at `ci-reusable.yml:679-709,1131,1156,1186`, pointing at `rrflow-qualification-storage` where the branch said `rrflow-eval` |
+| `branch/agent/rrflow-cld-triggers-20261110` | 256 | 5 | 0 | A visibility keyword and three lines of its journal's header; the code is at `engine/diagnostic/storage.rs:109` |
+| `branch/agent/turboquant-scan-20261111` | 345 | 80 | 1 | `turbo_segment.rs` is the same change as `24214d224` on `main` (`turbo_segment/config.rs:48`). The calibration example was rewritten on `main` by `d43578850` with nine rounds and a median with range; the missing identifier `median_ns` is its old helper |
+
+### The lab and contract-split refs (left `main` 2026-11-12 and 2026-11-13)
+
+| Ref | Item | Status | Evidence |
+|---|---|---|---|
+| `branch/agent/lab-core-crate-20261112` | The shared lab vocabulary crate | On `main`, renamed | `crates/evaluation/rrflow-evaluation-core/src/lib.rs:17,25,43,54,86,122` |
+| | Nesting under `crates/evaluation/workbench/lab` | Superseded | The layout approved on 2026-11-12 is `rrflow-evaluation-core`, `lab/` and `qualification/`; `rrflow-eval` no longer exists |
+| `branch/agent/workbench-lab-data-20261112` | Moving the lab's 94 data files to `eval/workbench/lab` | Superseded; no data lost | Compared file by file with `main`: 67 are the same blob at `eval/lab/…` or `eval/schemas/…`, 23 more are identical once the path text is replaced, and 4 (`README.md`, `pod.sh`, `pod_run.sh`, `run_system.sh`) differ only in folder depth and in naming `rrflow-lab` where the branch said `rrflow-eval`. None is absent |
+| `branch/agent/contract-lib-split-20261113` | The split of `rrd-contract/src/lib.rs` into 22 modules | On `main` | `c1dfbb346`, same subject; `main` has since split further |
+| | Architecture rules read the whole crate | On `main` | `rrd-engine/tests/workspace_architecture/support.rs:631` (`module_source`) |
+| | Its journal: method, owner direction, characterization results | **Was missing; ported unchanged** | [contract-lib-split-20261113.md](contract-lib-split-20261113.md) |
+
 ## Kept in the archive deliberately
 
 | Ref | Why |
