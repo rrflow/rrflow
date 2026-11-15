@@ -95,6 +95,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(storage);
 
     let engine = RrdEngine::open_installed(&project, &distribution)?;
+    // The seeded history is authoritative. Prepare and publish one real cold
+    // generation before any language client is given the harness.
+    if !engine.maintain_cold_history()? || !engine.maintain_cold_history()? {
+        return Err("SDK cold-history fixture did not publish its seeded generation".into());
+    }
     let server = RrdHttpServer::bind(engine, "127.0.0.1:0".parse::<SocketAddr>()?)?;
     let server_address = server.local_addr();
     let (server_shutdown, receiver) = tokio::sync::oneshot::channel();

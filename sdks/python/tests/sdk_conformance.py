@@ -27,6 +27,7 @@ assert set(cast(list[str], corpus["required_domains"])) == {
     "auth",
     "backup",
     "cancellation",
+    "cold_history",
     "crud",
     "estate",
     "live_feeds",
@@ -113,6 +114,18 @@ with RrdClient(str(manifest["base_url"]), str(identity["instance"])) as client:
         ),
     )
     session = Session(session.principal_id, renewed)
+    cold_request = obj(obj(corpus["cold_history"])["read"])
+    cold = client.call("cold-history-read", cold_request, options("cold-history", session=session))
+    generation = obj(cold["generation"])
+    changes = cast(list[object], cold["changes"])
+    assert cold["scope"] == cold_request["scope"]
+    assert generation["generation"] == cold_request["generation"]
+    assert generation["through_cursor"] > generation["requested_after_cursor"]
+    assert changes and generation["rows"] == len(changes)
+    assert all(obj(change)["scope"] == cold["scope"] for change in changes)
+    assert any(
+        obj(change)["actor"] == obj(corpus["cold_history"])["expected_actor"] for change in changes
+    )
     client.call(
         "vector-collection-ensure",
         obj(vector["ensure"]),

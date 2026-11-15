@@ -68,6 +68,25 @@ func main() {
 	renewedBytes, err := json.Marshal(renewed)
 	check(err)
 	check(json.Unmarshal(renewedBytes, &session.Lease))
+	coldRequest := object(object(corpus["cold_history"])["read"])
+	cold, err := api.Call(context.Background(), rrd.OperationColdHistoryRead, coldRequest, read("cold-history", session, nil, time.Time{}))
+	check(err)
+	coldGeneration := object(cold["generation"])
+	coldChanges := array(cold["changes"])
+	require(text(cold["scope"]) == text(coldRequest["scope"]), "cold scope differs")
+	require(integer(coldGeneration["generation"]) == integer(coldRequest["generation"]), "cold generation differs")
+	require(integer(coldGeneration["through_cursor"]) > integer(coldGeneration["requested_after_cursor"]), "cold cursor did not advance")
+	require(len(coldChanges) > 0 && integer(coldGeneration["rows"]) == len(coldChanges), "cold changes differ")
+	for _, change := range coldChanges {
+		require(text(object(change)["scope"]) == text(cold["scope"]), "cold change scope differs")
+	}
+	seeded := false
+	for _, change := range coldChanges {
+		if text(object(change)["actor"]) == text(object(corpus["cold_history"])["expected_actor"]) {
+			seeded = true
+		}
+	}
+	require(seeded, "cold seeded history is absent")
 	_, err = api.Call(context.Background(), rrd.OperationVectorCollectionEnsure, object(vector["ensure"]), mutation("vector-ensure", session, nil, time.Time{}))
 	check(err)
 	previewLease, err := api.Call(context.Background(), rrd.OperationTransactionBegin, object(transaction["preview_begin"]), mutation("preview-begin", session, nil, time.Time{}))

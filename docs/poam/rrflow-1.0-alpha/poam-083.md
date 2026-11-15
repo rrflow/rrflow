@@ -40,4 +40,4 @@ Roadmap owner: [Gate H](../../roadmap/rrflow-1.0/gate-h.md).
 
 Closed when all of the following hold:
 - No SDK conformance test can report success without executing against a daemon. Rust: done. .NET and Java: open.
-- The conformance runner requires each language's own completion line, with the corpus digest, and fails a successful process that did not print it. Rust: done, with a test. The other four print nothing of their own today; the runner prints their line after the process exits.
+- The conformance runner requires each language's own completion line, with the corpus digest, and fails a successful process that did not print it. Rust: done, with a test. Python and Go also print their own line, but the runner does not require it; for every language but Rust the runner prints the line itself after the process exits.

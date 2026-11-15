@@ -19,6 +19,7 @@ public sealed class SdkConformanceTests
         "auth",
         "backup",
         "cancellation",
+        "cold_history",
         "crud",
         "estate",
         "live_feeds",
@@ -122,6 +123,25 @@ public sealed class SdkConformanceTests
             new SessionLease(
                 renewed.GetProperty("session_id").GetString()!,
                 renewed.GetProperty("token").GetString()!));
+
+        JsonElement coldRequest = corpus.GetProperty("cold_history").GetProperty("read");
+        JsonElement cold = await api.CallAsync(
+            OperationId.ColdHistoryRead, coldRequest, Options("cold-history", session),
+            TestContext.Current.CancellationToken);
+        JsonElement coldGeneration = cold.GetProperty("generation");
+        JsonElement coldChanges = cold.GetProperty("changes");
+        Assert.Equal(coldRequest.GetProperty("scope").GetString(), cold.GetProperty("scope").GetString());
+        Assert.Equal(coldRequest.GetProperty("generation").GetInt64(), coldGeneration.GetProperty("generation").GetInt64());
+        Assert.True(coldGeneration.GetProperty("through_cursor").GetInt64() > coldGeneration.GetProperty("requested_after_cursor").GetInt64());
+        Assert.True(coldChanges.GetArrayLength() > 0);
+        Assert.Equal(coldChanges.GetArrayLength(), coldGeneration.GetProperty("rows").GetInt32());
+        bool seededCold = false;
+        foreach (JsonElement change in coldChanges.EnumerateArray())
+        {
+            Assert.Equal(cold.GetProperty("scope").GetString(), change.GetProperty("scope").GetString());
+            seededCold |= change.GetProperty("actor").GetString() == corpus.GetProperty("cold_history").GetProperty("expected_actor").GetString();
+        }
+        Assert.True(seededCold);
 
         await api.CallAsync(
             OperationId.VectorCollectionEnsure,

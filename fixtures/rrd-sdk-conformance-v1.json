@@ -7,6 +7,7 @@
     "auth",
     "backup",
     "cancellation",
+    "cold_history",
     "crud",
     "estate",
     "live_feeds",
@@ -307,6 +308,14 @@
     "follow_wait_timeout_ms": 50,
     "cancellation_wait_timeout_ms": 5000,
     "cancel_after_ms": 25
+  },
+  "cold_history": {
+    "read": {
+      "scope": "instance:instance-419b4396b027c76446541781",
+      "generation": 1,
+      "max_artifact_bytes": 1048576
+    },
+    "expected_actor": "sdk-conformance-harness"
   },
   "backup": {
     "create": {

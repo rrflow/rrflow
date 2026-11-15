@@ -292,7 +292,7 @@ pub(super) fn supported_sdks_share_one_strict_semantic_corpus() {
     ))
     .unwrap();
     corpus.validate().unwrap();
-    assert_eq!(corpus.required_domains.len(), 13);
+    assert_eq!(corpus.required_domains.len(), 14);
     assert_eq!(
         usize::from(corpus.expected.endpoint_count),
         rrd_contract::endpoint_catalogue().endpoints.len()

@@ -158,6 +158,7 @@ def main() -> None:
         "auth",
         "backup",
         "cancellation",
+        "cold_history",
         "crud",
         "estate",
         "live_feeds",

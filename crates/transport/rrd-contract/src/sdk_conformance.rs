@@ -4,8 +4,8 @@ use crate::{
     CanonicalId, CloseSession, CommitTransaction, ContractError, CreateInstanceBackup,
     CreateSession, DeleteVectorPayloadIndex, EnsureVectorCollection, EnsureVectorIndex,
     EnsureVectorPayloadIndex, ErrorCode, ExecuteQuery, ListInstanceBackups, PreviewTransaction,
-    ReadChangefeed, ReadEstate, RenewSession, Result, SearchVectors, VectorQuantizationMethod,
-    VectorSearchMode, PROTOCOL, PROTOCOL_VERSION,
+    ReadChangefeed, ReadColdHistory, ReadEstate, RenewSession, Result, SearchVectors,
+    VectorQuantizationMethod, VectorSearchMode, PROTOCOL, PROTOCOL_VERSION,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,10 +13,11 @@ use std::collections::BTreeSet;
 
 pub const SDK_CONFORMANCE_FORMAT_VERSION: u16 = 1;
 
-const REQUIRED_DOMAINS: [&str; 13] = [
+const REQUIRED_DOMAINS: [&str; 14] = [
     "auth",
     "backup",
     "cancellation",
+    "cold_history",
     "crud",
     "estate",
     "live_feeds",
@@ -49,6 +50,7 @@ pub struct SdkConformanceCorpus {
     pub query: ExecuteQuery,
     pub vector: SdkConformanceVector,
     pub changefeed: SdkConformanceChangefeed,
+    pub cold_history: SdkConformanceColdHistory,
     pub backup: SdkConformanceBackup,
     pub estate: ReadEstate,
     pub expected: SdkConformanceExpected,
@@ -126,6 +128,17 @@ pub struct SdkConformanceChangefeed {
     pub cancel_after_ms: u64,
 }
 
+/// The cold-history read every SDK client makes. The harness installs with
+/// the product's default configuration, where cold history is on, and
+/// publishes one generation of its seeded history before any client runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SdkConformanceColdHistory {
+    pub read: ReadColdHistory,
+    /// The actor the harness seeds history as; a generation must hold it.
+    pub expected_actor: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SdkConformanceBackup {
@@ -200,8 +213,19 @@ impl SdkConformanceCorpus {
         self.vector.index.spare_payload_index.validate()?;
         self.vector.index.delete_payload_index.validate()?;
         self.changefeed.read.validate()?;
+        self.cold_history.read.validate()?;
+        if self.cold_history.read.generation != Some(1)
+            || self.cold_history.expected_actor.is_empty()
+            || self.cold_history.expected_actor.len() > 128
+            || self.cold_history.expected_actor.contains('\0')
+        {
+            return invalid("SDK cold-history generation or seeded actor is invalid");
+        }
         self.backup.create.validate()?;
         let scope = format!("instance:{}", self.identity.instance);
+        if self.cold_history.read.scope != scope {
+            return invalid("SDK cold-history scope differs from the corpus instance");
+        }
         if self.query.scope != scope
             || self.vector.ensure.scope != scope
             || self.vector.search.scope != scope

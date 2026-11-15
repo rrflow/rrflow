@@ -60,6 +60,10 @@ interface Corpus {
     cancellation_wait_timeout_ms: number;
     cancel_after_ms: number;
   };
+  cold_history: {
+    read: JsonObject & { scope: string; generation: number };
+    expected_actor: string;
+  };
   backup: { create: JsonObject & { label: string }; list: JsonObject };
   estate: JsonObject;
   expected: {
@@ -88,6 +92,7 @@ assert.deepEqual(
     "auth",
     "backup",
     "cancellation",
+    "cold_history",
     "crud",
     "estate",
     "live_feeds",
@@ -164,6 +169,20 @@ const renewed = await client.call(
   mutation("session-renew", session, { session: session.lease.session_id }),
 );
 session = { principalId: session.principalId, lease: renewed };
+
+const cold = await client.call(
+  "cold-history-read",
+  corpus.cold_history.read as RequestPayload<"cold-history-read">,
+  read("cold-history", session),
+);
+assert.equal(cold.scope, corpus.cold_history.read.scope);
+assert.ok(cold.generation);
+assert.equal(cold.generation.generation, corpus.cold_history.read.generation);
+assert.ok(cold.generation.through_cursor > cold.generation.requested_after_cursor);
+assert.ok(cold.changes.length > 0);
+assert.equal(cold.generation.rows, cold.changes.length);
+assert.ok(cold.changes.every((change) => change.scope === cold.scope));
+assert.ok(cold.changes.some((change) => change.actor === corpus.cold_history.expected_actor));
 
 await client.call(
   "vector-collection-ensure",

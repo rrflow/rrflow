@@ -252,9 +252,9 @@ pub use router::{
     ROUTER_CONTRACT_VERSION,
 };
 pub use sdk_conformance::{
-    SdkConformanceBackup, SdkConformanceChangefeed, SdkConformanceCorpus, SdkConformanceExpected,
-    SdkConformanceIdentity, SdkConformanceSession, SdkConformanceTransaction, SdkConformanceVector,
-    SDK_CONFORMANCE_FORMAT_VERSION,
+    SdkConformanceBackup, SdkConformanceChangefeed, SdkConformanceColdHistory,
+    SdkConformanceCorpus, SdkConformanceExpected, SdkConformanceIdentity, SdkConformanceSession,
+    SdkConformanceTransaction, SdkConformanceVector, SDK_CONFORMANCE_FORMAT_VERSION,
 };
 pub use task::{
     CloseTask, ListTasks, OpenTask, ReadTask, TaskPage, TaskReadResult, TaskRecord, TaskResult,

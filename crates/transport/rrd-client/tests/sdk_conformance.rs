@@ -138,6 +138,26 @@ async fn rust_sdk_passes_shared_real_daemon_conformance() {
         .await
         .unwrap();
 
+    let cold = client
+        .read_cold_history(
+            &session,
+            corpus.cold_history.read.clone(),
+            read("cold-history"),
+        )
+        .await
+        .unwrap();
+    let generation = cold.generation.as_ref().expect("cold generation");
+    assert_eq!(cold.scope, corpus.cold_history.read.scope);
+    assert_eq!(generation.generation, 1);
+    assert!(generation.through_cursor > generation.requested_after_cursor);
+    assert!(!cold.changes.is_empty());
+    assert_eq!(generation.rows, cold.changes.len() as u64);
+    assert!(cold.changes.iter().all(|change| change.scope == cold.scope));
+    assert!(cold
+        .changes
+        .iter()
+        .any(|change| change.actor == corpus.cold_history.expected_actor));
+
     client
         .ensure_vector_collection(
             &session,

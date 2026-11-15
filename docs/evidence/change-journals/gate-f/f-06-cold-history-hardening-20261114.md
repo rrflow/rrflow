@@ -85,6 +85,20 @@ The crash test's source oracle is one helper in the test file, which the existin
 
 **After.** `configured_cold_history_publishes_and_reads_after_process_restart` commits three known transactions through the client (a schema with a record, an update, a retirement), waits until the copy's `through_cursor` reaches the last acknowledged cursor, reads every generation, and requires each acknowledged cursor to appear exactly once with its exact mutation. It then terminates the process, restarts it and requires the same generations with the same changes. Passes on `main` (2026-11-14, Windows, real binary); the whole `installed_lifecycle` target passes with it.
 
+## 6. Every SDK reads cold history in conformance (landed)
+
+**Before.** No SDK conformance client read cold history, so a client that could not decode a generation would have qualified.
+
+**After.** The shared corpus has a fourteenth required domain, `cold_history`: one read of generation 1 and the actor the harness seeds history as. The harness publishes one real generation of its seeded history before it serves any client. Each of the six clients reads that generation and requires its scope, a cursor that advanced, a row count equal to the changes returned, every change in scope, and at least one change by the seeded actor.
+
+**Adapted from the archive.** The archived corpus also carried a cold policy and installed the harness with it, which changed the installation identity. On `main` the default installed configuration already enables cold history, so the corpus carries only the read and the actor, and the identity is unchanged.
+
+**Evidence, Windows, 2026-11-14.** Through the real runner flow (harness, manifest, corpus digest `edade663…`): Rust, Python and Go passed. `cargo test -p rrd-contract`: all 30 targets pass. TypeScript type-check and lint pass.
+
+**Unexplained.** One of the first `cargo test -p rrd-client --locked` runs after this change reported 22 passed and 1 failed. I did not capture which test. The suite then passed 15 times in a row, so it is intermittent; I did not establish whether this change or an existing flake caused it.
+
+**Not run here.** Java (no Maven) and .NET (pinned SDK not installed) were not built. The TypeScript client's run fails on this machine at its retry step on unmodified `main` as well, before the cold check, so its cold read did not execute here. The gate's SDK conformance job on Linux is the proof for those three.
+
 ## Not established
 
 - Not run on Linux or macOS here.

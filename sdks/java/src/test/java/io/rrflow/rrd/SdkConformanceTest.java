@@ -25,6 +25,7 @@ final class SdkConformanceTest {
             "auth",
             "backup",
             "cancellation",
+            "cold_history",
             "crud",
             "estate",
             "live_feeds",
@@ -104,6 +105,30 @@ final class SdkConformanceTest {
                 session.principalId(),
                 new Session.SessionLease(
                         renewed.path("session_id").asString(), renewed.path("token").asString()));
+
+        JsonNode coldRequest = corpus.path("cold_history").path("read");
+        JsonNode cold = api.call(
+                OperationId.COLD_HISTORY_READ,
+                coldRequest,
+                options("cold-history", session, false, Map.of(), null));
+        JsonNode coldGeneration = cold.path("generation");
+        assertEquals(coldRequest.path("scope").asString(), cold.path("scope").asString());
+        assertEquals(
+                coldRequest.path("generation").asLong(),
+                coldGeneration.path("generation").asLong());
+        assertTrue(coldGeneration.path("through_cursor").asLong()
+                > coldGeneration.path("requested_after_cursor").asLong());
+        assertTrue(cold.path("changes").size() > 0);
+        assertEquals(cold.path("changes").size(), coldGeneration.path("rows").asInt());
+        String expectedColdActor = corpus.path("cold_history").path("expected_actor").asString();
+        boolean seededCold = false;
+        for (JsonNode change : cold.path("changes")) {
+            assertEquals(cold.path("scope").asString(), change.path("scope").asString());
+            if (expectedColdActor.equals(change.path("actor").asString())) {
+                seededCold = true;
+            }
+        }
+        assertTrue(seededCold);
 
         api.call(
                 OperationId.VECTOR_COLLECTION_ENSURE,

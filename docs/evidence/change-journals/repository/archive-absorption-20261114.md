@@ -272,7 +272,7 @@ Uncommitted F-06 cold-storage hardening on top of a head `main` already has. Its
 | Restricted-grant denial test | **Ported; passes on `main`** | `cold_history_denies_row_or_field_restricted_changefeed_grants`, same file |
 | Lock-free admission test | **Ported; passes on `main`** | `rrd-store/src/rrflow_kv/tests.rs`, `immutable_file_admission_skips_held_database_locks` |
 | Installed read-back proves coverage, not just existence | **Ported; passes on `main`** | `rrflow-cli/tests/installed_lifecycle/engrams_and_history.rs`: three known transactions, the copy must reach their last cursor, and each acknowledged cursor appears exactly once with its exact mutation, before and after a restart |
-| SDK cold-history conformance in the Rust, Python, Go, Java, .NET and TypeScript clients | Open: to port | No SDK test on `main` reads cold history. It changes the shared corpus digest; the .NET client cannot be built on this machine |
+| SDK cold-history conformance in the Rust, Python, Go, Java, .NET and TypeScript clients | **Ported** | The shared corpus gains a `cold_history` domain (`rrd-contract/src/sdk_conformance.rs`, `fixtures/rrd-sdk-conformance-v1.json`); the harness publishes one generation before any client runs; each client reads generation 1 and requires the seeded actor. Unlike the archive, the corpus carries no policy: `main` installs with cold history on by default, so the installation identity is unchanged. Run against a real daemon here for Rust, Python and Go; Java, .NET and the TypeScript run are proven only by the gate |
 
 Also recorded while verifying this ref, though not from it: the 2026-11-14 nightly failed on Windows creating its disposable account, [POAM-084](../../../poam/rrflow-1.0-alpha/poam-084.md).
 
