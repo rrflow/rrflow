@@ -634,3 +634,63 @@ fn artifact_read_checks_deadline_and_exact_length() {
     assert!(matches!(error, ServiceError::DeadlineExceeded));
     assert_eq!(slow.calls, 1);
 }
+
+// Carried from the archived F-06 worktree: native upkeep that always has
+// work must not keep the cold copy from advancing.
+#[test]
+fn embedded_maintenance_publishes_cold_history_while_native_debt_remains() {
+    use rrd_store::Durability;
+
+    let root = tempfile::tempdir().unwrap();
+    let mut engine = open(&root.path().join("estate"));
+    seed(&engine);
+    engine.estate_configuration.storage.cold_history = Some(policy());
+    let store = engine.storage.as_rrflow_kv().unwrap();
+    let mut ordinal = 0_u64;
+    let debt = || {
+        store
+            .physical_store_evidence()
+            .unwrap()
+            .compaction_debt_segments
+            .unwrap()
+    };
+    let mut replenish_debt = || {
+        for _ in 0..32 {
+            if debt() > 0 {
+                return;
+            }
+            ordinal += 1;
+            let mut tx = store.begin_transaction().unwrap();
+            tx.put(
+                format!("cold-fairness-{ordinal}").into_bytes(),
+                b"ack".to_vec(),
+            )
+            .unwrap();
+            tx.commit(Durability::Authoritative).unwrap();
+            store.flush(ordinal).unwrap();
+        }
+        panic!("could not create native compaction debt");
+    };
+    replenish_debt();
+    assert!(engine.maintain_storage().unwrap());
+    replenish_debt();
+    assert!(engine.maintain_storage().unwrap());
+    let prepared = engine
+        .storage
+        .control()
+        .get("server/state/cold/cold-history/head")
+        .unwrap();
+    assert!(
+        prepared.is_some(),
+        "cold work must be offered while native debt remains"
+    );
+    assert!(state(&engine).pending.is_some());
+    assert!(debt() > 0);
+    assert!(engine.maintain_storage().unwrap());
+    assert_eq!(state(&engine).generation, 0);
+    assert!(state(&engine).pending.is_some());
+    replenish_debt();
+    assert!(engine.maintain_storage().unwrap());
+    assert_eq!(state(&engine).generation, 1);
+    assert!(debt() > 0);
+}
