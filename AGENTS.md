@@ -152,9 +152,9 @@ the size and count limits for one pull request by applying the
 outside the project opens; project work does not use pull requests. Two
 agents that could touch the same files have the wrong task split, and a
 shared interface lands first. A session ends only
-when `python3 scripts/ci/check_session_end.py` passes: the worktree is clean,
-or its work is committed and pushed to a `*-wip-*` branch named in the
-pull request. Agents never merge; the merge queue and the owner do. The
+when `python3 scripts/ci/check_session_end.py` passes: `main` is the only
+branch and worktree, the worktree is clean, nothing is stashed or held in an
+archive ref, `main` is pushed, and the remote holds no other branch. Agents never merge; the merge queue and the owner do. The
 evidence behind these numbers is in
 [CI and runner operations](docs/operations/ci.md#pull-request-limits).
 

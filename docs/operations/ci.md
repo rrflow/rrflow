@@ -239,10 +239,13 @@ Sources: [DORA, trunk-based development](https://dora.dev/capabilities/trunk-bas
 [Wessel et al., AI policies in popular open source projects](https://arxiv.org/html/2609.07542);
 [AgenticFlict, merge conflicts in AI-generated contributions](https://arxiv.org/pdf/2601.20109).
 
-`scripts/ci/check_session_end.py` is the agent-side guard: it fails while the
-worktree holds uncommitted or unpushed work, so a session cannot end with
-hundreds of staged files that no pull request carries, as five did on
-2026-11-09.
+`scripts/ci/check_session_end.py` is the agent-side guard for the one-branch
+rule: it fails while any local branch, extra worktree, stash, archive ref or
+remote branch besides `main` exists, or while the worktree holds uncommitted or
+unpushed work. A session cannot end with work that only a side ref carries, as
+five worktrees did on 2026-11-09 and 35 worktrees, 172 branches, 8 stashes and
+81 archived refs did by 2026-11-14. `test_session_end.py` runs in the scripts
+lane and checks each rule against a throwaway repository.
 
 Rust cache steps still restore compatible entries on every candidate, but do
 not save new entries from `merge_group` runs. Queue-ref entries are scoped to

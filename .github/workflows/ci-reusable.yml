@@ -371,6 +371,7 @@ jobs:
       - name: Enforce the code-shape ratchet
         run: |
           python3 scripts/ci/test_code_shape.py
+          python3 scripts/ci/test_session_end.py
           python3 scripts/ci/check_code_shape.py
       - name: Check that every test name CI selects still exists
         run: |
@@ -1109,6 +1110,7 @@ jobs:
         # same check inside verify.
         run: |
           python3 scripts/ci/test_code_shape.py
+          python3 scripts/ci/test_session_end.py
           python3 scripts/ci/check_code_shape.py
       - name: Check that every test name CI selects still exists
         # Moving a test into a child module renames it; a selector that names

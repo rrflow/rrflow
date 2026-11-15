@@ -348,12 +348,21 @@ Remaining remote refs checked 2026-11-15 (second pass):
 
 The `origin` remote is the official repository and was only read.
 
-Remote tips are covered before any `development` branch is deleted: 61 are ancestors of `main`, 19 are in the archive bundle, and the 3 left (`c07-windows-characterization-evidence`, `poam-flush-stalls`, `copilot/fix-installed-domain-crash`) are in `D:\localdev\devlabsrflow-remote-tips-20261115.bundle`, verified complete.
+Remote tips are covered before any `development` branch is deleted: 61 are ancestors of `main`, 19 are in the archive bundle, and the 3 left (`c07-windows-characterization-evidence`, `poam-flush-stalls`, `copilot/fix-installed-domain-crash`) are in `D:\localdev\devlabs
+rflow-remote-tips-20261115.bundle`, verified complete.
 
 ## `wip/rrflow-workbench-capture` (absorbed 2026-11-15)
 
 Not source. Its commit `eb27cfa18` adds five files to `6448a4f` under `.rrflow`: `instance.toml` (id `rrflow-workbench-capture`), a manifest, `CURRENT`, an empty `MANIFEST.LOCK` and one 3.4 MB preallocated WAL. Reading the WAL shows a single record: the manual assertion `crate:connectome-ui` / `binary` / "connectome" built from the original Workbench crate by `operator:capture-seed`, plus its invocation record. The data is that one fact in a pre-release store format that today's engine does not read and that pre-release policy does not migrate. The ref stays in the bundle at `eb27cfa18`.
 
+## Line-level re-audit and the eight stashes (2026-11-15)
+
+Ancestry and blob equality do not show absorption, so every added line of every ref was checked against every normalized line of `main` (322,881 distinct lines; `estate` read as `engram`). Result for the 50 bundle refs: 4 add no lines, 46 are between 12.9 and 100 percent present. For every ref under 97%, the five files holding the most missing lines were read and compared with this ledger's verdict; the lines beyond those five files were not read. What was read was rewordings, code moved by the later splits, generated digests, or items this ledger already records as superseded with a reason (for example `wait_for_device_release`, absent by design because no create follows a detach on `main`). Two data losses are declared, not hidden: a 53 MB `connectome-ready.json` and four 176 MB runner executables from the 2026-11-08 workbench results exist only in the archive bundle, because GitHub refuses files that size.
+
+The repository also held **eight stashes** (`stash@{0}` to `{7}`: d04 source-spans, c07 manifest sharing, c07 backup scheduling, three Connectome runtime-visualizer plan corrections). They were in no earlier audit. Line audit: 85.3, 86.9, 87.0, 93.9, 94.1, 94.2, 96.3 and 98.6 percent present. Missing lines sit in the d04 parser draft (`rrd-attunement/src/parse.rs`, the tree-sitter parser), the D-01 installation-clock journal wording, the file-plan JSONL and an older `default-engram-configuration-v2` asset path. Item-by-item review is **not done**. All eight are saved in `D:\localdev\devlabs
+rflow-stashes-20261115.bundle` (verified complete). They stay in the stash list, and `check_session_end.py` fails because of them, until each is judged.
+
 ## Still open
 
-Nothing. All 81 archived refs are absorbed, superseded or dropped, each with evidence above.
+The eight stashes above. `check_session_end.py` also reports the 83 remote branches on `development` that the owner has not yet allowed me to delete.
+
