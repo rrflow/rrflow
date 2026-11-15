@@ -282,6 +282,9 @@ impl EngramLayout {
                     absent_sha256.to_owned()
                 },
                 removal_rule,
+                existing_directory_identity_sha256: None,
+                existing_directory_security_sha256: None,
+                publication_proof: None,
             },
         )
         .collect()

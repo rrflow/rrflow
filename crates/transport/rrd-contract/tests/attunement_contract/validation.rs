@@ -625,3 +625,102 @@ pub(super) fn public_attunement_control_commands_require_the_plan_contract_versi
         assert_eq!(outcomes, [version == ATTUNEMENT_CONTRACT_VERSION; 6]);
     }
 }
+
+fn retained_plan() -> InstallationPlan {
+    use rrd_contract::{
+        InstallationManagedPathKind as Kind, InstallationPublicationProof,
+        InstallationRemovalRule as Rule,
+    };
+    let mut plan = installation_plan(&attunement_plan());
+    let id = plan.storage_root_id.clone();
+    for path in &mut plan.managed_paths[..2] {
+        path.removal_rule = Rule::RetainExistingDirectory;
+        path.existing_directory_identity_sha256 = Some(digest(61));
+        path.existing_directory_security_sha256 = Some(digest(62));
+    }
+    for (kind, name) in [
+        (Kind::LocatorPending, "config"),
+        (Kind::BootstrapPending, "bootstrap"),
+    ] {
+        let path = plan
+            .managed_paths
+            .iter_mut()
+            .find(|path| path.kind == kind)
+            .unwrap();
+        path.relative_path = format!(".rrflow/credentials/.{name}.{id}.pending");
+        path.publication_proof = Some(InstallationPublicationProof {
+            relative_path: format!(".rrflow/credentials/.{name}.{id}.proof"),
+            precondition_sha256: digest(43),
+            removal_rule: Rule::RemoveIfOwnedDigestMatches,
+        });
+    }
+    plan.bootstrap
+        .private_directories
+        .retain(|path| path != ".rrflow" && path != ".rrflow/rrd");
+    for name in ["config", "bootstrap"] {
+        for suffix in ["pending", "proof"] {
+            plan.bootstrap
+                .private_files
+                .push(format!(".rrflow/credentials/.{name}.{id}.{suffix}"));
+        }
+    }
+    plan.bootstrap.private_files.sort();
+    plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();
+    plan
+}
+
+#[test]
+pub(super) fn retained_existing_directories_are_bound_by_identity_security_and_proof() {
+    use rrd_contract::InstallationRemovalRule as Rule;
+    let fresh = installation_plan(&attunement_plan());
+    let retained = retained_plan();
+    retained.validate().unwrap();
+    assert_ne!(retained.plan_sha256, fresh.plan_sha256);
+    let value = serde_json::to_value(&fresh).unwrap();
+    assert!(value["managed_paths"][0]
+        .get("existing_directory_identity_sha256")
+        .is_none());
+    let reopened: InstallationPlan =
+        serde_json::from_value(serde_json::to_value(&retained).unwrap()).unwrap();
+    assert_eq!(reopened, retained);
+
+    let reseal = |mut plan: InstallationPlan| {
+        plan.plan_sha256 = installation_plan_sha256(&plan).unwrap();
+        plan
+    };
+    let mut no_identity = retained.clone();
+    no_identity.managed_paths[0].existing_directory_identity_sha256 = None;
+    let mut no_security = retained.clone();
+    no_security.managed_paths[1].existing_directory_security_sha256 = None;
+    let mut storage_only = retained.clone();
+    storage_only.managed_paths[0].removal_rule = Rule::RemoveIfOwnedAndEmpty;
+    storage_only.managed_paths[0].existing_directory_identity_sha256 = None;
+    storage_only.managed_paths[0].existing_directory_security_sha256 = None;
+    let mut no_proof = retained.clone();
+    no_proof.managed_paths[10].publication_proof = None;
+    let mut wrong_proof_path = retained.clone();
+    wrong_proof_path.managed_paths[10]
+        .publication_proof
+        .as_mut()
+        .unwrap()
+        .relative_path = ".rrflow/credentials/elsewhere".into();
+    let mut proof_on_fresh = fresh.clone();
+    proof_on_fresh.managed_paths[10].publication_proof =
+        retained.managed_paths[10].publication_proof.clone();
+    let mut identity_on_fresh = fresh.clone();
+    identity_on_fresh.managed_paths[0].existing_directory_identity_sha256 = Some(digest(61));
+    let mut stale_policy = retained.clone();
+    stale_policy.bootstrap.private_directories = fresh.bootstrap.private_directories.clone();
+    for (name, invalid) in [
+        ("identity missing", no_identity),
+        ("security missing", no_security),
+        ("storage retained without engram", storage_only),
+        ("proof missing", no_proof),
+        ("proof path wrong", wrong_proof_path),
+        ("proof on a fresh plan", proof_on_fresh),
+        ("identity on a fresh plan", identity_on_fresh),
+        ("private-object policy stale", stale_policy),
+    ] {
+        assert!(reseal(invalid).validate().is_err(), "{name} was accepted");
+    }
+}

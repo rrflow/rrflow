@@ -119,14 +119,34 @@ pub enum InstallationRemovalRule {
     RemoveIfOwnedAndEmpty,
     /// Retain the empty native admission inode; unlinking it can split owners.
     RetainForExclusion,
+    /// A project-owned ancestor which RRFlow did not create and may not remove.
+    RetainExistingDirectory,
 }
 
-/// One RRFlow-owned path whose state is bound by the preview. The path is
-/// project-relative so the plan cannot silently redirect effects elsewhere.
+/// One managed or retained path whose state is bound by the preview. The path
+/// is project-relative so the plan cannot silently redirect effects elsewhere.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InstallationManagedPath {
     pub kind: InstallationManagedPathKind,
+    pub relative_path: String,
+    pub precondition_sha256: String,
+    pub removal_rule: InstallationRemovalRule,
+    /// Native identity of a preexisting project-owned directory. This is not a
+    /// portable identity, content digest, or protection against native ID reuse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub existing_directory_identity_sha256: Option<String>,
+    /// Security metadata observed from the same native directory handle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub existing_directory_security_sha256: Option<String>,
+    /// An owned private identity receipt for publication into a retained parent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_proof: Option<InstallationPublicationProof>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InstallationPublicationProof {
     pub relative_path: String,
     pub precondition_sha256: String,
     pub removal_rule: InstallationRemovalRule,
@@ -152,7 +172,39 @@ impl InstallationManagedPath {
         validate_sha256(
             &self.precondition_sha256,
             "installation managed path precondition_sha256",
-        )
+        )?;
+        if let Some(proof) = &self.publication_proof {
+            validate_project_relative_path(&proof.relative_path)?;
+            validate_sha256(&proof.precondition_sha256, "publication proof precondition")?;
+            if !matches!(
+                self.kind,
+                InstallationManagedPathKind::BootstrapPending
+                    | InstallationManagedPathKind::LocatorPending
+            ) || proof.removal_rule != InstallationRemovalRule::RemoveIfOwnedDigestMatches
+            {
+                return invalid("publication proof is not bound to an owned pending file");
+            }
+        }
+        match (
+            &self.existing_directory_identity_sha256,
+            &self.existing_directory_security_sha256,
+            self.removal_rule,
+        ) {
+            (Some(identity), Some(security), InstallationRemovalRule::RetainExistingDirectory)
+                if matches!(
+                    self.kind,
+                    InstallationManagedPathKind::EngramDirectory
+                        | InstallationManagedPathKind::StorageDirectory
+                ) =>
+            {
+                validate_sha256(identity, "existing directory identity")?;
+                validate_sha256(security, "existing directory security")
+            }
+            (None, None, rule) if rule != InstallationRemovalRule::RetainExistingDirectory => {
+                Ok(())
+            }
+            _ => invalid("existing directory identity and removal rule are inconsistent"),
+        }
     }
 }
 
@@ -295,8 +347,17 @@ impl InstallationPlan {
                 InstallationRemovalRule::RemoveIfOwnedDigestMatches,
             ),
         ];
+        let retained_engram = self.managed_paths.first().is_some_and(|path| {
+            path.removal_rule == InstallationRemovalRule::RetainExistingDirectory
+        });
         if self.managed_paths.len() != expected_paths.len() {
             return invalid("installation plan must bind every managed path exactly once");
+        }
+        if !retained_engram
+            && self.managed_paths[1].removal_rule
+                == InstallationRemovalRule::RetainExistingDirectory
+        {
+            return invalid("a retained storage directory requires a retained engram directory");
         }
         let mut paths = BTreeSet::new();
         for (managed, (expected_kind, expected_rule)) in
@@ -312,8 +373,14 @@ impl InstallationPlan {
                     "installation lease must bind the canonical empty-file admission rule",
                 );
             }
+            let retained = matches!(
+                expected_kind,
+                InstallationManagedPathKind::EngramDirectory
+                    | InstallationManagedPathKind::StorageDirectory
+            ) && managed.removal_rule
+                == InstallationRemovalRule::RetainExistingDirectory;
             if managed.kind != expected_kind
-                || managed.removal_rule != expected_rule
+                || (managed.removal_rule != expected_rule && !retained)
                 || !paths.insert(&managed.relative_path)
             {
                 return invalid("installation managed paths are duplicated or out of order");
@@ -326,7 +393,14 @@ impl InstallationPlan {
             ),
             (
                 InstallationManagedPathKind::LocatorPending,
-                format!(".rrflow/.config.{}.pending", self.storage_root_id),
+                if retained_engram {
+                    format!(
+                        ".rrflow/credentials/.config.{}.pending",
+                        self.storage_root_id
+                    )
+                } else {
+                    format!(".rrflow/.config.{}.pending", self.storage_root_id)
+                },
             ),
             (
                 InstallationManagedPathKind::ProjectBootstrap,
@@ -334,7 +408,14 @@ impl InstallationPlan {
             ),
             (
                 InstallationManagedPathKind::BootstrapPending,
-                format!(".rrflow/.bootstrap.{}.pending", self.storage_root_id),
+                if retained_engram {
+                    format!(
+                        ".rrflow/credentials/.bootstrap.{}.pending",
+                        self.storage_root_id
+                    )
+                } else {
+                    format!(".rrflow/.bootstrap.{}.pending", self.storage_root_id)
+                },
             ),
         ];
         for (kind, expected) in expected_extra_paths {
@@ -344,8 +425,31 @@ impl InstallationPlan {
                 );
             }
         }
+        for (kind, expected) in [
+            (
+                InstallationManagedPathKind::BootstrapPending,
+                format!(
+                    ".rrflow/credentials/.bootstrap.{}.proof",
+                    self.storage_root_id
+                ),
+            ),
+            (
+                InstallationManagedPathKind::LocatorPending,
+                format!(".rrflow/credentials/.config.{}.proof", self.storage_root_id),
+            ),
+        ] {
+            let proof = &self.managed_path(kind).publication_proof;
+            if retained_engram != proof.is_some()
+                || proof
+                    .as_ref()
+                    .is_some_and(|value| value.relative_path != expected)
+            {
+                return invalid("publication proof path differs from its installation identity");
+            }
+        }
         let mut private_directories: Vec<_> = self.managed_paths[..4]
             .iter()
+            .filter(|path| path.removal_rule != InstallationRemovalRule::RetainExistingDirectory)
             .map(|path| path.relative_path.clone())
             .collect();
         private_directories.sort();
@@ -358,6 +462,23 @@ impl InstallationPlan {
         .into_iter()
         .map(|kind| self.managed_path(kind).relative_path.clone())
         .collect();
+        if retained_engram {
+            for kind in [
+                InstallationManagedPathKind::BootstrapPending,
+                InstallationManagedPathKind::LocatorPending,
+            ] {
+                let pending = self.managed_path(kind);
+                private_files.push(pending.relative_path.clone());
+                private_files.push(
+                    pending
+                        .publication_proof
+                        .as_ref()
+                        .expect("validated proof")
+                        .relative_path
+                        .clone(),
+                );
+            }
+        }
         private_files.sort();
         if self.bootstrap.private_directories != private_directories
             || self.bootstrap.private_files != private_files
