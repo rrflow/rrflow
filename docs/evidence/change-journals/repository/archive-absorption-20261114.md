@@ -338,14 +338,22 @@ The archive covered local refs only. The remote also holds 37 branches. 19 appea
 | `copilot/fix-installed-domain-crash` | **Superseded** | Retry on a busy `hdiutil create`; `main`'s `run_native_capacity.py` has its own, wider `is_busy_darwin_create` retry (five attempts, partial-image cleanup) |
 | `gh-readonly-queue/main/pr-285-…` | Merge-queue scratch ref for PRs #285 and #287 | `docs/guides/getting-started.md` (from #287) is on `main`; #285's content not re-proven |
 
-No remote branch has been deleted.
+Remaining remote refs checked 2026-11-15 (second pass):
 
-## Kept in the archive deliberately
+| Ref | Verdict | Evidence |
+|---|---|---|
+| `gh-readonly-queue/main/pr-285`, `-349`, `-367`, `-376`, `-382` | Contained | Merge-queue scratch refs. `git log --no-merges main..<ref>` lists nothing: every non-merge commit is on `main`, and `b5821ac88` (the #285 NEON repair) is an ancestor of `main` |
+| `origin/backup/agent/c07-backup-scheduling`, `c07-run-progress`, `rrflowdb-postgres-identity`, `rrflowdb-postgres-plan` | Contained | Each file the branch adds (`c-07g-integrated-native-growth.md`, the three `rrflowdb-postgresql-*` journals, `docs/reference/protocol/postgresql.md`) exists on `main`; `c07-run-progress` has no file change |
+| `origin/codex/consolidate-project-structure-and-context` | **Superseded** | 2026-09-02 pre-RRFlow "vyrm" design: `scripts/project_shape.py` and a consolidation contract. `main` derives inventory from Git and enforces shape with `scripts/ci/check_code_shape.py`; the contract's one-engine flow is owned by the README and ADRs |
 
-| Ref | Why |
-|---|---|
-| `wip/rrflow-workbench-capture` | Not source: a 3.4 MB engine data store from the session that captured the original Workbench at `6448a4f`, the data behind those baseline screenshots |
+The `origin` remote is the official repository and was only read.
+
+Remote tips are covered before any `development` branch is deleted: 61 are ancestors of `main`, 19 are in the archive bundle, and the 3 left (`c07-windows-characterization-evidence`, `poam-flush-stalls`, `copilot/fix-installed-domain-crash`) are in `D:\localdev\devlabsrflow-remote-tips-20261115.bundle`, verified complete.
+
+## `wip/rrflow-workbench-capture` (absorbed 2026-11-15)
+
+Not source. Its commit `eb27cfa18` adds five files to `6448a4f` under `.rrflow`: `instance.toml` (id `rrflow-workbench-capture`), a manifest, `CURRENT`, an empty `MANIFEST.LOCK` and one 3.4 MB preallocated WAL. Reading the WAL shows a single record: the manual assertion `crate:connectome-ui` / `binary` / "connectome" built from the original Workbench crate by `operator:capture-seed`, plus its invocation record. The data is that one fact in a pre-release store format that today's engine does not read and that pre-release policy does not migrate. The ref stays in the bundle at `eb27cfa18`.
 
 ## Still open
 
-Only the ref kept deliberately above.
+Nothing. All 81 archived refs are absorbed, superseded or dropped, each with evidence above.
