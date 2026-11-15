@@ -618,6 +618,53 @@ fn wrong_stale_or_abstaining_selection_never_dispatches_or_spends_worker_effort(
     }
 }
 
+/// The contract admits adapters beyond the native chat ones, but the engine
+/// runs only those it implements. A worker bound to any other adapter must be
+/// refused before a reservation, a spend or a provider call.
+#[test]
+fn a_worker_adapter_the_engine_does_not_implement_is_refused_before_any_effect() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let (_root, engine, lease, mut selection) =
+        admitted_fixture(&format!("http://{}/v1", listener.local_addr().unwrap()));
+    let configuration = replace_profile(&engine, &lease, |profile| {
+        profile.worker_policy.as_mut().unwrap().bindings[0].adapter =
+            rrd_contract::EndpointWorkerAdapter::Other {
+                adapter_id: CanonicalId::new("unimplemented-adapter").unwrap(),
+                request_schema_sha256: digest::sha256_hex(b"request schema"),
+                response_schema_sha256: digest::sha256_hex(b"response schema"),
+            };
+    });
+    selection.expected_configuration_sha256 = configuration.sha256().unwrap();
+    let request = selected_request(&engine, &lease, &listener, &selection, 1_500, false);
+    let before = budget(&engine, &lease, &request.task_id);
+    let key = engine.budget_key(SCOPE, &request.task_id);
+    let stored = engine.storage.control().get(&key).unwrap();
+    let refused = engine.execute_task_worker_with_clock(
+        &lease.session_id,
+        &lease.token,
+        &request,
+        "unimplemented",
+        "unimplemented",
+        &FixedClock::at(1_600),
+    );
+    assert!(
+        matches!(
+            refused,
+            Err(ServiceError::EndpointCallFailed {
+                execution_may_continue: false,
+                ..
+            })
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(budget(&engine, &lease, &request.task_id), before);
+    assert_eq!(engine.storage.control().get(&key).unwrap(), stored);
+    assert_eq!(
+        listener.accept().unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+}
+
 #[test]
 fn every_worker_permission_is_required_before_effect() {
     for action in [
