@@ -1,6 +1,9 @@
 """Native filesystem checks for the SDK harness rendezvous boundary."""
 
+import contextlib
+import io
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -53,6 +56,18 @@ class PrivateManifestTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 create_manifest_staging(root)
             self.assertEqual(path.read_bytes(), b"")
+
+    def test_conformance_marker_is_required_even_for_successful_process(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError, "required corpus success marker"):
+                run([sys.executable, "-c", "print('no tests ran')"], required_output="expected-marker")
+
+    def test_conformance_marker_can_cross_stream_chunks(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            run(
+                [sys.executable, "-c", "print('x' * 4093 + 'expected-marker')"],
+                required_output="expected-marker",
+            )
 
     @unittest.skipUnless(os.name == "nt", "Windows command resolution test")
     def test_windows_resolves_cmd_tool_before_execution(self):

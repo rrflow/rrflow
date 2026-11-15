@@ -92,6 +92,6 @@
 - [POAM-080 — vector scans pay fixed per-candidate work and the planner prices codecs like exact scans](poam-080.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-080`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-080) — active parent-owned POA&M detail
 - [POAM-081 — task and flight lists read every version before paging](poam-081.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-081`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-081) — active parent-owned POA&M detail
 - [POAM-082 — the TypeScript SDK silently rounds 64-bit integers](poam-082.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-082`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-082) — active parent-owned POA&M detail
-- [POAM-083 — the Rust SDK conformance test passes without running](poam-083.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-083`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-083) — active parent-owned POA&M detail
+- [POAM-083 — SDK conformance tests can pass without running](poam-083.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-083`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-083) — active parent-owned POA&M detail
 - [POAM-084 — the Windows offline qualification sometimes cannot create its disposable account](poam-084.md) — [`rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-084`](rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-084) — active parent-owned POA&M detail
 <!-- rrflow:generated-index:end -->

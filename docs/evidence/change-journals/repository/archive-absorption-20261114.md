@@ -264,6 +264,7 @@ Uncommitted F-06 cold-storage hardening on top of a head `main` already has. Its
 |---|---|---|
 | TypeScript SDK silently rounds 64-bit integers | **Was untracked; verified on `main`** | [POAM-082](../../../poam/rrflow-1.0-alpha/poam-082.md): `sdks/typescript/src/transport.ts:35` |
 | Rust SDK conformance test passes without running | **Was untracked; verified on `main`** | [POAM-083](../../../poam/rrflow-1.0-alpha/poam-083.md): `rrd-client/tests/sdk_conformance.rs:51-53` |
+| The Rust conformance test is ignored by default, requires its manifest, and the runner requires its completion line | **Ported** | `rrd-client/tests/sdk_conformance.rs`, `scripts/ci/run_sdk_conformance.py` (`run`, `required_output`), two tests in `scripts/ci/test_sdk_private_manifest.py`, name owned in `scripts/ci/selected_tests.py`. The same defect exists in the .NET client and a milder form in Java; POAM-083 stays open for them |
 | Fair scheduling between native maintenance and CLD publication | Open: to port | `main` drops offers made while a quantum runs (`rrd-server/src/http/maintenance.rs`) and tries native first (`engine/maintenance.rs:9-14`) |
 | A timeout keeps its identity through cold encode, decode and Parquet export | Open: to port | `main` decides after the fact from the clock (`engine/cold_history/files.rs:25`) |
 | Bounded, deadline-checked artifact read | Open: to port | `main` reads the artifact with one `read_to_end` (`engine/cold_history/maintain.rs:181`) |

@@ -1,4 +1,4 @@
-# POAM-083 — the Rust SDK conformance test passes without running
+# POAM-083 — SDK conformance tests can pass without running
 
 **Status:** active parent-owned POA&M detail
 **Coordinate:** `rrflow://rrflow-instance/data/poam/rrflow-1.0-alpha/poam-083`
@@ -14,7 +14,17 @@ The F-06 worktree found this on 2026-11-07 and recorded it only there. It was ar
 - `crates/transport/rrd-client/tests/sdk_conformance.rs:51-53`: `rust_sdk_passes_shared_real_daemon_conformance` returns at once when `RRD_SDK_CONFORMANCE_MANIFEST` is not set. `cargo test -p rrd-client` therefore reports it as passed although it checked nothing.
 - `scripts/ci/run_sdk_conformance.py` sets that variable when it runs the Rust client, but accepts the process's exit status alone. If the variable were ever dropped or misnamed, the Rust leg would pass empty and nothing would notice.
 
-The archived work marked the test `#[ignore]`, made the manifest mandatory, and made the runner require the line `SDK conformance OK: language=rust corpus_sha256=…` in the output. None of that is on `main`.
+The archived work marked the test `#[ignore]`, made the manifest mandatory, and made the runner require the line `SDK conformance OK: language=rust corpus_sha256=…` in the output.
+
+Reading the other four clients on 2026-11-14 found the same shape in two of them:
+
+- **.NET** (`sdks/dotnet/tests/Rrflow.Rrd.Client.Tests/SdkConformanceTests.cs:37-40`) returns at once without the manifest, so an ordinary `dotnet test` counts it as passed.
+- **Java** (`sdks/java/src/test/java/io/rrflow/rrd/SdkConformanceTest.java:41-42`) is skipped by an assumption. That is reported as skipped, not passed, but the runner still accepts its exit status alone.
+- Python, Go and TypeScript refuse to start without the manifest.
+
+## Remediation in progress
+
+The Rust leg is fixed on 2026-11-14 ([ledger](../../evidence/change-journals/repository/archive-absorption-20261114.md)): the test is ignored by default and panics without its manifest, the runner selects it by name with `--ignored` and fails a successful process that did not print the Rust test's own completion line, and the name is owned in `scripts/ci/selected_tests.py`. Proven locally: plain `cargo test -p rrd-client --test sdk_conformance` reports 0 passed and 1 ignored; with `--ignored` and no manifest it fails. The .NET and Java legs are not changed.
 
 ## Impact
 
@@ -29,5 +39,5 @@ Roadmap owner: [Gate H](../../roadmap/rrflow-1.0/gate-h.md).
 ## Closure evidence
 
 Closed when all of the following hold:
-- The Rust conformance test cannot report success without executing against a daemon: it is ignored by default and fails when run without its manifest.
-- The conformance runner requires each language's completion line, with the corpus digest, and fails a successful process that did not print it. A test covers that.
+- No SDK conformance test can report success without executing against a daemon. Rust: done. .NET and Java: open.
+- The conformance runner requires each language's own completion line, with the corpus digest, and fails a successful process that did not print it. Rust: done, with a test. The other four print nothing of their own today; the runner prints their line after the process exits.

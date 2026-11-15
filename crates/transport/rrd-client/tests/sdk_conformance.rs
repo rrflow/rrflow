@@ -46,11 +46,13 @@ fn read(step: &str) -> RequestOptions {
     .unwrap()
 }
 
+// Ignored by default so an ordinary `cargo test` cannot count it as passed
+// without a daemon; `scripts/ci/run_sdk_conformance.py` runs it by name.
 #[tokio::test]
+#[ignore = "requires the real shared SDK conformance daemon"]
 async fn rust_sdk_passes_shared_real_daemon_conformance() {
-    let Ok(manifest_path) = std::env::var("RRD_SDK_CONFORMANCE_MANIFEST") else {
-        return;
-    };
+    let manifest_path = std::env::var("RRD_SDK_CONFORMANCE_MANIFEST")
+        .expect("real SDK conformance requires RRD_SDK_CONFORMANCE_MANIFEST");
     let manifest_bytes = std::fs::read(manifest_path).unwrap();
     let manifest: HarnessManifest = serde_json::from_slice(&manifest_bytes).unwrap();
     assert_eq!(manifest.format_version, 1);

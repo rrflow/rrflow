@@ -37,6 +37,7 @@ NATIVE_SAMPLE_MEMBERSHIP = "sustained::native_worker::tests::native_job_contains
 NATIVE_SAMPLE_ABRUPT = "sustained::native_worker::tests::native_job_abrupt_parent_fixture"
 NATIVE_SAMPLE_TIMEOUT = "sustained::native_worker::tests::native_allocation_timeout_cleanup_fixture"
 NATIVE_SAMPLE_HELPER = "sustained::native_worker::native_sample_helper"
+RUST_SDK_CONFORMANCE_CASE = "rust_sdk_passes_shared_real_daemon_conformance"
 MOUNT_CROSSING_LINUX = "bind_mount_crossing_is_denied_before_any_effect"
 MOUNT_CROSSING_OTHER = "mounted_volume_crossing_is_denied_before_any_effect"
 
@@ -54,6 +55,7 @@ SELECTORS: tuple[Selector, ...] = (
     *(Selector("rrflow-cli", "installed_lifecycle", case, owner="run_offline_lifecycle.py")
       for case in sorted(LIFECYCLE_CASES)),
     Selector("rrflow-cli", "installed_crash", NATIVE_CAPACITY_CASE, owner="run_native_capacity.py"),
+    Selector("rrd-client", "sdk_conformance", RUST_SDK_CONFORMANCE_CASE, owner="run_sdk_conformance.py"),
     Selector("rrflow-cli", "installed_reopen", SUSTAINED_CAPACITY_CASE, owner="run_sustained_capacity.py"),
     Selector("rrflow-cli", "installed_reopen", NATIVE_SAMPLE_MEMBERSHIP, owner="native sample tests"),
     Selector("rrflow-cli", "installed_reopen", NATIVE_SAMPLE_ABRUPT, owner="native sample tests"),
