@@ -3,9 +3,10 @@
 use super::*;
 
 pub const INSTALL_ATTUNEMENT_CONTRACT_VERSION: u16 = 1;
-/// Attunement plans and job transitions bind ordered plan positions in v2.
-/// Installation results and restore envelopes retain their separate version.
-pub const ATTUNEMENT_CONTRACT_VERSION: u16 = 2;
+/// Attunement plans keep each step's readable description, bound by the plan
+/// digest, in v3. Installation results and restore envelopes retain their
+/// separate version.
+pub const ATTUNEMENT_CONTRACT_VERSION: u16 = 3;
 /// Independent identity and initial-root binding are mandatory for new plans.
 /// Attunement and installation-result envelopes retain their own version.
 pub const INSTALLATION_PLAN_CONTRACT_VERSION: u16 = 4;
@@ -13,6 +14,8 @@ pub const INSTALLATION_LEASE_PATH: &str = ".rrflow-install.lock";
 pub const INSTALLATION_LEASE_PRECONDITION: &str = "rrflow-install-lease-absent-or-private-empty-v1";
 pub const MAX_INSTALLATION_ACTIONS: usize = 16;
 pub const MAX_ATTUNEMENT_PHASES: usize = 32;
+/// Bound on one plan step's readable description, in bytes.
+pub const MAX_ATTUNEMENT_DESCRIPTION_BYTES: usize = 1_024;
 pub const MAX_ATTUNEMENT_FAILURE_BYTES: usize = 4_096;
 pub const MAX_ATTUNEMENT_CANCEL_REASON_BYTES: usize = 4_096;
 pub const MAX_ATTUNEMENT_VERIFICATION_CHECKS: usize = 256;

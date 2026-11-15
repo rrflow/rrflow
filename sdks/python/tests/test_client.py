@@ -320,7 +320,7 @@ def test_attunement_source_change_keeps_actionable_error_details() -> None:
         client.call(
             "attunement-start",
             {
-                "contract_version": 2,
+                "contract_version": 3,
                 "job_id": "job-test",
                 "plan_sha256": "0" * 64,
                 "expected_revision": 1,

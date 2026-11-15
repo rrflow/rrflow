@@ -182,6 +182,7 @@ pub(super) fn planned_attunement_steps(
                 phase: step.phase,
                 sequence: u16::try_from(index + 1)
                     .map_err(|_| ServiceError::Contract("attunement step index overflow".into()))?,
+                description: step.configuration.clone(),
                 configuration_sha256: json_sha256(step)?,
                 estimated_items: step.estimated_items,
                 estimated_input_bytes: step.estimated_input_bytes,

@@ -62,6 +62,7 @@ fn predecessor() -> AttunementPlan {
         .map(|(index, phase)| AttunementPhasePlan {
             phase,
             sequence: (index + 1) as u16,
+            description: format!("{phase:?}"),
             configuration_sha256: "a".repeat(64),
             estimated_items: 1,
             estimated_input_bytes: 0,
@@ -282,6 +283,7 @@ fn derived_preview_validates_only_against_the_plan_its_evidence_produces() {
     forged.plan.phases.push(AttunementPhasePlan {
         phase: P::Verify,
         sequence: 4,
+        description: "forged verify".into(),
         configuration_sha256: "b".repeat(64),
         estimated_items: 1,
         estimated_input_bytes: 0,

@@ -233,6 +233,43 @@ pub fn derive_attunement_phases(evidence: &AttunementEvidence) -> Vec<Attunement
     selected
 }
 
+/// Why a derived step is in the plan, from the evidence that selected it.
+/// It states counts and bound grammars only, never what a step will achieve.
+fn derived_step_description(
+    phase: AttunementPhase,
+    evidence: &AttunementEvidence,
+    estimated_items: u64,
+) -> Result<String> {
+    let name = serde_json::to_value(phase)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .ok_or_else(|| crate::ContractError("attunement phase has no name".into()))?;
+    let grammars = evidence
+        .bound_grammars
+        .iter()
+        .map(CanonicalId::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Ok(match phase {
+        AttunementPhase::Parse
+        | AttunementPhase::Normalize
+        | AttunementPhase::EntityLink
+        | AttunementPhase::Embed
+        | AttunementPhase::Graph => format!(
+            "{name}: selected from project evidence; {estimated_items} files with a bound grammar ({grammars})"
+        ),
+        AttunementPhase::LexicalIndex => format!(
+            "{name}: selected from project evidence; {} files",
+            evidence.files
+        ),
+        AttunementPhase::Connect
+        | AttunementPhase::Inventory
+        | AttunementPhase::VectorIndex
+        | AttunementPhase::Ground
+        | AttunementPhase::Verify => format!("{name}: selected from project evidence"),
+    })
+}
+
 /// A derived step's configuration digest binds the capability identity and
 /// the evidence it was derived from, so two plans over different evidence
 /// never share a checkpoint chain.
@@ -341,6 +378,7 @@ pub fn derive_attunement_plan(
             phase,
             sequence: u16::try_from(index + 1)
                 .map_err(|_| crate::ContractError("attunement step index overflow".into()))?,
+            description: derived_step_description(phase, evidence, estimated_items)?,
             configuration_sha256: attunement_capability_configuration_sha256(
                 phase,
                 capability.version,

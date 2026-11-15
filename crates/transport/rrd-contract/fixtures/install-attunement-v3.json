@@ -50,13 +50,14 @@
     }
   ],
   "attunement_plan": {
-    "contract_version": 2,
+    "contract_version": 3,
     "estimated_max_duration_ms": 2700000,
     "estimated_min_duration_ms": 1800000,
     "id": "attune-01",
     "phases": [
       {
         "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+        "description": "test step 1",
         "estimated_input_bytes": 1024,
         "estimated_items": 10,
         "phase": "connect",
@@ -64,6 +65,7 @@
       },
       {
         "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+        "description": "test step 2",
         "estimated_input_bytes": 2048,
         "estimated_items": 20,
         "phase": "inventory",
@@ -71,6 +73,7 @@
       },
       {
         "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+        "description": "test step 3",
         "estimated_input_bytes": 3072,
         "estimated_items": 30,
         "phase": "parse",
@@ -78,6 +81,7 @@
       },
       {
         "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000068",
+        "description": "test step 4",
         "estimated_input_bytes": 4096,
         "estimated_items": 40,
         "phase": "normalize",
@@ -85,6 +89,7 @@
       },
       {
         "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000069",
+        "description": "test step 5",
         "estimated_input_bytes": 5120,
         "estimated_items": 50,
         "phase": "entity_link",
@@ -92,6 +97,7 @@
       },
       {
         "configuration_sha256": "000000000000000000000000000000000000000000000000000000000000006a",
+        "description": "test step 6",
         "estimated_input_bytes": 6144,
         "estimated_items": 60,
         "phase": "lexical_index",
@@ -99,6 +105,7 @@
       },
       {
         "configuration_sha256": "000000000000000000000000000000000000000000000000000000000000006b",
+        "description": "test step 7",
         "estimated_input_bytes": 7168,
         "estimated_items": 70,
         "phase": "embed",
@@ -106,6 +113,7 @@
       },
       {
         "configuration_sha256": "000000000000000000000000000000000000000000000000000000000000006c",
+        "description": "test step 8",
         "estimated_input_bytes": 8192,
         "estimated_items": 80,
         "phase": "vector_index",
@@ -113,6 +121,7 @@
       },
       {
         "configuration_sha256": "000000000000000000000000000000000000000000000000000000000000006d",
+        "description": "test step 9",
         "estimated_input_bytes": 9216,
         "estimated_items": 90,
         "phase": "graph",
@@ -120,6 +129,7 @@
       },
       {
         "configuration_sha256": "000000000000000000000000000000000000000000000000000000000000006e",
+        "description": "test step 10",
         "estimated_input_bytes": 10240,
         "estimated_items": 100,
         "phase": "ground",
@@ -127,13 +137,14 @@
       },
       {
         "configuration_sha256": "000000000000000000000000000000000000000000000000000000000000006f",
+        "description": "test step 11",
         "estimated_input_bytes": 11264,
         "estimated_items": 110,
         "phase": "verify",
         "sequence": 11
       }
     ],
-    "plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+    "plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
     "source_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
     "target": {
       "estate_id": "developer-estate",
@@ -142,11 +153,11 @@
     }
   },
   "cancel": {
-    "contract_version": 2,
+    "contract_version": 3,
     "expected_job_revision": 3,
     "job_id": "job-01",
-    "last_checkpoint_sha256": "e7bdc54e612e49c7f7cb0d905cfc00b608cbda835d8e29eec80a103d2fbca144",
-    "plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+    "last_checkpoint_sha256": "9d1cfc655fd9ce863aa856dba410327f249c094bd1a9ccc1247174f3397fc447",
+    "plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
     "reason": "operator requested cancellation",
     "requested_at_unix_ms": 1800000003001
   },
@@ -214,7 +225,7 @@
       }
     ],
     "attunement_plan_id": "attune-01",
-    "attunement_plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+    "attunement_plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
     "bootstrap": {
       "activated_provider_bindings": [],
       "credential_entropy_bytes": 32,
@@ -447,7 +458,7 @@
         "removal_rule": "remove_if_owned_digest_matches"
       }
     ],
-    "plan_sha256": "17aee5f936df3222e5d13f236d28f4c6a1be891507c16235c61bda368d0a57b9",
+    "plan_sha256": "0e2fc71a18649f8455c3e2d65ad346b904a83588791e7cd09036c7f9eec57af1",
     "product_version": "1.0.0",
     "profile_id": "default",
     "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
@@ -513,17 +524,17 @@
     "installed_record_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
     "locator_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
     "plan_id": "install-01",
-    "plan_sha256": "17aee5f936df3222e5d13f236d28f4c6a1be891507c16235c61bda368d0a57b9",
-    "result_sha256": "32fde8ec01b8cc3adbb26f680e38265c206683c0a0bedbe28b141a2ca0fcadef",
+    "plan_sha256": "0e2fc71a18649f8455c3e2d65ad346b904a83588791e7cd09036c7f9eec57af1",
+    "result_sha256": "529157576ffc81cc49d9df51e720cc5e3cb5a2d350c89ebcd655279a73d2e2df",
     "runtime_cursor": 1,
     "runtime_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000001e"
   },
   "resume": {
-    "contract_version": 2,
+    "contract_version": 3,
     "expected_job_revision": 3,
     "job_id": "job-01",
-    "last_checkpoint_sha256": "e7bdc54e612e49c7f7cb0d905cfc00b608cbda835d8e29eec80a103d2fbca144",
-    "plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+    "last_checkpoint_sha256": "9d1cfc655fd9ce863aa856dba410327f249c094bd1a9ccc1247174f3397fc447",
+    "plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
     "requested_at_unix_ms": 1800000003001,
     "resume_from_phase": "inventory"
   },
@@ -579,14 +590,14 @@
     }
   ],
   "status": {
-    "contract_version": 2,
+    "contract_version": 3,
     "job": {
       "checkpoints": [
         {
-          "checkpoint_sha256": "e7bdc54e612e49c7f7cb0d905cfc00b608cbda835d8e29eec80a103d2fbca144",
+          "checkpoint_sha256": "9d1cfc655fd9ce863aa856dba410327f249c094bd1a9ccc1247174f3397fc447",
           "committed_at_unix_ms": 1800000000101,
           "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
-          "contract_version": 2,
+          "contract_version": 3,
           "coordinates": {
             "catalogue_revision": 1,
             "runtime_cursor": 1,
@@ -597,11 +608,11 @@
           "job_id": "job-01",
           "output_sha256": "00000000000000000000000000000000000000000000000000000000000000c9",
           "phase": "connect",
-          "plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+          "plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
           "sequence": 1
         }
       ],
-      "contract_version": 2,
+      "contract_version": 3,
       "created_at_unix_ms": 1800000000010,
       "current_phase": "inventory",
       "id": "job-01",
@@ -613,7 +624,7 @@
         "id": "lease-01"
       },
       "plan_id": "attune-01",
-      "plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+      "plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
       "revision": 2,
       "state": "running",
       "updated_at_unix_ms": 1800000002000
@@ -628,14 +639,14 @@
         "passed": true
       }
     ],
-    "contract_version": 2,
+    "contract_version": 3,
     "job_id": "job-01",
     "job_revision": 20,
-    "last_checkpoint_sha256": "f9e2f56eeb8bfd0ea8c9b53d31238d70cd3bc3ed396d90b2dda44ae4c6ad3312",
-    "plan_sha256": "ed9ad5706a4a5d176fe312c668a0153f220c6cb182512b57b0084e94fe6fd74e",
+    "last_checkpoint_sha256": "3747907e74637f9dc808f57acf93b748dea87a2b9c74fa95e80eec107f07de33",
+    "plan_sha256": "9502a200ce7b9c1a77863fc8e638919c3c69ede0314b0ba7c90d8b4bfd368022",
     "runtime_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000137",
     "status": "passed",
-    "verification_sha256": "9d06c9304bf5cd5903e0c2c972dd4ec144ed2a4dabffa2d4549d3d369e1dd376",
+    "verification_sha256": "e64993b5e484bcd6d3965bd8f006863e3475a73371a5cf31e995953e94d1a6cd",
     "verified_at_unix_ms": 1800000020001
   }
 }

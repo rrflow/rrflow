@@ -7,6 +7,10 @@ use super::*;
 pub struct AttunementPhasePlan {
     pub phase: AttunementPhase,
     pub sequence: u16,
+    /// What this step is for, in words its approver read. It is metadata, not
+    /// executable configuration or authorization; the plan digest binds it.
+    #[schemars(schema_with = "attunement_step_description_schema")]
+    pub description: String,
     pub configuration_sha256: String,
     pub estimated_items: u64,
     pub estimated_input_bytes: u64,
@@ -20,6 +24,12 @@ impl AttunementPhasePlan {
             &self.configuration_sha256,
             "attunement phase configuration_sha256",
         )?;
+        if self.description.trim().is_empty()
+            || self.description.len() > MAX_ATTUNEMENT_DESCRIPTION_BYTES
+            || self.description.as_bytes().contains(&0)
+        {
+            return invalid("attunement step description is empty or exceeds its byte bound");
+        }
         if let Some(policy) = &self.parse_policy {
             if self.phase != AttunementPhase::Parse {
                 return invalid("source parse policy requires a Parse step");
@@ -28,6 +38,11 @@ impl AttunementPhasePlan {
         }
         Ok(())
     }
+}
+
+fn attunement_step_description_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    // JSON Schema counts characters; validation enforces the byte bound.
+    schemars::json_schema!({"type": "string", "minLength": 1, "maxLength": MAX_ATTUNEMENT_DESCRIPTION_BYTES})
 }
 
 pub(super) fn attunement_version_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {

@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/install-attunement-v2.json");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/install-attunement-v3.json");
     let mut fixture: Value = serde_json::from_slice(&std::fs::read(&path)?)?;
     fixture["installation_plan"]["configuration"] =
         serde_json::to_value(EstateConfiguration::default())?;

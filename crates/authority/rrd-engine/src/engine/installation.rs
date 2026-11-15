@@ -38,7 +38,8 @@ use rrd_contract::{
     InstallationActionKind, InstallationActionResult, InstallationManagedPathKind,
     InstallationPlan, InstallationPlanAction, InstallationResult, InstallationTargetKind,
     InstalledEstateIdentity, PersistMemoryengram, StorageProfileKind, ATTUNEMENT_CONTRACT_VERSION,
-    INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION, MAX_ATTUNEMENT_PHASES,
+    INSTALLATION_PLAN_CONTRACT_VERSION, INSTALL_ATTUNEMENT_CONTRACT_VERSION,
+    MAX_ATTUNEMENT_DESCRIPTION_BYTES, MAX_ATTUNEMENT_PHASES,
 };
 
 use rrd_core::digest::Sha256 as IncrementalSha256;
@@ -79,8 +80,6 @@ pub(super) const MAX_LOCATOR_BYTES: u64 = 64 * 1024;
 const MAX_CONFIGURATION_BYTES: u64 = 64 * 1024;
 
 const MAX_ATTUNEMENT_PROPOSAL_BYTES: u64 = 64 * 1024;
-
-const MAX_ATTUNEMENT_DESCRIPTION_BYTES: usize = 1_024;
 
 pub const INSTALLATION_PREVIEW_FORMAT_VERSION: u16 = 1;
 

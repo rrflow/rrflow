@@ -48,6 +48,10 @@ schema is a mechanical proposal-shape projection; it does not select or generate
 per-prompt schemas. The installed plan retains selected kinds, positions,
 estimates and descriptor digests, while proposal descriptions remain in the
 preview and are not yet available through engine readback. Only Connect executes.
+Since 2026-11-14 the stored plan also keeps each step's description, bound by
+the plan digest, and an authorized plan read returns it
+([journal](../../evidence/change-journals/gate-d/d-02-readable-plan-steps-20261114.md));
+that needed attunement contract version 3.
 This candidate does not close the handoff, open-question, automatic planning or
 source-to-knowledge gaps, and requires candidate and merge-group evidence.
 

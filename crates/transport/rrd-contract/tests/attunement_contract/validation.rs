@@ -75,14 +75,14 @@ pub(super) fn install_and_attunement_contract_matches_golden_json() {
     let actual = serde_json::to_value(&fixture).unwrap();
     if std::env::var_os("RRFLOW_UPDATE_GOLDEN").is_some() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("fixtures/install-attunement-v2.json");
+            .join("fixtures/install-attunement-v3.json");
         let mut encoded = serde_json::to_string_pretty(&actual).unwrap();
         encoded.push('\n');
         std::fs::write(path, encoded).unwrap();
         return;
     }
     let expected: serde_json::Value =
-        serde_json::from_str(include_str!("../../fixtures/install-attunement-v2.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/install-attunement-v3.json")).unwrap();
     assert_eq!(
         actual,
         expected,
@@ -91,6 +91,60 @@ pub(super) fn install_and_attunement_contract_matches_golden_json() {
     );
     let reopened: GoldenAttunementContract = serde_json::from_value(expected).unwrap();
     assert_eq!(reopened, fixture);
+}
+
+/// A stored plan reads back in the words its approver saw, and those words
+/// cannot change without changing the plan's identity.
+#[test]
+pub(super) fn plan_preserves_and_binds_readable_step_descriptions() {
+    let plan = attunement_plan();
+    let mut previous_version = plan.clone();
+    previous_version.contract_version = 2;
+    previous_version.plan_sha256 = attunement_plan_sha256(&previous_version).unwrap();
+    assert!(
+        previous_version.validate().is_err(),
+        "version 2 is not version 3"
+    );
+    let encoded = serde_json::to_value(&plan).unwrap();
+    assert_eq!(encoded["phases"][0]["description"], "test step 1");
+    let mut without = encoded.clone();
+    without["phases"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("description");
+    assert!(
+        serde_json::from_value::<AttunementPlan>(without).is_err(),
+        "a step without a description is not a plan"
+    );
+    let mut changed = encoded.clone();
+    changed["phases"][0]["description"] = "changed after approval".into();
+    let mut changed: AttunementPlan = serde_json::from_value(changed).unwrap();
+    assert!(
+        changed.validate().is_err(),
+        "description must be bound to plan digest"
+    );
+    changed.plan_sha256 = attunement_plan_sha256(&changed).unwrap();
+    changed.validate().unwrap();
+    assert_ne!(changed.plan_sha256, plan.plan_sha256);
+    assert_ne!(
+        installation_plan(&changed).plan_sha256,
+        installation_plan(&plan).plan_sha256
+    );
+    for invalid in [
+        "".to_string(),
+        " ".to_string(),
+        "nul\0byte".to_string(),
+        "\u{e9}".repeat(513),
+    ] {
+        let mut encoded = encoded.clone();
+        encoded["phases"][0]["description"] = invalid.into();
+        let mut invalid: AttunementPlan = serde_json::from_value(encoded).unwrap();
+        invalid.plan_sha256 = attunement_plan_sha256(&invalid).unwrap();
+        assert!(
+            invalid.validate().is_err(),
+            "invalid descriptions must be refused"
+        );
+    }
 }
 
 #[test]

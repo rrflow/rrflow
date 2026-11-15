@@ -173,6 +173,12 @@ def test_installed_python_stale_plan_replans_and_starts(
                 stale_request = start
                 if selected_progress:
                     assert len(plan["phases"]) == 3
+                    # The plan keeps the words its steps were proposed in.
+                    assert [step["description"] for step in plan["phases"]] == [
+                        "first",
+                        "second",
+                        "verify",
+                    ]
                     running = client.call(
                         "attunement-start",
                         start,
@@ -255,6 +261,19 @@ def test_installed_python_stale_plan_replans_and_starts(
                     options("new-start", session=session, mutation=True),
                 )
                 assert started["status"]["job"]["state"] == "running"
+                if selected_progress:
+                    # The successor's stored plan reads back in the same words.
+                    restored = client.call(
+                        "attunement-read",
+                        {"contract_version": plan["contract_version"], "job_id": successor["id"]},
+                        options("restored-plan", session=session),
+                    )
+                    assert restored["plan"]["plan_sha256"] == accepted["plan"]["plan_sha256"]
+                    assert [step["description"] for step in restored["plan"]["phases"]] == [
+                        "first",
+                        "second",
+                        "verify",
+                    ]
 
             process.terminate()
             process.wait(timeout=30)

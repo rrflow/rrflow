@@ -40,6 +40,32 @@ pub(super) fn selected_plan_replans_after_progress_and_reopens(git: bool) {
         },
     );
     assert_eq!(installed.preview.attunement.phases.len(), 3);
+    // The plan keeps the words its steps were proposed in, and the stored
+    // plan reads back in the same words.
+    let described = |plan: &rrd_contract::AttunementPlan| -> Vec<String> {
+        plan.phases
+            .iter()
+            .map(|step| step.description.clone())
+            .collect()
+    };
+    assert_eq!(
+        described(&installed.preview.attunement),
+        ["first", "second", "verify"]
+    );
+    let stored = engine
+        .read_attunement_detail(
+            &session.session_id,
+            &session.token,
+            &rrd_contract::ReadAttunement {
+                contract_version: rrd_contract::ATTUNEMENT_CONTRACT_VERSION,
+                job_id: installed.job.clone(),
+            },
+            BASE + 500,
+            "request-read-described",
+            "operation-read-described",
+        )
+        .unwrap();
+    assert_eq!(described(&stored.plan), ["first", "second", "verify"]);
     if git {
         std::fs::write(
             installed.root.path().join("ignored.log"),
@@ -170,6 +196,7 @@ pub(super) fn attunement_follows_a_bound_repeated_step_plan_after_reopen() {
     let verify = rrd_contract::AttunementPhasePlan {
         phase: Phase::Verify,
         sequence: 3,
+        description: "verify".into(),
         configuration_sha256: digest::sha256_hex(b"verify-configuration"),
         estimated_items: 1,
         estimated_input_bytes: 0,

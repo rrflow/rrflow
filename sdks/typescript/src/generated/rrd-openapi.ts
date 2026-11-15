@@ -1,4 +1,4 @@
-// OpenAPI SHA-256: 0e688c6bb9e5bf122ef959d097be3bbddf5c813d46f094cec1268d51f7d265ab
+// OpenAPI SHA-256: cdb35615c9dbbb028c9173535cfdb64579d360a87beed2c9f9a5f14152ca4820
 export interface paths {
     "/v1/attunement/cancel": {
         parameters: {
@@ -3404,7 +3404,7 @@ export interface operations {
                     };
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** Format: uint64 */
                         expected_job_revision: number;
                         /**
@@ -3462,7 +3462,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -3472,7 +3472,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -3498,7 +3498,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -3607,7 +3607,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -3617,7 +3617,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -3643,7 +3643,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -3764,7 +3764,7 @@ export interface operations {
                          */
                         after_job_id?: string | null;
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         limit: number;
                     };
                     protocol: string;
@@ -3809,7 +3809,7 @@ export interface operations {
                                  */
                                 after_job_id?: string | null;
                                 /** @constant */
-                                contract_version: 2;
+                                contract_version: 3;
                                 /**
                                  * Format: uint64
                                  * @description The control sequence was unchanged throughout this page's collection.
@@ -3937,7 +3937,7 @@ export interface operations {
                                  */
                                 after_job_id?: string | null;
                                 /** @constant */
-                                contract_version: 2;
+                                contract_version: 3;
                                 /**
                                  * Format: uint64
                                  * @description The control sequence was unchanged throughout this page's collection.
@@ -4070,7 +4070,7 @@ export interface operations {
                     };
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** Format: uint64 */
                         expected_revision: number;
                         /**
@@ -4124,7 +4124,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -4134,7 +4134,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -4160,7 +4160,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -4268,7 +4268,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -4278,7 +4278,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -4304,7 +4304,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -4419,7 +4419,7 @@ export interface operations {
                     /** @description Read one engine-owned installed job by its durable identity. */
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /**
                          * @description A canonical public identifier component.
                          *
@@ -4466,7 +4466,7 @@ export interface operations {
                                 /** @description A bounded, content-addressed plan over one project source snapshot. */
                                 plan: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** Format: uint64 */
                                     estimated_max_duration_ms: number;
                                     /** Format: uint64 */
@@ -4480,6 +4480,11 @@ export interface operations {
                                     id: string;
                                     phases: {
                                         configuration_sha256: string;
+                                        /**
+                                         * @description What this step is for, in words its approver read. It is metadata, not
+                                         *     executable configuration or authorization; the plan digest binds it.
+                                         */
+                                        description: string;
                                         /** Format: uint64 */
                                         estimated_input_bytes: number;
                                         /** Format: uint64 */
@@ -4556,7 +4561,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -4566,7 +4571,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -4592,7 +4597,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -4697,7 +4702,7 @@ export interface operations {
                                 /** @description A bounded, content-addressed plan over one project source snapshot. */
                                 plan: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** Format: uint64 */
                                     estimated_max_duration_ms: number;
                                     /** Format: uint64 */
@@ -4711,6 +4716,11 @@ export interface operations {
                                     id: string;
                                     phases: {
                                         configuration_sha256: string;
+                                        /**
+                                         * @description What this step is for, in words its approver read. It is metadata, not
+                                         *     executable configuration or authorization; the plan digest binds it.
+                                         */
+                                        description: string;
                                         /** Format: uint64 */
                                         estimated_input_bytes: number;
                                         /** Format: uint64 */
@@ -4787,7 +4797,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -4797,7 +4807,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -4823,7 +4833,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -4938,7 +4948,7 @@ export interface operations {
                     /** @description Read the authenticated principal's receipt without replaying its command. */
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         idempotency_key: string;
                         /**
                          * @description A canonical public identifier component.
@@ -4988,7 +4998,7 @@ export interface operations {
                                     /** @description A bounded, content-addressed plan over one project source snapshot. */
                                     plan: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         estimated_max_duration_ms: number;
                                         /** Format: uint64 */
@@ -5002,6 +5012,11 @@ export interface operations {
                                         id: string;
                                         phases: {
                                             configuration_sha256: string;
+                                            /**
+                                             * @description What this step is for, in words its approver read. It is metadata, not
+                                             *     executable configuration or authorization; the plan digest binds it.
+                                             */
+                                            description: string;
                                             /** Format: uint64 */
                                             estimated_input_bytes: number;
                                             /** Format: uint64 */
@@ -5085,7 +5100,7 @@ export interface operations {
                                      */
                                     status: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                         job: {
                                             /** @default [] */
@@ -5095,7 +5110,7 @@ export interface operations {
                                                 committed_at_unix_ms: number;
                                                 configuration_sha256: string;
                                                 /** @constant */
-                                                contract_version: 2;
+                                                contract_version: 3;
                                                 coordinates: {
                                                     /** Format: uint64 */
                                                     catalogue_revision: number;
@@ -5121,7 +5136,7 @@ export interface operations {
                                                 sequence: number;
                                             }[];
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** Format: uint64 */
                                             created_at_unix_ms: number;
                                             /** @enum {string|null} */
@@ -5229,7 +5244,7 @@ export interface operations {
                                     /** @description A bounded, content-addressed plan over one project source snapshot. */
                                     plan: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         estimated_max_duration_ms: number;
                                         /** Format: uint64 */
@@ -5243,6 +5258,11 @@ export interface operations {
                                         id: string;
                                         phases: {
                                             configuration_sha256: string;
+                                            /**
+                                             * @description What this step is for, in words its approver read. It is metadata, not
+                                             *     executable configuration or authorization; the plan digest binds it.
+                                             */
+                                            description: string;
                                             /** Format: uint64 */
                                             estimated_input_bytes: number;
                                             /** Format: uint64 */
@@ -5326,7 +5346,7 @@ export interface operations {
                                      */
                                     status: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                         job: {
                                             /** @default [] */
@@ -5336,7 +5356,7 @@ export interface operations {
                                                 committed_at_unix_ms: number;
                                                 configuration_sha256: string;
                                                 /** @constant */
-                                                contract_version: 2;
+                                                contract_version: 3;
                                                 coordinates: {
                                                     /** Format: uint64 */
                                                     catalogue_revision: number;
@@ -5362,7 +5382,7 @@ export interface operations {
                                                 sequence: number;
                                             }[];
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** Format: uint64 */
                                             created_at_unix_ms: number;
                                             /** @enum {string|null} */
@@ -5477,7 +5497,7 @@ export interface operations {
                     };
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** Format: uint64 */
                         expected_revision: number;
                         /**
@@ -5529,7 +5549,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -5539,7 +5559,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -5565,7 +5585,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -5673,7 +5693,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -5683,7 +5703,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -5709,7 +5729,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -5823,7 +5843,7 @@ export interface operations {
                     };
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** @description Preview is a bounded source observation, not an atomic snapshot. */
                         preview: {
                             /**
@@ -5863,7 +5883,7 @@ export interface operations {
                             /** @description A bounded, content-addressed plan over one project source snapshot. */
                             plan: {
                                 /** @constant */
-                                contract_version: 2;
+                                contract_version: 3;
                                 /** Format: uint64 */
                                 estimated_max_duration_ms: number;
                                 /** Format: uint64 */
@@ -5877,6 +5897,11 @@ export interface operations {
                                 id: string;
                                 phases: {
                                     configuration_sha256: string;
+                                    /**
+                                     * @description What this step is for, in words its approver read. It is metadata, not
+                                     *     executable configuration or authorization; the plan digest binds it.
+                                     */
+                                    description: string;
                                     /** Format: uint64 */
                                     estimated_input_bytes: number;
                                     /** Format: uint64 */
@@ -5993,7 +6018,7 @@ export interface operations {
                                 /** @description A bounded, content-addressed plan over one project source snapshot. */
                                 plan: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** Format: uint64 */
                                     estimated_max_duration_ms: number;
                                     /** Format: uint64 */
@@ -6007,6 +6032,11 @@ export interface operations {
                                     id: string;
                                     phases: {
                                         configuration_sha256: string;
+                                        /**
+                                         * @description What this step is for, in words its approver read. It is metadata, not
+                                         *     executable configuration or authorization; the plan digest binds it.
+                                         */
+                                        description: string;
                                         /** Format: uint64 */
                                         estimated_input_bytes: number;
                                         /** Format: uint64 */
@@ -6078,7 +6108,7 @@ export interface operations {
                                  */
                                 predecessor: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -6088,7 +6118,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -6114,7 +6144,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -6188,7 +6218,7 @@ export interface operations {
                                  */
                                 successor: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -6198,7 +6228,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -6224,7 +6254,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -6329,7 +6359,7 @@ export interface operations {
                                 /** @description A bounded, content-addressed plan over one project source snapshot. */
                                 plan: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** Format: uint64 */
                                     estimated_max_duration_ms: number;
                                     /** Format: uint64 */
@@ -6343,6 +6373,11 @@ export interface operations {
                                     id: string;
                                     phases: {
                                         configuration_sha256: string;
+                                        /**
+                                         * @description What this step is for, in words its approver read. It is metadata, not
+                                         *     executable configuration or authorization; the plan digest binds it.
+                                         */
+                                        description: string;
                                         /** Format: uint64 */
                                         estimated_input_bytes: number;
                                         /** Format: uint64 */
@@ -6414,7 +6449,7 @@ export interface operations {
                                  */
                                 predecessor: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -6424,7 +6459,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -6450,7 +6485,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -6524,7 +6559,7 @@ export interface operations {
                                  */
                                 successor: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -6534,7 +6569,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -6560,7 +6595,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -6674,7 +6709,7 @@ export interface operations {
                     };
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** Format: uint64 */
                         expected_revision: number;
                         /**
@@ -6757,7 +6792,7 @@ export interface operations {
                                 /** @description A bounded, content-addressed plan over one project source snapshot. */
                                 plan: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** Format: uint64 */
                                     estimated_max_duration_ms: number;
                                     /** Format: uint64 */
@@ -6771,6 +6806,11 @@ export interface operations {
                                     id: string;
                                     phases: {
                                         configuration_sha256: string;
+                                        /**
+                                         * @description What this step is for, in words its approver read. It is metadata, not
+                                         *     executable configuration or authorization; the plan digest binds it.
+                                         */
+                                        description: string;
                                         /** Format: uint64 */
                                         estimated_input_bytes: number;
                                         /** Format: uint64 */
@@ -6917,7 +6957,7 @@ export interface operations {
                                 /** @description A bounded, content-addressed plan over one project source snapshot. */
                                 plan: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** Format: uint64 */
                                     estimated_max_duration_ms: number;
                                     /** Format: uint64 */
@@ -6931,6 +6971,11 @@ export interface operations {
                                     id: string;
                                     phases: {
                                         configuration_sha256: string;
+                                        /**
+                                         * @description What this step is for, in words its approver read. It is metadata, not
+                                         *     executable configuration or authorization; the plan digest binds it.
+                                         */
+                                        description: string;
                                         /** Format: uint64 */
                                         estimated_input_bytes: number;
                                         /** Format: uint64 */
@@ -7053,7 +7098,7 @@ export interface operations {
                     /** @description Read the authenticated principal's receipt without replaying its command. */
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         idempotency_key: string;
                         /**
                          * @description A canonical public identifier component.
@@ -7102,7 +7147,7 @@ export interface operations {
                                     /** @description A bounded, content-addressed plan over one project source snapshot. */
                                     predecessor_plan: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         estimated_max_duration_ms: number;
                                         /** Format: uint64 */
@@ -7116,6 +7161,11 @@ export interface operations {
                                         id: string;
                                         phases: {
                                             configuration_sha256: string;
+                                            /**
+                                             * @description What this step is for, in words its approver read. It is metadata, not
+                                             *     executable configuration or authorization; the plan digest binds it.
+                                             */
+                                            description: string;
                                             /** Format: uint64 */
                                             estimated_input_bytes: number;
                                             /** Format: uint64 */
@@ -7220,7 +7270,7 @@ export interface operations {
                                         /** @description A bounded, content-addressed plan over one project source snapshot. */
                                         plan: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** Format: uint64 */
                                             estimated_max_duration_ms: number;
                                             /** Format: uint64 */
@@ -7234,6 +7284,11 @@ export interface operations {
                                             id: string;
                                             phases: {
                                                 configuration_sha256: string;
+                                                /**
+                                                 * @description What this step is for, in words its approver read. It is metadata, not
+                                                 *     executable configuration or authorization; the plan digest binds it.
+                                                 */
+                                                description: string;
                                                 /** Format: uint64 */
                                                 estimated_input_bytes: number;
                                                 /** Format: uint64 */
@@ -7322,7 +7377,7 @@ export interface operations {
                                         /** @description A bounded, content-addressed plan over one project source snapshot. */
                                         plan: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** Format: uint64 */
                                             estimated_max_duration_ms: number;
                                             /** Format: uint64 */
@@ -7336,6 +7391,11 @@ export interface operations {
                                             id: string;
                                             phases: {
                                                 configuration_sha256: string;
+                                                /**
+                                                 * @description What this step is for, in words its approver read. It is metadata, not
+                                                 *     executable configuration or authorization; the plan digest binds it.
+                                                 */
+                                                description: string;
                                                 /** Format: uint64 */
                                                 estimated_input_bytes: number;
                                                 /** Format: uint64 */
@@ -7407,7 +7467,7 @@ export interface operations {
                                          */
                                         predecessor: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                             job: {
                                                 /** @default [] */
@@ -7417,7 +7477,7 @@ export interface operations {
                                                     committed_at_unix_ms: number;
                                                     configuration_sha256: string;
                                                     /** @constant */
-                                                    contract_version: 2;
+                                                    contract_version: 3;
                                                     coordinates: {
                                                         /** Format: uint64 */
                                                         catalogue_revision: number;
@@ -7443,7 +7503,7 @@ export interface operations {
                                                     sequence: number;
                                                 }[];
                                                 /** @constant */
-                                                contract_version: 2;
+                                                contract_version: 3;
                                                 /** Format: uint64 */
                                                 created_at_unix_ms: number;
                                                 /** @enum {string|null} */
@@ -7517,7 +7577,7 @@ export interface operations {
                                          */
                                         successor: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                             job: {
                                                 /** @default [] */
@@ -7527,7 +7587,7 @@ export interface operations {
                                                     committed_at_unix_ms: number;
                                                     configuration_sha256: string;
                                                     /** @constant */
-                                                    contract_version: 2;
+                                                    contract_version: 3;
                                                     coordinates: {
                                                         /** Format: uint64 */
                                                         catalogue_revision: number;
@@ -7553,7 +7613,7 @@ export interface operations {
                                                     sequence: number;
                                                 }[];
                                                 /** @constant */
-                                                contract_version: 2;
+                                                contract_version: 3;
                                                 /** Format: uint64 */
                                                 created_at_unix_ms: number;
                                                 /** @enum {string|null} */
@@ -7661,7 +7721,7 @@ export interface operations {
                                     /** @description A bounded, content-addressed plan over one project source snapshot. */
                                     predecessor_plan: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         estimated_max_duration_ms: number;
                                         /** Format: uint64 */
@@ -7675,6 +7735,11 @@ export interface operations {
                                         id: string;
                                         phases: {
                                             configuration_sha256: string;
+                                            /**
+                                             * @description What this step is for, in words its approver read. It is metadata, not
+                                             *     executable configuration or authorization; the plan digest binds it.
+                                             */
+                                            description: string;
                                             /** Format: uint64 */
                                             estimated_input_bytes: number;
                                             /** Format: uint64 */
@@ -7779,7 +7844,7 @@ export interface operations {
                                         /** @description A bounded, content-addressed plan over one project source snapshot. */
                                         plan: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** Format: uint64 */
                                             estimated_max_duration_ms: number;
                                             /** Format: uint64 */
@@ -7793,6 +7858,11 @@ export interface operations {
                                             id: string;
                                             phases: {
                                                 configuration_sha256: string;
+                                                /**
+                                                 * @description What this step is for, in words its approver read. It is metadata, not
+                                                 *     executable configuration or authorization; the plan digest binds it.
+                                                 */
+                                                description: string;
                                                 /** Format: uint64 */
                                                 estimated_input_bytes: number;
                                                 /** Format: uint64 */
@@ -7881,7 +7951,7 @@ export interface operations {
                                         /** @description A bounded, content-addressed plan over one project source snapshot. */
                                         plan: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** Format: uint64 */
                                             estimated_max_duration_ms: number;
                                             /** Format: uint64 */
@@ -7895,6 +7965,11 @@ export interface operations {
                                             id: string;
                                             phases: {
                                                 configuration_sha256: string;
+                                                /**
+                                                 * @description What this step is for, in words its approver read. It is metadata, not
+                                                 *     executable configuration or authorization; the plan digest binds it.
+                                                 */
+                                                description: string;
                                                 /** Format: uint64 */
                                                 estimated_input_bytes: number;
                                                 /** Format: uint64 */
@@ -7966,7 +8041,7 @@ export interface operations {
                                          */
                                         predecessor: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                             job: {
                                                 /** @default [] */
@@ -7976,7 +8051,7 @@ export interface operations {
                                                     committed_at_unix_ms: number;
                                                     configuration_sha256: string;
                                                     /** @constant */
-                                                    contract_version: 2;
+                                                    contract_version: 3;
                                                     coordinates: {
                                                         /** Format: uint64 */
                                                         catalogue_revision: number;
@@ -8002,7 +8077,7 @@ export interface operations {
                                                     sequence: number;
                                                 }[];
                                                 /** @constant */
-                                                contract_version: 2;
+                                                contract_version: 3;
                                                 /** Format: uint64 */
                                                 created_at_unix_ms: number;
                                                 /** @enum {string|null} */
@@ -8076,7 +8151,7 @@ export interface operations {
                                          */
                                         successor: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                             job: {
                                                 /** @default [] */
@@ -8086,7 +8161,7 @@ export interface operations {
                                                     committed_at_unix_ms: number;
                                                     configuration_sha256: string;
                                                     /** @constant */
-                                                    contract_version: 2;
+                                                    contract_version: 3;
                                                     coordinates: {
                                                         /** Format: uint64 */
                                                         catalogue_revision: number;
@@ -8112,7 +8187,7 @@ export interface operations {
                                                     sequence: number;
                                                 }[];
                                                 /** @constant */
-                                                contract_version: 2;
+                                                contract_version: 3;
                                                 /** Format: uint64 */
                                                 created_at_unix_ms: number;
                                                 /** @enum {string|null} */
@@ -8231,7 +8306,7 @@ export interface operations {
                         lease_ms: number;
                         request: {
                             /** @constant */
-                            contract_version: 2;
+                            contract_version: 3;
                             /** Format: uint64 */
                             expected_job_revision: number;
                             /**
@@ -8290,7 +8365,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -8300,7 +8375,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -8326,7 +8401,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -8434,7 +8509,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -8444,7 +8519,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -8470,7 +8545,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -8585,7 +8660,7 @@ export interface operations {
                     /** @description Start the engine-owned job against its exact immutable plan. */
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** Format: uint64 */
                         expected_revision: number;
                         /**
@@ -8640,7 +8715,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -8650,7 +8725,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -8676,7 +8751,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -8784,7 +8859,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -8794,7 +8869,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -8820,7 +8895,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -8935,7 +9010,7 @@ export interface operations {
                     /** @description Advance the job whose plan is already bound to this revision and lease. */
                     payload: {
                         /** @constant */
-                        contract_version: 2;
+                        contract_version: 3;
                         /** Format: uint64 */
                         expected_revision: number;
                         /**
@@ -8989,7 +9064,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -8999,7 +9074,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -9025,7 +9100,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -9133,7 +9208,7 @@ export interface operations {
                                  */
                                 status: {
                                     /** @constant */
-                                    contract_version: 2;
+                                    contract_version: 3;
                                     /** @description The authoritative durable job snapshot projected by `RrdEngine`. */
                                     job: {
                                         /** @default [] */
@@ -9143,7 +9218,7 @@ export interface operations {
                                             committed_at_unix_ms: number;
                                             configuration_sha256: string;
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             coordinates: {
                                                 /** Format: uint64 */
                                                 catalogue_revision: number;
@@ -9169,7 +9244,7 @@ export interface operations {
                                             sequence: number;
                                         }[];
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /** Format: uint64 */
                                         created_at_unix_ms: number;
                                         /** @enum {string|null} */
@@ -29992,7 +30067,7 @@ export interface operations {
                                     /** @description Read one engine-owned installed job by its durable identity. */
                                     request: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -30090,7 +30165,7 @@ export interface operations {
                                     /** @description Read one engine-owned installed job by its durable identity. */
                                     request: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -30178,7 +30253,7 @@ export interface operations {
                             /** @description Read one engine-owned installed job by its durable identity. */
                             request: {
                                 /** @constant */
-                                contract_version: 2;
+                                contract_version: 3;
                                 /**
                                  * @description A canonical public identifier component.
                                  *
@@ -30275,7 +30350,7 @@ export interface operations {
                                     /** @description Read one engine-owned installed job by its durable identity. */
                                     request: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -30373,7 +30448,7 @@ export interface operations {
                                     /** @description Read one engine-owned installed job by its durable identity. */
                                     request: {
                                         /** @constant */
-                                        contract_version: 2;
+                                        contract_version: 3;
                                         /**
                                          * @description A canonical public identifier component.
                                          *
@@ -30523,7 +30598,7 @@ export interface operations {
                                         /** @description Read one engine-owned installed job by its durable identity. */
                                         request: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /**
                                              * @description A canonical public identifier component.
                                              *
@@ -30629,7 +30704,7 @@ export interface operations {
                                         /** @description Read one engine-owned installed job by its durable identity. */
                                         request: {
                                             /** @constant */
-                                            contract_version: 2;
+                                            contract_version: 3;
                                             /**
                                              * @description A canonical public identifier component.
                                              *

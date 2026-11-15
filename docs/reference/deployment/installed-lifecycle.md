@@ -229,10 +229,13 @@ rules and is authoritative. The selected proposal is included in the versioned
 preview, its step descriptions and estimates are bound to the attunement and
 installation digests, and apply revalidates the preview before effects rather
 than rereading the proposal file. The installed attunement plan retains step
-kinds, positions, estimates and descriptor digests; it does not retain the
-proposal descriptions for later readback. Retain the approved preview if those
-descriptions are needed. Editing a project source after preview still requires
-a fresh plan or authorized replan.
+kinds, positions, bounded descriptions, estimates and descriptor digests, and
+an authorized plan read returns them. A description is metadata, not
+executable configuration; the plan digest binds it, so it cannot change
+without changing the plan's identity. A step the engine derives from
+evidence carries a description built from that evidence: the step's name,
+and the file counts and bound grammars it was selected on. Editing a project
+source after preview still requires a fresh plan or authorized replan.
 
 An explicitly proposed Parse step may include a versioned `parse_policy` with
 case-sensitive extension/language bindings and work limits. Its values remain
@@ -273,7 +276,8 @@ must match that root before effects. Once the installed locator and record are
 published, relocation, reopen and exact completed replay retain the persisted
 identity; the live path is not its permanent identity. Prior version-1/2/3 plans
 are rejected. Attunement plans, jobs and commands use their independent version
-2; installation results retain version 1. Installation previews now carry an
+3, which added the readable step descriptions; version 1 and 2 attunement
+state and commands are rejected. Installation results retain version 1. Installation previews now carry an
 explicit preview-format version 1 and reject unversioned or unknown preview
 formats. Product version remains `1.0.0`. No migration for earlier attunement
 state or preview files is provided. This is not a binary-upgrade or estate-

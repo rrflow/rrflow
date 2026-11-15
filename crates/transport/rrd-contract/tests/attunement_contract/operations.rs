@@ -91,7 +91,7 @@ pub(super) fn public_replan_operations_have_exact_authentication_and_mutation_bo
         "unknown_effect": true
     })).is_err());
     let invalid: rrd_contract::StartAttunement = serde_json::from_value(serde_json::json!({
-        "contract_version": 2, "job_id": "job-a", "plan_sha256": "bad", "expected_revision": 1, "lease_ms": 100
+        "contract_version": rrd_contract::ATTUNEMENT_CONTRACT_VERSION, "job_id": "job-a", "plan_sha256": "bad", "expected_revision": 1, "lease_ms": 100
     })).unwrap();
     assert!(invalid.validate().is_err());
 }
@@ -194,6 +194,7 @@ pub(super) fn attunement_plan() -> AttunementPlan {
                 AttunementPhasePlan {
                     phase,
                     sequence,
+                    description: format!("test step {sequence}"),
                     configuration_sha256: digest(100 + u64::from(sequence)),
                     estimated_items: u64::from(sequence) * 10,
                     estimated_input_bytes: u64::from(sequence) * 1_024,
