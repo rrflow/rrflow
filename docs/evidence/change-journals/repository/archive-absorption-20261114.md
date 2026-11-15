@@ -308,11 +308,23 @@ One file, `.claude/settings.json`: two permission rules pointing at a long-gone 
 
 ### `wip/rrflow-existing-project` (left `main` 2026-11-14)
 
-**Open: being ported by hand.** An earlier entry here called this ref superseded by an owner decision and deleted it. That was wrong: the owner never decided the move-aside behaviour. The 2026-10-31 journal says the folder "must be adopted in place, not refused"; the relocation into `.rrflow/previous/` was an agent's reading of that sentence (#236). The ref was restored from the bundle (`d76fee096`) on 2026-11-15.
+The uncommitted work of draft PR #247 on a `main` of 2026-11-02 (838 commits behind): 18 files, +1,360 −121. An earlier entry here called it superseded by an owner decision and deleted it; that was wrong, the owner never decided the move-aside behaviour, and the ref was restored from the bundle.
 
-The uncommitted work of draft PR #247 on a `main` of 2026-11-02 (838 commits behind): 18 files, +1,360 −121. It leaves an existing `.rrflow` and its contents and permissions untouched, records the retained ancestors with their native identity and security descriptor in the sealed plan, and stages the locator and bootstrap in the private credential directory behind a publication proof. `main` has its oracle for it, `existing_project_preserves_inherited_engram_and_opens_after_replay`, ignored under POAM-006; run with `--ignored` it fails because the adoption moves the entries aside.
+**Absorbed 2026-11-15, by hand, in `main` `8c60d3101` (gate green).** It leaves an existing `.rrflow` and `.rrflow/rrd` in place, binds their native identity and security descriptor in the sealed plan, and stages the locator and bootstrap privately behind publication proofs. It replaces the relocation into `.rrflow/previous/` that #236 had chosen.
 
-Port, in order, each step its own commit with the failing test first: (1) contract fields and digest stability, (2) native directory security descriptors, (3) retained layout and ancestor binding, (4) installation and recovery, (5) the oracle enabled and #236's relocation removed, (6) documentation and journal.
+| Item | Status | Evidence |
+|---|---|---|
+| Contract fields, retain rule, publication proof | **Ported** | `attunement/installation.rs`; contract test for retained plans |
+| Native directory security digest | **Ported; Linux fixed** | Windows owner, group and DACL; Linux uid, gid, mode and ACLs. The archived Linux read never worked on an O_PATH handle (EBADF, caught by the gate); it now reads through `/proc/self/fd` |
+| Retained layout, ancestor binding, installation, recovery, open | **Ported against `main`'s split modules** | `engram_layout.rs`, `installation/*` |
+| Its tests | **Ported** | Preservation oracle un-ignored and passing; `retained_*` tests; process death at each of eleven install stages; in-process stage recovery |
+| #236's relocation | **Removed** | `adopted_engram_entries`, its constants, `adopt_*` helpers and tests |
+| Leniency for a non-private `.rrflow` | **Added, not in the archived work** | The archived version admitted it everywhere, which let a fresh engram's permission drift pass (`permissive_engram_directory_cannot_advance_recovery` failed). Leniency now applies only while installing or when a retained install left its proof |
+| Legacy `.rrflow/instance.toml` | **Changed** | Left in place instead of refused |
+
+[Journal](../gate-d/existing-project-retained-admission-20261115.md). Not proved: macOS, crash windows inside a staging write, re-admission after a changed retained descriptor, a run against the owner's real checkout.
+
+**Resolved.** The ref was in the bundle (`d76fee096`) and was deleted from `refs/archive` on 2026-11-15 after the gate passed.
 
 ## Remote branches on `rrflow/rrflow-development` (checked 2026-11-15)
 
@@ -336,4 +348,4 @@ No remote branch has been deleted.
 
 ## Still open
 
-`wip/rrflow-existing-project` (being ported) and the ref kept deliberately above.
+Only the ref kept deliberately above.
