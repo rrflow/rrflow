@@ -224,6 +224,21 @@ Each was checked the same way as the trial worktrees: every added line searched 
 
 Verdict: all four absorbed. The work is recorded in [its journal](../gate-d/d-02-parse-retirement-across-steps-20261114.md).
 
+### `branch/agent/project-map` and `branch/agent/project-map-final` (one commit, `e305e80f7`)
+
+Seven commits, all made through the owner's editor.
+
+| Commits | What they are | Status | Evidence |
+|---|---|---|---|
+| `9b60e959f`, `94e685c51`, `16c7318a7`, `2e4eb9d14` (2026-11-08 and 09) | Real-project workbench scripts, prompt sets, results, 57 crate changes | On `main` | `94c08bc98` carries the same tree. `git diff 94c08bc98 2e4eb9d14` is five files: four copies of one 176 MB `rrflow-runner.exe` and a 53 MB captured `connectome-ready.json`, left out on purpose because they cannot be pushed |
+| `af19567b7` (2026-11-14 17:00) | "Replace estate terminology with engram" | Nothing to port | Checked mechanically: all 27 files are exactly a case-insensitive replacement of "estate" by "engram", including inside other words (`LifecycleState` became `Lifecyclengram`, "restatements" became "rengramments") and inside recorded prompts and results |
+| `21924472e` (17:01) | "Refactor code structure" | Nothing to port | All 3 files are exactly `usengram` put back to `useState` |
+| `e305e80f7` (17:07) | "Add endpoint selection and worker functionality" | Nothing to port as code; intent recorded | 28 file moves with identical content, and the Connectome gitlink moved to `f7f481252`. No endpoint or worker code. With the paths inside the files unrenamed, the tip cannot compile |
+
+The moves in `e305e80f7` state a wanted structure, which belongs to the rename package and is not lost with the ref: `crates/authority/rrd-estate` to `rrd-engram`; `engine/estate_control.rs` and `estate_layout.rs` to `engram_*`; `rrd-contract/src/memory_estate.rs` to `memory_engram.rs`; and the seven `rrd-contract/src/endpoint_*.rs` files into `src/endpoints/`.
+
+Verdict: nothing to port. The two unpushable files exist only in the bundle, at `2e4eb9d14`.
+
 ## Kept in the archive deliberately
 
 | Ref | Why |
