@@ -34,10 +34,23 @@ Typos are the owner's and are kept.
 | A researched classifier built into RRFlow | [Kernel contract](kernel-contract.md) S2 and K8: classifier with per-feature toggles and measured accuracy; "best published query classifier was right 54.5% of the time" | Decided as K8; the owner now says RRFlow itself carries the classifier |
 | LFG as intent predictor and scout that emits clear signals for SWAG, RRFlow, Clyffy or any AI | K8 (a classification submodule that "never authorizes and never dispatches a model") | Partly. "Predictor and scout" and signals any AI can consume are new wording and need the owner's reading of K8 against it |
 
+## Follow-up the same day
+
+> previously was referred to as SecondBrain, but DevWORLD might be how I refer to it and the rest was discussed with the intent as SecondBrain, but not only second brain, the UI toggle, the schema in loop dynamically for reasoning, and then even for deep planning, there is a schema that ensures the handoff prevents drifts by havingf the AI prove it is working off the plan
+
+Two things follow. What was described above was said with the second brain in mind, but it is wider than the second brain: the UI toggle and the dynamic reasoning schemas apply to RRFlow as a whole. And a deep-planning handoff schema must make the AI prove it is working from the plan, so that it cannot drift.
+
+| Direction | Owner today | State |
+|---|---|---|
+| A schema in the reasoning loop, applied dynamically | Kernel contract S8 and K9: a reasoning structure is versioned data a request may follow, filled from code evidence, then second-brain preferences, then questions; free-form when the toggle is off | Decided 2026-11-13; not implemented |
+| A handoff schema for deep planning | Kernel contract K6 names `one-engine-handoff-v1`, whose schema (`docs/architecture/schemas/one-engine-handoff-v1.schema.json`, titled "Proposed") requires `plan`, `source`, `configuration_sha256`, `authorization`, `questions`, `effects` and `receipts` | Proposed schema, not implemented |
+| The AI proves it is working from the plan, preventing drift | Nothing states it as a requirement. The schema binds a plan and a source, and receipts record what was done; no field or check makes the receiving AI demonstrate that it holds the same plan and source before it acts | Open. Needs the owner's reading of what counts as proof |
+
 ## Open questions for the owner
 
-1. Does DevWorld replace the term "second brain" in the repository, or sit beside it? Renaming is a sweep like the engram rename and is not started.
+1. The owner said DevWorld "might be how I refer to it", so the name is not decided. Does it replace "second brain" in the repository, or sit beside it? Renaming is a sweep like the engram rename and is not started.
 2. Is the share-and-import unit a whole personal engram, a defined subset (preferences, schemas, crawled knowledge), or both? What is signed, and who is trusted?
 3. Should the LFG wording in K8 change, or is "predictor and scout" the same classifier given a new role?
+4. What is acceptable proof that an AI is working from the plan: a digest echo of the plan and source it holds, a signed receipt per step, a check by the engine before each effect, or a combination?
 
 Nothing here has been implemented, tested or measured.
