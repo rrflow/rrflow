@@ -20,6 +20,10 @@
 > this repository had 35 worktrees and 172 local branches, the owner could not
 > tell which checkout held the real work, and weeks were lost to it.
 
+How a session starts, claims results, uses machine resources and ends is
+[the AI agent session standard](docs/operations/agent-sessions.md); it adds no
+authority beyond this file.
+
 `README.md` is the bootstrap product entry point and knowledge map. It owns
 product identity and current status, and it links to the single owning memory
 record for each detailed subject. The RRFlow 1.0 release checklist is owned by
