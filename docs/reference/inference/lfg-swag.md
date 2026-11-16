@@ -574,7 +574,7 @@ executes a task attempt, and reads its budget/result or requests Stop.
 | `embedding-builtin-activate` | `ReasoningWrite` | Explicitly activate the bundled CPU FeatureHash reference adapter for this process. No model fetch, LLM or trained semantic-quality claim. |
 | `task-embedding-execute` | `ReasoningWrite` and `EmbeddingGenerate` | Require configuration and an activated backend; reserve one attempt through the existing durable owner before dispatch. |
 | `task-budget-read` | `ReasoningRead` | Return persisted counters, original deadline, terminal reason, uncertainty and the digest required by Stop. |
-| `task-budget-stop` | `ReasoningWrite` | Compare the observed budget digest, durably record cancellation, then signal active execution. Repeating the original Stop digest is safe after a lost acknowledgement. |
+| `task-budget-stop` | `ReasoningWrite` | Compare the observed budget digest, durably record cancellation, then signal active execution. Repeating the original Stop digest is safe after a lost acknowledgement. || `task-budget-resume` | `ReasoningWrite` | Compare the current budget digest, then clear a `cancelled`, `attempt_failed` or `repeated_work` stop when nothing is active or uncertain, the configuration is unchanged and the original deadline and steps remain. Dispatches nothing and keeps every attempt. |
 | `task-attempt-read` | `ReasoningRead` | Point-read retained status/output without executing or requiring backend activation. |
 
 Public embedding requests allow at most 16 inputs, 64 KiB total input and
@@ -589,8 +589,10 @@ never the durable authority.
 
 Activation is process-local and must be repeated explicitly after restart for
 new execution. Replaying retained output does not activate a backend. A stopped
-budget stays stopped across configuration retries, new sessions and reopen.
-There is no extension or reconciliation operation in this package. See the
+budget stays stopped across configuration retries, new sessions and reopen
+until an eligible explicit `task-budget-resume`; that operation preserves its
+original limits and history. There is no extension or reconciliation operation
+in this package. See the
 [public-flow evidence](../../evidence/change-journals/gate-g/g-02a-public-task-effort.md).
 
 #### Configurable repeated embedding work
@@ -736,6 +738,19 @@ completion does not imply acceptable output, attested identity or retry permissi
 Malformed, mismatched, oversized and lost responses remain uncertain. A failed
 attempt still spends its step and elapsed effort and stops its task budget.
 This classification applies to newly observed calls, not historical reservations.
+`task-budget-resume` allows an explicit authenticated transition from `cancelled`,
+`attempt_failed` or `repeated_work` when the task is open, no active or uncertain
+work remains, the engram configuration matches and original time/steps remain
+available. Supply the current `task-budget-read` digest as
+`expected_budget_sha256`. The engine preserves the original deadline, spent
+effort, repetition counts and all attempts. Resume dispatches nothing and cannot
+clear capacity leases. An equivalent request is stopped again before it reserves
+a step or calls a provider; a changed, currently authorized input must separately
+pass normal admission. Old attempt IDs remain non-replayable. Stale resume
+requests conflict. After a lost acknowledgement read the budget; do not
+automatically retry or reset it. The operation does not reconcile unknown
+provider outcomes or extend deadlines. `repetition_tracking_limit` remains
+stopped because the bounded identity history is full.
 Read `task-attempt-read` to recover a receipt without calling the provider again.
 Changed authority/configuration/task inputs invalidate accepted-output publication
 while retaining consumed effort. Ordinary repository-edit successor plans are not

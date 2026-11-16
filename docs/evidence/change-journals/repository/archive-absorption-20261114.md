@@ -370,6 +370,19 @@ The repository also held **eight stashes** (`stash@{0}` to `{7}`: d04 source-spa
 
 The bundle `D:\localdev\devlabs\rrflow-stashes-20261115.bundle` holds exactly the eight stash commits (verified complete; its heads equal the eight stash SHAs). The stash list was then cleared.
 
+## Remote branches judged one at a time (2026-11-16)
+
+The 83 `development` branches were each judged and deleted, oldest first. 60 had no commit that `main` lacks. Of the rest: three were empty or a merge with no manual resolution; five were 100% present line for line; the others were read file by file. Findings that mattered:
+
+| Branch | Finding |
+|---|---|
+| `agent/vector-generation-read-path-wip-20261109`, `agent/d04-source-spans-reconcile-wip-20261109` | 40 declared identifiers, 85 of 85 routes (one renamed `estates` to `engrams`) and both regression tests (`an_emptied_hnsw_generation_does_not_answer_for_another_collection`, `distinct_source_addresses_receive_distinct_hnsw_indexes`) are on `main`; POAM-048 tracks the defect. **The `task-budget-resume` contract text in `lfg-swag.md` was missing from `main` although the operation, tests and journals were there. Ported 2026-11-16**, checked against `resume.rs` |
+| `agent/contract-lib-split-20261113` | 85 of 85 endpoint paths match; 148 of 150 type names present, the other two renamed `Estate*` to `Engram*`; `main`'s `module_source` test helper reads the split crate |
+| `agent/workbench-lab-data-20261112` | All 94 files accounted for: 17 schemas moved to `eval/schemas`, the rest differ only by depth, `engram` naming, relocated crates and a regenerated digest. Its `eval/workbench/lab` nesting is superseded by the owner's "Workbench and Lab are one thing" |
+| `agent/hdiutil-held-helper-20261111`, `agent/macos-image-teardown-20261111` | Held-output tests ported; `wait_for_device_release` has nothing to attach to because `main` creates the APFS template once per suite and copies it per case |
+
+What these checks prove and do not: a name, route or line on `main` shows the capability was carried, and `main`'s own tests, which pass in the gate, cover any test the branch declared that survives by name. They do not show that behavior matches what the owner asked for at the time. Only reading found the resume-contract gap.
+
 ## Still open
 
-Nothing in the archive or the stash list. The only items left are the 83 remote branches on `development`, every tip of which is in `main` or a verified bundle; `check_session_end.py` reports them until they are deleted.
+Nothing in the archive or the stash list. None. The remote holds only `main`.
