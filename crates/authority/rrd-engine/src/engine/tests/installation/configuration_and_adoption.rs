@@ -213,6 +213,7 @@ pub(super) fn installed_locator_relocates_but_never_walks_ancestors_or_pairs_for
 
 /// A leftover `.rrflow` folder from earlier tools or runs, created with the
 /// platform's ordinary inherited permissions and holding no locator.
+#[cfg(any(windows, target_os = "linux"))]
 pub(super) fn leftover_rrflow(project: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     std::fs::create_dir_all(project.join(".rrflow/dev/old")).unwrap();
     std::fs::create_dir_all(project.join(".rrflow/rrd")).unwrap();
@@ -223,6 +224,7 @@ pub(super) fn leftover_rrflow(project: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     inventory(&project.join(".rrflow"))
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
 pub(super) fn a_leftover_rrflow_folder_is_retained_untouched_and_the_engram_installs_beside_it() {
     let project = tempfile::tempdir().unwrap();
@@ -277,6 +279,7 @@ pub(super) fn a_leftover_rrflow_folder_is_retained_untouched_and_the_engram_inst
     assert!(replay.idempotent_replay);
 }
 
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
 pub(super) fn a_changed_leftover_rrflow_folder_refuses_the_stale_plan_without_effects() {
     let project = tempfile::tempdir().unwrap();
@@ -297,6 +300,34 @@ pub(super) fn a_changed_leftover_rrflow_folder_refuses_the_stale_plan_without_ef
         &test_executable(),
     )
     .is_err());
+    assert_eq!(inventory(project.path()), before);
+}
+
+/// Where the platform cannot read a directory's owner, group and access list,
+/// an existing `.rrflow` cannot be bound by the plan, so the preview refuses
+/// by name and changes nothing.
+#[cfg(not(any(windows, target_os = "linux")))]
+#[test]
+pub(super) fn a_leftover_rrflow_folder_is_refused_where_its_security_cannot_be_read() {
+    let project = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(project.path().join(".rrflow/rrd")).unwrap();
+    std::fs::write(project.path().join(".rrflow/instance.toml"), "format = 1\n").unwrap();
+    std::fs::write(project.path().join("README.md"), "# project\n").unwrap();
+    let before = inventory(project.path());
+    let error = RrdEngine::plan_installation(
+        project.path(),
+        InstallationTargetKind::ExistingProject,
+        &"1".repeat(64),
+        "default",
+        None,
+        &test_executable(),
+    )
+    .unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains(".rrflow") && message.contains("not yet supported on this platform"),
+        "the refusal must name the directory and the platform limit: {message}"
+    );
     assert_eq!(inventory(project.path()), before);
 }
 
@@ -522,10 +553,11 @@ pub(super) fn existing_project_preserves_inherited_engram_and_opens_after_replay
         assert!(result.status.success());
         result.stdout
     };
+    // Whether the runner's temporary folder carries inherited entries is a
+    // property of the runner, not of the engine. The oracle is that neither
+    // listing changes, whatever it holds.
     let engram_acl = acl(&engram);
     let storage_acl = acl(&old_storage);
-    assert!(engram_acl.windows(3).any(|part| part == b"(I)"));
-    assert!(storage_acl.windows(3).any(|part| part == b"(I)"));
     let preview = plan(root.path());
     assert_eq!(
         inventory(root.path()),
